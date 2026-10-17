@@ -1,4 +1,5 @@
 import React from "react";
+import { QUICK_ITEMS } from "../../game/items.js";
 
 export function HotbarDock({
   coins = 0,
@@ -16,59 +17,21 @@ export function HotbarDock({
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {/* Slot 1: Kim Sáng Dược (HP) */}
-          <div
-            className="slot-item"
-            id="slot-1"
-            title="Phím [1]: Kim Sáng Dược (+35 HP)"
-            onClick={() => onUseItem(1)}
-          >
-            <span className="slot-key">1</span>
-            <div className="item-icon icon-hp-pot"></div>
-            <span className="slot-qty" id="qty-pot-hp">
-              99
-            </span>
-          </div>
-
-          {/* Slot 2: Đại Hoàn Đan (MP) */}
-          <div
-            className="slot-item"
-            id="slot-2"
-            title="Phím [2]: Đại Hoàn Đan (+25 MP)"
-            onClick={() => onUseItem(2)}
-          >
-            <span className="slot-key">2</span>
-            <div className="item-icon icon-mp-pot"></div>
-            <span className="slot-qty" id="qty-pot-mp">
-              86
-            </span>
-          </div>
-
-          {/* Slot 3: Nữ Nhi Hồng (Buff) */}
-          <div
-            className="slot-item"
-            id="slot-3"
-            title="Phím [3]: Nữ Nhi Hồng (+50 HP, +30 MP)"
-            onClick={() => onUseItem(3)}
-          >
-            <span className="slot-key">3</span>
-            <div className="item-icon icon-wine-pot"></div>
-            <span className="slot-qty" id="qty-pot-wine">
-              50
-            </span>
-          </div>
-
-          {/* Slot 4: Hồi Thành Phù */}
-          <div
-            className="slot-item"
-            id="slot-4"
-            title="Phím [4]: Hồi Thành Phù (Về Trường An)"
-            onClick={() => onUseItem(4)}
-          >
-            <span className="slot-key">4</span>
-            <div className="item-icon icon-scroll"></div>
-            <span className="slot-qty">10</span>
-          </div>
+          {QUICK_ITEMS.map((item) => (
+            <div
+              className="slot-item"
+              id={`slot-${item.useSlot}`}
+              key={item.id}
+              title={`Phím [${item.useSlot}]: ${item.name}`}
+              onClick={() => onUseItem(item.useSlot)}
+            >
+              <span className="slot-key">{item.useSlot}</span>
+              <div className={`item-icon ${item.icon}`} />
+              <span className="slot-qty" id={`qty-${item.id}`}>
+                {item.qty}
+              </span>
+            </div>
+          ))}
 
           {/* Slot 5 to 7: Martial shortcuts */}
           <div className="slot-item empty">

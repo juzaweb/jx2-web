@@ -6,6 +6,7 @@ import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
+import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 
 const INITIAL_LOGS = [
@@ -29,6 +30,7 @@ const INITIAL_LOGS = [
 export function App() {
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [stats, setStats] = useState({
     level: 1,
@@ -72,27 +74,34 @@ export function App() {
       setIsStarted(true);
     });
 
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        setIsHelpOpen((prev) => {
-          const nextState = !prev;
-          bridge.emit(EVENTS.ACTION_SET_PAUSED, nextState);
-          return nextState;
-        });
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
     return () => {
       unsubStats();
       unsubQuest();
       unsubLog();
       unsubAudio();
       unsubStarted();
-      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+
+      if (isInventoryOpen) {
+        setIsInventoryOpen(false);
+        return;
+      }
+
+      setIsHelpOpen((prev) => {
+        const nextState = !prev;
+        bridge.emit(EVENTS.ACTION_SET_PAUSED, nextState);
+        return nextState;
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isInventoryOpen]);
 
 
   const handleAttack = useCallback(() => {
@@ -126,6 +135,7 @@ export function App() {
   }, []);
 
   const handleOpenHelp = useCallback(() => {
+    setIsInventoryOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
   }, []);
@@ -135,19 +145,20 @@ export function App() {
     bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
   }, []);
 
+  const handleOpenInventory = useCallback(() => {
+    setIsHelpOpen(false);
+    setIsInventoryOpen(true);
+  }, []);
+
+  const handleCloseInventory = useCallback(() => {
+    setIsInventoryOpen(false);
+  }, []);
+
   const handleSendMessage = useCallback((text) => {
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
       text: `Lãng Khách: ${text}`,
       type: "near"
-    });
-  }, []);
-
-  const handleInventory = useCallback(() => {
-    bridge.emit(EVENTS.LOG_ADDED, {
-      id: `${Date.now()}-${Math.random()}`,
-      text: "Hành trang: Đang mang theo Kim Sáng Dược, Đại Hoàn Đan và Ngân Lượng.",
-      type: "system"
     });
   }, []);
 
@@ -176,7 +187,7 @@ export function App() {
           onAttack={handleAttack}
           onSkill={handleSkill}
           onSave={handleSave}
-          onInventory={handleInventory}
+          onInventory={handleOpenInventory}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
         />
@@ -194,6 +205,14 @@ export function App() {
         isOpen={isHelpOpen}
         onClose={handleCloseHelp}
         onReset={handleReset}
+      />
+
+      {/* Character Inventory ("Hành trang") */}
+      <InventoryModal
+        isOpen={isInventoryOpen}
+        onClose={handleCloseInventory}
+        onUseItem={handleUseItem}
+        coins={stats.coins}
       />
     </main>
   );

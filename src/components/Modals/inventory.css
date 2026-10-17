@@ -1,0 +1,342 @@
+/* ====================================================
+   Inventory ("Hành trang") — right-docked panel
+==================================================== */
+.inventory-dock {
+  position: absolute;
+  top: 224px;
+  right: 12px;
+  bottom: 64px;
+  z-index: 40;
+  display: flex;
+  pointer-events: none;
+}
+
+.inventory-panel {
+  pointer-events: auto;
+  width: min(400px, calc(100vw - 24px));
+  height: 100%;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #23303a 0%, #131a1f 55%, #0d1215 100%);
+  border: 2px solid #8e7343;
+  outline: 2px solid #140f0a;
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.92), inset 0 0 24px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+}
+
+.inv-titlebar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #3f7d76 0%, #26564f 45%, #173a35 100%);
+  border-bottom: 2px solid #8e7343;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.inv-title {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #eafff6;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 10px rgba(143, 215, 178, 0.45);
+}
+
+.inv-titlebar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.inv-icon-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: #ffdd59;
+  background: radial-gradient(circle, #34434e 0%, #1a232a 100%);
+  border: 1px solid #a88741;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.inv-icon-btn:hover {
+  border-color: #ffd43b;
+  box-shadow: 0 0 6px rgba(255, 212, 59, 0.55);
+}
+.inv-icon-btn.close {
+  color: #ff9e9e;
+  border-color: #a04a4a;
+}
+.inv-icon-btn.close:hover {
+  border-color: #e57373;
+  box-shadow: 0 0 6px rgba(229, 115, 115, 0.55);
+}
+
+.inv-hint {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: #d7dcce;
+  background: rgba(8, 12, 15, 0.85);
+  border-bottom: 1px solid #3a2f1f;
+}
+
+.inv-quickrow {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #1b262d 0%, #101a1f 100%);
+  border-bottom: 1px solid #3a2f1f;
+  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+}
+.inv-quickrow .inv-slot {
+  height: 58px;
+}
+.inv-slot.locked {
+  background: radial-gradient(circle at 50% 35%, #232a2e 0%, #0a0d0f 100%);
+  border-color: #6b5a2e;
+  opacity: 0.85;
+}
+.inv-lock-icon {
+  width: 20px;
+  height: 20px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="7" y="14" width="18" height="14" rx="2.5" fill="%23e0c46a" stroke="%236b5a2e" stroke-width="1.6"/><path d="M11 14 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="%23d9cf9a" stroke-width="2.4"/><circle cx="16" cy="20" r="2.4" fill="%235a4a1e"/><rect x="15" y="20" width="2" height="4" fill="%235a4a1e"/></svg>');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.inv-grid {
+  display: grid;
+  flex: 1;
+  grid-auto-rows: 1fr;
+  gap: 4px;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(6, 10, 12, 0.55), rgba(6, 10, 12, 0.55)),
+    repeating-linear-gradient(45deg, #1a2228 0 6px, #171e23 6px 12px);
+}
+
+.inv-slot {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: radial-gradient(circle at 50% 35%, #2b363d 0%, #0e1316 100%);
+  border: 2px inset #52442e;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.85);
+  border-radius: 2px;
+  cursor: default;
+  overflow: hidden;
+}
+.inv-slot.empty {
+  background: radial-gradient(circle at 50% 35%, #1a2126 0%, #0a0e10 100%);
+  opacity: 0.55;
+}
+.inv-slot.usable {
+  cursor: pointer;
+}
+.inv-slot.usable:hover {
+  border-color: #ffd43b;
+  box-shadow: 0 0 8px rgba(255, 212, 59, 0.55), inset 2px 2px 5px rgba(0, 0, 0, 0.8);
+}
+.inv-slot.usable:active {
+  transform: scale(0.96);
+}
+
+.inv-icon {
+  width: 62%;
+  height: 62%;
+  max-width: 38px;
+  max-height: 38px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7));
+}
+
+.inv-qty {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-family: monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+.inv-use-tag {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #0d1215;
+  background: #ffd43b;
+  padding: 1px 3px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.inv-footer {
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  background: linear-gradient(180deg, #1a232a 0%, #0d1316 100%);
+  border-top: 2px solid #8e7343;
+}
+
+.inv-weight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.inv-weight-label {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #b9a373;
+  white-space: nowrap;
+}
+.inv-weight-bar {
+  flex: 1;
+  height: 8px;
+  background: #0a0e10;
+  border: 1px solid #4a3e29;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.inv-weight-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f9b5a, #8fd7a0);
+  box-shadow: 0 0 6px rgba(143, 215, 160, 0.5);
+}
+.inv-weight-value {
+  font-family: monospace;
+  font-size: 9.5px;
+  color: #e4d7bc;
+  white-space: nowrap;
+}
+
+.inv-currency-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.inv-currency {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 6px;
+  background: rgba(8, 12, 15, 0.75);
+  border: 1px solid #3a2f1f;
+  border-radius: 2px;
+}
+.inv-coin-icon {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f6e7a8, #c9a24a 55%, #8a6a24);
+  box-shadow: inset 0 0 0 1px #5a4a1e;
+}
+.inv-coin-icon.kim {
+  background: radial-gradient(circle at 35% 30%, #fff2c0, #e0b84a 55%, #a8821e);
+}
+.inv-coin-icon.tien {
+  background: radial-gradient(circle at 35% 30%, #d6f7ff, #4fc0d6 55%, #1f7a92);
+}
+.inv-currency-value {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffe9ad;
+}
+
+.inv-kim-phieu {
+  font-size: 9.5px;
+  color: #c9b48a;
+  margin-bottom: 3px;
+}
+.inv-kim-phieu b {
+  color: #ffd43b;
+  font-family: monospace;
+}
+
+.inv-tab-label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #8fd7b2;
+  text-shadow: 0 0 8px rgba(143, 215, 178, 0.4);
+}
+
+.inv-tooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 210px;
+  padding: 8px 10px;
+  pointer-events: none;
+  background: linear-gradient(160deg, rgba(24, 32, 38, 0.98), rgba(10, 14, 17, 0.98));
+  border: 1.5px solid #8e7343;
+  outline: 1px solid rgba(224, 187, 106, 0.3);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.85);
+  border-radius: 2px;
+}
+.inv-tooltip-name {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffe9ad;
+  margin-bottom: 3px;
+}
+.inv-tooltip-qty {
+  font-size: 9.5px;
+  color: #8fd7b2;
+  margin-bottom: 3px;
+}
+.inv-tooltip-desc {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #c9d0ca;
+}
+.inv-tooltip-use {
+  margin-top: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #ffd43b;
+}
+
+@media (max-width: 900px) {
+  .inventory-dock {
+    top: 214px;
+    bottom: 64px;
+  }
+}
+
+@media (max-width: 720px) {
+  .inventory-dock {
+    left: 12px;
+    right: 12px;
+    top: 150px;
+    bottom: 150px;
+  }
+  .inventory-panel {
+    width: 100%;
+  }
+}
