@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { WorldManager, WORLD_CONFIG } from "./world.js";
 import { Player } from "./player.js";
 import { EnemyManager } from "./enemy.js";
-import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled } from "./combat.js";
+import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIManager } from "./ui.js";
 import { StorageManager } from "./storage.js";
 
@@ -14,6 +14,9 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   create() {
+    // Disable browser right click context menu on game canvas
+    this.input.mouse.disableContextMenu();
+
     // Generate reusable dot texture for physics colliders
     if (!this.textures.exists("entity-dot")) {
       const textureGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -67,10 +70,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
       if (this.savedData.audioEnabled !== undefined) {
         setAudioEnabled(this.savedData.audioEnabled);
-        const soundBtn = document.getElementById("sound-btn");
-        if (soundBtn) {
-          soundBtn.innerHTML = `ÂM THANH: <span>${this.savedData.audioEnabled ? "ON" : "OFF"}</span>`;
-        }
+        this.uiManager.updateSoundButton(this.savedData.audioEnabled);
       }
       this.uiManager.updateStartButton(`TIẾP TỤC HÀNH TẨU (CẤP ${this.player.stats.level})`);
     }
@@ -82,23 +82,50 @@ export class JiangHuScene extends Phaser.Scene {
     // Scale resize handler
     this.scale.on("resize", () => this.updateCameraZoom());
 
-    // Input handlers (only process when active and not paused)
+    // Mouse input handlers (Left click: Basic Attack, Right click: Kiếm Khí)
     this.input.on("pointerdown", (pointer) => {
-      if (this.started && !this.isPaused && !pointer.event.target?.closest?.("button")) {
+      if (!this.started || this.isPaused) return;
+
+      // Do not attack when clicking on interactive HUD elements
+      const target = pointer.event.target;
+      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input")) {
+        return;
+      }
+
+      if (pointer.rightButtonDown()) {
+        this.combat.performSkill();
+      } else {
         this.combat.performAttack();
       }
     });
 
+    // Keyboard Hotkeys
     this.input.keyboard.on("keydown-SPACE", () => {
-      if (this.started && !this.isPaused) {
-        this.combat.performAttack();
-      }
+      if (this.started && !this.isPaused) this.combat.performAttack();
     });
 
     this.input.keyboard.on("keydown-Q", () => {
-      if (this.started && !this.isPaused) {
-        this.combat.performSkill();
-      }
+      if (this.started && !this.isPaused) this.combat.performSkill();
+    });
+
+    this.input.keyboard.on("keydown-ONE", () => {
+      if (this.started && !this.isPaused) this.useItem(1);
+    });
+
+    this.input.keyboard.on("keydown-TWO", () => {
+      if (this.started && !this.isPaused) this.useItem(2);
+    });
+
+    this.input.keyboard.on("keydown-THREE", () => {
+      if (this.started && !this.isPaused) this.useItem(3);
+    });
+
+    this.input.keyboard.on("keydown-FOUR", () => {
+      if (this.started && !this.isPaused) this.useItem(4);
+    });
+
+    this.input.keyboard.on("keydown-EIGHT", () => {
+      if (this.started && !this.isPaused) this.combat.performSkill();
     });
 
     // Wire UI controls
@@ -117,6 +144,16 @@ export class JiangHuScene extends Phaser.Scene {
       onAttack: () => {
         if (this.started && !this.isPaused) {
           this.combat.performAttack();
+        }
+      },
+      onSkill: () => {
+        if (this.started && !this.isPaused) {
+          this.combat.performSkill();
+        }
+      },
+      onUseItem: (slot) => {
+        if (this.started && !this.isPaused) {
+          this.useItem(slot);
         }
       },
       onPauseChange: (paused) => this.setPaused(paused),
@@ -159,6 +196,53 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Initial HUD update
     this.uiManager.updateHud(this.player.stats);
+    this.uiManager.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+  }
+
+  useItem(slot) {
+    if (!this.player || !this.started) return;
+
+    if (slot === 1) {
+      // Kim Sáng Dược (+35 HP)
+      if (this.player.stats.hp >= this.player.stats.maxHp) {
+        this.uiManager.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
+        return;
+      }
+      const healed = this.player.heal(35);
+      this.combat.showFloatText(this.player.x, this.player.y - 45, `+${healed} HP`, "#69db7c");
+      playTone(520, 0.12, "triangle", 0.03);
+      this.uiManager.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
+      this.uiManager.updateHud(this.player.stats);
+      this.saveGame(false);
+    } else if (slot === 2) {
+      // Đại Hoàn Đan (+25 MP)
+      if (this.player.stats.mp >= this.player.stats.maxMp) {
+        this.uiManager.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
+        return;
+      }
+      const restored = this.player.restoreMp(25);
+      this.combat.showFloatText(this.player.x, this.player.y - 45, `+${restored} MP`, "#74c0fc");
+      playTone(580, 0.12, "sine", 0.03);
+      this.uiManager.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
+      this.uiManager.updateHud(this.player.stats);
+      this.saveGame(false);
+    } else if (slot === 3) {
+      // Nữ Nhi Hồng (+50 HP & +30 MP)
+      const healed = this.player.heal(50);
+      const restored = this.player.restoreMp(30);
+      this.combat.showFloatText(this.player.x, this.player.y - 50, `Ấm lòng! +HP +MP`, "#ffd43b");
+      playTone(440, 0.15, "triangle", 0.035);
+      this.uiManager.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
+      this.uiManager.updateHud(this.player.stats);
+      this.saveGame(false);
+    } else if (slot === 4) {
+      // Hồi Thành Phù (Về điểm hồi sinh Trường An)
+      this.player.setPosition(640, 620);
+      this.combat.showFloatText(this.player.x, this.player.y - 45, `Về Trường An`, "#ffdd59");
+      playTone(330, 0.2, "sine", 0.04);
+      this.uiManager.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
+      this.saveGame(false);
+    }
   }
 
   setPaused(paused) {
@@ -187,7 +271,7 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     if (success && showFeedback) {
-      this.uiManager.addLog("Đã lưu tiến trình giang hồ thành công.");
+      this.uiManager.addLog("Đã lưu tiến trình giang hồ thành công.", "system");
       this.combat.showFloatText(
         this.player.x,
         this.player.y - 65,
@@ -203,7 +287,7 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   updateCameraZoom() {
-    const zoom = Math.min(this.scale.width / 1000, this.scale.height / 570, 1.1);
+    const zoom = Math.min(this.scale.width / 1000, this.scale.height / 570, 1.15);
     this.cameras.main.setZoom(zoom);
   }
 
@@ -214,10 +298,11 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (this.savedData) {
       this.uiManager.addLog(
-        `Chào mừng trở lại! Tải lại nhân vật Cấp ${this.player.stats.level} — Bạc: ${this.player.stats.coins}.`
+        `Chào mừng trở lại! Tải lại nhân vật Cấp ${this.player.stats.level} — Bạc: ${this.player.stats.coins}.`,
+        "system"
       );
     } else {
-      this.uiManager.addLog("Bạn đã đặt chân đến Trường An. Chúc hiệp khách hành tẩu bình an.");
+      this.uiManager.addLog("Bạn đã đặt chân đến Trường An. Chúc hiệp khách hành tẩu bình an.", "system");
       this.player.setPosition(640, 620);
     }
 
@@ -241,8 +326,9 @@ export class JiangHuScene extends Phaser.Scene {
     // Update collectible loot drops
     this.combat.updateDrops(time);
 
-    // Update UI HUD
+    // Update UI HUD & Minimap Radar
     this.uiManager.updateHud(this.player.stats);
+    this.uiManager.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
   }
 }
 

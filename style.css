@@ -1,14 +1,968 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
-:root{--gold:#e9c77b;--gold2:#a97b38;--ink:#10151a;--glass:rgba(15,21,27,.82);--line:rgba(233,199,123,.34)}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#27333a 0,#101418 60%,#090c0f 100%);color:#eee9df;font-family:'Be Vietnam Pro',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
-#game-shell{width:min(1280px,100%);border:1px solid #625039;box-shadow:0 24px 80px #0009;background:#11171b}
-.topbar{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:linear-gradient(90deg,#171e22,#222a2c,#13191d);border-bottom:1px solid var(--line);gap:15px}
-.brand{display:flex;align-items:center;gap:11px}.brand-mark{width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--gold2);color:var(--gold);font-size:25px;background:#281f17;font-family:serif}.brand strong{font-family:Cinzel,serif;letter-spacing:3px;font-size:16px;display:block}.brand small{font-size:9px;letter-spacing:2px;color:#9da5a4}.realm{font-size:11px;color:#aeb6b5;letter-spacing:1px}.realm b{color:var(--gold);font-weight:600}.top-actions{display:flex;gap:8px}.ghost{background:#1d2528;color:#d7d3c8;border:1px solid #47504d;padding:9px 11px;font:600 10px 'Be Vietnam Pro';letter-spacing:.6px;cursor:pointer}.ghost:hover{border-color:var(--gold);color:var(--gold)}
-.game-frame{position:relative;overflow:hidden;background:#18241d}#game-container{width:100%;aspect-ratio:16/9;min-height:380px;max-height:720px}#game-container canvas{display:block;width:100%!important;height:100%!important;object-fit:contain}
-.hud{position:absolute;inset:0;pointer-events:none}.glass{background:linear-gradient(135deg,rgba(17,23,27,.92),rgba(23,29,30,.78));border:1px solid var(--line);box-shadow:0 6px 20px #0004;backdrop-filter:blur(8px)}
-.player-card{position:absolute;left:18px;top:18px;width:260px;padding:12px;display:flex;gap:12px}.avatar{width:54px;height:54px;flex:none;display:grid;place-items:center;color:#e9d19b;font-family:serif;font-size:32px;background:linear-gradient(145deg,#3d3427,#171b1a);border:1px solid #8e7040}.player-info{flex:1;min-width:0}.player-name{font-size:12px;font-weight:700;margin-bottom:8px}.level{color:var(--gold);font-size:10px;margin-left:6px}.bar-label{display:flex;justify-content:space-between;font-size:9px;color:#bfc5bf;margin:4px 0 3px}.bar{height:5px;background:#303536;overflow:hidden;border-radius:5px}.bar i{display:block;height:100%;width:100%;transition:width .2s}.hp i{background:linear-gradient(90deg,#a72e36,#ef6c61)}.mp i{background:linear-gradient(90deg,#2866a6,#65b7e8)}.exp i{background:linear-gradient(90deg,#a57a2b,#e9c77b)}
-.quest-card{position:absolute;right:18px;top:18px;width:220px;padding:13px 15px}.quest-title,.feed-title{font-size:10px;color:var(--gold);letter-spacing:1.2px;font-weight:700;margin-bottom:10px}.quest-card #quest-text{font-size:12px;font-weight:600}.quest-progress{font-size:10px;color:#aeb5b1;margin-top:6px}.feed{position:absolute;left:18px;bottom:44px;width:270px;padding:11px 13px;max-height:130px;overflow:hidden}.feed-title{margin-bottom:5px}.feed p{font-size:10px;line-height:1.45;margin:5px 0;color:#c0c5c0}.feed p:first-of-type{color:#e6d5ac}.controls-hint{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);white-space:nowrap;color:#c8c9bd;font-size:9px;letter-spacing:1px;text-shadow:0 2px 3px #000}.controls-hint span{margin-left:18px;color:var(--gold)}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,10,11,.52);backdrop-filter:blur(4px);pointer-events:auto;z-index:5}.hidden{display:none!important}.modal{width:min(440px,calc(100% - 30px));padding:34px 35px;text-align:center;position:relative}.modal-symbol{font-family:serif;font-size:42px;color:var(--gold);margin-bottom:3px;text-shadow:0 0 25px #c78f3d66}.eyebrow{font-size:10px;letter-spacing:3px;color:var(--gold);margin:0 0 8px}.modal h1{font-family:Cinzel,serif;font-size:39px;letter-spacing:7px;margin:0;color:#f4e6c8;text-shadow:0 4px 20px #d4a64b44}.subtitle{font-size:12px;color:#c4c6bc;margin:12px 0 22px}.feature-row{display:flex;justify-content:center;gap:13px;color:#d8c59b;font-size:10px;margin-bottom:24px}.primary{background:linear-gradient(110deg,#9b6b2c,#e0bd6d,#a67a3a);border:1px solid #f2d99c;color:#1b1b16;padding:14px 18px;width:100%;font:700 11px 'Be Vietnam Pro';letter-spacing:1px;cursor:pointer;box-shadow:0 5px 20px #0004}.primary:hover{filter:brightness(1.12)}.primary span{float:right;font-size:15px;line-height:10px}.modal>small{display:block;color:#858e88;font-size:9px;margin-top:15px}.help-modal{text-align:left}.help-modal h2{font-family:Cinzel,serif;color:#f4e6c8}.help-modal p{font-size:12px;line-height:1.6;color:#c5cbc4}.help-modal p b{color:var(--gold)}.close{position:absolute;right:12px;top:10px;border:0;background:none;color:#ddd;font-size:25px;cursor:pointer}
-footer{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;color:#737e79;font-size:9px;letter-spacing:1px;background:#11171b;border-top:1px solid #303b38}footer span:last-child{color:var(--gold)}
-.mobile-controls{display:none;position:absolute;bottom:50px;right:14px;pointer-events:auto}.mobile-controls button{width:38px;height:38px;background:#121a1bd9;color:#e9c77b;border:1px solid #c4a36388;border-radius:8px;font-size:16px;margin:2px}.mobile-controls>div{display:flex}
-@media(max-width:760px){body{padding:0;align-items:flex-start}#game-shell{border-left:0;border-right:0;width:100%}.topbar{height:58px;padding:0 10px}.brand strong{font-size:12px;letter-spacing:2px}.brand-mark{width:34px;height:34px}.realm{display:none}.ghost{font-size:8px;padding:8px 7px}.top-actions{gap:4px}#game-container{aspect-ratio:4/3;min-height:420px}.player-card{left:8px;top:8px;width:190px;padding:7px;gap:7px}.avatar{width:37px;height:43px;font-size:23px}.player-name{font-size:10px;margin-bottom:4px}.level{font-size:9px}.bar-label{font-size:8px}.quest-card{right:8px;top:8px;width:145px;padding:8px}.quest-title{font-size:8px;letter-spacing:.5px;margin-bottom:6px}.quest-card #quest-text{font-size:10px}.quest-progress{font-size:8px}.feed{display:none}.controls-hint{display:none}.mobile-controls{display:block}.modal{padding:25px 20px}.modal h1{font-size:32px}.feature-row{gap:8px;font-size:9px}footer{font-size:7px;padding:0 8px}footer span:nth-child(2){display:none}}
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@600;700&display=swap');
+
+:root {
+  --wuxia-gold: #f4d06f;
+  --wuxia-gold-dark: #a97b2b;
+  --wuxia-gold-light: #fff3c4;
+  --wuxia-bronze: #5e4a30;
+  --wuxia-metal-dark: #12181c;
+  --wuxia-metal-mid: #1d252b;
+  --wuxia-metal-light: #2e3b43;
+  --wuxia-hp-red: #d9383a;
+  --wuxia-mp-blue: #2b7bc4;
+  --wuxia-sta-green: #389e5a;
+  --wuxia-exp-gold: #e59d24;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background: #090d10;
+  color: #eee4ce;
+  font-family: 'Be Vietnam Pro', 'Noto Serif SC', serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #111a15;
+}
+
+/* ----------------------------------------------------
+   Game Canvas Viewport (Edge-to-Edge)
+---------------------------------------------------- */
+#game-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#game-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+/* ----------------------------------------------------
+   HUD Overlay (Interactive Layers on top of canvas)
+---------------------------------------------------- */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Allow clicks inside HUD widgets */
+.metal-card,
+.top-left-panel,
+.bottom-dock,
+.mobile-controls {
+  pointer-events: auto;
+}
+
+/* Generic Metal Wuxia Container Styling */
+.metal-card {
+  background: linear-gradient(145deg, rgba(29, 38, 44, 0.94), rgba(16, 22, 26, 0.96));
+  border: 1.5px solid #5a4933;
+  outline: 1px solid rgba(224, 187, 106, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+}
+
+/* ====================================================
+   TOP-LEFT: Player Status Bars & Martial Aura (VL2)
+==================================================== */
+.top-left-panel {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 15;
+}
+
+.status-bracket {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 5px;
+  background: linear-gradient(90deg, rgba(20, 26, 30, 0.96) 0%, rgba(29, 38, 43, 0.92) 80%, rgba(29, 38, 43, 0.4) 100%);
+  border: 1.5px solid #594731;
+  border-left: 3px solid #d4af37;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+}
+
+/* Level Badge (Square black box with gold digits) */
+.level-box {
+  width: 38px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle, #252119 0%, #0d1012 100%);
+  border: 1.5px solid #c59e47;
+  color: #ffdd59;
+  font-family: 'Cinzel', monospace, serif;
+  font-size: 19px;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.7), 0 2px 2px #000;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9);
+  flex-shrink: 0;
+}
+
+/* Bars Column */
+.bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 250px;
+}
+
+.vital-bar-wrap {
+  position: relative;
+  background: #0d1215;
+  border: 1px solid #4a3c27;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  border-radius: 1px;
+}
+
+.vital-bar {
+  width: 100%;
+  height: 100%;
+}
+
+.vital-bar i {
+  display: block;
+  height: 100%;
+  transition: width 0.18s ease-out;
+}
+
+.bar-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff8e8;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 1px 2px #000;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+}
+
+/* EXP Bar (Top thin bar) */
+.exp-wrap {
+  height: 10px;
+}
+.vital-bar.exp i {
+  background: linear-gradient(180deg, #ffe066 0%, #d48806 50%, #873800 100%);
+}
+
+/* HP Bar (Major Red Bar) */
+.hp-wrap {
+  height: 17px;
+}
+.vital-bar.hp i {
+  background: linear-gradient(180deg, #ff7b7b 0%, #d32f2f 40%, #7f0000 100%);
+  border-bottom: 1px solid #450303;
+}
+
+/* Sub-bars: MP & Stamina */
+.sub-bars-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+
+.mp-wrap, .sta-wrap {
+  height: 13px;
+}
+
+.vital-bar.mp i {
+  background: linear-gradient(180deg, #64b5f6 0%, #1976d2 45%, #0d47a1 100%);
+}
+
+.vital-bar.sta i {
+  background: linear-gradient(180deg, #81c784 0%, #2e7d32 45%, #1b5e20 100%);
+}
+
+/* Buff / Aura Slot */
+.buff-slot {
+  width: 36px;
+  height: 48px;
+  background: radial-gradient(circle, #1a2733 0%, #0d1216 100%);
+  border: 1px solid #4a82b4;
+  box-shadow: 0 0 10px rgba(74, 130, 180, 0.4), inset 0 0 6px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.buff-icon {
+  font-family: serif;
+  font-size: 18px;
+  color: #79caff;
+  text-shadow: 0 0 8px #79caff;
+  line-height: 1;
+}
+
+.buff-timer {
+  font-size: 8px;
+  font-family: monospace;
+  color: #aed9ff;
+  margin-top: 2px;
+}
+
+/* ====================================================
+   TOP-RIGHT: Minimap Radar & Channel (VL2)
+==================================================== */
+.top-right-panel {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 15;
+}
+
+.minimap-frame {
+  width: 176px;
+  padding: 4px;
+}
+
+.minimap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 4px;
+  border-bottom: 1px solid #4a3e29;
+}
+
+.region-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8ce99a;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.minimap-actions {
+  display: flex;
+  gap: 3px;
+}
+
+.mini-btn {
+  background: #252f36;
+  border: 1px solid #5a4b35;
+  color: #d8c7a1;
+  width: 17px;
+  height: 17px;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.mini-btn:hover {
+  background: #3c4952;
+  color: #ffd43b;
+  border-color: #d4af37;
+}
+.mini-btn.gold {
+  color: #ffdd59;
+  font-weight: bold;
+}
+
+.minimap-subinfo {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 4px;
+  font-size: 9.5px;
+  color: #c4cebe;
+}
+.minimap-subinfo .coords {
+  color: #ffd43b;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.minimap-view {
+  width: 168px;
+  height: 116px;
+  background: #19271c;
+  border: 1.5px inset #4a3c26;
+  position: relative;
+  overflow: hidden;
+}
+
+#minimap-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.minimap-radar-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 65%, rgba(0, 0, 0, 0.45) 100%);
+  border: 1px solid rgba(224, 187, 106, 0.15);
+}
+
+/* Quest Tracker under Minimap */
+.quest-tracker {
+  margin-top: 5px;
+  padding: 5px 6px;
+  background: rgba(12, 17, 21, 0.9);
+  border: 1px solid #4a3b25;
+}
+.quest-head {
+  font-size: 9.5px;
+  color: #f5c762;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.quest-body {
+  font-size: 11px;
+  color: #e5ece6;
+  font-weight: 600;
+}
+.quest-progress {
+  font-size: 9.5px;
+  color: #aebdb4;
+  margin-top: 2px;
+}
+
+/* ====================================================
+   BOTTOM-LEFT: Classic MMORPG Chat / Feed Box
+==================================================== */
+.bottom-left-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 82px;
+  z-index: 15;
+}
+
+.chat-box {
+  width: 320px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.chat-tabs {
+  display: flex;
+  background: #141c21;
+  border-bottom: 1px solid #493c28;
+}
+
+.chat-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-right: 1px solid #28333a;
+  color: #8c979e;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 5px 2px;
+  cursor: pointer;
+}
+.chat-tab:hover {
+  color: #ffea79;
+}
+.chat-tab.active {
+  background: #252f36;
+  color: #ffd43b;
+  border-bottom: 1.5px solid #ffd43b;
+}
+
+.chat-content {
+  height: 105px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  background: rgba(11, 15, 18, 0.88);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.chat-content p {
+  margin: 3px 0;
+  word-break: break-word;
+}
+
+.tag {
+  font-weight: bold;
+  margin-right: 4px;
+}
+.tag-system { color: #f59f00; }
+.tag-near   { color: #f1f3f5; }
+.tag-combat { color: #ff6b6b; }
+.tag-guide  { color: #69db7c; }
+
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  background: #161e23;
+  border-top: 1px solid #3e3220;
+  padding: 3px;
+  gap: 3px;
+}
+
+.channel-select {
+  font-size: 9px;
+  color: #d8c59b;
+  background: #232c32;
+  border: 1px solid #4c3f2b;
+  padding: 3px 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#chat-input {
+  flex: 1;
+  background: #0d1215;
+  border: 1px solid #3a3223;
+  color: #eee;
+  padding: 4px 6px;
+  font-size: 10px;
+  outline: none;
+}
+#chat-input:focus {
+  border-color: #d4af37;
+}
+
+.chat-send {
+  background: #334047;
+  border: 1px solid #5d4e36;
+  color: #ffd859;
+  font-size: 9.5px;
+  font-weight: bold;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+.chat-send:hover {
+  background: #46555e;
+}
+
+/* ====================================================
+   BOTTOM BAR: Authentic VLTK2 Action Dock & Hotbar
+==================================================== */
+.bottom-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: linear-gradient(180deg, #323d44 0%, #192025 35%, #0f1418 100%);
+  border-top: 2px solid #a88741;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 5px 12px;
+}
+
+.dock-container {
+  max-width: 1260px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Numbered Quick Slots (1 to 8) */
+.hotbar-slots {
+  display: flex;
+  gap: 4px;
+}
+
+.slot-item {
+  width: 42px;
+  height: 42px;
+  background: radial-gradient(circle, #252f36 0%, #101418 100%);
+  border: 2px inset #52442e;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.8);
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.slot-item:hover {
+  border-color: #ffd43b;
+  box-shadow: 0 0 6px rgba(255, 212, 59, 0.5);
+}
+.slot-item:active {
+  transform: scale(0.96);
+}
+
+.slot-key {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font-size: 9.5px;
+  font-family: 'Cinzel', monospace;
+  font-weight: 800;
+  color: #ffdd59;
+  text-shadow: 0 1px 2px #000;
+}
+
+.slot-qty {
+  position: absolute;
+  bottom: 1px;
+  right: 3px;
+  font-size: 9px;
+  font-family: monospace;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+}
+
+.slot-item.empty {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Potion & Item Icons (Crafted SVG / CSS Art) */
+.item-icon {
+  width: 28px;
+  height: 28px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* HP Potion (Kim Sáng Dược) */
+.icon-hp-pot {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M12 4 h8 v4 h-8 z" fill="%23d4af37"/><path d="M8 10 C8 8, 24 8, 24 10 C24 14, 28 20, 26 27 C24 31, 8 31, 6 27 C4 20, 8 14, 8 10 Z" fill="%23d32f2f" stroke="%23ff9999" stroke-width="1.2"/><ellipse cx="16" cy="18" rx="6" ry="7" fill="%23ff6666" opacity="0.45"/></svg>');
+}
+
+/* MP Potion (Đại Hoàn Đan) */
+.icon-mp-pot {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M12 4 h8 v4 h-8 z" fill="%23d4af37"/><path d="M8 10 C8 8, 24 8, 24 10 C24 14, 28 20, 26 27 C24 31, 8 31, 6 27 C4 20, 8 14, 8 10 Z" fill="%231976d2" stroke="%2390caf9" stroke-width="1.2"/><ellipse cx="16" cy="18" rx="6" ry="7" fill="%2364b5f6" opacity="0.45"/></svg>');
+}
+
+/* Wine Jar (Nữ Nhi Hồng) */
+.icon-wine-pot {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M10 6 h12 v3 h-12 z" fill="%23b82e2e"/><circle cx="16" cy="19" r="10" fill="%23c59e47" stroke="%235a4b33" stroke-width="1.5"/><rect x="12" y="15" width="8" height="7" fill="%23b82e2e"/><text x="16" y="21" font-size="6" text-anchor="middle" fill="%23fff" font-family="serif">酒</text></svg>');
+}
+
+/* Scroll (Hồi Thành Phù) */
+.icon-scroll {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="7" y="5" width="18" height="22" rx="2" fill="%23f4ecd8" stroke="%23a07b38" stroke-width="1.5"/><line x1="10" y1="10" x2="22" y2="10" stroke="%23b83838" stroke-width="1.5"/><line x1="10" y1="14" x2="22" y2="14" stroke="%234a4233" stroke-width="1.2"/><line x1="10" y1="18" x2="19" y2="18" stroke="%234a4233" stroke-width="1.2"/></svg>');
+}
+
+/* Sword Aura Skill Icon (Slot 8 / Q) */
+.icon-sword-aura {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="%230f3650" stroke="%2356c5e8" stroke-width="1.5"/><path d="M16 4 L19 14 L28 16 L19 18 L16 28 L13 18 L4 16 L13 14 Z" fill="%23a8eaff"/><circle cx="16" cy="16" r="3" fill="%23ffffff"/></svg>');
+}
+
+/* Middle: Martial Arts Display */
+.martial-center {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(14, 20, 24, 0.9);
+  padding: 4px 8px;
+  border: 1px solid #574630;
+  border-radius: 2px;
+}
+
+.martial-skill-box {
+  width: 44px;
+  height: 44px;
+  background: #141b20;
+  border: 2px solid #9c7c3d;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.9), 0 0 6px rgba(156, 124, 61, 0.4);
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.martial-skill-box:hover {
+  border-color: #ffd43b;
+  box-shadow: 0 0 8px #ffd43b;
+}
+
+.skill-art {
+  width: 32px;
+  height: 32px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.art-sword {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><line x1="6" y1="26" x2="26" y2="6" stroke="%23fff" stroke-width="3"/><path d="M26 6 L23 11 L21 9 Z" fill="%23ffdd59"/><circle cx="8" cy="24" r="3" fill="%23c59e47"/></svg>');
+}
+
+.art-aura {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="%2372d8ff" stroke-width="3" stroke-dasharray="6 3"/><circle cx="16" cy="16" r="5" fill="%23b8f1ff"/></svg>');
+}
+
+.click-badge {
+  position: absolute;
+  bottom: -6px;
+  background: #192025;
+  border: 1px solid #c59e47;
+  color: #ffdd59;
+  font-size: 7.5px;
+  font-weight: bold;
+  padding: 0 3px;
+  white-space: nowrap;
+}
+
+.martial-text-label {
+  display: flex;
+  flex-direction: column;
+}
+.martial-name {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffe699;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 3px #000;
+}
+.martial-sub {
+  font-size: 9px;
+  color: #8ce99a;
+  margin-top: 1px;
+}
+
+/* Character Portrait */
+.hero-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.portrait-avatar {
+  width: 42px;
+  height: 42px;
+  background: radial-gradient(circle, #384852 0%, #151c20 100%);
+  border: 2px solid #d4af37;
+  display: grid;
+  place-items: center;
+  color: #ffe699;
+  font-family: serif;
+  font-size: 24px;
+  text-shadow: 0 0 6px #ffd700;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.portrait-coins {
+  font-size: 9.5px;
+  font-weight: bold;
+  color: #ffd43b;
+  font-family: monospace;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* System Tray Buttons */
+.system-icons-tray {
+  display: flex;
+  gap: 4px;
+}
+
+.sys-btn {
+  background: linear-gradient(180deg, #2a343b 0%, #151c20 100%);
+  border: 1px solid #5d4e36;
+  padding: 4px 6px;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.sys-btn:hover {
+  background: linear-gradient(180deg, #3c4952 0%, #1f282e 100%);
+  border-color: #d4af37;
+}
+.sys-btn:active {
+  transform: translateY(1px);
+}
+
+.sys-ico {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.sys-lbl {
+  font-size: 8px;
+  font-weight: 700;
+  color: #e4d7bc;
+  white-space: nowrap;
+}
+
+.sys-btn.pk-mode {
+  border-color: #388e3c;
+}
+.sys-btn.pk-mode .sys-lbl {
+  color: #81c784;
+}
+
+/* ====================================================
+   Mobile Touch On-Screen Controls
+==================================================== */
+.mobile-controls {
+  display: none;
+  position: absolute;
+  bottom: 80px;
+  right: 14px;
+  z-index: 30;
+}
+
+.mobile-controls button {
+  width: 42px;
+  height: 42px;
+  background: rgba(18, 25, 30, 0.88);
+  color: #ffd43b;
+  border: 1.5px solid #a88741;
+  border-radius: 6px;
+  font-size: 18px;
+  margin: 2px;
+  cursor: pointer;
+}
+.mobile-controls button:active {
+  background: #3e4a52;
+}
+
+.mobile-controls > div {
+  display: flex;
+}
+
+.mobile-combat-btns {
+  display: flex;
+  margin-top: 6px;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.mobile-combat-btns .mobile-q {
+  background: #143547;
+  color: #70d7ff;
+  border-color: #4da5c7;
+}
+.mobile-combat-btns .mobile-atk {
+  background: #471a1a;
+  color: #ff9e9e;
+  border-color: #b84343;
+}
+
+/* ====================================================
+   Modals: Authentic Wuxia Parchment & Steel
+==================================================== */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 10, 0.75);
+  backdrop-filter: blur(5px);
+  pointer-events: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.wuxia-modal {
+  width: min(460px, calc(100% - 32px));
+  padding: 30px;
+  text-align: center;
+  position: relative;
+  background: radial-gradient(circle at center, #26333c 0%, #11171a 100%);
+  border: 2px solid #8e7343;
+  outline: 2px solid #231b13;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.modal-seal {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 10px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #d4af37;
+  background: #361b18;
+  color: #ffdd59;
+  font-family: serif;
+  font-size: 32px;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.4);
+}
+
+.modal-eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #ffd43b;
+  margin-bottom: 6px;
+}
+
+.modal-title {
+  font-family: 'Cinzel', serif;
+  font-size: 34px;
+  letter-spacing: 6px;
+  color: #f7e8c6;
+  text-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
+  margin-bottom: 8px;
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: #bfc6be;
+  margin-bottom: 18px;
+  font-style: italic;
+}
+
+.feature-pills {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #e5d7b5;
+  margin-bottom: 22px;
+}
+.feature-pills span {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 8px;
+  border: 1px solid #4a3e29;
+}
+
+.wuxia-btn-primary {
+  background: linear-gradient(180deg, #d4af37 0%, #9e7b26 100%);
+  border: 1px solid #ffeaa7;
+  color: #171712;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 13px 20px;
+  width: 100%;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+.wuxia-btn-primary:hover {
+  filter: brightness(1.15);
+}
+
+.wuxia-btn-danger {
+  background: linear-gradient(180deg, #9c2e2e 0%, #571616 100%);
+  border: 1px solid #e57373;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px;
+  width: 100%;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.wuxia-btn-danger:hover {
+  filter: brightness(1.15);
+}
+
+.modal-foot {
+  display: block;
+  font-size: 9.5px;
+  color: #7b8882;
+  margin-top: 14px;
+}
+
+/* Help Modal Specifics */
+.help-modal-box {
+  text-align: left;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.help-modal-box h2 {
+  font-family: 'Cinzel', serif;
+  color: #f7e8c6;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.guide-scroll {
+  background: rgba(10, 14, 17, 0.7);
+  padding: 12px;
+  border: 1px solid #443725;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: #c9d0ca;
+  margin-bottom: 16px;
+}
+.guide-scroll b {
+  color: #ffd43b;
+}
+.modal-close-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #c5a86d;
+  font-size: 26px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* ====================================================
+   Responsive Adjustments
+==================================================== */
+@media (max-width: 900px) {
+  .bars-container {
+    width: 180px;
+  }
+  .chat-box {
+    width: 250px;
+  }
+  .martial-text-label {
+    display: none;
+  }
+  .hero-portrait {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .mobile-controls {
+    display: block;
+  }
+  .bottom-left-panel {
+    display: none;
+  }
+  .top-right-panel {
+    transform: scale(0.85);
+    transform-origin: top right;
+  }
+  .top-left-panel {
+    transform: scale(0.85);
+    transform-origin: top left;
+  }
+  .hotbar-slots .slot-item:nth-child(n+5) {
+    display: none;
+  }
+  .martial-center {
+    display: none;
+  }
+  .system-icons-tray .sys-btn:nth-child(n+4) {
+    display: none;
+  }
+}

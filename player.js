@@ -135,6 +135,18 @@ export class Player {
     };
   }
 
+  heal(amount) {
+    const prev = this.stats.hp;
+    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
+    return this.stats.hp - prev;
+  }
+
+  restoreMp(amount) {
+    const prev = this.stats.mp;
+    this.stats.mp = Math.min(this.stats.maxMp, this.stats.mp + amount);
+    return this.stats.mp - prev;
+  }
+
   get x() {
     return this.sprite ? this.sprite.x : this.spawnX;
   }
