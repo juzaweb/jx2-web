@@ -120,8 +120,20 @@ export function HotbarDock({
         </div>
 
         {/* Hero Portrait */}
-        <div className="hero-portrait" title="Lãng Khách Trường An">
-          <div className="portrait-avatar">侠</div>
+        <div className="hero-portrait" title="Lãng Khách Võ Đang">
+          <div className="portrait-avatar">
+            <img
+              src="/hero_portrait.png"
+              alt="Lãng Khách"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "center 15%",
+                display: "block"
+              }}
+            />
+          </div>
           <div className="portrait-coins" id="coin-label">
             BẠC: {coins}
           </div>

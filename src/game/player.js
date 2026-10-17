@@ -60,17 +60,161 @@ export class Player {
   }
 
   drawHero(container) {
-    const shadow = this.scene.add.ellipse(0, 18, 42, 14, 0x0b100d, 0.45);
-    const cloak = this.scene.add.triangle(0, 2, -15, -8, 14, -8, 0, 22, 0x9d3433).setStrokeStyle(2, 0x5c2423);
-    const body = this.scene.add.ellipse(0, 0, 23, 28, 0x263c53).setStrokeStyle(2, 0x9cb2b9);
-    const belt = this.scene.add.rectangle(0, 7, 22, 4, 0xd5b66d);
-    const head = this.scene.add.circle(0, -19, 10, 0xe4bd91).setStrokeStyle(2, 0x6a4d3b);
-    const hair = this.scene.add.ellipse(0, -26, 23, 10, 0x20201d);
-    const hat = this.scene.add.triangle(0, -30, -16, 3, 0, -12, 16, 3, 0x2b2925).setStrokeStyle(1, 0xc4a05b);
-    const sword = this.scene.add.line(16, -1, 0, -17, 2, 17, 0xe6e2cf).setOrigin(0).setLineWidth(3);
-    const glow = this.scene.add.circle(0, -1, 25, 0x6da7cc, 0.06);
+    // 1. Soft ground shadow
+    const shadow = this.scene.add.ellipse(0, 34, 40, 13, 0x090e0c, 0.45);
 
-    container.add([glow, shadow, cloak, body, belt, head, hair, hat, sword]);
+    // 2. High-definition 3D character sprite from original Võ Lâm 2 model
+    if (this.scene.textures.exists("hero-sprite")) {
+      const aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
+      this.heroImage = this.scene.add.image(0, 0, "hero-sprite");
+      this.heroImage.setDisplaySize(28, 76);
+      this.heroImage.setOrigin(0.5, 0.5);
+
+      container.add([aura, shadow, this.heroImage]);
+      return;
+    }
+
+    // Fallback vector drawing if texture fails to load
+
+    // 3. Back coat tails (Royal blue & white lining flowing behind)
+    const backCoat = this.scene.add.polygon(0, 10, [[-9, -6], [9, -6], [14, 16], [-14, 16]], 0x1e3a8a).setStrokeStyle(1.2, 0x172554);
+    const whiteTail = this.scene.add.polygon(-6, 12, [[-6, -6], [2, -6], [0, 14], [-10, 12]], 0xf1f5f9, 0.95).setStrokeStyle(1, 0xcfd8dc);
+
+    // 4. Lower body: Crimson red martial trousers & Purple greaves
+    const legL = this.scene.add.rectangle(-6, 13, 5.5, 10, 0xb91c1c);
+    const legR = this.scene.add.rectangle(6, 13, 5.5, 10, 0xb91c1c);
+
+    // Purple tall boots (Ủng chiến tím)
+    const bootL = this.scene.add.rectangle(-6, 21, 6.5, 11, 0x6b21a8).setStrokeStyle(1, 0x3b0764);
+    const bootR = this.scene.add.rectangle(6, 21, 6.5, 11, 0x6b21a8).setStrokeStyle(1, 0x3b0764);
+
+    // Silver circular knee ornaments (Họa tiết nguyệt ngân)
+    const kneeL = this.scene.add.circle(-6, 17, 2.6, 0xe2e8f0).setStrokeStyle(1, 0x475569);
+    const kneeR = this.scene.add.circle(6, 17, 2.6, 0xe2e8f0).setStrokeStyle(1, 0x475569);
+
+    // Cyan boot decorative bands
+    const bandL = this.scene.add.line(0, 0, -9, 23, -3, 23, 0x38bdf8).setLineWidth(1.2);
+    const bandR = this.scene.add.line(0, 0, 3, 23, 9, 23, 0x38bdf8).setLineWidth(1.2);
+
+    // Dark indigo martial shoes
+    const shoeL = this.scene.add.ellipse(-6, 26, 8, 3.5, 0x2e1065);
+    const shoeR = this.scene.add.ellipse(6, 26, 8, 3.5, 0x2e1065);
+
+    // 5. White front apron with red accents (Vạt áo trắng họa tiết đỏ)
+    const frontApron = this.scene.add.rectangle(0, 10, 14, 16, 0xf8fafc).setStrokeStyle(1, 0xcfd8dc);
+    const apronHem = this.scene.add.rectangle(0, 17, 14, 2.5, 0x1d4ed8);
+    const ribbonL = this.scene.add.line(0, 0, -4, 4, -4, 15, 0xdc2626).setLineWidth(1.8);
+    const ribbonR = this.scene.add.line(0, 0, 4, 4, 4, 15, 0xdc2626).setLineWidth(1.8);
+
+    // 6. Upper Torso (Áo lam Võ Đang - Royal Blue Tunic)
+    const tunic = this.scene.add.rectangle(0, -3, 20, 15, 0x2563eb).setStrokeStyle(1.5, 0x1d4ed8);
+    const tunicRoll = this.scene.add.ellipse(0, 3, 20, 5, 0x1e40af);
+    const collar = this.scene.add.arc(0, -9, 4.5, 0, 180, false, 0xdc2626).setStrokeStyle(1.8, 0xef4444);
+
+    // White shoulder racing stripes
+    const shoulderL = this.scene.add.line(0, 0, -8, -10, -11, -3, 0xffffff).setLineWidth(1.5);
+    const shoulderR = this.scene.add.line(0, 0, 8, -10, 11, -3, 0xffffff).setLineWidth(1.5);
+
+    // Red chest accent seams
+    const redSeamL = this.scene.add.line(0, 0, -4, -8, -7, -2, 0xdc2626).setLineWidth(1.4);
+    const redSeamR = this.scene.add.line(0, 0, 4, -8, 7, -2, 0xdc2626).setLineWidth(1.4);
+
+    // 7. Arms with studded leather bracers (Giáp cổ tay đinh tán)
+    // Left arm
+    const sleeveL = this.scene.add.rectangle(-11, -4, 5, 8, 0x2563eb);
+    const bracerL = this.scene.add.rectangle(-12, 1, 5.5, 5.5, 0x292524).setStrokeStyle(0.8, 0x78716c);
+    const studL1 = this.scene.add.circle(-12, 0, 0.9, 0xffffff);
+    const studL2 = this.scene.add.circle(-12, 2.4, 0.9, 0xffffff);
+    const handL = this.scene.add.circle(-12, 6, 2.2, 0xfcd34d);
+
+    // Right arm (Holding sword)
+    const sleeveR = this.scene.add.rectangle(11, -4, 5, 8, 0x2563eb);
+    const bracerR = this.scene.add.rectangle(12, 1, 5.5, 5.5, 0x292524).setStrokeStyle(0.8, 0x78716c);
+    const studR1 = this.scene.add.circle(12, 0, 0.9, 0xffffff);
+    const studR2 = this.scene.add.circle(12, 2.4, 0.9, 0xffffff);
+    const handR = this.scene.add.circle(12, 6, 2.2, 0xfcd34d);
+
+    // 8. Longsword (Trường kiếm chuôi vàng)
+    const swordPommel = this.scene.add.circle(13, 0, 1.8, 0xf59e0b);
+    const swordGuard = this.scene.add.rectangle(13, 3, 7, 2.5, 0xf59e0b).setStrokeStyle(0.6, 0xb45309);
+    const swordBlade = this.scene.add.line(0, 0, 13, 5, 16, 24, 0xe2e8f0).setLineWidth(2.5);
+    const swordTip = this.scene.add.circle(16, 24, 1.2, 0xffffff);
+
+    // 9. Head, Face & Hair Topknot (Búi tóc đỉnh đầu cài ngọc)
+    const neck = this.scene.add.rectangle(0, -11, 5, 4, 0xfde68a);
+    const face = this.scene.add.ellipse(0, -17, 12, 13.5, 0xfef08a).setStrokeStyle(1, 0xd97706, 0.4);
+
+    // Facial features (Eyes & Eyebrows)
+    const eyeL = this.scene.add.rectangle(-3, -17, 2, 1, 0x0f172a);
+    const eyeR = this.scene.add.rectangle(3, -17, 2, 1, 0x0f172a);
+    const eyebrowL = this.scene.add.line(0, 0, -4.5, -19, -1.5, -18.5, 0x0f172a).setLineWidth(1);
+    const eyebrowR = this.scene.add.line(0, 0, 1.5, -18.5, 4.5, -19, 0x0f172a).setLineWidth(1);
+
+    // Long hair framing locks (Lọn tóc dài rủ hai bên)
+    const lockL = this.scene.add.line(0, 0, -5.5, -20, -7.5, -9, 0x0f172a).setLineWidth(2);
+    const lockR = this.scene.add.line(0, 0, 5.5, -20, 7.5, -9, 0x0f172a).setLineWidth(2);
+    const fringe = this.scene.add.triangle(0, -21, -5.5, 0, 5.5, 0, 0, 3.5, 0x0f172a);
+    const hairCrown = this.scene.add.ellipse(0, -22, 13, 8, 0x0f172a);
+
+    // Topknot & Jade ring (Búi tóc & Trâm ngọc xanh)
+    const bun = this.scene.add.circle(0, -27, 4.2, 0x0f172a);
+    const jadeRing = this.scene.add.rectangle(0, -24.5, 5, 2.2, 0x10b981).setStrokeStyle(0.8, 0x047857);
+    const bunTop = this.scene.add.triangle(0, -31, -2.5, 2, 2.5, 2, 0, -2, 0x0f172a);
+
+    container.add([
+      shadow,
+      auraGlow,
+      backCoat,
+      whiteTail,
+      legL,
+      legR,
+      bootL,
+      bootR,
+      kneeL,
+      kneeR,
+      bandL,
+      bandR,
+      shoeL,
+      shoeR,
+      frontApron,
+      apronHem,
+      ribbonL,
+      ribbonR,
+      tunic,
+      tunicRoll,
+      collar,
+      shoulderL,
+      shoulderR,
+      redSeamL,
+      redSeamR,
+      sleeveL,
+      bracerL,
+      studL1,
+      studL2,
+      handL,
+      sleeveR,
+      bracerR,
+      studR1,
+      studR2,
+      handR,
+      swordBlade,
+      swordTip,
+      swordGuard,
+      swordPommel,
+      neck,
+      face,
+      eyeL,
+      eyeR,
+      eyebrowL,
+      eyebrowR,
+      lockL,
+      lockR,
+      fringe,
+      hairCrown,
+      bun,
+      jadeRing,
+      bunTop
+    ]);
   }
 
   createKeyboard() {
@@ -80,13 +224,22 @@ export class Player {
   update(time, delta) {
     if (!this.sprite || !this.sprite.body) return;
 
+    this.updateMovement();
+
+    // Natural walking bobbing and idle breathing
+    const speed = this.sprite.body.velocity.length();
+    let bobY = 0;
+    if (speed > 10) {
+      bobY = Math.sin(time * 0.018) * 1.8;
+    } else {
+      bobY = Math.sin(time * 0.003) * 0.5;
+    }
+
     // Depth sorting
     this.sprite.setDepth(this.sprite.y);
-    this.visual.setPosition(this.sprite.x, this.sprite.y);
+    this.visual.setPosition(this.sprite.x, this.sprite.y + bobY);
     this.visual.setDepth(this.sprite.y);
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 55);
-
-    this.updateMovement();
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 55 + bobY * 0.5);
   }
 
   updateMovement() {

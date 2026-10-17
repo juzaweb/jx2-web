@@ -15,6 +15,11 @@ export class JiangHuScene extends Phaser.Scene {
     this.unsubscribers = [];
   }
 
+  preload() {
+    this.load.image("hero-sprite", "/hero.png");
+    this.load.image("hero-portrait", "/hero_portrait.png");
+  }
+
   create() {
     // Disable browser right click context menu on game canvas
     this.input.mouse.disableContextMenu();
