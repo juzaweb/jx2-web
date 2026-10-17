@@ -11,7 +11,7 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ## EPIC E — Engineering Quality (do these first)
 
-### E1 — Add a test harness · `todo` · P0
+### E1 — Add a test harness · `done` · P0
 - **Why:** No `npm test` exists; nothing guards combat/storage/items logic.
 - **Scope:** Add Vitest + jsdom config; add `test` + `test:ci` scripts.
 - **Acceptance:**
@@ -19,11 +19,13 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
   - A first unit test covers `src/game/storage.js` save/load round-trip.
   - A unit test covers item catalog shape in `src/game/items.js`.
 - **Touches:** `package.json`, `vite.config.js`, new `src/**/*.test.js`.
+- **Evidence:** Vitest 5 + jsdom; 16 tests pass across `storage.test.js`, `items.test.js`, `bridge.test.js`.
 
-### E2 — CI workflow (build + test) · `todo` · P0
+### E2 — CI workflow (build + test) · `done` · P0
 - **Why:** No `.github/workflows`; regressions land unseen.
 - **Acceptance:** PR triggers `npm ci` → `npm run build` → `npm test`; fails on error.
 - **Touches:** `.github/workflows/ci.yml`.
+- **Evidence:** `.github/workflows/ci.yml` runs on PR to `main`/`develop` and push to `develop`.
 
 ### E3 — Playwright smoke test · `todo` · P1
 - **Why:** Need proof the game actually boots in a browser.

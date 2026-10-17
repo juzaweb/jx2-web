@@ -38,6 +38,16 @@ Preview the production build locally:
 npm run preview
 ```
 
+### Tests
+Run the Vitest suite once:
+```bash
+npm test
+```
+Watch mode:
+```bash
+npm run test:watch
+```
+
 ## Controls
 - **Move:** `W`, `A`, `S`, `D` or Arrow keys
 - **Basic Attack:** `Space` or Left Click on the map

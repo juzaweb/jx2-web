@@ -32,8 +32,7 @@ These rules are loaded by opencode before loop work.
 ## Project (jx2-web)
 
 - Stack: React 19 + Vite + Phaser 3 (Arcade physics).
-- Documented verify command: `npm run build`. There is no test runner yet
-  (see `BACKLOG.md` EPIC E); do not invent one as part of an unrelated change.
+- Documented verify command: `npm run build && npm test` (Vitest + jsdom).
 - Work source: pick exactly one `todo` item from `BACKLOG.md`, highest priority first.
 - Move an item to `done` only when it meets the Definition of Done in `BACKLOG.md`.
 - Game content strings are Vietnamese; code, identifiers, and commit messages stay English.

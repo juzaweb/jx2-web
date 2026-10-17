@@ -8,22 +8,20 @@ Last run: never
 - Entry: `src/main.jsx` → `src/App.jsx` (React HUD) + `src/game/game.js` (Phaser scene).
 - Bridge: `src/game/bridge.js` (pub/sub between Phaser and React HUD).
 - Persistence: `src/game/storage.js` (localStorage, partial).
-- Verify command: `npm run build` (no test suite yet — see BACKLOG.md).
-- Run locally: `npm run dev` (http://localhost:3000).
+- Verify command: `npm run build && npm test` (Vitest + jsdom). Run locally: `npm run dev` (http://localhost:3000).
 
 ## High Priority (loop is acting or waiting on human)
 
-- [ ] Push the local `develop` branch to `origin` so the PR/merge flow works (remote has `main` only).
-- [ ] Enable branch protection on `main` on GitHub (human-only merges).
-- [ ] (Backlog seed) Add test harness + CI — EPIC E (`npm test` does not exist yet).
-- [ ] (Backlog seed) Persist inventory + quest state (`src/game/items.js` is static demo data).
+- [ ] Merge/push the E1+E2 bootstrap to `origin/develop` (touches `package.json` → human merge).
+- [ ] Next loop item: **C1 — Persist inventory state** (`BACKLOG.md`).
+- [ ] Enable branch protection requirements so CI must pass before merge on `develop`.
 
 ## Watch List
 
-- Rollout level: **L2 enabled** by human on this date. Merge target = `develop` only.
-- Pipeline agents defined in `opencode.json`: `loop-feature`, `feature-propose`, `spec-review`, `implementer`, `verifier`.
+- Rollout level: **L2 enabled**. Merge target = `develop` only.
+- Pipeline agents in `opencode.json`: `loop-feature`, `feature-propose`, `spec-review`, `implementer`, `verifier`.
 - Policy: `gate.yaml` + `docs/safety.md`. Feature menu: `docs/jx2-feature-library.md`.
-- Backlog source of truth: `BACKLOG.md`.
+- Toolchain: Vitest 5 + jsdom; CI at `.github/workflows/ci.yml`.
 
 ## Recent Noise (ignored this run)
 
