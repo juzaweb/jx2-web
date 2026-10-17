@@ -1,0 +1,77 @@
+import React, { useEffect, useRef } from "react";
+import { bridge, EVENTS } from "../../game/bridge.js";
+
+export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest }) {
+  const canvasRef = useRef(null);
+  const coordsRef = useRef(null);
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      bridge.emit(EVENTS.ACTION_REGISTER_MINIMAP, {
+        canvas: canvasRef.current,
+        coordsEl: coordsRef.current
+      });
+    }
+  }, []);
+
+  return (
+    <section className="top-right-panel" id="minimap-panel">
+      <div className="minimap-frame metal-card">
+        <div className="minimap-header">
+          <div className="region-title">
+            <span className="realm-channel">Tàng Long (Máy chủ 1)</span>
+          </div>
+          <div className="minimap-actions">
+            <button
+              id="map-help-btn"
+              className="mini-btn gold"
+              title="Cẩm nang tân thủ"
+              onClick={onOpenHelp}
+            >
+              ?
+            </button>
+            <button
+              id="map-sound-btn"
+              className="mini-btn"
+              title="Bật / Tắt âm thanh"
+              style={{ color: audioEnabled ? "#ffd43b" : "#888" }}
+              onClick={onToggleAudio}
+            >
+              ♫
+            </button>
+          </div>
+        </div>
+
+        <div className="minimap-subinfo">
+          <span className="subzone-name">Trường An Cổ Đạo</span>
+          <span className="coords" id="coords-text" ref={coordsRef}>
+            640 / 620
+          </span>
+        </div>
+
+        <div className="minimap-view">
+          <canvas
+            id="minimap-canvas"
+            ref={canvasRef}
+            width={168}
+            height={116}
+          ></canvas>
+          <div className="minimap-radar-sweep"></div>
+        </div>
+
+        {/* Pinned Quest Objective */}
+        <div className="quest-tracker" id="quest-tracker">
+          <div className="quest-head">✦ NHIỆM VỤ TÂN THỦ</div>
+          <div className="quest-body" id="quest-text">
+            {quest?.completed ? "Đã hoàn thành nhiệm vụ" : "Tiêu diệt 3 Sói Xám"}
+          </div>
+          <div className="quest-progress" id="quest-progress">
+            {quest?.completed
+              ? "Hoàn thành! +50 EXP thưởng"
+              : `Tiến độ: ${quest?.progress || 0} / ${quest?.total || 3}`}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

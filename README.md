@@ -1,53 +1,79 @@
-# Giang Hồ — HTML5 Phaser 3 Mini RPG
+# Giang Hồ — React & Phaser 3 Wuxia RPG
 
-A small browser-playable wuxia RPG demo inspired by classic Vietnamese martial-arts MMORPGs.
+A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs (Vo Lam Truyen Ky 2), built with **React**, **Vite**, and **Phaser 3**.
 
 ## Features
-- Phaser 3 scene rendered on HTML5 Canvas
-- Scrollable forest village map with buildings and road
-- Player movement using WASD / arrow keys
-- Basic sword attack and Q skill (Kiếm Khí)
-- Wolf enemies chase and attack the player
-- HP, MP, EXP, level-ups, coin rewards and collectible drops
-- Beginner quest: defeat three wolves
-- Responsive HUD and simple touch controls
-- No build step or package installation required
+- **Modern React UI Overlay:** Decoupled HUD components for Player Vitals (HP/MP/Stamina/EXP/Buff Aura), Minimap Radar & Quest tracker, Giang Ho Chat feed, and Authentic Hotbar Dock.
+- **Phaser 3 Game Engine:** 60FPS Arcade physics, world map, collision detection, and entity management.
+- **Event-Driven Bridge:** Reactive bi-directional communication between Phaser game loop and React components.
+- **Sound & Combat:** Web Audio API synth effects for attacks, skills, potion drinking, and sound toggle.
+- **Persistent Progress:** Automatic and manual progress saving with `localStorage`.
+- **Responsive & Touch Friendly:** On-screen mobile d-pad and combat buttons for mobile screens.
 
-## Run locally
-Because the game loads Phaser from a CDN, you need an internet connection on first load.
+## Getting Started
 
-### Option A: Python
-From this folder run:
+### Prerequisites
+- Node.js (v18+ recommended)
+- npm or yarn
+
+### Installation
 ```bash
-python -m http.server 8000
+npm install
 ```
-Open http://localhost:8000 in your browser.
 
-### Option B: PHP (Laravel developer friendly)
-From this folder run:
+### Development
+Start the local Vite development server:
 ```bash
-php -S localhost:8000
+npm run dev
 ```
-Open http://localhost:8000.
+Open `http://localhost:3000` in your browser.
 
-You can also deploy the three files to any static web host.
+### Production Build
+Build optimized production bundle:
+```bash
+npm run build
+```
+Preview the production build locally:
+```bash
+npm run preview
+```
 
 ## Controls
-- Move: WASD or arrow keys
-- Attack: Space or click/tap the game area
-- Skill: Q
-- On mobile: use the on-screen directional pad and sword button
+- **Move:** `W`, `A`, `S`, `D` or Arrow keys
+- **Basic Attack:** `Space` or Left Click on the map
+- **Kiếm Khí Skill:** `Q` or `8` or Right Click
+- **Quick Potions:**
+  - `1`: Kim Sáng Dược (+35 HP)
+  - `2`: Đại Hoàn Đan (+25 MP)
+  - `3`: Nữ Nhi Hồng (+50 HP & +30 MP)
+  - `4`: Hồi Thành Phù (Return to central Truong An)
+- **Pause & Guide:** `Esc` or click the Guide button
+- **Mobile:** Touch directional pad and action buttons
 
-## Project files
-- `index.html` — page structure, importmap for Phaser ESM
-- `style.css` — modern wuxia-inspired UI
-- `game.js` — main entry point, Phaser game configuration, and scene orchestration
-- `world.js` — world configuration, terrain, roads, river, buildings, lanterns, and decorations
-- `player.js` — Player class, movement input (keyboard/touch), avatar rendering, stats, and respawn
-- `enemy.js` — Wolf AI entity, health bar, chase/aggro behavior, and EnemyManager
-- `combat.js` — CombatSystem, sword attack, Kiếm Khí skill, drops, and Web Audio synthesizer
-- `ui.js` — UIManager, HUD status bars, quest progression tracker, and combat feed log
-- `storage.js` — StorageManager for saving/loading game state with localStorage
-
-## Notes
-This is an original demo inspired by classic wuxia RPG mechanics. It does not include original VLTK assets, servers, networking, or official game content.
+## Architecture
+```
+src/
+├── main.jsx              # React entry point
+├── App.jsx               # Main state orchestrator & layout
+├── index.css             # Authentic wuxia MMORPG styling & tokens
+├── components/
+│   ├── GameCanvas.jsx    # Hosts Phaser game lifecycle
+│   ├── HUD/
+│   │   ├── PlayerVitals.jsx   # Top-left HP/MP/EXP/Buff HUD
+│   │   ├── MinimapPanel.jsx   # Top-right radar & quest tracker
+│   │   ├── ChatPanel.jsx      # Bottom-left multi-tab chat feed
+│   │   └── HotbarDock.jsx     # Bottom quick-slots & system dock
+│   ├── Modals/
+│   │   ├── StartModal.jsx     # Entry modal
+│   │   └── HelpModal.jsx      # Guide & progress reset modal
+│   └── MobileControls.jsx     # Touch d-pad and skill buttons
+└── game/
+    ├── bridge.js         # Pub/Sub bridge between React & Phaser
+    ├── uiBridgeAdapter.js# Bridge adapter for HUD and minimap radar
+    ├── game.js           # Phaser Scene & game factory
+    ├── world.js          # Map rendering & terrain layout
+    ├── player.js         # Player physics, sprite, and controls
+    ├── enemy.js          # Wolf entities and AI aggro
+    ├── combat.js         # Combat system, sound synth, and drops
+    └── storage.js        # Progress persistence
+```

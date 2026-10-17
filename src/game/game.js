@@ -3,14 +3,16 @@ import { WorldManager, WORLD_CONFIG } from "./world.js";
 import { Player } from "./player.js";
 import { EnemyManager } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
-import { UIManager } from "./ui.js";
+import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
+import { bridge, EVENTS } from "./bridge.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
     super("JiangHuScene");
     this.started = false;
     this.isPaused = false;
+    this.unsubscribers = [];
   }
 
   create() {
@@ -38,21 +40,22 @@ export class JiangHuScene extends Phaser.Scene {
     this.enemyManager = new EnemyManager(this);
     this.enemyManager.create();
 
-    // Static physics collisions between world obstacles (buildings) and entities
+    // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();
     if (obstacles) {
       this.physics.add.collider(this.player.sprite, obstacles);
       this.physics.add.collider(this.enemyManager.group, obstacles);
     }
 
-    this.uiManager = new UIManager();
+    // UI Bridge Adapter to communicate with React components
+    this.uiBridge = new UIBridgeAdapter();
 
     // Combat system with state change hook for auto-saving
     this.combat = new CombatSystem(
       this,
       this.player,
       this.enemyManager,
-      this.uiManager,
+      this.uiBridge,
       () => this.saveGame(false)
     );
 
@@ -66,13 +69,12 @@ export class JiangHuScene extends Phaser.Scene {
         this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
       }
       if (this.savedData.questRewarded !== undefined) {
-        this.uiManager.setQuestRewarded(this.savedData.questRewarded);
+        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
       }
       if (this.savedData.audioEnabled !== undefined) {
         setAudioEnabled(this.savedData.audioEnabled);
-        this.uiManager.updateSoundButton(this.savedData.audioEnabled);
+        this.uiBridge.updateSoundButton(this.savedData.audioEnabled);
       }
-      this.uiManager.updateStartButton(`TIẾP TỤC HÀNH TẨU (CẤP ${this.player.stats.level})`);
     }
 
     // Camera follow player
@@ -86,9 +88,9 @@ export class JiangHuScene extends Phaser.Scene {
     this.input.on("pointerdown", (pointer) => {
       if (!this.started || this.isPaused) return;
 
-      // Do not attack when clicking on interactive HUD elements
+      // Do not attack when clicking on interactive HUD elements or React overlays
       const target = pointer.event.target;
-      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input")) {
+      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay")) {
         return;
       }
 
@@ -128,42 +130,30 @@ export class JiangHuScene extends Phaser.Scene {
       if (this.started && !this.isPaused) this.combat.performSkill();
     });
 
-    // Wire UI controls
-    this.uiManager.initControls({
-      onStart: () => this.startGame(),
-      onSoundToggle: () => {
-        const enabled = toggleAudio();
+    // Listen to React UI Actions via Game Bridge
+    this.unsubscribers.push(
+      bridge.on(EVENTS.ACTION_START, () => this.startGame()),
+      bridge.on(EVENTS.ACTION_ATTACK, () => {
+        if (this.started && !this.isPaused) this.combat.performAttack();
+      }),
+      bridge.on(EVENTS.ACTION_SKILL, () => {
+        if (this.started && !this.isPaused) this.combat.performSkill();
+      }),
+      bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
+        if (this.started && !this.isPaused) this.useItem(slot);
+      }),
+      bridge.on(EVENTS.ACTION_MOVE, (direction) => {
+        if (!this.isPaused) this.player.setTouchDirection(direction);
+      }),
+      bridge.on(EVENTS.ACTION_SAVE, () => this.saveGame(true)),
+      bridge.on(EVENTS.ACTION_RESET, () => this.resetGame()),
+      bridge.on(EVENTS.ACTION_TOGGLE_AUDIO, () => {
+        const isEnabled = toggleAudio();
+        this.uiBridge.updateSoundButton(isEnabled);
         this.saveGame(false);
-        return enabled;
-      },
-      onMove: (direction) => {
-        if (!this.isPaused) {
-          this.player.setTouchDirection(direction);
-        }
-      },
-      onAttack: () => {
-        if (this.started && !this.isPaused) {
-          this.combat.performAttack();
-        }
-      },
-      onSkill: () => {
-        if (this.started && !this.isPaused) {
-          this.combat.performSkill();
-        }
-      },
-      onUseItem: (slot) => {
-        if (this.started && !this.isPaused) {
-          this.useItem(slot);
-        }
-      },
-      onPauseChange: (paused) => this.setPaused(paused),
-      onSave: () => this.saveGame(true),
-      onReset: () => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?")) {
-          this.resetGame();
-        }
-      }
-    });
+      }),
+      bridge.on(EVENTS.ACTION_SET_PAUSED, (paused) => this.setPaused(paused))
+    );
 
     // Enemy respawn loop
     this.spawnTimer = this.time.addEvent({
@@ -188,15 +178,16 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     // Save on window close / page leave
-    window.addEventListener("beforeunload", () => {
+    this.unloadHandler = () => {
       if (this.started) {
         this.saveGame(false);
       }
-    });
+    };
+    window.addEventListener("beforeunload", this.unloadHandler);
 
-    // Initial HUD update
-    this.uiManager.updateHud(this.player.stats);
-    this.uiManager.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+    // Initial Stats emit to React
+    this.uiBridge.updateHud(this.player.stats);
+    this.uiBridge.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
   }
 
   useItem(slot) {
@@ -205,26 +196,26 @@ export class JiangHuScene extends Phaser.Scene {
     if (slot === 1) {
       // Kim Sáng Dược (+35 HP)
       if (this.player.stats.hp >= this.player.stats.maxHp) {
-        this.uiManager.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
+        this.uiBridge.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
         return;
       }
       const healed = this.player.heal(35);
       this.combat.showFloatText(this.player.x, this.player.y - 45, `+${healed} HP`, "#69db7c");
       playTone(520, 0.12, "triangle", 0.03);
-      this.uiManager.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
-      this.uiManager.updateHud(this.player.stats);
+      this.uiBridge.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
+      this.uiBridge.updateHud(this.player.stats);
       this.saveGame(false);
     } else if (slot === 2) {
       // Đại Hoàn Đan (+25 MP)
       if (this.player.stats.mp >= this.player.stats.maxMp) {
-        this.uiManager.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
+        this.uiBridge.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
         return;
       }
       const restored = this.player.restoreMp(25);
       this.combat.showFloatText(this.player.x, this.player.y - 45, `+${restored} MP`, "#74c0fc");
       playTone(580, 0.12, "sine", 0.03);
-      this.uiManager.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
-      this.uiManager.updateHud(this.player.stats);
+      this.uiBridge.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
+      this.uiBridge.updateHud(this.player.stats);
       this.saveGame(false);
     } else if (slot === 3) {
       // Nữ Nhi Hồng (+50 HP & +30 MP)
@@ -232,21 +223,22 @@ export class JiangHuScene extends Phaser.Scene {
       const restored = this.player.restoreMp(30);
       this.combat.showFloatText(this.player.x, this.player.y - 50, `Ấm lòng! +HP +MP`, "#ffd43b");
       playTone(440, 0.15, "triangle", 0.035);
-      this.uiManager.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
-      this.uiManager.updateHud(this.player.stats);
+      this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
+      this.uiBridge.updateHud(this.player.stats);
       this.saveGame(false);
     } else if (slot === 4) {
       // Hồi Thành Phù (Về điểm hồi sinh Trường An)
       this.player.setPosition(640, 620);
       this.combat.showFloatText(this.player.x, this.player.y - 45, `Về Trường An`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
-      this.uiManager.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
+      this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
       this.saveGame(false);
     }
   }
 
   setPaused(paused) {
     this.isPaused = !!paused;
+    bridge.emit(EVENTS.GAME_PAUSED, this.isPaused);
     if (this.isPaused) {
       this.physics.pause();
       if (this.player?.sprite?.body) {
@@ -266,12 +258,12 @@ export class JiangHuScene extends Phaser.Scene {
         x: Math.round(this.player.x),
         y: Math.round(this.player.y)
       },
-      questRewarded: this.uiManager.questRewarded,
+      questRewarded: this.uiBridge.questRewarded,
       audioEnabled: isAudioEnabled()
     });
 
     if (success && showFeedback) {
-      this.uiManager.addLog("Đã lưu tiến trình giang hồ thành công.", "system");
+      this.uiBridge.addLog("Đã lưu tiến trình giang hồ thành công.", "system");
       this.combat.showFloatText(
         this.player.x,
         this.player.y - 65,
@@ -295,14 +287,15 @@ export class JiangHuScene extends Phaser.Scene {
     this.started = true;
     this.setPaused(false);
     this.player.sprite.body.enable = true;
+    bridge.emit(EVENTS.GAME_STARTED);
 
     if (this.savedData) {
-      this.uiManager.addLog(
+      this.uiBridge.addLog(
         `Chào mừng trở lại! Tải lại nhân vật Cấp ${this.player.stats.level} — Bạc: ${this.player.stats.coins}.`,
         "system"
       );
     } else {
-      this.uiManager.addLog("Bạn đã đặt chân đến Trường An. Chúc hiệp khách hành tẩu bình an.", "system");
+      this.uiBridge.addLog("Bạn đã đặt chân đến Trường An. Chúc hiệp khách hành tẩu bình an.", "system");
       this.player.setPosition(640, 620);
     }
 
@@ -310,7 +303,6 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    // Do not update when not started, paused, or player destroyed
     if (!this.started || this.isPaused || !this.player) return;
 
     // Update player movement and animation
@@ -327,26 +319,46 @@ export class JiangHuScene extends Phaser.Scene {
     this.combat.updateDrops(time);
 
     // Update UI HUD & Minimap Radar
-    this.uiManager.updateHud(this.player.stats);
-    this.uiManager.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+    this.uiBridge.updateHud(this.player.stats);
+    this.uiBridge.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+  }
+
+  shutdown() {
+    if (this.unloadHandler) {
+      window.removeEventListener("beforeunload", this.unloadHandler);
+    }
+    if (this.unsubscribers) {
+      this.unsubscribers.forEach((unsub) => unsub());
+      this.unsubscribers = [];
+    }
+    if (this.uiBridge) {
+      this.uiBridge.destroy();
+    }
   }
 }
 
-const config = {
-  type: Phaser.AUTO,
-  parent: "game-container",
-  width: 1280,
-  height: 720,
-  backgroundColor: "#24392b",
-  physics: {
-    default: "arcade",
-    arcade: { debug: false }
-  },
-  scale: {
-    mode: Phaser.Scale.RESIZE,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-  scene: [JiangHuScene]
-};
+/**
+ * Factory function to initialize Phaser game in React lifecycle
+ * @param {string|HTMLElement} parent
+ * @returns {Phaser.Game}
+ */
+export function createGame(parent) {
+  const config = {
+    type: Phaser.AUTO,
+    parent: parent,
+    width: 1280,
+    height: 720,
+    backgroundColor: "#24392b",
+    physics: {
+      default: "arcade",
+      arcade: { debug: false }
+    },
+    scale: {
+      mode: Phaser.Scale.RESIZE,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    scene: [JiangHuScene]
+  };
 
-export const game = new Phaser.Game(config);
+  return new Phaser.Game(config);
+}
