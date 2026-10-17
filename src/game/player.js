@@ -33,6 +33,7 @@ export class Player {
     this.stepPhase = 0;
     this.lastDustTime = 0;
     this.lastTrailTime = 0;
+    this.currentStance = "front"; // "front" | "side"
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
@@ -71,7 +72,37 @@ export class Player {
     // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
     this.body = this.scene.add.container(0, 0);
 
-    // High-definition 3D character sprite from original Võ Lâm 2 model
+    // Register animations
+    if (this.scene.textures.exists("hero-walk") && !this.scene.anims.exists("player-walk")) {
+      this.scene.anims.create({
+        key: "player-walk",
+        frames: this.scene.anims.generateFrameNumbers("hero-walk", { start: 1, end: 5 }),
+        frameRate: 11,
+        repeat: -1
+      });
+    }
+
+    if (this.scene.textures.exists("hero-side-walk") && !this.scene.anims.exists("player-side-walk")) {
+      this.scene.anims.create({
+        key: "player-side-walk",
+        frames: this.scene.anims.generateFrameNumbers("hero-side-walk", { start: 0, end: 3 }),
+        frameRate: 8,
+        repeat: -1
+      });
+    }
+
+    // 2. High-definition 3D character with real walking leg animation
+    if (this.scene.textures.exists("hero-walk")) {
+      this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
+      this.heroImage = this.scene.add.sprite(0, 0, "hero-walk", 0);
+      this.heroImage.setDisplaySize(28, 76);
+      this.heroImage.setOrigin(0.5, 0.5);
+
+      this.body.add([this.aura, this.heroImage]);
+      container.add([this.shadow, this.body]);
+      return;
+    }
+
     if (this.scene.textures.exists("hero-sprite")) {
       this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
       this.heroImage = this.scene.add.image(0, 0, "hero-sprite");
@@ -226,6 +257,25 @@ export class Player {
     container.add([this.shadow, this.body]);
   }
 
+  setStance(stance) {
+    if (this.currentStance === stance || !this.heroImage) return;
+    this.currentStance = stance;
+
+    if (stance === "side") {
+      if (this.scene.textures.exists("hero-side-walk")) {
+        this.heroImage.setTexture("hero-side-walk", 0);
+        this.heroImage.setDisplaySize(55, 76);
+        this.heroImage.setOrigin(0.42, 0.5);
+      }
+    } else {
+      if (this.scene.textures.exists("hero-walk")) {
+        this.heroImage.setTexture("hero-walk", 0);
+        this.heroImage.setDisplaySize(28, 76);
+        this.heroImage.setOrigin(0.5, 0.5);
+      }
+    }
+  }
+
   createKeyboard() {
     this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Q");
   }
@@ -240,26 +290,39 @@ export class Player {
     const speed = this.sprite.body.velocity.length();
 
     if (speed > 15) {
+      // Prioritize side view when moving horizontally (turn sideways, not crab walking)
+      const isHorizontal = Math.abs(vx) >= Math.abs(vy) * 0.65;
+
+      if (isHorizontal) {
+        this.setStance("side");
+        if (this.heroImage?.anims) {
+          if (!this.heroImage.anims.isPlaying || this.heroImage.anims.currentAnim?.key !== "player-side-walk") {
+            this.heroImage.play("player-side-walk");
+          }
+        }
+      } else {
+        this.setStance("front");
+        if (this.heroImage?.anims) {
+          if (!this.heroImage.anims.isPlaying || this.heroImage.anims.currentAnim?.key !== "player-walk") {
+            this.heroImage.play("player-walk");
+          }
+        }
+      }
+
       // Advance walk cycle synchronized with actual movement velocity
       this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
 
       // Dynamic bobbing: natural arc of legs pushing up and landing
       const sinStep = Math.sin(this.stepPhase);
-      const bounceY = -Math.abs(sinStep) * 5.5;
+      const bounceY = -Math.abs(sinStep) * 4;
 
-      // Squash and stretch along movement stride
-      const squash = Math.cos(this.stepPhase * 2) * 0.045;
-      const bodyScaleY = 1 - squash;
-      const bodyScaleX = 1 + squash * 0.7;
-
-      // Forward lean / aerodynamic sprint tilt
-      const targetTilt = 0.085;
+      // Subtle forward lean / aerodynamic sprint tilt
+      const targetTilt = 0.06;
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, targetTilt, 0.18);
       this.body.y = bounceY;
-      this.body.setScale(bodyScaleX, bodyScaleY);
 
       // Dynamic ground shadow responds to elevation
-      const shadowFactor = 1 - (Math.abs(bounceY) / 5.5) * 0.25;
+      const shadowFactor = 1 - (Math.abs(bounceY) / 4) * 0.2;
       this.shadow.setScale(shadowFactor, shadowFactor);
       this.shadow.setAlpha(0.48 * shadowFactor);
 
@@ -275,6 +338,12 @@ export class Player {
         this.spawnGhostTrail(this.sprite.x, this.sprite.y, this.visual.scaleX, this.body.rotation, this.body.y);
       }
     } else {
+      // Standing idle: pause animation and return to frame 0
+      if (this.heroImage?.anims && this.heroImage.anims.isPlaying) {
+        this.heroImage.stop();
+        this.heroImage.setFrame(0);
+      }
+
       // Idle breathing cycle (Qi Gong internal breathing)
       const breath = Math.sin(time * 0.0035);
       const breathBounce = breath * 0.8;
@@ -297,12 +366,15 @@ export class Player {
   }
 
   spawnGhostTrail(x, y, facing, rotation, bodyOffsetY) {
-    if (!this.scene.textures.exists("hero-sprite")) return;
+    if (!this.heroImage) return;
 
-    const ghost = this.scene.add.image(x, y + bodyOffsetY, "hero-sprite");
-    ghost.setDisplaySize(28, 76);
-    ghost.setOrigin(0.5, 0.5);
-    ghost.setScale(facing * (28 / ghost.width), 76 / ghost.height);
+    const currentTexture = this.heroImage.texture.key;
+    const currentFrame = this.heroImage.frame ? this.heroImage.frame.name : 0;
+
+    const ghost = this.scene.add.sprite(x, y + bodyOffsetY, currentTexture, currentFrame);
+    ghost.setDisplaySize(this.heroImage.displayWidth, this.heroImage.displayHeight);
+    ghost.setOrigin(this.heroImage.originX, this.heroImage.originY);
+    ghost.setScale(facing * (this.heroImage.displayWidth / ghost.width), this.heroImage.displayHeight / ghost.height);
     ghost.setRotation(rotation);
     ghost.setDepth(y - 1);
     ghost.setTint(0x38bdf8); // Azure martial sword qi tint
@@ -311,8 +383,8 @@ export class Player {
     this.scene.tweens.add({
       targets: ghost,
       alpha: 0,
-      scaleX: facing * (28 / ghost.width) * 1.06,
-      scaleY: (76 / ghost.height) * 1.06,
+      scaleX: facing * (this.heroImage.displayWidth / ghost.width) * 1.05,
+      scaleY: (this.heroImage.displayHeight / ghost.height) * 1.05,
       duration: 250,
       ease: "Cubic.easeOut",
       onComplete: () => ghost.destroy()

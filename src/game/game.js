@@ -17,6 +17,14 @@ export class JiangHuScene extends Phaser.Scene {
 
   preload() {
     this.load.image("hero-sprite", "/hero.png");
+    this.load.spritesheet("hero-walk", "/hero_walk.png", {
+      frameWidth: 102,
+      frameHeight: 320
+    });
+    this.load.spritesheet("hero-side-walk", "/hero_side_walk.png", {
+      frameWidth: 231,
+      frameHeight: 320
+    });
     this.load.image("hero-portrait", "/hero_portrait.png");
   }
 
