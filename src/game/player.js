@@ -72,40 +72,20 @@ export class Player {
     // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
     this.body = this.scene.add.container(0, 0);
 
-    // Register animations
-    if (this.scene.textures.exists("hero-walk") && !this.scene.anims.exists("player-walk")) {
-      this.scene.anims.create({
-        key: "player-walk",
-        frames: this.scene.anims.generateFrameNumbers("hero-walk", { start: 1, end: 5 }),
-        frameRate: 11,
-        repeat: -1
-      });
-    }
-
+    // Register side walk animation (Clean 2-frame strides)
     if (this.scene.textures.exists("hero-side-walk") && !this.scene.anims.exists("player-side-walk")) {
       this.scene.anims.create({
         key: "player-side-walk",
-        frames: this.scene.anims.generateFrameNumbers("hero-side-walk", { start: 0, end: 3 }),
-        frameRate: 8,
+        frames: this.scene.anims.generateFrameNumbers("hero-side-walk", { start: 0, end: 1 }),
+        frameRate: 6,
         repeat: -1
       });
     }
 
-    // 2. High-definition 3D character with real walking leg animation
-    if (this.scene.textures.exists("hero-walk")) {
-      this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
-      this.heroImage = this.scene.add.sprite(0, 0, "hero-walk", 0);
-      this.heroImage.setDisplaySize(28, 76);
-      this.heroImage.setOrigin(0.5, 0.5);
-
-      this.body.add([this.aura, this.heroImage]);
-      container.add([this.shadow, this.body]);
-      return;
-    }
-
+    // 2. High-definition character visuals (Clean 2-leg authentic models)
     if (this.scene.textures.exists("hero-sprite")) {
       this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
-      this.heroImage = this.scene.add.image(0, 0, "hero-sprite");
+      this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
       this.heroImage.setDisplaySize(28, 76);
       this.heroImage.setOrigin(0.5, 0.5);
 
@@ -264,12 +244,15 @@ export class Player {
     if (stance === "side") {
       if (this.scene.textures.exists("hero-side-walk")) {
         this.heroImage.setTexture("hero-side-walk", 0);
-        this.heroImage.setDisplaySize(55, 76);
-        this.heroImage.setOrigin(0.42, 0.5);
+        this.heroImage.setDisplaySize(67, 76);
+        this.heroImage.setOrigin(0.44, 0.5);
       }
     } else {
-      if (this.scene.textures.exists("hero-walk")) {
-        this.heroImage.setTexture("hero-walk", 0);
+      if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
+        this.heroImage.stop();
+      }
+      if (this.scene.textures.exists("hero-sprite")) {
+        this.heroImage.setTexture("hero-sprite");
         this.heroImage.setDisplaySize(28, 76);
         this.heroImage.setOrigin(0.5, 0.5);
       }
@@ -290,22 +273,17 @@ export class Player {
     const speed = this.sprite.body.velocity.length();
 
     if (speed > 15) {
-      // Prioritize side view when moving horizontally (turn sideways, not crab walking)
+      // Prioritize side profile view when moving horizontally (turn sideways, not crab walking)
       const isHorizontal = Math.abs(vx) >= Math.abs(vy) * 0.65;
+      this.setStance(isHorizontal ? "side" : "front");
 
-      if (isHorizontal) {
-        this.setStance("side");
-        if (this.heroImage?.anims) {
-          if (!this.heroImage.anims.isPlaying || this.heroImage.anims.currentAnim?.key !== "player-side-walk") {
-            this.heroImage.play("player-side-walk");
-          }
+      if (this.currentStance === "side") {
+        if (this.scene.anims.exists("player-side-walk") && !this.heroImage.anims.isPlaying) {
+          this.heroImage.play("player-side-walk");
         }
       } else {
-        this.setStance("front");
-        if (this.heroImage?.anims) {
-          if (!this.heroImage.anims.isPlaying || this.heroImage.anims.currentAnim?.key !== "player-walk") {
-            this.heroImage.play("player-walk");
-          }
+        if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
+          this.heroImage.stop();
         }
       }
 
@@ -314,15 +292,19 @@ export class Player {
 
       // Dynamic bobbing: natural arc of legs pushing up and landing
       const sinStep = Math.sin(this.stepPhase);
-      const bounceY = -Math.abs(sinStep) * 4;
+      const bounceY = -Math.abs(sinStep) * 4.5;
+
+      // Natural stride stretch & compression along movement pace (2 legs only, no 3rd leg)
+      const strideScale = Math.sin(this.stepPhase * 2) * 0.035;
+      this.body.setScale(1 + strideScale, 1 - strideScale);
 
       // Subtle forward lean / aerodynamic sprint tilt
-      const targetTilt = 0.06;
+      const targetTilt = 0.065;
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, targetTilt, 0.18);
       this.body.y = bounceY;
 
       // Dynamic ground shadow responds to elevation
-      const shadowFactor = 1 - (Math.abs(bounceY) / 4) * 0.2;
+      const shadowFactor = 1 - (Math.abs(bounceY) / 4.5) * 0.22;
       this.shadow.setScale(shadowFactor, shadowFactor);
       this.shadow.setAlpha(0.48 * shadowFactor);
 
@@ -338,8 +320,8 @@ export class Player {
         this.spawnGhostTrail(this.sprite.x, this.sprite.y, this.visual.scaleX, this.body.rotation, this.body.y);
       }
     } else {
-      // Standing idle: pause animation and return to frame 0
-      if (this.heroImage?.anims && this.heroImage.anims.isPlaying) {
+      // Stopped moving - reset walk animation
+      if (this.currentStance === "side" && this.heroImage.anims && this.heroImage.anims.isPlaying) {
         this.heroImage.stop();
         this.heroImage.setFrame(0);
       }
@@ -370,11 +352,10 @@ export class Player {
 
     const currentTexture = this.heroImage.texture.key;
     const currentFrame = this.heroImage.frame ? this.heroImage.frame.name : 0;
-
     const ghost = this.scene.add.sprite(x, y + bodyOffsetY, currentTexture, currentFrame);
     ghost.setDisplaySize(this.heroImage.displayWidth, this.heroImage.displayHeight);
     ghost.setOrigin(this.heroImage.originX, this.heroImage.originY);
-    ghost.setScale(facing * (this.heroImage.displayWidth / ghost.width), this.heroImage.displayHeight / ghost.height);
+    ghost.setScale(facing * (this.heroImage.displayWidth / (ghost.width || 1)), this.heroImage.displayHeight / (ghost.height || 1));
     ghost.setRotation(rotation);
     ghost.setDepth(y - 1);
     ghost.setTint(0x38bdf8); // Azure martial sword qi tint
@@ -383,8 +364,8 @@ export class Player {
     this.scene.tweens.add({
       targets: ghost,
       alpha: 0,
-      scaleX: facing * (this.heroImage.displayWidth / ghost.width) * 1.05,
-      scaleY: (this.heroImage.displayHeight / ghost.height) * 1.05,
+      scaleX: facing * (this.heroImage.displayWidth / (ghost.width || 1)) * 1.05,
+      scaleY: (this.heroImage.displayHeight / (ghost.height || 1)) * 1.05,
       duration: 250,
       ease: "Cubic.easeOut",
       onComplete: () => ghost.destroy()
