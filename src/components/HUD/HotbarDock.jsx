@@ -10,14 +10,15 @@ export function HotbarDock({
   onSave,
   onInventory,
   onOpenHelp,
-  onToggleAudio
+  onToggleAudio,
+  items = QUICK_ITEMS
 }) {
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {QUICK_ITEMS.map((item) => (
+          {items.map((item) => (
             <div
               className="slot-item"
               id={`slot-${item.useSlot}`}

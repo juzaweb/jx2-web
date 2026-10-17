@@ -6,6 +6,7 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
+import { getQuantities } from "./items.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -315,7 +316,8 @@ export class JiangHuScene extends Phaser.Scene {
         y: Math.round(this.player.y)
       },
       questRewarded: this.uiBridge.questRewarded,
-      audioEnabled: isAudioEnabled()
+      audioEnabled: isAudioEnabled(),
+      inventory: getQuantities()
     });
 
     if (success && showFeedback) {

@@ -3,7 +3,11 @@ import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
   INVENTORY_CAPACITY,
-  INVENTORY_TREASURY
+  INVENTORY_TREASURY,
+  defaultQuantities,
+  applyQuantities,
+  setQuantities,
+  getQuantities
 } from "./items.js";
 
 describe("item catalog", () => {
@@ -49,5 +53,43 @@ describe("item catalog", () => {
     Object.values(INVENTORY_TREASURY).forEach((value) => {
       expect(typeof value).toBe("number");
     });
+  });
+});
+
+describe("inventory quantities", () => {
+  it("collects a default quantity for every stacked catalog item", () => {
+    const quantities = defaultQuantities();
+    QUICK_ITEMS.forEach((item) => expect(quantities[item.id]).toBe(item.qty));
+    INVENTORY_ITEMS.filter(Boolean).forEach((item) => {
+      if (typeof item.qty === "number") {
+        expect(quantities[item.id]).toBe(item.qty);
+      }
+    });
+  });
+
+  it("does not assign quantities to quantity-less equipment", () => {
+    const quantities = defaultQuantities();
+    const weapon = INVENTORY_ITEMS.find((item) => item && item.id === "hac-ung-kiem");
+    expect(quantities[weapon.id]).toBeUndefined();
+  });
+
+  it("applies persisted quantities over the catalog", () => {
+    const { quickItems, inventoryItems } = applyQuantities({
+      "kim-sang-duoc": 7,
+      "tui-bac": 0
+    });
+
+    expect(quickItems.find((item) => item.id === "kim-sang-duoc").qty).toBe(7);
+    expect(inventoryItems.find((item) => item.id === "tui-bac").qty).toBe(0);
+    // Items with no saved or default quantity stay untouched.
+    expect(inventoryItems.find((item) => item.id === "hac-ung-kiem").qty).toBeUndefined();
+  });
+
+  it("keeps the shared in-memory store merged over defaults", () => {
+    setQuantities({ "kim-sang-duoc": 1 });
+
+    expect(getQuantities()["kim-sang-duoc"]).toBe(1);
+    // An untouched item keeps its catalog default.
+    expect(getQuantities()["dai-hoan-dan"]).toBe(86);
   });
 });
