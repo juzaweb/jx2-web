@@ -237,6 +237,9 @@ export class JiangHuScene extends Phaser.Scene {
     // Initial Stats emit to React
     this.uiBridge.updateHud(this.player.stats);
     this.uiBridge.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+
+    // Auto-start game immediately without start modal
+    this.startGame();
   }
 
   useItem(slot) {

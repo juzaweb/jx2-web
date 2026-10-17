@@ -5,10 +5,8 @@ import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
-import { StartModal } from "./components/Modals/StartModal.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
-import { StorageManager } from "./game/storage.js";
 
 const INITIAL_LOGS = [
   {
@@ -29,7 +27,7 @@ const INITIAL_LOGS = [
 ];
 
 export function App() {
-  const [isStarted, setIsStarted] = useState(false);
+  const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [stats, setStats] = useState({
@@ -52,7 +50,6 @@ export function App() {
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
 
-  const savedExists = StorageManager.exists();
 
   useEffect(() => {
     const unsubStats = bridge.on(EVENTS.STATS_UPDATED, (newStats) => {
@@ -97,10 +94,6 @@ export function App() {
     };
   }, []);
 
-  const handleStart = useCallback(() => {
-    setIsStarted(true);
-    bridge.emit(EVENTS.ACTION_START);
-  }, []);
 
   const handleAttack = useCallback(() => {
     bridge.emit(EVENTS.ACTION_ATTACK);
@@ -195,13 +188,6 @@ export function App() {
         />
       </div>
 
-      {/* Start Modal */}
-      <StartModal
-        isOpen={!isStarted}
-        onStart={handleStart}
-        level={stats.level}
-        isSaved={savedExists}
-      />
 
       {/* Help & Guide Modal */}
       <HelpModal
