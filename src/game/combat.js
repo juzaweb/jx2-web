@@ -64,6 +64,9 @@ export class CombatSystem {
       this.attackReady = true;
     });
 
+    // Trigger physical sword thrust / lunge animation on character body
+    this.player.playAttackMotion?.();
+
     playTone(260, 0.07, "sawtooth", 0.02);
 
     const facingRight = this.player.visual.scaleX >= 0;
@@ -120,6 +123,9 @@ export class CombatSystem {
     this.scene.time.delayedCall(1800, () => {
       this.skillReady = true;
     });
+
+    // Trigger martial focus & release animation
+    this.player.playSkillMotion?.();
 
     this.player.stats.mp -= 15;
     playTone(420, 0.18, "triangle", 0.035);

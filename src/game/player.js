@@ -29,6 +29,11 @@ export class Player {
     this.targetY = null;
     this.isMovingToTarget = false;
 
+    // Movement & wuxia animation states
+    this.stepPhase = 0;
+    this.lastDustTime = 0;
+    this.lastTrailTime = 0;
+
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
     this.createKeyboard();
@@ -61,16 +66,20 @@ export class Player {
 
   drawHero(container) {
     // 1. Soft ground shadow
-    const shadow = this.scene.add.ellipse(0, 34, 40, 13, 0x090e0c, 0.45);
+    this.shadow = this.scene.add.ellipse(0, 34, 40, 13, 0x090e0c, 0.45);
 
-    // 2. High-definition 3D character sprite from original Võ Lâm 2 model
+    // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
+    this.body = this.scene.add.container(0, 0);
+
+    // High-definition 3D character sprite from original Võ Lâm 2 model
     if (this.scene.textures.exists("hero-sprite")) {
-      const aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
+      this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
       this.heroImage = this.scene.add.image(0, 0, "hero-sprite");
       this.heroImage.setDisplaySize(28, 76);
       this.heroImage.setOrigin(0.5, 0.5);
 
-      container.add([aura, shadow, this.heroImage]);
+      this.body.add([this.aura, this.heroImage]);
+      container.add([this.shadow, this.body]);
       return;
     }
 
@@ -161,9 +170,7 @@ export class Player {
     const jadeRing = this.scene.add.rectangle(0, -24.5, 5, 2.2, 0x10b981).setStrokeStyle(0.8, 0x047857);
     const bunTop = this.scene.add.triangle(0, -31, -2.5, 2, 2.5, 2, 0, -2, 0x0f172a);
 
-    container.add([
-      shadow,
-      auraGlow,
+    this.body.add([
       backCoat,
       whiteTail,
       legL,
@@ -215,6 +222,8 @@ export class Player {
       jadeRing,
       bunTop
     ]);
+
+    container.add([this.shadow, this.body]);
   }
 
   createKeyboard() {
@@ -226,20 +235,136 @@ export class Player {
 
     this.updateMovement();
 
-    // Natural walking bobbing and idle breathing
+    const vx = this.sprite.body.velocity.x;
+    const vy = this.sprite.body.velocity.y;
     const speed = this.sprite.body.velocity.length();
-    let bobY = 0;
-    if (speed > 10) {
-      bobY = Math.sin(time * 0.018) * 1.8;
+
+    if (speed > 15) {
+      // Advance walk cycle synchronized with actual movement velocity
+      this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
+
+      // Dynamic bobbing: natural arc of legs pushing up and landing
+      const sinStep = Math.sin(this.stepPhase);
+      const bounceY = -Math.abs(sinStep) * 5.5;
+
+      // Squash and stretch along movement stride
+      const squash = Math.cos(this.stepPhase * 2) * 0.045;
+      const bodyScaleY = 1 - squash;
+      const bodyScaleX = 1 + squash * 0.7;
+
+      // Forward lean / aerodynamic sprint tilt
+      const targetTilt = 0.085;
+      this.body.rotation = Phaser.Math.Linear(this.body.rotation, targetTilt, 0.18);
+      this.body.y = bounceY;
+      this.body.setScale(bodyScaleX, bodyScaleY);
+
+      // Dynamic ground shadow responds to elevation
+      const shadowFactor = 1 - (Math.abs(bounceY) / 5.5) * 0.25;
+      this.shadow.setScale(shadowFactor, shadowFactor);
+      this.shadow.setAlpha(0.48 * shadowFactor);
+
+      // Footstep dust puff when foot strikes the road
+      if (time - this.lastDustTime > 190) {
+        this.lastDustTime = time;
+        this.spawnFootstepDust(this.sprite.x, this.sprite.y + 32, vx, vy);
+      }
+
+      // Wuxia Qinggong ghost afterimage trail
+      if (speed > 40 && time - this.lastTrailTime > 68) {
+        this.lastTrailTime = time;
+        this.spawnGhostTrail(this.sprite.x, this.sprite.y, this.visual.scaleX, this.body.rotation, this.body.y);
+      }
     } else {
-      bobY = Math.sin(time * 0.003) * 0.5;
+      // Idle breathing cycle (Qi Gong internal breathing)
+      const breath = Math.sin(time * 0.0035);
+      const breathBounce = breath * 0.8;
+      const bodyScaleY = 1 + breath * 0.018;
+      const bodyScaleX = 1 - breath * 0.012;
+
+      this.body.y = breathBounce;
+      this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.14);
+      this.body.setScale(bodyScaleX, bodyScaleY);
+
+      this.shadow.setScale(1 + breath * 0.02, 1 + breath * 0.02);
+      this.shadow.setAlpha(0.45);
     }
 
-    // Depth sorting
+    // Depth sorting based on Y position
     this.sprite.setDepth(this.sprite.y);
-    this.visual.setPosition(this.sprite.x, this.sprite.y + bobY);
+    this.visual.setPosition(this.sprite.x, this.sprite.y);
     this.visual.setDepth(this.sprite.y);
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 55 + bobY * 0.5);
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 56 + this.body.y * 0.35);
+  }
+
+  spawnGhostTrail(x, y, facing, rotation, bodyOffsetY) {
+    if (!this.scene.textures.exists("hero-sprite")) return;
+
+    const ghost = this.scene.add.image(x, y + bodyOffsetY, "hero-sprite");
+    ghost.setDisplaySize(28, 76);
+    ghost.setOrigin(0.5, 0.5);
+    ghost.setScale(facing * (28 / ghost.width), 76 / ghost.height);
+    ghost.setRotation(rotation);
+    ghost.setDepth(y - 1);
+    ghost.setTint(0x38bdf8); // Azure martial sword qi tint
+    ghost.setAlpha(0.38);
+
+    this.scene.tweens.add({
+      targets: ghost,
+      alpha: 0,
+      scaleX: facing * (28 / ghost.width) * 1.06,
+      scaleY: (76 / ghost.height) * 1.06,
+      duration: 250,
+      ease: "Cubic.easeOut",
+      onComplete: () => ghost.destroy()
+    });
+  }
+
+  spawnFootstepDust(x, y, vx, vy) {
+    const offsetX = -Math.sign(vx) * (7 + Math.random() * 4);
+    const offsetY = (Math.random() - 0.5) * 3;
+
+    const dust = this.scene.add.ellipse(x + offsetX, y + offsetY, 7, 4, 0xc4b998, 0.42);
+    dust.setDepth(y - 2);
+
+    this.scene.tweens.add({
+      targets: dust,
+      x: dust.x + offsetX * 0.4,
+      y: dust.y - 2,
+      scaleX: 1.8,
+      scaleY: 1.4,
+      alpha: 0,
+      duration: 280,
+      ease: "Quad.easeOut",
+      onComplete: () => dust.destroy()
+    });
+  }
+
+  playAttackMotion() {
+    if (!this.body) return;
+    this.scene.tweens.add({
+      targets: this.body,
+      x: 7,
+      scaleX: 1.08,
+      scaleY: 0.94,
+      duration: 75,
+      yoyo: true,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        if (this.body) this.body.x = 0;
+      }
+    });
+  }
+
+  playSkillMotion() {
+    if (!this.body) return;
+    this.scene.tweens.add({
+      targets: this.body,
+      scaleX: 1.15,
+      scaleY: 0.88,
+      duration: 80,
+      yoyo: true,
+      ease: "Quad.easeOut"
+    });
   }
 
   updateMovement() {
