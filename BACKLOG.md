@@ -36,7 +36,7 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ## EPIC C — Items & Progression
 
-### C1 — Persist inventory state · `todo` · P0
+### C1 — Persist inventory state · `in-progress` · P0
 - **Why:** `src/game/items.js` is explicitly static demo data; quantities reset on reload.
 - **Acceptance:** Inventory + quick-slot quantities load from and save to `storage.js`.
 - **Touches:** `src/game/items.js`, `src/game/storage.js`, `src/components/Modals/InventoryModal.jsx`.
@@ -53,7 +53,13 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ### C4 — Use consumables from inventory grid · `todo` · P2
 - **Acceptance:** Clicking a consumable in `InventoryModal` triggers `ACTION_USE_POTION` and decrements qty.
-- **Touches:** `src/components/Modals/InventoryModal.jsx`.
+- **Touches:** `src/components/Modals/InventoryModal.jsx`
+
+### C5 — Item rarity tiers with colored tooltips · `todo` · P2
+- **Why:** Every item renders identically; the JX2 rarity tiers (thường / lam / kim / huyền) are missing, so loot has no visible value gradient.
+- **Acceptance:** Each item in `QUICK_ITEMS` and `INVENTORY_ITEMS` declares `rarity` in `{common, uncommon, rare, epic}`; inventory names and tooltips apply a per-rarity CSS class/colour; a unit test asserts every item has a valid rarity and that all four tiers appear at least once.
+- **Touches:** `src/game/items.js`, `src/components/Modals/InventoryModal.jsx`, `src/components/HUD/HotbarDock.jsx`, `src/styles/item-icons.css`, `src/game/items.test.js`.
+- **Maps to:** Items & Equipment `[stretch]` — "Item rarity tiers (thường / lam / kim / huyền)".
 
 ---
 
@@ -71,6 +77,12 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 ### A3 — Enemy variety (ranged + elite) · `todo` · P2
 - **Touches:** `src/game/enemy.js`, `src/game/world.js`.
 
+### A4 — Critical hits + attack/defense damage formula · `todo` · P1
+- **Why:** Damage is a flat random range (`Phaser.Math.Between(17, 25)`); there is no attack/defense formula or crit, so C3 equipment stats would have nothing to affect.
+- **Acceptance:** A pure `computeDamage(attacker, defender, rng)` returns `{ damage, crit }`, applying attack-minus-defense mitigation, a minimum-damage floor of 1, and a crit multiplier; `performAttack`/`performSkill` use it and the combat log marks critical hits; unit tests cover the floor, the crit path, and a deterministic rng.
+- **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/game/enemy.js`, new `src/game/combat.test.js`.
+- **Maps to:** Combat `[core]` — "Critical hits, damage formula with attack/defense".
+
 ---
 
 ## EPIC B — World & NPC
@@ -81,7 +93,13 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 ### B4 — Quest system (log, rewards, multi-quest) · `todo` · P1
 - **Why:** Quest is a single hard-coded kill counter (`progress/total`).
 - **Acceptance:** Quest definitions, active-quest tracker in HUD, reward on completion, persists.
-- **Touches:** `src/game/`, `src/components/HUD/MinimapPanel.jsx`.
+- **Touches:** `src/game/`, `src/components/HUD/MinimapPanel.jsx`
+
+### B5 — Day/night ambience cycle · `todo` · P3
+- **Why:** The world is permanently tinted daylight; a slow day/night cycle adds JX2 atmosphere and makes the street lanterns meaningful.
+- **Acceptance:** A pure `tintForTime(elapsedMs)` maps a cycle position to an RGB tint plus lantern intensity; the scene applies it each frame and cycles over a fixed period; a unit test covers the mapping endpoints and determinism.
+- **Touches:** `src/game/world.js`, `src/game/game.js`, new `src/game/world.test.js`.
+- **Maps to:** Presentation `[stretch]` — "Day/night and weather on the world map".
 
 ---
 

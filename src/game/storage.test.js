@@ -74,4 +74,47 @@ describe("StorageManager", () => {
     StorageManager.save({ ...SAMPLE, questRewarded: undefined });
     expect(StorageManager.load().questRewarded).toBe(false);
   });
+
+  it("round-trips persisted stack quantities", () => {
+    StorageManager.save({
+      ...SAMPLE,
+      inventory: { "kim-sang-duoc": 42, "tui-bac": 7 }
+    });
+
+    expect(StorageManager.load().inventory).toEqual({
+      "kim-sang-duoc": 42,
+      "tui-bac": 7
+    });
+  });
+
+  it("sanitizes invalid inventory entries on save", () => {
+    StorageManager.save({
+      ...SAMPLE,
+      inventory: {
+        good: 3,
+        neg: -1,
+        str: "5",
+        nan: NaN,
+        inf: Infinity,
+        ["__proto__"]: 9
+      }
+    });
+
+    expect(StorageManager.load().inventory).toEqual({ good: 3 });
+  });
+
+  it("preserves existing inventory when a later save omits it", () => {
+    StorageManager.save({ ...SAMPLE, inventory: { "tui-bac": 5 } });
+    StorageManager.save({ ...SAMPLE, stats: { ...SAMPLE.stats, coins: 999 } });
+
+    expect(StorageManager.load().inventory).toEqual({ "tui-bac": 5 });
+  });
+
+  it("loadInventory merges saved values over the provided defaults", () => {
+    StorageManager.save({ ...SAMPLE, inventory: { "kim-sang-duoc": 12 } });
+
+    expect(
+      StorageManager.loadInventory({ "kim-sang-duoc": 99, "dai-hoan-dan": 86 })
+    ).toEqual({ "kim-sang-duoc": 12, "dai-hoan-dan": 86 });
+  });
 });

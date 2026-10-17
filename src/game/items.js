@@ -1,6 +1,6 @@
 /**
  * Shared item catalog for the character's inventory ("Hành Trang") and quick slots.
- * Static demo data — quantities are illustrative and not yet persisted to storage.
+ * The catalog itself is static; stack quantities are persisted via src/game/storage.js.
  */
 
 /**
@@ -97,3 +97,74 @@ export const INVENTORY_ITEMS = [
   { id: "hoang-kim-huyen-thiet", name: "Huyền Thiết Kim", icon: "icon-gem", qty: 67, desc: "Kim loại huyền thiết, chế tạo binh khí thượng hạng." },
   { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." }
 ];
+
+/**
+ * Build the default id -> quantity map from the static catalog.
+ * Only items that actually carry a numeric quantity are included, so equipment
+ * and icons without a stack count stay quantity-less.
+ * @returns {Record<string, number>}
+ */
+export function defaultQuantities() {
+  const quantities = {};
+  const collect = (item) => {
+    if (item && typeof item.qty === "number" && Number.isFinite(item.qty)) {
+      quantities[item.id] = item.qty;
+    }
+  };
+  QUICK_ITEMS.forEach(collect);
+  INVENTORY_ITEMS.filter(Boolean).forEach(collect);
+  return quantities;
+}
+
+/**
+ * In-memory source of truth for stack quantities, shared by the React HUD
+ * (rendering) and the Phaser scene (persisting via StorageManager.save()).
+ * `null` until the first `setQuantities()` call, in which case defaults are used.
+ * @type {Record<string, number> | null}
+ */
+let currentQuantities = null;
+
+/**
+ * Replace the in-memory quantities, merged over the catalog defaults so that
+ * newly added catalog items always keep a value.
+ * @param {Record<string, number>} [quantities]
+ * @returns {Record<string, number>} The merged map
+ */
+export function setQuantities(quantities = {}) {
+  const merged = { ...defaultQuantities() };
+  Object.entries(quantities || {}).forEach(([id, qty]) => {
+    if (typeof qty === "number" && Number.isFinite(qty) && qty >= 0) {
+      merged[id] = Math.floor(qty);
+    }
+  });
+  currentQuantities = merged;
+  return merged;
+}
+
+/**
+ * Current stack quantities. Falls back to catalog defaults before any load.
+ * @returns {Record<string, number>}
+ */
+export function getQuantities() {
+  return currentQuantities || defaultQuantities();
+}
+
+/**
+ * Resolve the catalog into render-ready arrays with persisted quantities applied.
+ * Inventory items with no saved or default quantity are returned unchanged.
+ * @param {Record<string, number>} [quantities]
+ * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
+ */
+export function applyQuantities(quantities = defaultQuantities()) {
+  const withQty = (item) => {
+    const saved = quantities[item.id];
+    if (typeof saved === "number" && Number.isFinite(saved)) {
+      return { ...item, qty: saved };
+    }
+    return item;
+  };
+  return {
+    quickItems: QUICK_ITEMS.map(withQty),
+    inventoryItems: INVENTORY_ITEMS.map((item) => (item ? withQty(item) : null))
+  };
+}
