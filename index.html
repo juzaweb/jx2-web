@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Giang Hồ — HTML5 RPG</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="game-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">武</span><div><strong>GIANG HỒ</strong><small>MINI MMORPG • DEMO</small></div></div>
+      <div class="realm">BẢN ĐỒ: <b>THÔN TRƯỜNG AN</b></div>
+      <div class="top-actions"><button id="sound-btn" class="ghost">ÂM THANH: <span>ON</span></button><button id="help-btn" class="ghost">HƯỚNG DẪN</button></div>
+    </header>
+    <section class="game-frame">
+      <div id="game-container"></div>
+      <div class="hud">
+        <div class="player-card glass">
+          <div class="avatar">侠</div><div class="player-info"><div class="player-name">Lãng Khách <span class="level" id="level-label">Cấp 1</span></div>
+            <div class="bar-label"><span>HP</span><span id="hp-text">100 / 100</span></div><div class="bar hp"><i id="hp-bar"></i></div>
+            <div class="bar-label"><span>MP</span><span id="mp-text">60 / 60</span></div><div class="bar mp"><i id="mp-bar"></i></div>
+            <div class="bar-label"><span>EXP</span><span id="exp-text">0 / 100</span></div><div class="bar exp"><i id="exp-bar"></i></div>
+          </div>
+        </div>
+        <div class="quest-card glass"><div class="quest-title">✦ NHIỆM VỤ TÂN THỦ</div><div id="quest-text">Tiêu diệt 3 Sói Xám</div><div class="quest-progress" id="quest-progress">Tiến độ: 0 / 3</div></div>
+        <div class="feed glass" id="combat-log"><div class="feed-title">TIN GIANG HỒ</div><p>Chào mừng hiệp khách đến với Trường An.</p><p>Di chuyển bằng WASD hoặc phím mũi tên.</p></div>
+        <div class="controls-hint">WASD / ← ↑ ↓ → DI CHUYỂN <span>SPACE / CLICK: TẤN CÔNG</span></div>
+        <div class="mobile-controls"><button data-move="up">▲</button><div><button data-move="left">◀</button><button data-move="down">▼</button><button data-move="right">▶</button></div><button id="mobile-attack">⚔</button></div>
+      </div>
+      <div id="overlay" class="overlay">
+        <div class="modal glass">
+          <div class="modal-symbol">武</div><p class="eyebrow">THẾ GIỚI KIẾM HIỆP</p><h1>GIANG HỒ</h1><p class="subtitle">Một bước vào giang hồ, vạn bước chẳng quay đầu.</p>
+          <div class="feature-row"><span>⚔ Chiến đấu</span><span>✦ Lên cấp</span><span>◆ Nhặt đồ</span></div>
+          <button id="start-btn" class="primary">BƯỚC CHÂN VÀO GIANG HỒ <span>→</span></button>
+          <small>Game demo lấy cảm hứng từ RPG võ hiệp cổ điển</small>
+        </div>
+      </div>
+      <div id="help-modal" class="overlay hidden">
+        <div class="modal glass help-modal"><button id="close-help" class="close">×</button><p class="eyebrow">CẨM NANG TÂN THỦ</p><h2>Hành tẩu giang hồ</h2>
+          <p><b>Di chuyển:</b> WASD hoặc phím mũi tên.</p><p><b>Tấn công:</b> Space hoặc nhấp chuột vào bản đồ.</p><p><b>Kỹ năng:</b> Nhấn Q để thi triển kiếm khí, tiêu hao nội lực.</p><p><b>Tu luyện:</b> Hạ Sói Xám để nhận kinh nghiệm và bạc. Lên cấp sẽ hồi đầy HP/MP.</p><p><b>Vật phẩm:</b> Đi tới gần túi đồ phát sáng để nhặt.</p><button id="resume-btn" class="primary">ĐÃ HIỂU</button>
+        </div>
+      </div>
+    </section>
+    <footer><span>GIANG HỒ MINI • PHASER 3</span><span>Hành hiệp trượng nghĩa — Tự tại tiêu dao</span><span id="coin-label">BẠC: 0</span></footer>
+  </main>
+  <script type="importmap">
+  {
+    "imports": {
+      "phaser": "https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.esm.js"
+    }
+  }
+  </script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
