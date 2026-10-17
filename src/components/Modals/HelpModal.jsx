@@ -13,10 +13,10 @@ export function HelpModal({ isOpen, onClose, onReset }) {
         <h2>Hướng Dẫn Tân Thủ</h2>
         <div className="guide-scroll">
           <p>
-            <b>Di chuyển:</b> Dùng cụm phím <b>W, A, S, D</b> hoặc <b>← ↑ ↓ →</b>.
+            <b>Di chuyển:</b> Nhấp <b>chuột trái</b> vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng phím <b>W, A, S, D / phím mũi tên</b>.
           </p>
           <p>
-            <b>Chiến đấu:</b> Nhấn <b>Space</b> hoặc nhấp chuột trái vào bản đồ để xuất chiêu kiếm pháp.
+            <b>Chiến đấu:</b> Nhấn <b>Space</b> để xuất chiêu, hoặc nhấp chuột trái trực tiếp vào quái vật để tấn công.
           </p>
           <p>
             <b>Tuyệt kỹ Kiếm Khí:</b> Nhấn phím <b>Q</b> hoặc <b>Phím 8</b>, phát kình khí diện rộng (tiêu hao 15 MP).

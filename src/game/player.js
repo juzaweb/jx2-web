@@ -25,6 +25,9 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
+    this.targetX = null;
+    this.targetY = null;
+    this.isMovingToTarget = false;
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
@@ -88,37 +91,85 @@ export class Player {
 
   updateMovement() {
     const k = this.keys;
-    const left = k.A.isDown || k.LEFT.isDown || this.touchDirection === "left";
-    const right = k.D.isDown || k.RIGHT.isDown || this.touchDirection === "right";
-    const up = k.W.isDown || k.UP.isDown || this.touchDirection === "up";
-    const down = k.S.isDown || k.DOWN.isDown || this.touchDirection === "down";
+    const keyLeft = k.A.isDown || k.LEFT.isDown || this.touchDirection === "left";
+    const keyRight = k.D.isDown || k.RIGHT.isDown || this.touchDirection === "right";
+    const keyUp = k.W.isDown || k.UP.isDown || this.touchDirection === "up";
+    const keyDown = k.S.isDown || k.DOWN.isDown || this.touchDirection === "down";
 
-    let vx = 0;
-    let vy = 0;
-    if (left) vx -= 1;
-    if (right) vx += 1;
-    if (up) vy -= 1;
-    if (down) vy += 1;
+    // If keyboard or touch-dpad is active, cancel target movement and prioritize keys
+    if (keyLeft || keyRight || keyUp || keyDown) {
+      this.isMovingToTarget = false;
+      this.targetX = null;
+      this.targetY = null;
 
-    const vector = new Phaser.Math.Vector2(vx, vy);
-    if (vector.length() > 0) {
-      vector.normalize().scale(175);
+      let vx = 0;
+      let vy = 0;
+      if (keyLeft) vx -= 1;
+      if (keyRight) vx += 1;
+      if (keyUp) vy -= 1;
+      if (keyDown) vy += 1;
+
+      const vector = new Phaser.Math.Vector2(vx, vy);
+      if (vector.length() > 0) {
+        vector.normalize().scale(175);
+      }
+
+      this.sprite.setVelocity(vector.x, vector.y);
+
+      if (vx !== 0) {
+        this.visual.setScale(vx < 0 ? -1 : 1, 1);
+      }
+      return;
     }
 
-    this.sprite.setVelocity(vector.x, vector.y);
+    // Click-to-move handling
+    if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
+      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
 
-    if (vx !== 0) {
-      this.visual.setScale(vx < 0 ? -1 : 1, 1);
+      if (dist <= 8) {
+        this.stopMovement();
+        return;
+      }
+
+      const angle = Phaser.Math.Angle.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
+      const vx = Math.cos(angle) * 175;
+      const vy = Math.sin(angle) * 175;
+
+      this.sprite.setVelocity(vx, vy);
+
+      if (Math.abs(vx) > 10) {
+        this.visual.setScale(vx < 0 ? -1 : 1, 1);
+      }
+      return;
+    }
+
+    this.sprite.setVelocity(0, 0);
+  }
+
+  moveTo(x, y) {
+    this.targetX = x;
+    this.targetY = y;
+    this.isMovingToTarget = true;
+  }
+
+  stopMovement() {
+    this.isMovingToTarget = false;
+    this.targetX = null;
+    this.targetY = null;
+    if (this.sprite?.body) {
+      this.sprite.setVelocity(0, 0);
     }
   }
 
   setPosition(x, y) {
+    this.stopMovement();
     this.sprite.setPosition(x, y);
     this.visual.setPosition(x, y);
     this.nameText.setPosition(x, y - 55);
   }
 
   respawn() {
+    this.stopMovement();
     this.setPosition(this.spawnX, this.spawnY);
     this.sprite.setVelocity(0, 0);
   }

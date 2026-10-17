@@ -84,11 +84,13 @@ export class JiangHuScene extends Phaser.Scene {
     // Scale resize handler
     this.scale.on("resize", () => this.updateCameraZoom());
 
-    // Mouse input handlers (Left click: Basic Attack, Right click: Kiếm Khí)
+    this.isPointerMoving = false;
+
+    // Mouse input handlers (Left click: Move or Attack Enemy, Right click: Kiếm Khí)
     this.input.on("pointerdown", (pointer) => {
       if (!this.started || this.isPaused) return;
 
-      // Do not attack when clicking on interactive HUD elements or React overlays
+      // Do not handle when clicking on interactive HUD elements or React overlays
       const target = pointer.event.target;
       if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay")) {
         return;
@@ -96,9 +98,51 @@ export class JiangHuScene extends Phaser.Scene {
 
       if (pointer.rightButtonDown()) {
         this.combat.performSkill();
-      } else {
-        this.combat.performAttack();
+        return;
       }
+
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+
+      // Check if clicking directly on a living enemy
+      const clickedEnemy = this.enemyManager
+        .getAlive()
+        .find((wolf) => Phaser.Math.Distance.Between(worldX, worldY, wolf.x, wolf.y) < 38);
+
+      if (clickedEnemy) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedEnemy.x, clickedEnemy.y);
+        if (dist <= 85) {
+          this.player.stopMovement();
+          this.combat.performAttack();
+        } else {
+          this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
+          this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
+        }
+        return;
+      }
+
+      // Left click on terrain: Move to destination
+      this.isPointerMoving = true;
+      this.player.moveTo(worldX, worldY);
+      this.showClickIndicator(worldX, worldY, 0xffdd59);
+    });
+
+    // Hold-to-move continuous cursor tracking
+    this.input.on("pointermove", (pointer) => {
+      if (!this.started || this.isPaused || !this.isPointerMoving || !pointer.isDown || pointer.rightButtonDown()) {
+        return;
+      }
+
+      const target = pointer.event.target;
+      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay")) {
+        return;
+      }
+
+      this.player.moveTo(pointer.worldX, pointer.worldY);
+    });
+
+    this.input.on("pointerup", () => {
+      this.isPointerMoving = false;
     });
 
     // Keyboard Hotkeys
@@ -281,6 +325,21 @@ export class JiangHuScene extends Phaser.Scene {
   updateCameraZoom() {
     const zoom = Math.min(this.scale.width / 1000, this.scale.height / 570, 1.15);
     this.cameras.main.setZoom(zoom);
+  }
+
+  showClickIndicator(x, y, color = 0xffdd59) {
+    const ring = this.add.circle(x, y, 5, color, 0.25);
+    ring.setStrokeStyle(2, color, 0.95);
+    ring.setDepth(y);
+
+    this.tweens.add({
+      targets: ring,
+      radius: 17,
+      alpha: 0,
+      duration: 300,
+      ease: "Cubic.easeOut",
+      onComplete: () => ring.destroy()
+    });
   }
 
   startGame() {
