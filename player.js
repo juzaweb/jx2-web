@@ -127,6 +127,14 @@ export class Player {
     this.touchDirection = direction;
   }
 
+  loadStats(savedStats) {
+    if (!savedStats || typeof savedStats !== "object") return;
+    this.stats = {
+      ...this.stats,
+      ...savedStats
+    };
+  }
+
   get x() {
     return this.sprite ? this.sprite.x : this.spawnX;
   }

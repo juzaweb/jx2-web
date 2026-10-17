@@ -43,12 +43,14 @@ export class CombatSystem {
    * @param {import("./player.js").Player} player
    * @param {import("./enemy.js").EnemyManager} enemyManager
    * @param {import("./ui.js").UIManager} uiManager
+   * @param {Function} [onStateChange]
    */
-  constructor(scene, player, enemyManager, uiManager) {
+  constructor(scene, player, enemyManager, uiManager, onStateChange = null) {
     this.scene = scene;
     this.player = player;
     this.enemyManager = enemyManager;
     this.ui = uiManager;
+    this.onStateChange = onStateChange;
 
     this.attackReady = true;
     this.skillReady = true;
@@ -181,6 +183,9 @@ export class CombatSystem {
 
     this.checkLevelUp();
     this.ui.updateHud(this.player.stats);
+    if (typeof this.onStateChange === "function") {
+      this.onStateChange();
+    }
 
     // Check quest progress after a brief interval
     this.scene.time.delayedCall(650, () => {
@@ -199,6 +204,9 @@ export class CombatSystem {
     this.checkLevelUp();
     this.ui.addLog("Nhiệm vụ hoàn thành! Thưởng thêm 50 EXP và 20 bạc.");
     this.ui.updateHud(this.player.stats);
+    if (typeof this.onStateChange === "function") {
+      this.onStateChange();
+    }
   }
 
   damagePlayer(amount) {
@@ -246,6 +254,9 @@ export class CombatSystem {
 
     if (leveledUp) {
       this.ui.updateHud(this.player.stats);
+      if (typeof this.onStateChange === "function") {
+        this.onStateChange();
+      }
     }
   }
 
@@ -299,6 +310,9 @@ export class CombatSystem {
 
     this.ui.addLog("Nhặt được Túi Bạc: +5 bạc, +5 nội lực.");
     this.ui.updateHud(this.player.stats);
+    if (typeof this.onStateChange === "function") {
+      this.onStateChange();
+    }
   }
 
   showFloatText(x, y, text, color) {

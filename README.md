@@ -47,6 +47,7 @@ You can also deploy the three files to any static web host.
 - `enemy.js` — Wolf AI entity, health bar, chase/aggro behavior, and EnemyManager
 - `combat.js` — CombatSystem, sword attack, Kiếm Khí skill, drops, and Web Audio synthesizer
 - `ui.js` — UIManager, HUD status bars, quest progression tracker, and combat feed log
+- `storage.js` — StorageManager for saving/loading game state with localStorage
 
 ## Notes
 This is an original demo inspired by classic wuxia RPG mechanics. It does not include original VLTK assets, servers, networking, or official game content.

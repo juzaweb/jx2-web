@@ -9,8 +9,17 @@ export class UIManager {
   /**
    * Set up UI buttons, mobile pad, and modals
    * @param {Object} handlers
+   * @param {Function} handlers.onStart
+   * @param {Function} handlers.onSoundToggle
+   * @param {Function} handlers.onMove
+   * @param {Function} handlers.onAttack
+   * @param {Function} [handlers.onPauseChange]
+   * @param {Function} [handlers.onSave]
+   * @param {Function} [handlers.onReset]
    */
-  initControls({ onStart, onSoundToggle, onMove, onAttack }) {
+  initControls({ onStart, onSoundToggle, onMove, onAttack, onPauseChange, onSave, onReset }) {
+    this.onPauseChange = onPauseChange;
+
     // Start Game button
     const startBtn = document.getElementById("start-btn");
     if (startBtn) {
@@ -23,18 +32,56 @@ export class UIManager {
     // Help modal buttons
     const helpBtn = document.getElementById("help-btn");
     if (helpBtn) {
-      helpBtn.addEventListener("click", () => this.showHelp());
+      helpBtn.addEventListener("click", () => {
+        this.showHelp();
+        if (typeof this.onPauseChange === "function") this.onPauseChange(true);
+      });
     }
 
     const closeHelpBtn = document.getElementById("close-help");
     if (closeHelpBtn) {
-      closeHelpBtn.addEventListener("click", () => this.hideHelp());
+      closeHelpBtn.addEventListener("click", () => {
+        this.hideHelp();
+        if (typeof this.onPauseChange === "function") this.onPauseChange(false);
+      });
     }
 
     const resumeBtn = document.getElementById("resume-btn");
     if (resumeBtn) {
-      resumeBtn.addEventListener("click", () => this.hideHelp());
+      resumeBtn.addEventListener("click", () => {
+        this.hideHelp();
+        if (typeof this.onPauseChange === "function") this.onPauseChange(false);
+      });
     }
+
+    // Manual Save button
+    const saveBtn = document.getElementById("save-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        if (typeof onSave === "function") onSave();
+      });
+    }
+
+    // Reset button
+    const resetBtn = document.getElementById("reset-btn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        if (typeof onReset === "function") onReset();
+      });
+    }
+
+    // Keyboard ESC shortcut to toggle Help / Pause
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (this.isHelpOpen()) {
+          this.hideHelp();
+          if (typeof this.onPauseChange === "function") this.onPauseChange(false);
+        } else if (!this.isOverlayOpen()) {
+          this.showHelp();
+          if (typeof this.onPauseChange === "function") this.onPauseChange(true);
+        }
+      }
+    });
 
     // Sound toggle button
     const soundBtn = document.getElementById("sound-btn");
@@ -71,6 +118,14 @@ export class UIManager {
     }
   }
 
+  isHelpOpen() {
+    return this.helpModal && !this.helpModal.classList.contains("hidden");
+  }
+
+  isOverlayOpen() {
+    return this.overlay && !this.overlay.classList.contains("hidden");
+  }
+
   hideOverlay() {
     if (this.overlay) {
       this.overlay.classList.add("hidden");
@@ -87,6 +142,17 @@ export class UIManager {
     if (this.helpModal) {
       this.helpModal.classList.add("hidden");
     }
+  }
+
+  updateStartButton(text) {
+    const startBtn = document.getElementById("start-btn");
+    if (startBtn) {
+      startBtn.innerHTML = `${text} <span>→</span>`;
+    }
+  }
+
+  setQuestRewarded(rewarded) {
+    this.questRewarded = !!rewarded;
   }
 
   /**

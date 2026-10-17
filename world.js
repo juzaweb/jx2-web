@@ -13,9 +13,11 @@ export class WorldManager {
     this.scene = scene;
     this.width = WORLD_CONFIG.width;
     this.height = WORLD_CONFIG.height;
+    this.obstacles = null;
   }
 
   create() {
+    this.obstacles = this.scene.physics.add.staticGroup();
     this.drawTerrain();
     this.drawRoad();
     this.drawRiver();
@@ -120,6 +122,25 @@ export class WorldManager {
 
     group.add([shadow, body, door, roof, plaque, text]);
     group.setDepth(y + h);
+
+    // Static physics body for building collision
+    if (this.obstacles) {
+      const colWidth = Math.max(20, w - 16);
+      const colHeight = Math.max(20, h * 0.6);
+      const colY = y + h * 0.65;
+      const obstacle = this.obstacles.create(x + w / 2, colY, "entity-dot");
+      obstacle.setSize(colWidth, colHeight);
+      obstacle.setVisible(false);
+      obstacle.refreshBody();
+    }
+  }
+
+  /**
+   * Get static physics group containing world obstacles (buildings)
+   * @returns {Phaser.Physics.Arcade.StaticGroup}
+   */
+  getObstacles() {
+    return this.obstacles;
   }
 
   drawStreetLanterns() {
