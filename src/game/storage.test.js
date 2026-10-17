@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { StorageManager } from "./storage.js";
 
 const STORAGE_KEY = "giang_ho_game_save_v1";
@@ -55,8 +56,13 @@ describe("StorageManager", () => {
   });
 
   it("returns null on malformed JSON", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     localStorage.setItem(STORAGE_KEY, "{not valid json");
+
     expect(StorageManager.load()).toBeNull();
+
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("returns null when the payload has no stats", () => {

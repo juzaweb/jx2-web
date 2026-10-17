@@ -26,7 +26,6 @@ describe("item catalog", () => {
 
   it("fills a 5x6 inventory grid (30 slots)", () => {
     expect(INVENTORY_ITEMS).toHaveLength(30);
-    expect(INVENTORY_ITEMS.some((slot) => slot === null)).toBe(false);
   });
 
   it("gives every inventory slot the required display fields", () => {

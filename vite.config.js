@@ -8,8 +8,7 @@ export default defineConfig({
     open: false
   },
   test: {
-    environment: "jsdom",
-    include: ["src/**/*.test.{js,jsx}"],
-    reporters: ["default"]
+    environment: "node",
+    include: ["src/**/*.test.{js,jsx}"]
   }
 });

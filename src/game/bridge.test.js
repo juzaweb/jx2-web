@@ -27,6 +27,7 @@ describe("GameEventBridge", () => {
   });
 
   it("isolates a throwing handler from other subscribers", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const bad = vi.fn(() => {
       throw new Error("boom");
     });
@@ -36,6 +37,8 @@ describe("GameEventBridge", () => {
 
     expect(() => bridge.emit(EVENTS.STATS_UPDATED, { hp: 1 })).not.toThrow();
     expect(good).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("is a no-op when emitting with no subscribers", () => {

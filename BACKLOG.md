@@ -13,7 +13,7 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ### E1 — Add a test harness · `done` · P0
 - **Why:** No `npm test` exists; nothing guards combat/storage/items logic.
-- **Scope:** Add Vitest + jsdom config; add `test` + `test:ci` scripts.
+- **Scope:** Add Vitest + jsdom config; add `test` + `test:watch` scripts.
 - **Acceptance:**
   - `npm test` runs and passes.
   - A first unit test covers `src/game/storage.js` save/load round-trip.
