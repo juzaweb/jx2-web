@@ -15,7 +15,7 @@ const EQUIPMENT_SLOTS = {
     { key: "secretManual", label: "Mật tịch", icon: "manual" }
   ],
   // Sits at the elbow where the vertical column meets the horizontal row.
-  corner: { key: "subManual", label: "Phó mật tịch", icon: "manual" },
+  corner: { key: "subManual", label: "Phó mật tịch", icon: "subManual" },
   row: [
     { key: "cosHat", label: "Ngoại trang - Nón", icon: "cosHat" },
     { key: "cosTop", label: "Ngoại trang - Áo", icon: "cosTop" },
@@ -70,6 +70,12 @@ const SLOT_ICONS = {
       <rect x="6" y="4" width="12" height="16" rx="1.5" />
       <path d="M9 9h6" />
       <path d="M9 13h6" />
+    </>
+  ),
+  subManual: (
+    <>
+      <rect x="6" y="4" width="12" height="16" rx="1.5" />
+      <path d="M12 4v6l2-1.5 2 1.5V4" />
     </>
   ),
   cosHat: (

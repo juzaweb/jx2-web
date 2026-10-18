@@ -2,12 +2,11 @@
  * Character sheet derivation.
  *
  * The game currently persists only a small set of live values (level, HP, MP,
- * stamina, exp, kills). The full JX2 sheet exposes many combat attributes that
- * have no backing model yet, so for this phase every derived value is computed
- * from the character level by a deterministic formula. Nothing here affects
- * combat — it is presentation only, and the shape is kept flat/testable so a
- * real attribute + equipment model can replace the formulas later without
- * touching the modal.
+ * exp). The full JX2 sheet exposes many combat attributes that have no backing
+ * model yet, so for this phase every derived value is computed from the
+ * character level by a deterministic formula. Nothing here affects combat — it
+ * is presentation only, and the shape is kept flat/testable so a real attribute
+ * + equipment model can replace the formulas later without touching the modal.
  */
 
 const MIN_LEVEL = 1;
