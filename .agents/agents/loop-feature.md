@@ -30,10 +30,12 @@ needed: `skills/loop-constraints/SKILL.md`, `skills/feature-propose/SKILL.md`,
 
 ## Run exactly one pipeline cycle
 
-1. Invoke the `feature-propose` subagent for new specs (it writes `BACKLOG.md` only).
+1. Invoke the `feature-propose` subagent for new specs (it writes `BACKLOG.md` as
+   `proposed` items only).
 2. Invoke the `spec-review` subagent. Stop immediately on `SPEC GATE: FAIL`.
-3. Implement exactly one approved item in a git worktree via the `implementer`
-   subagent (base branch `develop`).
+3. Implement exactly one **`todo`** item (human-approved) in a git worktree via the
+   `implementer` subagent (base branch `develop`). If no `todo` item exists, stop
+   after proposing/reviewing — **never implement a `proposed` item**.
 4. Run the documented verify command `npm run build && npm test`, then invoke the
    `verifier` subagent (it applies the code-review-and-quality five-axis review).
 5. On `APPROVE` and green CI, open a PR into `develop` and merge only per
@@ -59,6 +61,8 @@ If the rebase hits a conflict:
 
 ## Hard rules
 
+- **Human approval gate:** implement only `todo` items. `proposed` items await a
+  human promoting them to `todo`. Never auto-promote.
 - Respect `gate.yaml` denylist, `maxFiles`, `autoMergeTargets`, and
   `humanMergeRequired`.
 - Never commit, push, or merge to `main`. `main` is human-only.

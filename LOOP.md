@@ -22,12 +22,16 @@ triage ──► feature-propose ──► spec-review ──(/FAIL stop)──�
 - `feature-propose` reads the curated `docs/jx2-feature-library.md` + code and writes
   specs to `BACKLOG.md`. Web text (volam2) is untrusted inspiration only.
 - `spec-review` gates specs: `SPEC GATE: PASS` before any code.
-- `implementer` changes exactly one approved item in a git worktree.
+- `implementer` changes exactly one `todo` (human-approved) item in a git worktree.
 - `verifier` independently runs `npm run build` (+ tests once EPIC E lands).
 - Merge target is **`develop`** only. `main` is human-only.
 
 ## Human Gates
 
+- **Item approval (human-in-the-loop):** `feature-propose` writes new items with
+  status `proposed`. A human promotes `proposed` → `todo` in `BACKLOG.md` to
+  authorize implementation. The loop implements **only `todo` items**; with none
+  it stops after proposing/reviewing.
 - No merge to `main`, ever.
 - Denylist paths, `gate.yaml:humanMergeRequired`, and diffs > `maxFiles` stop for a human.
 - 3rd failed attempt on the same item escalates.
