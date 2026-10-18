@@ -22,6 +22,17 @@ const makeCanvas = (ctx = makeCtx()) => ({
   getContext: vi.fn(() => ctx)
 });
 
+const WORLD = { width: 2200, height: 1250 };
+
+/** True when a blip arc was drawn at the canvas point for world (wx, wy). */
+const blipDrawnAt = (ctx, wx, wy) => {
+  const cx = wx * (168 / WORLD.width);
+  const cy = wy * (116 / WORLD.height);
+  return ctx.arc.mock.calls.some(
+    ([ax, ay]) => Math.abs(ax - cx) < 1e-6 && Math.abs(ay - cy) < 1e-6
+  );
+};
+
 describe("UIBridgeAdapter minimap registration", () => {
   beforeEach(() => bridge.clear());
   afterEach(() => bridge.clear());
@@ -60,14 +71,15 @@ describe("UIBridgeAdapter minimap registration", () => {
     adapter.drawMinimap(
       { x: 640, y: 620 },
       [{ x: 840, y: 600, active: true, isDead: false }],
-      { width: 2200, height: 1250 },
+      WORLD,
       // RemotePlayer renders through `container`, not a physics `sprite`
       [{ x: 700, y: 640, container: { active: true } }]
     );
 
     expect(ctx.fillRect).toHaveBeenCalled();
-    // 1 enemy + 1 remote + the player beacon at minimum
-    expect(ctx.arc.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(blipDrawnAt(ctx, 840, 600)).toBe(true); // enemy
+    expect(blipDrawnAt(ctx, 700, 640)).toBe(true); // remote player
+    expect(blipDrawnAt(ctx, 640, 620)).toBe(true); // local player beacon
   });
 
   it("skips a remote player that has been destroyed (no live container)", () => {
@@ -78,12 +90,13 @@ describe("UIBridgeAdapter minimap registration", () => {
     adapter.drawMinimap(
       { x: 640, y: 620 },
       [],
-      { width: 2200, height: 1250 },
+      WORLD,
       [{ x: 700, y: 640, container: { active: false } }, { x: 720, y: 660 }]
     );
 
-    // Only the player sight-radius arc + center dot remain
-    expect(ctx.arc.mock.calls.length).toBe(2);
+    expect(blipDrawnAt(ctx, 700, 640)).toBe(false);
+    expect(blipDrawnAt(ctx, 720, 660)).toBe(false);
+    expect(blipDrawnAt(ctx, 640, 620)).toBe(true); // the local player is still drawn
   });
 
   it("does nothing before a canvas is bound", () => {
