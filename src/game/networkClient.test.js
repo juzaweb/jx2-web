@@ -29,6 +29,18 @@ describe("NetworkClient", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it("should drop its handlers when disconnected for good", () => {
+    const handler = vi.fn();
+    client.on("disconnected", handler);
+
+    client.disconnect();
+    // The socket's `close` arrives after the teardown; it must find no listeners
+    client.emit("disconnected", {});
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(client.shouldReconnect).toBe(false);
+  });
+
   it("should handle error in event listener gracefully", () => {
     const brokenHandler = () => {
       throw new Error("test crash");

@@ -170,6 +170,7 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.connect();
+    this.bindSceneTeardown();
 
     this.isPointerMoving = false;
 
@@ -595,6 +596,21 @@ export class JiangHuScene extends Phaser.Scene {
       WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
+  }
+
+  /**
+   * Close the multiplayer client when this scene goes away.
+   *
+   * React unmounts and remounts the canvas whenever the game is re-entered or a
+   * module reloads (Vite HMR), and Phaser then destroys the scene. Without this
+   * the abandoned `NetworkClient` stays connected and keeps auto-reconnecting
+   * with the same per-tab player id, so the server closes the other socket on
+   * every join and the two clients fight forever — the live client just keeps
+   * logging "Mất kết nối máy chủ. Đang tự động kết nối lại...".
+   */
+  bindSceneTeardown() {
+    this.events.once("shutdown", this.shutdown, this);
+    this.events.once("destroy", this.shutdown, this);
   }
 
   shutdown() {
