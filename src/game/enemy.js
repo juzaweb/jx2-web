@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { reconcileEnemyState } from "./enemySync.js";
+import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
 
 export class Wolf {
   /**
@@ -27,6 +27,9 @@ export class Wolf {
     };
     this.isDead = false;
     this.nextBite = 0;
+    // Where the server says this wolf is; the render follows it (see update())
+    this.targetX = x;
+    this.targetY = y;
 
     this.createSprite(x, y);
     this.createVisuals(x, y);
@@ -74,6 +77,9 @@ export class Wolf {
   update(time, delta, player, onBite) {
     if (!this.sprite.active || this.isDead) return;
 
+    // The server owns movement (see server/src/enemyAi.js); render its lead
+    this.followServerPosition(delta);
+
     const x = this.sprite.x;
     const y = this.sprite.y;
 
@@ -89,32 +95,48 @@ export class Wolf {
     this.nameText.setPosition(x, y - 29);
     this.nameText.setDepth(y + 3);
 
+    // The server drives the AI (see server/src/enemyAi.js); the client renders the
+    // authoritative position and only bites when the wolf is close enough
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
 
-    // AI Aggro range
-    if (distance < 210) {
-      this.scene.physics.moveToObject(this.sprite, player.sprite, distance > 52 ? 43 : 0);
-      // Flip wolf facing player
-      this.wolfVisual.setScale(player.x < x ? -1 : 1, 1);
-
-      if (distance < 55 && time > this.nextBite) {
-        this.nextBite = time + 1400;
-        if (typeof onBite === "function") {
-          onBite(this);
-        }
+    if (distance < 55 && time > this.nextBite) {
+      this.nextBite = time + 1400;
+      if (typeof onBite === "function") {
+        onBite(this);
       }
+    }
+  }
+
+  /**
+   * Smoothly follow the authoritative position for this frame.
+   * @param {number} deltaMs
+   */
+  followServerPosition(deltaMs) {
+    if (!Number.isFinite(this.targetX) || !Number.isFinite(this.targetY)) return;
+
+    const next = interpolateEnemyPosition(
+      { x: this.x, y: this.y },
+      { x: this.targetX, y: this.targetY },
+      deltaMs
+    );
+    if (next.x === this.x && next.y === this.y) return;
+
+    this.placeAt(next.x, next.y);
+    if (Math.abs(this.targetX - next.x) > 1) {
+      this.wolfVisual.setScale(this.targetX < next.x ? -1 : 1, 1);
+    }
+  }
+
+  /**
+   * Put the sprite and its physics body on a position.
+   * @param {number} x
+   * @param {number} y
+   */
+  placeAt(x, y) {
+    if (this.sprite.body?.reset) {
+      this.sprite.body.reset(x, y);
     } else {
-      // Idle return home
-      this.sprite.body.setVelocity(
-        this.sprite.body.velocity.x * 0.94,
-        this.sprite.body.velocity.y * 0.94
-      );
-
-      const distHome = Phaser.Math.Distance.Between(x, y, this.homeX, this.homeY);
-      if (distHome > 10) {
-        this.scene.physics.moveTo(this.sprite, this.homeX, this.homeY, 22);
-        this.wolfVisual.setScale(this.homeX < x ? -1 : 1, 1);
-      }
+      this.sprite.setPosition(x, y);
     }
   }
 
@@ -130,7 +152,8 @@ export class Wolf {
   }
 
   /**
-   * Apply an authoritative server snapshot: health always, position only when far off.
+   * Apply an authoritative server snapshot: health always, position by the
+   * server's lead (a warp is applied at once, anything smaller is smoothed).
    * @param {{x?:number,y?:number,hp?:number,isDead?:boolean}} state
    */
   applyServerState(state = {}) {
@@ -145,10 +168,15 @@ export class Wolf {
 
     if (next.isDead) {
       if (!this.isDead) this.die();
-    } else if (this.isDead) {
-      this.revive();
-    } else if (next.snap && this.sprite.body) {
-      this.sprite.body.reset(state.x, state.y);
+      return;
+    }
+
+    if (this.isDead) this.revive();
+
+    if (Number.isFinite(state.x) && Number.isFinite(state.y)) {
+      this.targetX = state.x;
+      this.targetY = state.y;
+      if (next.snap) this.placeAt(state.x, state.y);
     }
   }
 
@@ -167,6 +195,8 @@ export class Wolf {
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
     this.sprite.body.enable = true;
+    this.targetX = this.homeX;
+    this.targetY = this.homeY;
     this.wolfVisual.setVisible(true);
     this.wolfVisual.setAlpha(1);
     this.hpBack.setVisible(true);

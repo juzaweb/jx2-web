@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { rollEnemyReward } from "../rewards.js";
+import { stepEnemy } from "../enemyAi.js";
 
 /**
  * Clean sanitization for player strings
@@ -32,8 +33,8 @@ const WORLD_HEIGHT = 1250;
 /** Enemy tuning mirroring the client's Wolf entity. */
 export const ENEMY_MAX_HP = 45;
 export const ENEMY_RESPAWN_MS = 10000;
-/** Minimum drift (px) before the server relays an enemy position to other clients. */
-const ENEMY_MOVE_BROADCAST_DISTANCE = 40;
+/** Server AI tick (10 Hz): fast enough to look continuous, cheap enough to share. */
+export const ENEMY_TICK_MS = 100;
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
@@ -74,13 +75,15 @@ export class GameSocketManager {
     this.players = new Map(); // key: socket, value: player object
     this.playerById = new Map(); // key: playerId, value: { socket, data }
 
-    // Server-owned enemy state: position, health and respawn are shared by every client
+    // Server-owned enemy state: position, health, movement and respawn are shared
     this.enemies = new Map(createEnemyState().map((enemy) => [enemy.id, enemy]));
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
     this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
+    this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
 
     this.setupServer();
     this.startHeartbeat();
+    this.startEnemyTick();
   }
 
   setupServer() {
@@ -189,10 +192,6 @@ export class GameSocketManager {
 
       case "enemy_hit":
         this.handleEnemyHit(ws, msg.payload);
-        break;
-
-      case "enemy_move":
-        this.handleEnemyMove(ws, msg.payload);
         break;
 
       case "ping":
@@ -434,35 +433,40 @@ export class GameSocketManager {
   }
 
   /**
-   * Relay enemy positions reported by a client so all players see the same monsters.
-   * @param {WebSocket} ws
-   * @param {Object} payload
+   * Advance the enemy AI on a fixed tick so every client renders the same
+   * monsters in the same place, whoever happens to be nearby.
    */
-  handleEnemyMove(ws, payload = {}) {
-    const player = this.players.get(ws);
-    if (!player || !Array.isArray(payload.enemies)) return;
+  startEnemyTick() {
+    this.enemyTickTimer = setInterval(() => this.tickEnemies(), this.enemyTickMs);
+    if (this.enemyTickTimer.unref) this.enemyTickTimer.unref();
+  }
 
+  /**
+   * Step every living enemy once and broadcast only the ones that actually moved.
+   * A wolf at rest (walked home or holding at its stop distance) produces no
+   * traffic, so an idle map stays quiet.
+   */
+  tickEnemies() {
+    if (!this.wss.clients.size) return;
+
+    const players = Array.from(this.players.values());
     const moved = [];
 
-    payload.enemies.slice(0, 32).forEach((entry) => {
-      const enemy = this.enemies.get(entry?.id);
-      if (!enemy || enemy.isDead) return;
+    this.enemies.forEach((enemy) => {
+      if (enemy.isDead) return;
 
-      const x = clampNum(entry.x, 0, WORLD_WIDTH, enemy.x);
-      const y = clampNum(entry.y, 0, WORLD_HEIGHT, enemy.y);
-      const last = enemy.lastSynced || { x: enemy.homeX, y: enemy.homeY };
+      const next = stepEnemy(enemy, players, this.enemyTickMs);
+      const x = clampNum(next.x, 0, WORLD_WIDTH, enemy.x);
+      const y = clampNum(next.y, 0, WORLD_HEIGHT, enemy.y);
+      if (x === enemy.x && y === enemy.y) return;
 
       enemy.x = x;
       enemy.y = y;
-
-      if (Math.hypot(x - last.x, y - last.y) >= ENEMY_MOVE_BROADCAST_DISTANCE) {
-        enemy.lastSynced = { x, y };
-        moved.push({ id: enemy.id, x, y });
-      }
+      moved.push({ id: enemy.id, x, y });
     });
 
     if (moved.length) {
-      this.broadcast(ws, { type: "enemy_moved", payload: { enemies: moved } });
+      this.broadcastAll({ type: "enemy_moved", payload: { enemies: moved } });
     }
   }
 
@@ -493,7 +497,6 @@ export class GameSocketManager {
     enemy.x = enemy.homeX;
     enemy.y = enemy.homeY;
     enemy.isDead = false;
-    enemy.lastSynced = { x: enemy.homeX, y: enemy.homeY };
 
     this.broadcastAll({
       type: "enemy_respawned",
@@ -533,6 +536,9 @@ export class GameSocketManager {
   close() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
+    }
+    if (this.enemyTickTimer) {
+      clearInterval(this.enemyTickTimer);
     }
     this.enemyRespawnTimers.forEach((timer) => clearTimeout(timer));
     this.enemyRespawnTimers.clear();
