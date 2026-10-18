@@ -40,6 +40,11 @@ say() {
   printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" | tee -a "$LOG"
 }
 
+# --- 0. Dependencies -------------------------------------------------------
+for cmd in git flock timeout opencode; do
+  command -v "$cmd" >/dev/null 2>&1 || { say "required command '$cmd' not found; abort"; exit 1; }
+done
+
 # --- 1. Day window ---------------------------------------------------------
 hour=$(date +%-H)
 if (( hour < START_HOUR || hour >= END_HOUR )); then
@@ -54,7 +59,7 @@ if ! flock -n 9; then
   exit 0
 fi
 
-cd "$REPO"
+cd "$REPO" || { say "cannot cd into JX2_REPO='$REPO'; skip"; exit 0; }
 
 # --- 3. Preconditions -----------------------------------------------------
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -90,8 +95,14 @@ git merge --ff-only origin/develop >/dev/null 2>&1 || {
 
 # --- 5. Run one pipeline cycle --------------------------------------------
 say "start: agent=$AGENT model=$MODEL timeout=$TIMEOUT"
+run_args=(--agent "$AGENT" -m "$MODEL")
+if [[ -n "$AUTO_FLAG" ]]; then
+  # JX2_AUTO_FLAG may hold one or more flags (e.g. "--auto").
+  read -r -a _auto <<< "$AUTO_FLAG"
+  run_args+=("${_auto[@]}")
+fi
 set +e
-timeout "$TIMEOUT" opencode run "$PROMPT" --agent "$AGENT" -m "$MODEL" $AUTO_FLAG 2>&1 | tee -a "$LOG"
+timeout "$TIMEOUT" opencode run "$PROMPT" "${run_args[@]}" 2>&1 | tee -a "$LOG"
 rc=${PIPESTATUS[0]}
 set -e
 

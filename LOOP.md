@@ -10,8 +10,12 @@
 ## Feature Pipeline (L2)
 
 ```
-triage ──► feature-propose ──► spec-review ──(/FAIL stop)──► implementer (worktree)
-                                                                      │
+triage ──► feature-propose ──► spec-review ──(/FAIL stop)──► BACKLOG `proposed`
+                                                                     │
+                                              human approves: proposed ─► todo
+                                                                     │
+                                                         implementer (worktree, `todo` items only)
+                                                                     │
                                           verifier APPROVE + CI green ─┘
                                                      │
                                             gate.yaml check
@@ -20,14 +24,19 @@ triage ──► feature-propose ──► spec-review ──(/FAIL stop)──�
 ```
 
 - `feature-propose` reads the curated `docs/jx2-feature-library.md` + code and writes
-  specs to `BACKLOG.md`. Web text (volam2) is untrusted inspiration only.
-- `spec-review` gates specs: `SPEC GATE: PASS` before any code.
-- `implementer` changes exactly one approved item in a git worktree.
+  specs to `BACKLOG.md` as `proposed` items. Web text (volam2) is untrusted inspiration only.
+- `spec-review` is a quality gate on proposals: `SPEC GATE: PASS` before anything is
+  eligible — but a **human** promotes `proposed` → `todo` to authorize implementation.
+- `implementer` changes exactly one `todo` (human-approved) item in a git worktree.
 - `verifier` independently runs `npm run build` (+ tests once EPIC E lands).
 - Merge target is **`develop`** only. `main` is human-only.
 
 ## Human Gates
 
+- **Item approval (human-in-the-loop):** `feature-propose` writes new items with
+  status `proposed`. A human promotes `proposed` → `todo` in `BACKLOG.md` to
+  authorize implementation. The loop implements **only `todo` items**; with none
+  it stops after proposing/reviewing.
 - No merge to `main`, ever.
 - Denylist paths, `gate.yaml:humanMergeRequired`, and diffs > `maxFiles` stop for a human.
 - 3rd failed attempt on the same item escalates.
@@ -56,11 +65,14 @@ cadence and every safety precondition before a cycle starts.
 
 Recommended cadence:
 
-- **Feature pipeline (L2):** hourly inside the day window (`08:00–22:00`, up to
-  14 cycles/day). Each cycle is small (one item, one PR merged into `develop`).
-- **Night (`22:00–08:00`):** `loop-triage` in report-only (L1) only — no code.
+- **Feature pipeline (L2):** every 1–2h. Default day window `08:00–22:00`
+  (2h → 7 cycles/day); widen the window to run at night (2h over 24h → 12
+  cycles/day). Each cycle is small (one item, one PR merged into `develop`).
+- **Night gap (`22:00–08:00`):** with the default window, only `loop-triage`
+  in report-only (L1) runs — no code. Removing the window lets the loop merge
+  unattended overnight; treat `develop` as integration and review it daily.
 - **Warm-up:** start at 2h intervals for 2–3 days, watch for conflicts,
-  duplicate/low-value items, and rising test time, then move to hourly.
+  duplicate/low-value items, and rising test time, then tighten if desired.
 - Never faster than 1 run/hour; offset the minute so runs never overlap.
 
 Guardrails the script applies (all must hold or it skips):

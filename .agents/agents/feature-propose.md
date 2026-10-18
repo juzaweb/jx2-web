@@ -32,6 +32,8 @@ small number of high-value features and write them as backlog items. Follow
 ## Rules
 
 - Never edit source code. Proposals only, appended to `BACKLOG.md`.
+- Write new items with status **`proposed`**, never `todo` — only a human promotes
+  `proposed` → `todo` to approve work.
 - At most 3 new items per run, each with: stable ID + epic prefix, Why,
   objectively testable Acceptance, Touches, and the JX2 system it maps to.
 - Never invent features with no acceptance criteria.

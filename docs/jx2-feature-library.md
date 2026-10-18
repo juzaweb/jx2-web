@@ -30,7 +30,6 @@ Fit legend: `[core]` fits the existing demo directly · `[stretch]` needs new sy
 ## Combat (Chiến đấu)
 - `[core]` Melee, ranged, and AoE skill shapes.
 - `[core]` Critical hits, damage formula with attack/defense.
-- `[stretch]` Elemental types and resistances.
 - `[stretch]` PvP duels / arena.
 
 ## Items & Equipment (Trang bị)
@@ -47,7 +46,7 @@ Fit legend: `[core]` fits the existing demo directly · `[stretch]` needs new sy
 - `[stretch]` Material refinement / crafting (rèn đúc).
 
 ## World & NPC (Bản đồ)
-- `[stretch]` Multiple maps with portal transitions (e.g. Trường An, Tương Dương).
+- `[stretch]` Multiple maps with portal transitions (e.g. Trường An, Biện Kinh, Tuyền Châu, Tương Dương); each map loads on demand and unloads on exit — never preload all maps.
 - `[core]` NPCs with dialogue and quest givers.
 - `[core]` Quest system: log, objectives, rewards, persistence.
 - `[stretch]` Dungeons / phó bản with waves and a boss.

@@ -27,8 +27,8 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item F1 — server-synced e
 - Policy: `gate.yaml` + `docs/safety.md`. Feature menu: `docs/jx2-feature-library.md`.
 - Toolchain: Vitest 5 + jsdom; CI at `.github/workflows/ci.yml`.
 - Spec review 2026-10-18: APPROVE A4, B5, C5, A5, C6, D4 — `SPEC GATE: PASS`.
-- Spec review 2026-10-18 (C2 cycle): APPROVE A6, C7, C8 (new) + C2 — `SPEC GATE: PASS`.
-- Feature scout 2026-10-18: proposed A6 (ngũ hành, P2), C7 (rèn đúc, P3), C8 (cường hoá, P3); queue now 22 todo items.
+- Spec review 2026-10-18 (C2 cycle): APPROVE C7, C8 (new) + C2 — `SPEC GATE: PASS`. (A6 was also approved then but has since been dropped.)
+- Feature scout 2026-10-18: proposed C7 (rèn đúc, P3), C8 (cường hoá, P3); queue ~20 todo items. A6 (ngũ hành) dropped by human; B1 expanded to named maps (Trường An, Biện Kinh, Tuyền Châu, Tương Dương).
 - **Verifier finding (C1/C2, deferred):** HUD inventory is a mount-time snapshot, so a looted quantity is not shown live in `InventoryModal` until reload. Persistence still works. Wire quantity changes through `bridge` when a UI item (C4 consume, or a dedicated UX item) lands.
 - **Verifier finding (A4, deferred):** In `CombatSystem.damagePlayer`, backward compatibility with existing `game.js:387` calls (`this.combat.damagePlayer(7)`) is preserved via proximity lookup. In a future pass touching `game.js`, cleanly update to `this.combat.onBite(wolf)`.
 - **Verifier finding (C1, deferred):** stack quantities live in two places — React

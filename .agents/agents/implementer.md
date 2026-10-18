@@ -23,8 +23,8 @@ You implement exactly one approved item. Read `AGENTS.md`, `LOOP.md`,
 
 ## Steps
 
-1. Confirm the item passed `spec-review` (`SPEC GATE: PASS`) and read its
-   Acceptance criteria plus Touches.
+1. Confirm the item's status is `todo` (human-approved) and it passed
+   `spec-review` (`SPEC GATE: PASS`); read its Acceptance criteria plus Touches.
 2. Implement only that item. Stay within the listed files and the epic scope.
 3. Run the documented verify command `npm run build && npm test` and keep the
    output as evidence.
