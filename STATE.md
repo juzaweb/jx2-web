@@ -1,7 +1,22 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — direct request (review+fix): hardening pass on the globally-unique-names change.
-(Prior run: direct request (change) — make character names globally unique + drop soft-delete.)
+Last run: 2026-10-18 — direct request: sync a character's items to the server and deduct quantity on use
+(Prior run: direct request (fix) — other players did not appear on the minimap.)
+
+## Character inventory ↔ server sync + consume-on-use (2026-10-18, direct request)
+
+- Request: "Đồng bộ item của nhân vật lên server, trừ số lượng khi đã dùng" — mirror each hero's bag to the backend and decrement a consumable when it is actually used.
+- Decisions (human-confirmed): key the server bag by **characterId** (not account); the **server is the source of truth** on entering the game with the local save as fallback; push on **every change + each `saveGame`**.
+- Backend: no new route — the existing `GET`/`PUT /api/inventory/:playerId` already accepts a `char_...` id (regex `[a-zA-Z0-9_-]{1,64}`), verified by an integration smoke test (empty → push → read-back → invalid rejected).
+- Change:
+  - **items.js:** new `getQuantity(id)`, `consumeQuantity(id, amount)` (all-or-nothing `{ ok, quantity }`), and a shared `sanitizeQuantities` — now the single canonical sanitizer reused by `storage.js` and `inventorySync.js` (removed the duplicated logic).
+  - **inventorySync.js (new):** pure `sanitizeInventory` / `inventorySignature` (order-independent dedupe key) / `hasInventory` / `planInventorySync` (`{ action: "adopt" | "push", quantities }`), plus an `InventorySyncer` class that owns the round trips, the dedupe signature and the "read before upload" gate — unit tested with a fake API, no Phaser/DOM.
+  - **game.js:** `useItem(slot)` split into `applyItemEffect` (returns whether a real use happened) + `consumeQuantity` + `onInventoryChanged`. Empty stack is refused before any effect; a refused effect (HP/MP already full — now incl. Nữ Nhi Hồng when both full) consumes nothing. The scene wires one `InventorySyncer` (owner = `activeCharacter.id`) and delegates `saveGame` → `sync()` and `startGame` → `reset()` + `load()`; `collectDrop` refreshes the HUD.
+  - **HUD live update (closes the deferred C1 verifier finding):** new bridge `INVENTORY_UPDATED`; `UIBridgeAdapter.updateInventory()` emits render-ready arrays; `App.jsx` holds the inventory in state and subscribes, so a use/loot reflects in the hotbar and `InventoryModal` without a reload.
+  - **Local bag now per-character (follow-up fix):** the bag was still persisted in the account save blob (`giang_ho_game_save_v1_<userId>`), so a fresh second character inherited the first's local bag whenever the server had none. `storage.js` now persists the bag separately under `giang_ho_inventory_v1_<characterId>` (`setCharacterId` / `getInventoryKey` / `saveInventory` / `clearInventory`), and `save()` no longer carries inventory. `App.jsx` seeds the shared store from the selected character on start/login/logout; the scene sets the character id in `startGame` and `resetGame` clears the character bag too. A new character now always starts from the catalog defaults.
+- Verify: `npm run build` ✅ · `npm test` ✅ **184 passed / 184** (16 files; +39) · `npm run server:test` ✅ **50 passed / 50** (the WebSocket enemy-tick tests are load-sensitive and intermittently report 47/50 — unrelated to this change).
+- Review (code-review-and-quality, self): flagged the duplicated sanitizer (extracted to `items.js`), the sync/gate logic buried and untested in the god-scene (extracted `InventorySyncer`), the slot-3 full-HP inconsistency, per-potion chat spam (removed), the account-local bag leak (bag re-keyed per character), the character-switch fetch race (owner re-checked after the await), and the seed duplication (`loadCharacterInventory`).
+- Note: bags are per-character on both the server (`/api/inventory/:characterId`) and locally; account progress (stats/position) is still keyed by account — an existing documented limitation, unchanged here. Server inventory routes have no ownership check (consistent with the existing save routes); char ids embed a random hex suffix.
 
 ## Review + fix pass on global unique names (2026-10-18, direct request)
 
@@ -26,7 +41,6 @@ Last run: 2026-10-18 — direct request (review+fix): hardening pass on the glob
   - **Client:** `apiClient.restoreCharacter` removed; `CharacterSelectModal.jsx` drops the "Khôi phục nhân vật" button, `deletedCount` state, and the "Bạn có thể khôi phục lại" notice; the delete confirm now says "xoá vĩnh viễn".
 - Caveat: SQLite `COLLATE NOCASE` only folds ASCII case, so names differing only by non-ASCII casing (e.g. `Độc` vs `độc`) are treated as distinct — same as the previous per-account behavior.
 - Verify: `npm run build` ✅ · `npm test` ✅ **148 passed / 148** (15 files) · `npm run server:test` ✅ **52 passed / 52** (3 suites; new cross-account-duplicate, hard-delete-frees-name, DELETE-404, and legacy soft-delete/duplicate migration tests). (Superseded by the next run's 53-test suite.)
-
 
 ## Remote players missing from the minimap (2026-10-18, direct request)
 

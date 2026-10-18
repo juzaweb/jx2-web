@@ -47,6 +47,20 @@ const isGuestSession = (session) =>
   session?.token === "offline-guest-token" ||
   String(session?.user?.id || "").startsWith("guest_");
 
+/**
+ * Point the persisted bag and the shared in-memory store at one character, and
+ * return the render-ready inventory for the HUD. `characterId` may be null
+ * (no character chosen), which falls back to the account-scoped guest bag.
+ * @param {string|null} characterId
+ * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
+ */
+const loadCharacterInventory = (characterId) => {
+  StorageManager.setCharacterId(characterId || null);
+  return applyQuantities(
+    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+  );
+};
+
 export function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     const session = readSession();
@@ -94,13 +108,11 @@ export function App() {
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
 
-  // Inventory stack quantities are persisted in the same save slot as stats.
-  // Seeding the shared in-memory store here also lets the Phaser scene persist
-  // the loaded values on its first save. Resolved once at mount.
-  const [{ quickItems, inventoryItems }] = useState(() =>
-    applyQuantities(
-      rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
-    )
+  // Inventory stack quantities are persisted per character and mirrored to that
+  // character's server bag. Live edits (use / loot) arrive over the bridge, so the
+  // HUD is no longer a mount-time snapshot.
+  const [inventory, setInventory] = useState(() =>
+    loadCharacterInventory(readSession()?.activeCharacter?.id)
   );
 
   // Bridge subscriptions live for the whole session, so they read the latest user
@@ -168,6 +180,10 @@ export function App() {
       setAudioEnabled(enabled);
     });
 
+    const unsubInventory = bridge.on(EVENTS.INVENTORY_UPDATED, (next) => {
+      if (next) setInventory(next);
+    });
+
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
       const user = currentUserRef.current;
@@ -186,6 +202,7 @@ export function App() {
       unsubQuest();
       unsubLog();
       unsubAudio();
+      unsubInventory();
       unsubStarted();
     };
   }, []);
@@ -276,6 +293,7 @@ export function App() {
     setActiveCharacter(null);
     setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
+    StorageManager.setCharacterId(null);
     setIsLoginOpen(false);
   }, []);
 
@@ -287,6 +305,11 @@ export function App() {
     });
 
     setActiveCharacter(character);
+    // Switch the shared bag store to this character's own inventory before the
+    // scene enters the world, so the server fallback can never leak another
+    // character's items.
+    setInventory(loadCharacterInventory(character.id));
+
     bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
@@ -303,6 +326,7 @@ export function App() {
       setActiveCharacter(null);
       setServerName("");
       StorageManager.setUserId(null);
+      StorageManager.setCharacterId(null);
       setIsLoginOpen(true);
       bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
@@ -334,7 +358,7 @@ export function App() {
         <HotbarDock
           coins={stats.coins}
           audioEnabled={audioEnabled}
-          items={quickItems}
+          items={inventory.quickItems}
           onUseItem={handleUseItem}
           onAttack={handleAttack}
           onSkill={handleSkill}
@@ -384,8 +408,8 @@ export function App() {
         onClose={handleCloseInventory}
         onUseItem={handleUseItem}
         coins={stats.coins}
-        quickItems={quickItems}
-        inventoryItems={inventoryItems}
+        quickItems={inventory.quickItems}
+        inventoryItems={inventory.inventoryItems}
       />
     </main>
   );

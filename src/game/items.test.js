@@ -8,7 +8,9 @@ import {
   applyQuantities,
   setQuantities,
   getQuantities,
+  getQuantity,
   addQuantity,
+  consumeQuantity,
   DROP_TABLE,
   rollDrop,
   rollKillReward,
@@ -146,8 +148,71 @@ describe("addQuantity", () => {
   });
 });
 
-describe("rollDrop", () => {
-  const catalogIds = new Set([
+describe("getQuantity", () => {
+  it("reads the current stack and floors it", () => {
+    setQuantities({ "kim-sang-duoc": 3 });
+    expect(getQuantity("kim-sang-duoc")).toBe(3);
+  });
+
+  it("returns 0 for an unknown or invalid id without mutating the store", () => {
+    setQuantities({ "tui-bac": 21 });
+    expect(getQuantity("khong-ton-tai")).toBe(0);
+    expect(getQuantity("")).toBe(0);
+    expect(getQuantity(null)).toBe(0);
+    expect(getQuantities()["tui-bac"]).toBe(21);
+  });
+});
+
+describe("consumeQuantity", () => {
+  it("removes one from the stack by default", () => {
+    setQuantities({ "kim-sang-duoc": 5 });
+
+    expect(consumeQuantity("kim-sang-duoc")).toEqual({ ok: true, quantity: 4 });
+    expect(getQuantity("kim-sang-duoc")).toBe(4);
+  });
+
+  it("removes an explicit amount", () => {
+    setQuantities({ "tui-bac": 10 });
+
+    expect(consumeQuantity("tui-bac", 4)).toEqual({ ok: true, quantity: 6 });
+  });
+
+  it("allows consuming the last unit down to zero", () => {
+    setQuantities({ "kim-sang-duoc": 1 });
+
+    expect(consumeQuantity("kim-sang-duoc")).toEqual({ ok: true, quantity: 0 });
+    // Further use is refused; the stack never goes negative.
+    expect(consumeQuantity("kim-sang-duoc")).toEqual({ ok: false, quantity: 0 });
+  });
+
+  it("refuses an amount larger than the stack without mutating it", () => {
+    setQuantities({ "tui-bac": 2 });
+
+    expect(consumeQuantity("tui-bac", 3)).toEqual({ ok: false, quantity: 2 });
+    expect(getQuantity("tui-bac")).toBe(2);
+  });
+
+  it("refuses an empty stack, an invalid id, or an invalid amount", () => {
+    setQuantities({ "tui-bac": 0 });
+
+    expect(consumeQuantity("tui-bac")).toEqual({ ok: false, quantity: 0 });
+    expect(consumeQuantity("", 1)).toEqual({ ok: false, quantity: 0 });
+    expect(consumeQuantity("tui-bac", 0)).toEqual({ ok: false, quantity: 0 });
+    expect(consumeQuantity("tui-bac", -2)).toEqual({ ok: false, quantity: 0 });
+    expect(consumeQuantity("tui-bac", Number.NaN)).toEqual({ ok: false, quantity: 0 });
+  });
+
+  it("initializes the shared store from catalog defaults when unset", async () => {
+    vi.resetModules();
+    const fresh = await import("./items.js");
+
+    // "dai-hoan-dan" ships with a catalog default of 86.
+    expect(fresh.consumeQuantity("dai-hoan-dan", 1)).toEqual({ ok: true, quantity: 85 });
+    expect(fresh.getQuantity("dai-hoan-dan")).toBe(85);
+  });
+});
+
+describe("rollDrop", () => {  const catalogIds = new Set([
     ...QUICK_ITEMS.map((item) => item.id),
     ...INVENTORY_ITEMS.filter(Boolean).map((item) => item.id)
   ]);

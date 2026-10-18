@@ -1,4 +1,5 @@
 import { bridge, EVENTS } from "./bridge.js";
+import { applyQuantities, getQuantities } from "./items.js";
 
 export class UIBridgeAdapter {
   constructor() {
@@ -44,6 +45,16 @@ export class UIBridgeAdapter {
   updateHud(stats) {
     if (!stats) return;
     bridge.emit(EVENTS.STATS_UPDATED, { ...stats });
+  }
+
+  /**
+   * Push the current bag to the React HUD so hotbar / inventory quantities stay
+   * live after a use or a loot pickup (the HUD otherwise holds a mount snapshot).
+   * @param {Record<string, number>} [quantities] - Defaults to the shared store
+   */
+  updateInventory(quantities) {
+    const { quickItems, inventoryItems } = applyQuantities(quantities || getQuantities());
+    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems });
   }
 
   updateQuest(stats, onQuestComplete) {
