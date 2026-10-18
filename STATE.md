@@ -24,6 +24,7 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item C1)
 - Policy: `gate.yaml` + `docs/safety.md`. Feature menu: `docs/jx2-feature-library.md`.
 - Toolchain: Vitest 5 + jsdom; CI at `.github/workflows/ci.yml`.
 - Spec review 2026-10-18: APPROVE A4, B5, C5 — `SPEC GATE: PASS`.
+- Proposed on 2026-10-18: A5, C6, D4 pending spec-review.
 - **Verifier finding (C1, deferred):** stack quantities live in two places — React
   state snapshot (`App.jsx`) and the `items.js` module singleton. `useItem` never
   decrements, and the HUD would go stale if it did. Wire quantity changes through
