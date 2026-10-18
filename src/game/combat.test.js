@@ -13,7 +13,8 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { computeDamage } from "./combat.js";
+import { CombatSystem, computeDamage } from "./combat.js";
+import { DROP_TABLE, getQuantities } from "./items.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 
@@ -239,5 +240,198 @@ describe("computeDamage", () => {
       // 12 - 6 = 6
       expect(wolfAttackingPlayer.damage).toBe(6);
     });
+  });
+});
+
+describe("CombatSystem kill rewards", () => {
+  const makePlayer = () => ({
+    x: 100,
+    y: 200,
+    stats: {
+      kills: 0,
+      coins: 10,
+      exp: 900,
+      hp: 50,
+      maxHp: 50,
+      mp: 20,
+      maxMp: 20,
+      level: 1,
+      nextExp: 1000
+    }
+  });
+
+  const makeCombat = ({ isConnected = false, playerId = null } = {}) => {
+    const player = makePlayer();
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn() };
+    const visualStub = () => {
+      const node = {
+        add: () => node,
+        setDepth: () => node,
+        setStrokeStyle: () => node,
+        setPosition: () => node,
+        setAlpha: () => node,
+        destroy: () => {}
+      };
+      return node;
+    };
+    const scene = {
+      networkClient: { isConnected },
+      time: { delayedCall: vi.fn() },
+      add: { container: visualStub, circle: visualStub, polygon: visualStub }
+    };
+    const onStateChange = vi.fn();
+    const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui, onStateChange);
+
+    combat.setLocalPlayerId(playerId);
+    // Real spawnDrop (drop objects are asserted below), float text stubbed
+    vi.spyOn(combat, "spawnDrop");
+    vi.spyOn(combat, "showFloatText").mockImplementation(() => {});
+
+    return { combat, player, ui, onStateChange };
+  };
+
+  const serverReward = (overrides = {}) => ({
+    enemyId: 1,
+    attackerId: "usr_hero",
+    exp: 35,
+    coins: 7,
+    x: 1110,
+    y: 590,
+    drop: { id: DROP_TABLE[0].id, qty: DROP_TABLE[0].qty },
+    ...overrides
+  });
+
+  it("pays a server reward to the client the kill was attributed to", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerReward(serverReward());
+
+    expect(player.stats.kills).toBe(1);
+    expect(player.stats.exp).toBe(935);
+    expect(player.stats.coins).toBe(17);
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the shared drop for bystanders without paying them", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+
+    combat.applyServerReward(serverReward());
+
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("ignores a reward payload it cannot trust", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerReward({ attackerId: "usr_hero", coins: 5 });
+    combat.applyServerReward(null);
+    combat.applyServerReward(serverReward({ coins: Number.NaN }));
+
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(combat.spawnDrop).not.toHaveBeenCalled();
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("rolls the reward locally while offline", () => {
+    const { combat, player } = makeCombat({ isConnected: false });
+    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
+
+    combat.handleWolfKill(wolf);
+
+    expect(wolf.die).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(1);
+    expect(player.stats.exp).toBe(935);
+    expect(player.stats.coins).toBeGreaterThanOrEqual(13);
+    expect(player.stats.coins).toBeLessThanOrEqual(19);
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the payout to the server while connected", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
+
+    combat.handleWolfKill(wolf);
+
+    expect(wolf.die).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
+    expect(combat.spawnDrop).not.toHaveBeenCalled();
+  });
+
+  it("marks the kill's drop collectable only for the attributed killer", () => {
+    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    killer.applyServerReward(serverReward());
+
+    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    bystander.applyServerReward(serverReward());
+
+    expect(killer.drops).toHaveLength(1);
+    expect(killer.drops[0].collectable).toBe(true);
+    expect(bystander.drops).toHaveLength(1);
+    expect(bystander.drops[0].collectable).toBe(false);
+  });
+
+  it("does not let a bystander pick up another player's kill loot", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    combat.applyServerReward(serverReward());
+
+    const drop = combat.drops[0];
+    const before = getQuantities()[drop.itemId] ?? 0;
+    player.x = drop.x;
+    player.y = drop.y;
+    combat.updateDrops(0);
+
+    expect(drop.active).toBe(true);
+    expect(player.stats.coins).toBe(10);
+    expect(getQuantities()[drop.itemId]).toBe(before);
+  });
+
+  it("still lets the killer pick up the loot the server rolled", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    combat.applyServerReward(serverReward());
+
+    const drop = combat.drops[0];
+    const before = getQuantities()[drop.itemId] ?? 0;
+    player.x = drop.x;
+    player.y = drop.y;
+    combat.updateDrops(0);
+
+    expect(drop.active).toBe(false);
+    // 10 starting bạc + 7 from the kill + 5 pickup bonus
+    expect(player.stats.coins).toBe(22);
+    expect(getQuantities()[drop.itemId]).toBe(before + drop.qty);
+  });
+
+  it("fades the loot a bystander cannot take and keeps the killer's drop", () => {
+    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    bystander.applyServerReward(serverReward());
+    bystander.updateDrops(9000);
+
+    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    killer.applyServerReward(serverReward());
+    killer.updateDrops(9000);
+
+    expect(bystander.drops[0].active).toBe(false);
+    expect(killer.drops[0].active).toBe(true);
+  });
+
+  it("bounds the remembered drop list across many kills", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    for (let i = 0; i < 40; i++) {
+      combat.applyServerReward(serverReward());
+    }
+    player.x = -1000;
+    player.y = -1000;
+    combat.updateDrops(0);
+
+    expect(combat.drops.length).toBeLessThanOrEqual(32);
   });
 });

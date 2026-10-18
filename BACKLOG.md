@@ -38,6 +38,12 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Acceptance:** Loads app, canvas mounts, HUD (vitals, hotbar) visible; no console errors.
 - **Touches:** new `e2e/`, Playwright config.
 
+### E4 — Split the loot/drop concern out of CombatSystem · `proposed` · P3
+- **Why:** `src/game/combat.js` is ~600 lines mixing the damage model, kill rewards, drop lifecycle, quest progress, player damage, level-up and audio; F2 added five reward methods to it (code review 2026-10-18 flagged the file size as the follow-up to F2). The drop concern — spawning, ownership, expiry, animating and collecting world loot — is self-contained and can be unit tested without a `CombatSystem` instance.
+- **Acceptance:** A focused module (e.g. `src/game/drops.js`) owns `spawnDrop`/`updateDrops`/`collectDrop` (ownership + expiry + the drop-list bound); `CombatSystem` delegates to it and keeps only combat/reward orchestration; drop behaviour is covered by tests that build the drop manager directly rather than through `CombatSystem`; `npm run build` and `npm test` stay green with no behaviour change.
+- **Touches:** `src/game/combat.js`, new `src/game/drops.js`, new `src/game/drops.test.js`, `src/game/combat.test.js`.
+- **Spec gate:** pending — new item awaiting `spec-review`.
+
 ---
 
 ## EPIC C — Items & Progression
@@ -181,6 +187,21 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
   - Unit tests cover the client reconciliation rules (`src/game/enemySync.test.js`) and the WebSocket protocol (`server/tests/websocket.test.js`).
 - **Touches:** `server/src/websocket/gameSocket.js`, `src/game/enemy.js`, `src/game/enemySync.js`, `src/game/combat.js`, `src/game/game.js`, `src/game/networkClient.js`, tests.
 - **Maps to:** Social / MMO `[stretch]` — shared real-time world state (enemy HP/position).
+- **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
+
+### F2 — Server-authoritative kill rewards (EXP / bạc / drops) · `done` · P2
+- **Why:** F1 put enemy HP, death and respawn on the server, but the reward is still minted by whichever client locally crosses HP ≤ 0: `CombatSystem.damageEnemy` → `handleWolfKill` rolled `Phaser.Math.Between(3, 9)` bạc, added a flat +35 EXP, incremented the kill counter, fired `spawnDrop` (a `rollDrop` from `DROP_TABLE`) and persisted the stats through `onStateChange`. That was the only client-authoritative step left in the combat loop — the server's `enemy_hit` broadcast already carried `attackerId`, yet nothing a client received could contradict a doctored payout. Acceptable for the co-op demo, but it has to close before any economy feature that treats bạc/EXP as scarce (B3 shop, C7 rèn đúc, C8 cường hoá).
+- **Acceptance:**
+  - The server rolls the kill reward when it marks an enemy dead from its own HP pool, attributes the kill to the `attackerId` of the `enemy_hit` that finished it, and broadcasts an `enemy_reward` event.
+  - Clients no longer add EXP/bạc/drops on their own when an enemy reaches 0 HP; `handleWolfKill` keeps only presentation (death, log line) and pays out from the server event.
+  - A reward is granted exactly once per kill: a duplicate, late, or post-death `enemy_hit` for the same enemy — including the existing "already dead on the server: resync" path — produces no second reward.
+  - The reward roll reuses the shared catalog (`items.js` `DROP_TABLE` / `rollKillReward`) so client and server agree on EXP, bạc and loot; the client validates the payload (finite non-negative amounts, catalog-backed drop id) and rejects anything else.
+  - A client that did not land the killing blow still renders the shared drop in the world, but that drop is only collectable by the attributed killer, so EXP, bạc and loot for one kill cannot be duplicated across clients.
+  - Unit tests cover the server reward roll + attribution under a fixed rng (`server/tests/rewards.test.js`), the broadcast and the no-double-reward rule (`server/tests/websocket.test.js`), the payload validation (`src/game/rewardSync.test.js`) and client-side application (`src/game/combat.test.js`).
+- **Touches:** `server/src/rewards.js`, `server/src/websocket/gameSocket.js`, `src/game/items.js`, `src/game/rewardSync.js`, `src/game/combat.js`, `src/game/game.js`, tests.
+- **Depends on:** F1 (server-owned enemy HP/death).
+- **Maps to:** Social / MMO `[stretch]` — authoritative shared world state; unblocks the economy items (B3, C7, C8).
+- **Evidence:** Branch `loop/f2-server-rewards` → PR #15 against `develop`; `npm run build` ✅ · `npm test` ✅ 92/92 (8 files; +18) · `npm run server:test` ✅ 29/29 (+4). Verifier (code-review, 2026-10-18) found the shared drop was collectable by bystanders, which duplicated loot per client → fixed by marking the drop `collectable` only for the attributed killer (+3 tests). Diff 13 files (> `gate.yaml:maxFiles` 10) → escalated to a human merge.
 - **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
 
 ---

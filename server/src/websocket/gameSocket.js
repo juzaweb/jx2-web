@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { rollEnemyReward } from "../rewards.js";
 
 /**
  * Clean sanitization for player strings
@@ -383,6 +384,7 @@ export class GameSocketManager {
 
   /**
    * Apply damage from a client and broadcast the authoritative enemy health.
+   * The killing blow also triggers the authoritative reward broadcast.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -406,7 +408,8 @@ export class GameSocketManager {
     enemy.y = clampNum(payload.y, 0, WORLD_HEIGHT, enemy.y);
     enemy.hp = Math.max(0, enemy.hp - damage);
 
-    if (enemy.hp <= 0) {
+    const killed = enemy.hp <= 0;
+    if (killed) {
       enemy.isDead = true;
       this.scheduleEnemyRespawn(enemy.id);
     }
@@ -419,6 +422,15 @@ export class GameSocketManager {
         attackerId: player.id
       }
     });
+
+    if (killed) {
+      // Rolled from the server's own health pool and attributed to the killing
+      // blow, so the client that landed it cannot mint its own payout
+      this.broadcastAll({
+        type: "enemy_reward",
+        payload: rollEnemyReward(player.id, enemy)
+      });
+    }
   }
 
   /**

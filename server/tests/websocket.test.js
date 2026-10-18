@@ -4,15 +4,20 @@ import http from "node:http";
 import { WebSocket } from "ws";
 import { createApp } from "../src/app.js";
 import { initGameSocket, ENEMY_MAX_HP } from "../src/websocket/gameSocket.js";
+import { DROP_TABLE } from "../../src/game/items.js";
 
 const createTestClient = async (url) => {
   const ws = new WebSocket(url);
   const queue = [];
   const listeners = [];
+  // Every parsed message, including ones a waitFor already consumed, so a test can
+  // also assert that an event was *not* sent.
+  const messages = [];
 
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
+      messages.push(msg);
       for (let i = 0; i < listeners.length; i++) {
         if (listeners[i].predicate(msg)) {
           const l = listeners.splice(i, 1)[0];
@@ -33,6 +38,7 @@ const createTestClient = async (url) => {
 
   return {
     ws,
+    messages,
     send: (data) => ws.send(JSON.stringify(data)),
     waitFor: (predicate, timeoutMs = 2500) => {
       for (let i = 0; i < queue.length; i++) {
@@ -243,11 +249,32 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(kill1.payload.attackerId, "usr_wolf2");
     assert.equal(kill2.payload.hp, 0);
 
+    // The killing blow's reward is rolled by the server and shared by both clients
+    const reward1 = await client1.waitFor((m) => m.type === "enemy_reward");
+    const reward2 = await client2.waitFor((m) => m.type === "enemy_reward");
+    assert.equal(reward1.payload.enemyId, 0);
+    assert.equal(reward1.payload.attackerId, "usr_wolf2");
+    assert.equal(reward2.payload.attackerId, "usr_wolf2");
+    assert.equal(reward1.payload.exp, 35);
+    assert.ok(reward1.payload.coins >= 3 && reward1.payload.coins <= 9);
+    assert.ok(
+      DROP_TABLE.some((entry) => entry.id === reward1.payload.drop.id),
+      "The reward always carries a catalog-backed drop"
+    );
+
     // Hitting a corpse resyncs instead of dealing damage twice
     client1.send({ type: "enemy_hit", payload: { id: 0, damage: 25 } });
     const resync = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.damage === 0);
     assert.equal(resync.payload.hp, 0);
     assert.equal(resync.payload.isDead, true);
+
+    // A corpse hit resyncs and can never pay a second reward
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(
+      client1.messages.filter((m) => m.type === "enemy_reward").length,
+      1,
+      "Only the killing blow pays a reward"
+    );
 
     // Respawn is driven by the server clock, not by the killer's client
     const respawned = await client2.waitFor((m) => m.type === "enemy_respawned", 3000);

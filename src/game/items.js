@@ -222,6 +222,41 @@ export function rollDrop(rng = Math.random) {
 }
 
 /**
+ * Kill-reward tuning shared with the server, which rolls the reward from its own
+ * authoritative enemy health (see server/src/rewards.js).
+ */
+export const KILL_REWARD = {
+  exp: 35,
+  coinsMin: 3,
+  coinsMax: 9
+};
+
+/**
+ * Roll the full reward for one defeated enemy: EXP, bạc and the loot entry.
+ * Pure and deterministic for a fixed rng, so the server and a client derive the
+ * same reward from the same roll.
+ * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
+ * @returns {{ exp: number, coins: number, drop: { id: string, qty: number } }}
+ */
+export function rollKillReward(rng = Math.random) {
+  const next = () => {
+    const drawn = typeof rng === "function" ? rng() : rng;
+    return typeof drawn === "number" && Number.isFinite(drawn)
+      ? Math.min(Math.max(drawn, 0), 1)
+      : 0;
+  };
+
+  const span = KILL_REWARD.coinsMax - KILL_REWARD.coinsMin + 1;
+  const coins = Math.min(
+    KILL_REWARD.coinsMin + Math.floor(next() * span),
+    KILL_REWARD.coinsMax
+  );
+  const drop = rollDrop(next());
+
+  return { exp: KILL_REWARD.exp, coins, drop: { id: drop.id, qty: drop.qty } };
+}
+
+/**
  * Resolve the catalog into render-ready arrays with persisted quantities applied.
  * Inventory items with no saved or default quantity are returned unchanged.
  * @param {Record<string, number>} [quantities]
