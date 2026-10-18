@@ -213,7 +213,11 @@ export class NetworkClient {
   }
 
   /**
-   * Cleanly disconnect and stop auto-reconnect
+   * Cleanly disconnect and stop auto-reconnect. Terminal for this instance: the
+   * handlers are dropped too, so a late `close` event or an in-flight packet can
+   * never reach a scene that has already been torn down (entering the game again
+   * builds a fresh client). Leaving them registered is how a dead scene ends up
+   * logging into the live HUD — or touching destroyed Phaser objects.
    */
   disconnect() {
     this.shouldReconnect = false;
@@ -232,5 +236,6 @@ export class NetworkClient {
       this.ws = null;
     }
     this.isConnected = false;
+    this.listeners.clear();
   }
 }

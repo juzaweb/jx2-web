@@ -1,7 +1,14 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — feature pipeline cycle (L2, item F3 — server-authoritative enemy movement)
-(Prior run: direct human request — character select/create, branch `feature/character-select`.)
+Last run: 2026-10-18 — direct request (fix): an HMR / canvas remount left an orphaned `NetworkClient` reconnecting forever
+(Prior run: F3 server-authoritative enemy movement, PR #19 merged; before that: character select/create.)
+
+## HMR reconnect loop (2026-10-18, direct request — PR #22)
+
+- Report: after pulling F3 the game page logged "Mất kết nối máy chủ. Đang tự động kết nối lại..." endlessly.
+- Cause: `JiangHuScene.shutdown()` existed but was never invoked — `game.js` had no `events.on/once` registration at all. A scene destroyed by an HMR reload or a canvas remount therefore left its `NetworkClient` connected with auto-reconnect on. Both the orphan and the live client join with the same per-tab player id, and the server closes the *other* socket on every join, so the two kicked each other off forever. The same dead scene produced the console error `init_world → Cannot read properties of null (reading 'add')` (`remotePlayer.js:31`): Phaser's `Systems.destroy()` nulls `scene.add`/`displayList` immediately after emitting `destroy`.
+- Fix: `bindSceneTeardown()` registers `shutdown()` on the scene's `shutdown` and `destroy` events, and `NetworkClient.disconnect()` now drops its handlers as well, so a late `close` or in-flight packet cannot reach the torn-down scene (nor log into the live HUD through the shared `bridge`).
+- Verify: `npm run build` ✅ · `npm test` ✅ **127 passed / 127** (11 files; +5: new `src/game/game.test.js`, `networkClient.test.js`) · `npm run server:test` ✅ **49 passed / 49**.
 
 ## Character Select & Create (2026-10-18, direct request)
 
