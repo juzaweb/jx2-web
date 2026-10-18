@@ -30,7 +30,7 @@ const INITIAL_LOGS = [
   {
     id: "init-1",
     type: "system",
-    text: "Chào mừng hiệp khách đến với Trường An."
+    text: "Chào mừng hiệp khách đến với Biện Kinh."
   },
   {
     id: "init-2",
