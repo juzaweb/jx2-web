@@ -155,19 +155,18 @@ describe("ApiClient", () => {
     );
   });
 
-  it("listCharacters returns characters, slots and deleted count", async () => {
+  it("listCharacters returns characters and slots", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
-        data: { characters: [{ id: "c1", name: "Tiêu Phong" }], maxSlots: 3, deletedCount: 1 }
+        data: { characters: [{ id: "c1", name: "Tiêu Phong" }], maxSlots: 3 }
       })
     });
 
     const res = await client.listCharacters("u1");
     expect(res.characters).toHaveLength(1);
     expect(res.maxSlots).toBe(3);
-    expect(res.deletedCount).toBe(1);
     expect(global.fetch).toHaveBeenCalledWith("http://mock-api:5000/api/users/u1/characters");
   });
 
@@ -196,11 +195,11 @@ describe("ApiClient", () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 409,
-      json: async () => ({ success: false, error: "Tên nhân vật này đã tồn tại trong tài khoản." })
+      json: async () => ({ success: false, error: "Tên nhân vật này đã được sử dụng." })
     });
 
     await expect(client.createCharacter("u1", "Trùng Tên")).rejects.toThrow(
-      "Tên nhân vật này đã tồn tại trong tài khoản."
+      "Tên nhân vật này đã được sử dụng."
     );
   });
 
@@ -209,7 +208,7 @@ describe("ApiClient", () => {
       ok: true,
       json: async () => ({
         success: true,
-        data: { characters: [], deletedCount: 1 }
+        data: { characters: [] }
       })
     });
 
@@ -218,27 +217,6 @@ describe("ApiClient", () => {
     expect(global.fetch).toHaveBeenCalledWith(
       "http://mock-api:5000/api/users/u1/characters/c1",
       expect.objectContaining({ method: "DELETE" })
-    );
-  });
-
-  it("restoreCharacter posts to the restore endpoint and returns the character", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        data: {
-          character: { id: "c1", name: "Tiêu Phong" },
-          characters: [{ id: "c1", name: "Tiêu Phong" }],
-          deletedCount: 0
-        }
-      })
-    });
-
-    const res = await client.restoreCharacter("u1");
-    expect(res.character.name).toBe("Tiêu Phong");
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://mock-api:5000/api/users/u1/characters/restore",
-      expect.objectContaining({ method: "POST" })
     );
   });
 
