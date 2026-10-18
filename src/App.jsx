@@ -7,6 +7,7 @@ import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
+import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import {
   defaultQuantities,
@@ -34,6 +35,21 @@ const INITIAL_LOGS = [
 ];
 
 export function App() {
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("jx2_user_session");
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      if (parsed?.user?.id) {
+        StorageManager.setUserId(parsed.user.id);
+        return parsed.user;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoginOpen, setIsLoginOpen] = useState(() => !currentUser);
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
@@ -170,9 +186,31 @@ export function App() {
   const handleSendMessage = useCallback((text) => {
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
-      text: `Lãng Khách: ${text}`,
+      text: `${currentUser?.displayName || currentUser?.username || "Lãng Khách"}: ${text}`,
       type: "near"
     });
+  }, [currentUser]);
+
+  const handleLoginSuccess = useCallback((session) => {
+    setCurrentUser(session.user);
+    StorageManager.setUserId(session.user.id);
+    setIsLoginOpen(false);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+    bridge.emit(EVENTS.LOG_ADDED, {
+      id: `login-${Date.now()}`,
+      text: `Hiệp khách ${session.user.displayName || session.user.username} đã gia nhập ${session.server || "Giang Hồ"}!`,
+      type: "system"
+    });
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    if (window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?")) {
+      localStorage.removeItem("jx2_user_session");
+      setCurrentUser(null);
+      StorageManager.setUserId(null);
+      setIsLoginOpen(true);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+    }
   }, []);
 
   return (
@@ -182,7 +220,11 @@ export function App() {
 
       {/* React MMORPG Wuxia HUD */}
       <div className="hud-overlay" id="hud-overlay">
-        <PlayerVitals stats={stats} />
+        <PlayerVitals
+          stats={stats}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+        />
 
         <MinimapPanel
           audioEnabled={audioEnabled}
@@ -204,6 +246,7 @@ export function App() {
           onInventory={handleOpenInventory}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
+          onLogout={handleLogout}
         />
 
         <MobileControls
@@ -213,6 +256,11 @@ export function App() {
         />
       </div>
 
+      {/* JX2 Authentic Login Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onLoginSuccess={handleLoginSuccess}
+      />
 
       {/* Help & Guide Modal */}
       <HelpModal

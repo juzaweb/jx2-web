@@ -127,6 +127,45 @@ export class ApiClient {
     const json = await res.json();
     return json.data.inventory;
   }
+
+  /**
+   * Register a new user
+   * @param {string} username
+   * @param {string} password
+   * @param {string} [displayName]
+   * @returns {Promise<{ user: Object, token: string }>}
+   */
+  async register(username, password, displayName = "") {
+    const res = await fetch(`${this.baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, displayName }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || `Registration failed with HTTP ${res.status}`);
+    }
+    return json.data;
+  }
+
+  /**
+   * Authenticate user credentials
+   * @param {string} username
+   * @param {string} password
+   * @returns {Promise<{ user: Object, token: string }>}
+   */
+  async login(username, password) {
+    const res = await fetch(`${this.baseUrl}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || `Login failed with HTTP ${res.status}`);
+    }
+    return json.data;
+  }
 }
 
 export const apiClient = new ApiClient();

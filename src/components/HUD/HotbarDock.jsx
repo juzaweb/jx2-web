@@ -11,6 +11,7 @@ export function HotbarDock({
   onInventory,
   onOpenHelp,
   onToggleAudio,
+  onLogout,
   items = QUICK_ITEMS
 }) {
   return (
@@ -148,6 +149,17 @@ export function HotbarDock({
             <span className="sys-ico">⚔️</span>
             <span className="sys-lbl">Hòa Bình</span>
           </button>
+          {onLogout && (
+            <button
+              className="sys-btn"
+              id="logout-btn"
+              title="Đăng xuất khỏi tài khoản"
+              onClick={onLogout}
+            >
+              <span className="sys-ico">🚪</span>
+              <span className="sys-lbl">Đăng Xuất</span>
+            </button>
+          )}
         </div>
       </div>
     </section>

@@ -69,4 +69,60 @@ describe("ApiClient", () => {
       "http://mock-api:5000/api/leaderboard?sortBy=kills&limit=5"
     );
   });
+
+  it("register posts credentials and returns user and token", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          user: { id: "u1", username: "tieuvotruong", displayName: "Tiêu Võ Trưởng" },
+          token: "token-123"
+        }
+      })
+    });
+
+    const res = await client.register("tieuvotruong", "pass123456", "Tiêu Võ Trưởng");
+    expect(res.user.username).toBe("tieuvotruong");
+    expect(res.token).toBe("token-123");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/register",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          username: "tieuvotruong",
+          password: "pass123456",
+          displayName: "Tiêu Võ Trưởng"
+        })
+      })
+    );
+  });
+
+  it("login posts credentials and returns user and token", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          user: { id: "u1", username: "tieuvotruong" },
+          token: "token-123"
+        }
+      })
+    });
+
+    const res = await client.login("tieuvotruong", "pass123456");
+    expect(res.user.username).toBe("tieuvotruong");
+    expect(res.token).toBe("token-123");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/login",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          username: "tieuvotruong",
+          password: "pass123456"
+        })
+      })
+    );
+  });
 });
+
