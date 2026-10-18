@@ -32,3 +32,17 @@ Append one entry per run. Prune entries older than 30 days.
   "target": "develop"
 }
 ```
+
+```json
+{
+  "run_id": "2026-10-18T04:23:00Z",
+  "pattern": "loop-feature",
+  "item": "C2",
+  "pr": 7,
+  "commit": "182e8c8",
+  "files_touched": 3,
+  "tests_passing": 52,
+  "outcome": "merged",
+  "target": "develop"
+}
+```
