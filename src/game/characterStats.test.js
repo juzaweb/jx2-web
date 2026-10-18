@@ -30,14 +30,11 @@ describe("deriveCharacterSheet", () => {
       hp: 999,
       maxHp: 200,
       mp: -3,
-      maxMp: 60,
-      sta: 50,
-      maxSta: 100
+      maxMp: 60
     });
 
     expect(findRow(sheet.vitals, "hp").value).toBe("200/200");
     expect(findRow(sheet.vitals, "mp").value).toBe("0/60");
-    expect(findRow(sheet.vitals, "sta").value).toBe("50/100");
   });
 
   it("defaults vitals when the stats object is empty", () => {
@@ -45,7 +42,6 @@ describe("deriveCharacterSheet", () => {
     expect(sheet.level).toBe(1);
     expect(findRow(sheet.vitals, "hp").value).toBe("100/100");
     expect(findRow(sheet.vitals, "mp").value).toBe("60/60");
-    expect(findRow(sheet.vitals, "sta").value).toBe("100/100");
   });
 
   it("grows attributes and combat values with level", () => {

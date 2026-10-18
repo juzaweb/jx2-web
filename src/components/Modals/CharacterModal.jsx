@@ -4,7 +4,7 @@ import "../../styles/character.css";
 
 /** Paper-doll slots. Presentation only — equipment is not simulated yet. */
 const EQUIPMENT_SLOTS = {
-  left: [
+  columnLeft: [
     { key: "helm", label: "Mũ" },
     { key: "armor", label: "Áo giáp" },
     { key: "belt", label: "Đai lưng" },
@@ -12,20 +12,19 @@ const EQUIPMENT_SLOTS = {
     { key: "bracers", label: "Hộ uyển" },
     { key: "weapon", label: "Vũ khí" }
   ],
-  right: [
-    { key: "necklace", label: "Dây chuyền" },
-    { key: "ring1", label: "Nhẫn" },
-    { key: "ring2", label: "Nhẫn" },
-    { key: "jade", label: "Ngọc bội" },
-    { key: "amulet", label: "Bùa hộ mệnh" },
-    { key: "boots", label: "Giày" }
+  // Sits at the elbow where the vertical column meets the horizontal row.
+  corner: { key: "subManual", label: "Phó mật tịch", icon: "manual" },
+  row: [
+    { key: "cosHat", label: "Ngoại trang - Nón", icon: "cosHat" },
+    { key: "cosTop", label: "Ngoại trang - Áo", icon: "cosTop" },
+    { key: "cosPants", label: "Ngoại trang - Quần", icon: "cosPants" },
+    { key: "mount", label: "Ngựa", icon: "mount" }
   ]
 };
 
 const TABS = [
   { key: "equip", label: "Trang bị", enabled: true },
-  { key: "news", label: "Tin tức", enabled: false },
-  { key: "pet", label: "Thủ nuôi", enabled: false }
+  { key: "news", label: "Tin tức", enabled: false }
 ];
 
 /** Faint silhouette drawn behind each empty equipment slot. */
@@ -64,35 +63,26 @@ const SLOT_ICONS = {
       <path d="M12 19v3" />
     </>
   ),
-  necklace: (
+  manual: (
     <>
-      <path d="M6 5a7 7 0 0 0 12 0" />
-      <circle cx="12" cy="14" r="2.5" />
+      <rect x="6" y="4" width="12" height="16" rx="1.5" />
+      <path d="M9 9h6" />
+      <path d="M9 13h6" />
     </>
   ),
-  ring: (
+  cosHat: (
     <>
-      <circle cx="12" cy="14" r="6" />
-      <path d="M9 8l3-3 3 3" />
+      <path d="M12 4l9 13H3z" />
+      <path d="M4 17h16" />
     </>
   ),
-  jade: (
+  cosTop: <path d="M9 5l3 2 3-2 3 3-2 2v9H8v-9L6 8z" />,
+  cosPants: <path d="M8 4h8v4l-1 12h-2l-1-8-1 8H9L8 8z" />,
+  mount: (
     <>
-      <circle cx="12" cy="12" r="7" />
-      <circle cx="12" cy="12" r="2.5" />
-    </>
-  ),
-  amulet: (
-    <>
-      <path d="M8 4h8v16l-4-3-4 3z" />
-      <path d="M10 8h4" />
-      <path d="M10 11h4" />
-    </>
-  ),
-  boots: (
-    <>
-      <path d="M9 3h5v8l4 3v4H9z" />
-      <path d="M9 15h9" />
+      <path d="M5 19v-6l3-1 4-4 4 2 3 1v8" />
+      <path d="M8 19v-3" />
+      <path d="M16 19v-3" />
     </>
   )
 };
@@ -107,7 +97,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
   const renderSlot = (slot) => (
     <div className="equip-slot" key={slot.key} title={`${slot.label} (chưa trang bị)`}>
       <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
-        {SLOT_ICONS[slot.key]}
+        {SLOT_ICONS[slot.icon || slot.key]}
       </svg>
     </div>
   );
@@ -148,7 +138,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
         )}
 
         <div className="char-body">
-          <div className="char-main">
+          <div className="char-side">
             <div className="char-tabs" role="tablist">
               {TABS.map((tab) => (
                 <button
@@ -165,19 +155,6 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
               ))}
             </div>
 
-            <div className="char-equip">
-              <div className="equip-col left">{EQUIPMENT_SLOTS.left.map(renderSlot)}</div>
-
-              <div className="char-model">
-                <img src="/hero_portrait.png" alt={playerName || "Nhân vật"} />
-                {playerName && <div className="char-model-name">{playerName}</div>}
-              </div>
-
-              <div className="equip-col right">{EQUIPMENT_SLOTS.right.map(renderSlot)}</div>
-            </div>
-          </div>
-
-          <div className="char-side">
             <div className="char-stats">
               {sheet.vitals.map((row) => (
                 <div className="stat-row vital" key={row.key}>
@@ -211,6 +188,23 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
             <div className="char-potential">
               <span className="stat-label">Tiềm năng</span>
               <span className="stat-value">{sheet.footer.potential}</span>
+            </div>
+          </div>
+
+          <div className="char-main">
+            <div className="char-equip">
+              <div className="equip-col left">
+                {EQUIPMENT_SLOTS.columnLeft.map(renderSlot)}
+              </div>
+
+              <div className="char-model">
+                <img src="/hero_full.png" alt={playerName || "Nhân vật"} />
+                {playerName && <div className="char-model-name">{playerName}</div>}
+              </div>
+
+              <div className="equip-corner">{renderSlot(EQUIPMENT_SLOTS.corner)}</div>
+
+              <div className="equip-row">{EQUIPMENT_SLOTS.row.map(renderSlot)}</div>
             </div>
           </div>
         </div>

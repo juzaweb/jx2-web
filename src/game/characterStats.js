@@ -42,9 +42,9 @@ function deriveAttributes(level) {
   const steps = level - 1;
   return [
     { key: "strength", label: "Sức mạnh", base: 1, bonus: steps },
+    { key: "agility", label: "Thân pháp", base: 1, bonus: Math.floor(steps * 1.2) },
     { key: "internal", label: "Nội công", base: 1, bonus: steps * 2 },
     { key: "bone", label: "Gân cốt", base: 1, bonus: Math.floor(steps * 0.8) },
-    { key: "agility", label: "Thân pháp", base: 1, bonus: Math.floor(steps * 1.2) },
     { key: "flexibility", label: "Linh hoạt", base: 1, bonus: 0 }
   ];
 }
@@ -71,6 +71,9 @@ function deriveCombat(level) {
     { key: "magicDef", label: "Nội phòng", value: percentFlat(0, 20 + steps * 2) },
     { key: "dodge", label: "Né tránh", value: String(10 + steps * 2) },
     { key: "crit", label: "Chí mạng", value: String(1 + Math.floor(steps / 5)) },
+    { key: "burst", label: "Điểm bạo", value: String(steps) },
+    { key: "burstHard", label: "Bạo cương", value: String(Math.floor(steps / 2)) },
+    { key: "woundRate", label: "Tỉ lệ thương", value: String(Math.floor(steps / 3)) },
     { key: "critResist", label: "Khắc nộ", value: String(1 + Math.floor(steps / 10)) },
     { key: "cast", label: "Xuất chiêu", value: String(0) },
     { key: "attackSpeed", label: "Tốc độ đánh", value: String(60 + steps * 3) },
@@ -94,17 +97,14 @@ export function deriveCharacterSheet(stats = {}) {
 
   const maxHp = toInt(stats.maxHp, 100, 1);
   const maxMp = toInt(stats.maxMp, 60, 0);
-  const maxSta = toInt(stats.maxSta, 100, 1);
   const hp = clamp(toInt(stats.hp, maxHp, 0), 0, maxHp);
   const mp = clamp(toInt(stats.mp, maxMp, 0), 0, maxMp);
-  const sta = clamp(toInt(stats.sta, maxSta, 0), 0, maxSta);
 
   return {
     level,
     vitals: [
-      { key: "hp", label: "Sinh", value: `${hp}/${maxHp}` },
-      { key: "mp", label: "Nội", value: `${mp}/${maxMp}` },
-      { key: "sta", label: "Thể", value: `${sta}/${maxSta}` }
+      { key: "hp", label: "Sinh lực", value: `${hp}/${maxHp}` },
+      { key: "mp", label: "Nội lực", value: `${mp}/${maxMp}` }
     ],
     combat: deriveCombat(level),
     attributes: deriveAttributes(level),
