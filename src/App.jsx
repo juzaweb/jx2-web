@@ -7,6 +7,7 @@ import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
+import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
@@ -87,6 +88,7 @@ export function App() {
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [stats, setStats] = useState({
     level: 1,
@@ -209,7 +211,24 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === "F3") {
+        e.preventDefault();
+        const next = !isCharacterOpen;
+        setIsCharacterOpen(next);
+        if (next) {
+          setIsInventoryOpen(false);
+          setIsHelpOpen(false);
+          bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        }
+        return;
+      }
+
       if (e.key !== "Escape") return;
+
+      if (isCharacterOpen) {
+        setIsCharacterOpen(false);
+        return;
+      }
 
       if (isInventoryOpen) {
         setIsInventoryOpen(false);
@@ -225,7 +244,7 @@ export function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isInventoryOpen]);
+  }, [isCharacterOpen, isInventoryOpen]);
 
   const handleAttack = useCallback(() => {
     bridge.emit(EVENTS.ACTION_ATTACK);
@@ -259,6 +278,7 @@ export function App() {
 
   const handleOpenHelp = useCallback(() => {
     setIsInventoryOpen(false);
+    setIsCharacterOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
   }, []);
@@ -270,11 +290,23 @@ export function App() {
 
   const handleOpenInventory = useCallback(() => {
     setIsHelpOpen(false);
+    setIsCharacterOpen(false);
     setIsInventoryOpen(true);
   }, []);
 
   const handleCloseInventory = useCallback(() => {
     setIsInventoryOpen(false);
+  }, []);
+
+  const handleOpenCharacter = useCallback(() => {
+    setIsHelpOpen(false);
+    setIsInventoryOpen(false);
+    setIsCharacterOpen(true);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleCloseCharacter = useCallback(() => {
+    setIsCharacterOpen(false);
   }, []);
 
   const handleSendMessage = useCallback((text) => {
@@ -364,6 +396,7 @@ export function App() {
           onSkill={handleSkill}
           onSave={handleSave}
           onInventory={handleOpenInventory}
+          onCharacter={handleOpenCharacter}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
           onLogout={handleLogout}
@@ -410,6 +443,14 @@ export function App() {
         coins={stats.coins}
         quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}
+      />
+
+      {/* Character Sheet ("Nhân vật") */}
+      <CharacterModal
+        isOpen={isCharacterOpen}
+        onClose={handleCloseCharacter}
+        stats={stats}
+        playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
       />
     </main>
   );
