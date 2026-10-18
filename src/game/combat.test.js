@@ -408,4 +408,30 @@ describe("CombatSystem kill rewards", () => {
     expect(player.stats.coins).toBe(22);
     expect(getQuantities()[drop.itemId]).toBe(before + drop.qty);
   });
+
+  it("fades the loot a bystander cannot take and keeps the killer's drop", () => {
+    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    bystander.applyServerReward(serverReward());
+    bystander.updateDrops(9000);
+
+    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    killer.applyServerReward(serverReward());
+    killer.updateDrops(9000);
+
+    expect(bystander.drops[0].active).toBe(false);
+    expect(killer.drops[0].active).toBe(true);
+  });
+
+  it("bounds the remembered drop list across many kills", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    for (let i = 0; i < 40; i++) {
+      combat.applyServerReward(serverReward());
+    }
+    player.x = -1000;
+    player.y = -1000;
+    combat.updateDrops(0);
+
+    expect(combat.drops.length).toBeLessThanOrEqual(32);
+  });
 });

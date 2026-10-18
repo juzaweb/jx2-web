@@ -117,6 +117,15 @@ export function computeDamage(attacker, defender, rng = Math.random, options = {
   };
 }
 
+/**
+ * Ceiling on remembered drops. Every client renders every kill's loot, so swept-up
+ * entries must not accumulate for the whole session.
+ */
+const MAX_DROPS = 32;
+
+/** Lifetime (ms) of a drop this client is not allowed to collect. */
+const UNOWNED_DROP_TTL_MS = 8000;
+
 export class CombatSystem {
   /**
    * @param {Phaser.Scene} scene
@@ -301,14 +310,13 @@ export class CombatSystem {
       return;
     }
 
-    this.grantKillReward(
-      rollKillReward(Math.random),
-      { x: wolf.x, y: wolf.y - 25 },
-      {
-        x: wolf.x + Phaser.Math.Between(-20, 20),
-        y: wolf.y + Phaser.Math.Between(-10, 10)
-      }
+    const reward = rollKillReward(Math.random);
+    this.spawnDrop(
+      wolf.x + Phaser.Math.Between(-20, 20),
+      wolf.y + Phaser.Math.Between(-10, 10),
+      reward.drop
     );
+    this.grantKillReward(reward, { x: wolf.x, y: wolf.y - 25 });
 
     // Schedule enemy revive (the server drives respawn while connected)
     this.scene.time.delayedCall(10000, () => {
@@ -339,19 +347,18 @@ export class CombatSystem {
 
     this.grantKillReward(
       { exp: reward.exp, coins: reward.coins },
-      { x, y: y - 25 },
-      null
+      { x, y: y - 25 }
     );
   }
 
   /**
-   * Pay a kill reward to the local player: EXP, bạc, kill count, loot and the
-   * quest/save side effects.
+   * Pay a kill reward to the local player: EXP, bạc, kill count and the
+   * level-up / quest / save side effects. Loot is spawned by the caller, which
+   * knows whether the drop is a local roll or an authoritative one.
    * @param {{exp:number, coins:number}} reward
    * @param {{x:number, y:number}} feedbackPosition - where the +EXP float text appears
-   * @param {?{x:number, y:number}} [dropPosition] - where a local loot drop lands, if any
    */
-  grantKillReward(reward, feedbackPosition, dropPosition = null) {
+  grantKillReward(reward, feedbackPosition) {
     this.player.stats.kills++;
     this.player.stats.coins += reward.coins;
     this.player.stats.exp += reward.exp;
@@ -360,10 +367,6 @@ export class CombatSystem {
       `Đánh bại Sói Xám! +${reward.exp} EXP, nhận được ${reward.coins} bạc.`
     );
     this.showFloatText(feedbackPosition.x, feedbackPosition.y, `+${reward.exp} EXP`, "#f3d17f");
-
-    if (dropPosition) {
-      this.spawnDrop(dropPosition.x, dropPosition.y);
-    }
 
     this.checkLevelUp();
     this.ui.updateHud(this.player.stats);
@@ -518,7 +521,9 @@ export class CombatSystem {
       collectable,
       itemId: rolled.id,
       qty: rolled.qty ?? dropEntry?.qty ?? 1,
-      name: dropEntry ? dropEntry.name : rolled.id
+      name: dropEntry ? dropEntry.name : rolled.id,
+      // Someone else's loot can never be picked up, so it fades instead of littering
+      expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
     };
 
     drop.visual = this.scene.add.container(x, y).setDepth(y + 5);
@@ -537,8 +542,18 @@ export class CombatSystem {
   }
 
   updateDrops(time) {
+    if (this.drops.length > MAX_DROPS) {
+      this.drops = this.drops.filter((drop) => drop.active).slice(-MAX_DROPS);
+    }
+
     this.drops.forEach((drop) => {
       if (!drop.active) return;
+
+      if (!drop.collectable && time >= drop.expiresAt) {
+        drop.active = false;
+        drop.visual.destroy();
+        return;
+      }
 
       drop.visual.setPosition(
         drop.x,

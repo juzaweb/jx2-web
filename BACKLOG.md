@@ -38,6 +38,12 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Acceptance:** Loads app, canvas mounts, HUD (vitals, hotbar) visible; no console errors.
 - **Touches:** new `e2e/`, Playwright config.
 
+### E4 — Split the loot/drop concern out of CombatSystem · `proposed` · P3
+- **Why:** `src/game/combat.js` is ~600 lines mixing the damage model, kill rewards, drop lifecycle, quest progress, player damage, level-up and audio; F2 added five reward methods to it (code review 2026-10-18 flagged the file size as the follow-up to F2). The drop concern — spawning, ownership, expiry, animating and collecting world loot — is self-contained and can be unit tested without a `CombatSystem` instance.
+- **Acceptance:** A focused module (e.g. `src/game/drops.js`) owns `spawnDrop`/`updateDrops`/`collectDrop` (ownership + expiry + the drop-list bound); `CombatSystem` delegates to it and keeps only combat/reward orchestration; drop behaviour is covered by tests that build the drop manager directly rather than through `CombatSystem`; `npm run build` and `npm test` stay green with no behaviour change.
+- **Touches:** `src/game/combat.js`, new `src/game/drops.js`, new `src/game/drops.test.js`, `src/game/combat.test.js`.
+- **Spec gate:** pending — new item awaiting `spec-review`.
+
 ---
 
 ## EPIC C — Items & Progression
