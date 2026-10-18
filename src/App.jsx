@@ -47,6 +47,20 @@ const isGuestSession = (session) =>
   session?.token === "offline-guest-token" ||
   String(session?.user?.id || "").startsWith("guest_");
 
+/**
+ * Point the persisted bag and the shared in-memory store at one character, and
+ * return the render-ready inventory for the HUD. `characterId` may be null
+ * (no character chosen), which falls back to the account-scoped guest bag.
+ * @param {string|null} characterId
+ * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
+ */
+const loadCharacterInventory = (characterId) => {
+  StorageManager.setCharacterId(characterId || null);
+  return applyQuantities(
+    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+  );
+};
+
 export function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     const session = readSession();
@@ -97,12 +111,9 @@ export function App() {
   // Inventory stack quantities are persisted per character and mirrored to that
   // character's server bag. Live edits (use / loot) arrive over the bridge, so the
   // HUD is no longer a mount-time snapshot.
-  const [inventory, setInventory] = useState(() => {
-    StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
-    return applyQuantities(
-      rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
-    );
-  });
+  const [inventory, setInventory] = useState(() =>
+    loadCharacterInventory(readSession()?.activeCharacter?.id)
+  );
 
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
@@ -297,10 +308,7 @@ export function App() {
     // Switch the shared bag store to this character's own inventory before the
     // scene enters the world, so the server fallback can never leak another
     // character's items.
-    StorageManager.setCharacterId(character.id);
-    const quantities = StorageManager.loadInventory(defaultQuantities());
-    rememberQuantities(quantities);
-    setInventory(applyQuantities(quantities));
+    setInventory(loadCharacterInventory(character.id));
 
     bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);

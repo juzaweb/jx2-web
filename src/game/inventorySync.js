@@ -51,9 +51,8 @@ export function hasInventory(inventory) {
  * @returns {{ action: "adopt"|"push", quantities: Record<string, number> }}
  */
 export function planInventorySync(serverInventory, localInventory) {
-  const server = sanitizeInventory(serverInventory);
-  if (Object.keys(server).length > 0) {
-    return { action: "adopt", quantities: server };
+  if (hasInventory(serverInventory)) {
+    return { action: "adopt", quantities: sanitizeInventory(serverInventory) };
   }
   return { action: "push", quantities: sanitizeInventory(localInventory) };
 }
@@ -119,6 +118,9 @@ export class InventorySyncer {
    * Read the character's bag from the server (source of truth). With server data
    * the local store adopts it; with none, the local bag is pushed up. An
    * unreachable backend keeps the local bag and unblocks later uploads.
+   *
+   * The owner is re-checked after the await: switching characters mid-flight must
+   * not let a stale response adopt the old character's bag into the new one.
    */
   async load() {
     const ownerId = this.getOwnerId();
@@ -127,6 +129,8 @@ export class InventorySyncer {
     this.ready = false;
     try {
       const serverInventory = await this.api.getInventory(ownerId);
+      if (this.getOwnerId() !== ownerId) return;
+
       const { action, quantities } = planInventorySync(serverInventory, this.getQuantities());
 
       if (action === "adopt") {
@@ -140,6 +144,7 @@ export class InventorySyncer {
         this.sync();
       }
     } catch (error) {
+      if (this.getOwnerId() !== ownerId) return;
       this.lastSignature = null;
       this.ready = true;
       if (this.onError) this.onError(error);

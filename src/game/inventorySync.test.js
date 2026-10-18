@@ -174,4 +174,30 @@ describe("InventorySyncer", () => {
     expect(api.updateInventory).not.toHaveBeenCalled();
     expect(api.getInventory).not.toHaveBeenCalled();
   });
+
+  it("ignores a server response that arrives after the character changed", async () => {
+    let owner = "char_a";
+    let resolveGet;
+    const api = {
+      getInventory: vi.fn(() => new Promise((resolve) => { resolveGet = resolve; })),
+      updateInventory: vi.fn()
+    };
+    const setQuantities = vi.fn();
+    const onAdopt = vi.fn();
+    const syncer = new InventorySyncer({
+      api,
+      getOwnerId: () => owner,
+      getQuantities: () => ({ "tui-bac": 21 }),
+      setQuantities,
+      onAdopt
+    });
+
+    const pending = syncer.load();
+    owner = "char_b"; // switched characters while the fetch was in flight
+    resolveGet({ "tui-bac": 4 });
+    await pending;
+
+    expect(setQuantities).not.toHaveBeenCalled();
+    expect(onAdopt).not.toHaveBeenCalled();
+  });
 });
