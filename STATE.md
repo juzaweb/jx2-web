@@ -1,6 +1,6 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — feature pipeline cycle (L2, item A4)
+Last run: 2026-10-18 — feature pipeline cycle (L2, item C2)
 
 ## Project Snapshot
 
@@ -15,7 +15,8 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item A4)
 - [x] A4 is merged to `develop` (`e5933ca`, PR #5).
 - [x] Spec review on 2026-10-18 approved A5, C6, D4 — `SPEC GATE: PASS`.
 - [x] C1 is merged to `develop` (`89c5bd5`).
-- [ ] Next loop item after A4: pick highest-priority `todo` in `BACKLOG.md` (C2, A1, A2, B4 at P1).
+- [x] C2 is merged to `develop` (`182e8c8`, PR #7).
+- [ ] Next loop item after C2: pick highest-priority `todo` in `BACKLOG.md` (A1, A2, B4 at P1; E3 is P1 but needs Playwright → `package.json` humanMergeRequired).
 - [ ] Enable branch protection requirements so CI must pass before merge on `develop`.
 
 ## Watch List
@@ -25,31 +26,33 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item A4)
 - Policy: `gate.yaml` + `docs/safety.md`. Feature menu: `docs/jx2-feature-library.md`.
 - Toolchain: Vitest 5 + jsdom; CI at `.github/workflows/ci.yml`.
 - Spec review 2026-10-18: APPROVE A4, B5, C5, A5, C6, D4 — `SPEC GATE: PASS`.
-- Feature scout 2026-10-18: No proposals this run (sufficient queue: 19 todo items in backlog).
+- Spec review 2026-10-18 (C2 cycle): APPROVE A6, C7, C8 (new) + C2 — `SPEC GATE: PASS`.
+- Feature scout 2026-10-18: proposed A6 (ngũ hành, P2), C7 (rèn đúc, P3), C8 (cường hoá, P3); queue now 22 todo items.
+- **Verifier finding (C1/C2, deferred):** HUD inventory is a mount-time snapshot, so a looted quantity is not shown live in `InventoryModal` until reload. Persistence still works. Wire quantity changes through `bridge` when a UI item (C4 consume, or a dedicated UX item) lands.
 - **Verifier finding (A4, deferred):** In `CombatSystem.damagePlayer`, backward compatibility with existing `game.js:387` calls (`this.combat.damagePlayer(7)`) is preserved via proximity lookup. In a future pass touching `game.js`, cleanly update to `this.combat.onBite(wolf)`.
 - **Verifier finding (C1, deferred):** stack quantities live in two places — React
   state snapshot (`App.jsx`) and the `items.js` module singleton. `useItem` never
   decrements, and the HUD would go stale if it did. Wire quantity changes through
   `bridge` when C2 (loot) / C4 (consume) land.
 
-## Verifier Run — A4 (2026-10-18, step 4)
+## Verifier Run — C2 (2026-10-18, step 4)
 
-- Skill: code-review-and-quality (5 axes). Scope: PR #5 diff against `develop` (`5b0fa5c`).
-- **Correctness:** pure `computeDamage(attacker, defender, rng, options)` with attack-defense mitigation, floor of 1, crit multipliers, and combat log integration. ✅
-- **Readability:** clear 4-step logic with JSDoc annotations and straightforward control flow. ✅
-- **Architecture:** entity stats and getters on `Player` and `Wolf`, completely decoupled pure damage math. ✅
-- **Security:** pure functional design, safe nullish coalescing, no prototype mutation. ✅
-- **Performance:** O(1) arithmetic operations with negligible allocations. ✅
-- **Tests:** 43/43 pass; 14 new unit tests in `src/game/combat.test.js`. ✅
-- Verdict: **APPROVE** — `npm run build` ✅ · `npm test` ✅ 43/43.
+- Skill: code-review-and-quality (5 axes). Scope: PR #7 diff against `develop` (`f8c7efe`); branch `loop/c2-loot-drops`.
+- **Correctness:** `collectDrop → addQuantity → onStateChange → saveGame → StorageManager.save({inventory: getQuantities()})` traced; reload path (`App.jsx` mount → `loadInventory`) round-trip independently re-probed; `rollDrop` never returns a non-catalog id. ✅
+- **Readability:** full JSDoc, straight control flow, clear names. ✅ (Nit: `DROP_TABLE.find` after `rollDrop` is redundant.)
+- **Architecture:** helpers live in `items.js` (catalog + quantities owner); `combat.js` imports one-way, no cycle; matches `Touches`. ✅
+- **Security:** input validation on id/amount; adversarial probe confirms no prototype pollution (`__proto__`/`constructor` non-issue and unreachable). ✅
+- **Performance:** `rollDrop` O(4), `addQuantity` O(1), no leaks. ✅
+- **Tests:** 52/52 pass; `items.test.js` 10 → 19 (+9), no existing test weakened. ✅
+- Verdict: **APPROVE** — `npm run build` ✅ · `npm test` ✅ 52/52.
 
 ## Last Run Evidence (2026-10-18)
 
-- Item: **A4 — Critical hits + attack/defense damage formula** (branch `loop/a4-damage-formula`, PR #5, commit `e5933ca`, worktree `/tmp/opencode/jx2-a4`).
-- Change: pure `computeDamage` exported in `combat.js`; integrated into `performAttack`, `performSkill`, `damagePlayer`; Vietnamese combat logs and floating text for critical strikes; base attributes added to `Player` and `Wolf`; 14 unit tests in `combat.test.js`.
-- Verify: `npm run build` ✅ · `npm test` ✅ **43 passed / 43** (5 files; +14 new tests in `combat.test.js`).
-- Diff: 4 files (≤ `gate.yaml:maxFiles` 10); all paths in `autoMergeAllowlist`, none in `humanMergeRequired` or denylist.
-- Merge: PR #5 squashed & merged into `develop` automatically per `gate.yaml`.
+- Item: **C2 — Loot drops feed inventory** (branch `loop/c2-loot-drops`, PR #7, commit `182e8c8`, worktree `/tmp/opencode/jx2-c2`).
+- Change: `addQuantity(id, amount)` + weighted `DROP_TABLE`/pure `rollDrop(rng)` in `items.js`; `spawnDrop` rolls a loot entry and `collectDrop` grants it to the persisted inventory with a Vietnamese log line; existing +5 bạc / +5 nội lực and the `onStateChange` save path preserved; 9 unit tests in `items.test.js`.
+- Verify: `npm run build` ✅ · `npm test` ✅ **52 passed / 52** (5 files; +9 new tests in `items.test.js`).
+- Diff: 3 files (≤ `gate.yaml:maxFiles` 10); all paths in `autoMergeAllowlist` (`src/**`, `**/*.test.js`), none in `humanMergeRequired` or denylist.
+- CI: `build-and-test` ✅. Merge: PR #7 squashed & merged into `develop` automatically per `gate.yaml`.
 
 ## Recent Noise (ignored this run)
 

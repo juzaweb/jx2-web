@@ -42,10 +42,12 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 - **Touches:** `src/game/items.js`, `src/game/storage.js`, `src/components/Modals/InventoryModal.jsx`.
 - **Evidence:** Merged in `89c5bd5`; 24 unit tests passing across storage and items suites.
 
-### C2 — Loot drops feed inventory · `todo` · P1
+### C2 — Loot drops feed inventory · `done` · P1
 - **Why:** Kills drop items visually but inventory is static.
 - **Acceptance:** Enemy drop adds to inventory quantity; persists across reload.
 - **Touches:** `src/game/combat.js`, `src/game/items.js`.
+- **Evidence:** Merged PR #7 (`182e8c8`); `addQuantity` + weighted `DROP_TABLE`/`rollDrop` in `items.js`; `collectDrop` grants the rolled item and persists via `saveGame`; 52 unit tests passing (+9 in `items.test.js`); verifier APPROVE.
+- **Maps to:** Loot & Economy `[core]` — "Enemy drop tables feeding inventory".
 
 ### C3 — Equipment affects stats · `todo` · P2
 - **Why:** Weapons/armor exist as inert icons only.
@@ -67,6 +69,20 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 - **Acceptance:** A pure catalog defines ≥3 sects (`thieu-lam`, `vo-dang`, `nga-my`) with Vietnamese names, descriptions, and stat affinity modifiers (e.g. Thiếu Lâm +HP/DEF, Võ Đang +MP/ATK, Nga My +HP/MP regen); player can select or switch sect via `Lệnh Bài Môn Phái` or dialogue; chosen sect persists in `storage.js`; HUD and player overhead name display the sect title (e.g. "Võ Đang Đệ Tử"); unit tests verify stat modifier calculation, storage round-trip, and invalid sect ID rejection.
 - **Touches:** `src/game/player.js`, `src/game/storage.js`, `src/components/HUD/PlayerVitals.jsx`, new `src/game/sect.js`, new `src/game/sect.test.js`.
 - **Maps to:** Factions & Classes `[core]` — "Sect affects starting stats and one signature skill".
+
+### C7 — Material refinement / crafting (rèn đúc) · `todo` · P3
+- **Why:** The catalog already carries refinement materials — `huyen-kim-thach` ("dùng để rèn đúc trang bị"), `hoang-kim-huyen-thiet`, `yeu-dan`, `bach-nien-linh-chi` — but nothing consumes them, so loot has no sink. Crafting turns farmed materials into existing weapons/armor and closes the loot → gear loop.
+- **Acceptance:** A pure `RECIPES` catalog defines ≥3 recipes, each mapping input `{ itemId: qty }` materials to one output equipment id already present in `INVENTORY_ITEMS`, and every referenced id exists in the catalog; `canCraft(quantities, recipeId)` reports whether all inputs are satisfied; `craft(quantities, recipeId)` returns `{ ok, quantities }`, consuming inputs and adding the output only when `canCraft` is true and leaving quantities untouched on failure or an unknown recipe; crafted changes persist through `storage.js` and round-trip after reload; a `Rèn Đúc` action (new modal or a section in `InventoryModal`) lists recipes and disables those with insufficient materials; unit tests cover sufficient materials (inputs consumed, output added), insufficient materials (no mutation), unknown-recipe rejection, and a storage save/load round-trip.
+- **Touches:** new `src/game/recipes.js`, new `src/game/recipes.test.js`, `src/game/items.js`, `src/game/storage.js`, `src/components/Modals/InventoryModal.jsx`.
+- **Maps to:** Loot & Economy `[stretch]` — "Material refinement / crafting (rèn đúc)".
+- **Depends on:** C1 (done) for persisted quantities; benefits from C2 for material drops.
+
+### C8 — Equipment enhancement (cường hoá) +0..+N · `todo` · P3
+- **Why:** JX2's signature gear sink is cường hoá: spend stones for a chance to raise a piece +0 → +N, with a downgrade risk at high levels. The equipment in `INVENTORY_ITEMS` is currently inert and there is no risk/reward progression axis.
+- **Acceptance:** A pure `ENHANCE_TABLE` maps level → `{ successChance, downgradeChance }` for +0..+10, with success chance decreasing and a non-zero downgrade risk above a threshold; `enhance(level, rng)` returns `{ nextLevel, result: "success" | "fail" | "downgrade" }` and is deterministic for a fixed rng; enhancement consumes a material (e.g. a `huyen-tinh-thach` stone added to the catalog) and is rejected at max level or without materials; each `+N` grants a documented attack/defense bonus; enhanced levels persist through `storage.js`; `InventoryModal` shows the `+N` suffix on enhanced gear and exposes an enhance action; unit tests cover guaranteed success, failure without downgrade, failure with downgrade, max-level rejection, and material consumption.
+- **Touches:** new `src/game/enhance.js`, new `src/game/enhance.test.js`, `src/game/items.js`, `src/game/storage.js`, `src/components/Modals/InventoryModal.jsx`.
+- **Maps to:** Items & Equipment `[stretch]` — "Enhancement (cường hoá) +0..+N with success chance and downgrade risk".
+- **Depends on:** C3 for equip stats (bonus targets attack/defense).
 
 ---
 
@@ -96,6 +112,13 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 - **Acceptance:** A pure status effect engine `updateBuffs(buffs, deltaMs)` handles duration decay, interval-based ticks, and stat modifiers; supports at least one buff ("Hộ Thể Khí" reducing damage taken) and one debuff ("Trúng Độc" dealing periodic damage); active buffs display in the PlayerVitals buff slot with name, icon, and remaining timer; combat log announces effect application and expiration; unit tests cover duration decay, tick triggers, modifier application, and clean expiration removal.
 - **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/components/HUD/PlayerVitals.jsx`, new `src/game/buffs.js`, new `src/game/buffs.test.js`.
 - **Maps to:** Skills `[stretch]` — "Buffs / debuffs with duration and stacking rules".
+
+### A6 — Elemental damage types & resistances (ngũ hành) · `todo` · P2
+- **Why:** `computeDamage` is purely physical. JX2 combat depth comes from the ngũ hành wheel (Kim / Mộc / Thủy / Hỏa / Thổ), where a skill's element is stronger or weaker against a defender's element; this extends the A4 formula into a typed one so future skills and enemies have meaningful match-ups.
+- **Acceptance:** A pure `ELEMENTS` catalog exports `kim`, `moc`, `thuy`, `hoa`, `tho` with Vietnamese labels; `computeDamage` accepts an attacker element (`options.element`) and a defender element (`options.defenderElement`, falling back to `defender.element`) and applies an element multiplier (neutral 1.0, strong 1.5, weak 0.75) before the minimum-damage floor of 1; behaviour with no element supplied is unchanged (floor, crit, and variance still hold); `performAttack`/`performSkill` pass the player's element and each `Wolf` declares an element; the combat log names the element on a strong/weak hit; unit tests cover neutral, strong, weak, and missing-element cases and confirm the floor of 1 survives a weak hit.
+- **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/game/enemy.js`, `src/game/combat.test.js`.
+- **Maps to:** Combat `[stretch]` — "Elemental types and resistances".
+- **Depends on:** A4 (done) for `computeDamage`.
 
 ---
 
