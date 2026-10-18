@@ -119,18 +119,23 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/components/HUD/PlayerVitals.jsx`, new `src/game/buffs.js`, new `src/game/buffs.test.js`.
 - **Maps to:** Skills `[stretch]` — "Buffs / debuffs with duration and stacking rules".
 
-### A6 — Elemental damage types & resistances (ngũ hành) · `todo` · P2
-- **Why:** `computeDamage` is purely physical. JX2 combat depth comes from the ngũ hành wheel (Kim / Mộc / Thủy / Hỏa / Thổ), where a skill's element is stronger or weaker against a defender's element; this extends the A4 formula into a typed one so future skills and enemies have meaningful match-ups.
-- **Acceptance:** A pure `ELEMENTS` catalog exports `kim`, `moc`, `thuy`, `hoa`, `tho` with Vietnamese labels; `computeDamage` accepts an attacker element (`options.element`) and a defender element (`options.defenderElement`, falling back to `defender.element`) and applies an element multiplier (neutral 1.0, strong 1.5, weak 0.75) before the minimum-damage floor of 1; behaviour with no element supplied is unchanged (floor, crit, and variance still hold); `performAttack`/`performSkill` pass the player's element and each `Wolf` declares an element; the combat log names the element on a strong/weak hit; unit tests cover neutral, strong, weak, and missing-element cases and confirm the floor of 1 survives a weak hit.
-- **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/game/enemy.js`, `src/game/combat.test.js`.
-- **Maps to:** Combat `[stretch]` — "Elemental types and resistances".
-- **Depends on:** A4 (done) for `computeDamage`.
-
 ---
 
 ## EPIC B — World & NPC
 
-### B1 — Multiple maps + portals · `todo` · P2
+### B1 — Multiple maps + portals (Biện Kinh, Tuyền Châu, Tương Dương) · `todo` · P2
+- **Why:** The world is a single hard-coded map. JX2 travel is defined by distinct cities linked by portals; named maps give the world a sense of place and a backbone for quests, NPCs, and shops. Maps must load **on demand** — preloading every map at boot is too heavy.
+- **Acceptance:**
+  - A map registry defines ≥4 named maps (Trường An, Biện Kinh, Tuyền Châu, Tương Dương), each with a ground tint/decoration and a spawn point.
+  - Only the active map is built/loaded; a map is created lazily when the player enters it via a portal — never preload all maps at startup.
+  - On transition the previous map's scene/game objects are torn down, so memory does not grow across travels.
+  - A pure helper resolves `{ fromMapId, portalId } → { toMapId, x, y }` and rejects unknown portals/maps.
+  - The current map name shows in the HUD/minimap.
+  - The player's map id + position save per map and restore after reload.
+  - Unit tests cover portal resolution and per-map save/restore.
+- **Touches:** `src/game/world.js`, `src/game/game.js`, `src/game/storage.js`, `src/components/HUD/MinimapPanel.jsx`, new `src/game/maps.js`, new `src/game/maps.test.js`.
+- **Maps to:** World & NPC `[stretch]` — "Multiple maps with portal transitions".
+
 ### B2 — NPCs + dialogue system · `todo` · P2
 ### B3 — Shop NPC (buy/sell with coins) · `todo` · P3
 ### B4 — Quest system (log, rewards, multi-quest) · `todo` · P1
