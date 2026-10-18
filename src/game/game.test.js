@@ -15,6 +15,7 @@ vi.mock("phaser", () => ({
   }
 }));
 
+import { NetworkClient } from "./networkClient.js";
 import { JiangHuScene } from "./game.js";
 
 /** Registers the scene lifecycle hooks the way Phaser's event emitter does. */
@@ -73,6 +74,27 @@ describe("JiangHuScene teardown", () => {
     unsubscribers.forEach((unsub) => expect(unsub).toHaveBeenCalledTimes(1));
 
     removeEventListener.mockRestore();
+  });
+
+  it("leaves nothing on the old client that can poke the teardown-up scene", () => {
+    const addLog = vi.fn();
+    const networkClient = new NetworkClient("ws://127.0.0.1:1/ws");
+    networkClient.on("disconnected", () =>
+      addLog("Mất kết nối máy chủ. Đang tự động kết nối lại...")
+    );
+    const scope = {
+      networkClient,
+      remotePlayerManager: { destroy: vi.fn() },
+      uiBridge: { destroy: vi.fn(), addLog }
+    };
+
+    JiangHuScene.prototype.shutdown.call(scope);
+    // The socket's `close` lands after the scene is gone: it must go nowhere,
+    // otherwise the *live* HUD (shared bridge) logs a phantom disconnect
+    networkClient.emit("disconnected", {});
+
+    expect(addLog).not.toHaveBeenCalled();
+    expect(scope.networkClient).toBeNull();
   });
 
   it("survives a second teardown without disconnecting twice", () => {
