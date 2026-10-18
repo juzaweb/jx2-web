@@ -36,10 +36,11 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ## EPIC C — Items & Progression
 
-### C1 — Persist inventory state · `in-progress` · P0
+### C1 — Persist inventory state · `done` · P0
 - **Why:** `src/game/items.js` is explicitly static demo data; quantities reset on reload.
 - **Acceptance:** Inventory + quick-slot quantities load from and save to `storage.js`.
 - **Touches:** `src/game/items.js`, `src/game/storage.js`, `src/components/Modals/InventoryModal.jsx`.
+- **Evidence:** Merged in `89c5bd5`; 24 unit tests passing across storage and items suites.
 
 ### C2 — Loot drops feed inventory · `todo` · P1
 - **Why:** Kills drop items visually but inventory is static.
@@ -83,10 +84,11 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 ### A3 — Enemy variety (ranged + elite) · `todo` · P2
 - **Touches:** `src/game/enemy.js`, `src/game/world.js`.
 
-### A4 — Critical hits + attack/defense damage formula · `todo` · P1
+### A4 — Critical hits + attack/defense damage formula · `done` · P1
 - **Why:** Damage is a flat random range (`Phaser.Math.Between(17, 25)`); there is no attack/defense formula or crit, so C3 equipment stats would have nothing to affect.
 - **Acceptance:** A pure `computeDamage(attacker, defender, rng)` returns `{ damage, crit }`, applying attack-minus-defense mitigation, a minimum-damage floor of 1, and a crit multiplier; `performAttack`/`performSkill` use it and the combat log marks critical hits; unit tests cover the floor, the crit path, and a deterministic rng.
 - **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/game/enemy.js`, new `src/game/combat.test.js`.
+- **Evidence:** Merged PR #5 (`e5933ca`); 43 unit tests passing (14 new in `combat.test.js`); verifier APPROVE.
 - **Maps to:** Combat `[core]` — "Critical hits, damage formula with attack/defense".
 
 ### A5 — Combat status effects & buff slot · `todo` · P2
