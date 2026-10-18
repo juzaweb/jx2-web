@@ -260,7 +260,7 @@ export class Player {
   }
 
   createKeyboard() {
-    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Q");
+    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Q", false);
   }
 
   update(time, delta) {
@@ -421,6 +421,15 @@ export class Player {
   }
 
   updateMovement() {
+    const isTyping = typeof document !== "undefined" && (
+      document.activeElement?.tagName === "INPUT" ||
+      document.activeElement?.tagName === "TEXTAREA"
+    );
+    if (isTyping) {
+      this.sprite.setVelocity(0, 0);
+      return;
+    }
+
     const k = this.keys;
     const keyLeft = k.A.isDown || k.LEFT.isDown || this.touchDirection === "left";
     const keyRight = k.D.isDown || k.RIGHT.isDown || this.touchDirection === "right";

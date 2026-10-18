@@ -316,7 +316,11 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         {successMsg && <div className="jx2-alert-banner success">{successMsg}</div>}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={(e) => e.stopPropagation()}
+          style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+        >
           {/* Username */}
           <div className="jx2-form-group">
             <label className="jx2-form-label" htmlFor="jx2-username">

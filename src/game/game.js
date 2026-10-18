@@ -155,33 +155,40 @@ export class JiangHuScene extends Phaser.Scene {
       this.isPointerMoving = false;
     });
 
+    // Allow standard typing in HTML form inputs (e.g. login form, chat)
+    this.input.keyboard.preventDefault = false;
+    const isTyping = () => {
+      const tag = typeof document !== "undefined" && document.activeElement?.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA";
+    };
+
     // Keyboard Hotkeys
     this.input.keyboard.on("keydown-SPACE", () => {
-      if (this.started && !this.isPaused) this.combat.performAttack();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performAttack();
     });
 
     this.input.keyboard.on("keydown-Q", () => {
-      if (this.started && !this.isPaused) this.combat.performSkill();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
     });
 
     this.input.keyboard.on("keydown-ONE", () => {
-      if (this.started && !this.isPaused) this.useItem(1);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
     });
 
     this.input.keyboard.on("keydown-TWO", () => {
-      if (this.started && !this.isPaused) this.useItem(2);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(2);
     });
 
     this.input.keyboard.on("keydown-THREE", () => {
-      if (this.started && !this.isPaused) this.useItem(3);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(3);
     });
 
     this.input.keyboard.on("keydown-FOUR", () => {
-      if (this.started && !this.isPaused) this.useItem(4);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
     });
 
     this.input.keyboard.on("keydown-EIGHT", () => {
-      if (this.started && !this.isPaused) this.combat.performSkill();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
     });
 
     // Listen to React UI Actions via Game Bridge

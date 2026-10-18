@@ -18,3 +18,4 @@ Write-Host " Frontend Port: $FrontendPort" -ForegroundColor Yellow
 Write-Host "====================================================" -ForegroundColor Green
 
 node scripts/dev.js
+
