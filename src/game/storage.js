@@ -1,5 +1,23 @@
 const STORAGE_KEY = "giang_ho_game_save_v1";
 
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Coerce an arbitrary value into a safe id -> non-negative integer map.
+ * @param {*} value
+ * @returns {Record<string, number> | undefined}
+ */
+const sanitizeInventory = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out = {};
+  Object.entries(value).forEach(([id, qty]) => {
+    if (DANGEROUS_KEYS.has(id)) return;
+    if (typeof qty !== "number" || !Number.isFinite(qty) || qty < 0) return;
+    out[id] = Math.floor(qty);
+  });
+  return out;
+};
+
 export class StorageManager {
   /**
    * Save game state to localStorage
@@ -8,15 +26,25 @@ export class StorageManager {
    * @param {{ x: number, y: number }} [data.position] Player coordinates
    * @param {boolean} [data.questRewarded] Quest completion state
    * @param {boolean} [data.audioEnabled] Sound setting
+   * @param {Record<string, number>} [data.inventory] Stack quantities keyed by item id
    * @returns {boolean} Success status
    */
   static save(data) {
     try {
+      // Preserve previously saved stack quantities when a caller (e.g. the game
+      // loop) saves unrelated state without passing inventory.
+      let inventory = data.inventory;
+      if (inventory === undefined) {
+        const previous = this.load();
+        inventory = previous ? previous.inventory : undefined;
+      }
+
       const payload = {
         stats: data.stats,
         position: data.position,
         questRewarded: !!data.questRewarded,
         audioEnabled: data.audioEnabled,
+        inventory: sanitizeInventory(inventory),
         savedAt: Date.now()
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -44,6 +72,18 @@ export class StorageManager {
       console.warn("StorageManager: Failed to parse saved game:", error);
       return null;
     }
+  }
+
+  /**
+   * Load persisted stack quantities, merged over catalog defaults so that
+   * newly added items keep their catalog quantity.
+   * @param {Record<string, number>} [defaults]
+   * @returns {Record<string, number>}
+   */
+  static loadInventory(defaults = {}) {
+    const data = this.load();
+    const saved = data && data.inventory ? data.inventory : {};
+    return { ...defaults, ...saved };
   }
 
   /**

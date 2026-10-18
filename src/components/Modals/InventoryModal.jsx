@@ -13,7 +13,14 @@ const TOOLTIP_EDGE = 12;
 
 const clamp = (value, max) => Math.max(4, Math.min(value, max));
 
-export function InventoryModal({ isOpen, onClose, onUseItem, coins = 0 }) {
+export function InventoryModal({
+  isOpen,
+  onClose,
+  onUseItem,
+  coins = 0,
+  quickItems = QUICK_ITEMS,
+  inventoryItems = INVENTORY_ITEMS
+}) {
   const [hovered, setHovered] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [showHint, setShowHint] = useState(false);
@@ -92,7 +99,7 @@ export function InventoryModal({ isOpen, onClose, onUseItem, coins = 0 }) {
 
         {/* Top equip / quick-access belt */}
         <div className="inv-quickrow">
-          {QUICK_ITEMS.map((item) => (
+          {quickItems.map((item) => (
             <button
               type="button"
               key={item.id}
@@ -117,7 +124,7 @@ export function InventoryModal({ isOpen, onClose, onUseItem, coins = 0 }) {
           className="inv-grid"
           style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
         >
-          {INVENTORY_ITEMS.map((item, index) => {
+          {inventoryItems.map((item, index) => {
             if (!item) {
               return (
                 <div

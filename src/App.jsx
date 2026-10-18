@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { GameCanvas } from "./components/GameCanvas.jsx";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
@@ -8,6 +8,12 @@ import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
+import {
+  defaultQuantities,
+  applyQuantities,
+  setQuantities as rememberQuantities
+} from "./game/items.js";
+import { StorageManager } from "./game/storage.js";
 
 const INITIAL_LOGS = [
   {
@@ -51,6 +57,18 @@ export function App() {
     completed: false
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
+
+  // Inventory stack quantities are persisted in the same save slot as stats.
+  // The lazy initializer also seeds the shared in-memory store so the Phaser
+  // scene persists the loaded values on its first save.
+  const [inventoryQuantities] = useState(() =>
+    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+  );
+
+  const { quickItems, inventoryItems } = useMemo(
+    () => applyQuantities(inventoryQuantities),
+    [inventoryQuantities]
+  );
 
 
   useEffect(() => {
@@ -183,6 +201,7 @@ export function App() {
         <HotbarDock
           coins={stats.coins}
           audioEnabled={audioEnabled}
+          items={quickItems}
           onUseItem={handleUseItem}
           onAttack={handleAttack}
           onSkill={handleSkill}
@@ -213,6 +232,8 @@ export function App() {
         onClose={handleCloseInventory}
         onUseItem={handleUseItem}
         coins={stats.coins}
+        quickItems={quickItems}
+        inventoryItems={inventoryItems}
       />
     </main>
   );

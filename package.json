@@ -1,5 +1,5 @@
 {
-  "name": "giang_ho_html5_game",
+  "name": "jx2-web",
   "version": "1.0.0",
   "description": "A small browser-playable wuxia RPG demo inspired by classic Vietnamese martial-arts MMORPGs.",
   "main": "combat.js",
@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "phaser": "^3.90.0",
@@ -16,6 +18,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
-    "vite": "^8.3.4"
+    "jsdom": "^30.1.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
   }
 }
