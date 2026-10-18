@@ -90,34 +90,74 @@ export class UIBridgeAdapter {
     const scaleX = w / worldConfig.width;
     const scaleY = h / worldConfig.height;
 
-    // Background terrain (Dark ancient earth)
+    // 1. Countryside outskirts
     ctx.fillStyle = "#1e3324";
     ctx.fillRect(0, 0, w, h);
 
-    // Stone road (Central crossway)
-    ctx.fillStyle = "#5c5344";
-    ctx.fillRect(0, 510 * scaleY, w, 210 * scaleY);
+    // 2. Moat water surrounding the city
+    ctx.fillStyle = "#275560";
+    ctx.fillRect(220 * scaleX, 130 * scaleY, 50 * scaleX, 990 * scaleY); // West
+    ctx.fillRect(220 * scaleX, 1110 * scaleY, 1750 * scaleX, 50 * scaleY); // South
+    ctx.fillRect(1940 * scaleX, 130 * scaleY, 50 * scaleX, 990 * scaleY); // East
 
-    // River stream
-    ctx.fillStyle = "#2c5b66";
+    // 3. Inner city stone ground
+    ctx.fillStyle = "#4a4237";
+    ctx.fillRect(280 * scaleX, 150 * scaleY, 1660 * scaleX, 950 * scaleY);
+
+    // 4. Imperial Palace royal courtyard
+    ctx.fillStyle = "#692e24";
+    ctx.fillRect(1440 * scaleX, 160 * scaleY, 480 * scaleX, 360 * scaleY);
+
+    // 5. City walls outline
+    ctx.strokeStyle = "#80735a";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(0, 925 * scaleY);
-    ctx.lineTo(w * 0.3, 910 * scaleY);
-    ctx.lineTo(w * 0.6, 950 * scaleY);
-    ctx.lineTo(w, 960 * scaleY);
-    ctx.lineTo(w, 1080 * scaleY);
-    ctx.lineTo(0, 1080 * scaleY);
+    ctx.moveTo(280 * scaleX, 150 * scaleY);
+    ctx.lineTo(1940 * scaleX, 150 * scaleY);
+    ctx.lineTo(1940 * scaleX, 1100 * scaleY);
+    ctx.lineTo(280 * scaleX, 1100 * scaleY);
     ctx.closePath();
+    ctx.stroke();
+
+    // 6. Paved avenues
+    ctx.fillStyle = "#695f4e";
+    // West-East Main Avenue
+    ctx.fillRect(280 * scaleX, 575 * scaleY, 1660 * scaleX, 90 * scaleY);
+    // South-North Avenue
+    ctx.fillRect(955 * scaleX, 620 * scaleY, 90 * scaleX, 480 * scaleY);
+    ctx.fillRect(1040 * scaleX, 260 * scaleY, 90 * scaleX, 360 * scaleY);
+
+    // 7. Central Plaza
+    ctx.fillStyle = "#7a705e";
+    ctx.beginPath();
+    ctx.arc(1100 * scaleX, 620 * scaleY, 80 * scaleX, 0, Math.PI * 2);
     ctx.fill();
 
-    // Buildings footprint (Brown rectangles)
-    ctx.fillStyle = "#4a3c2e";
-    // Inn (Khách Sạn)
-    ctx.fillRect(260 * scaleX, 280 * scaleY, 220 * scaleX, 150 * scaleY);
-    // Martial Academy (Võ Quán)
-    ctx.fillRect(1510 * scaleX, 260 * scaleY, 230 * scaleX, 160 * scaleY);
-    // Apothecary (Dược Điếm)
-    ctx.fillRect(900 * scaleX, 220 * scaleY, 180 * scaleX, 130 * scaleY);
+    // 8. Key building footprints
+    ctx.fillStyle = "#33261c";
+    // Dược Điếm (Top-left plaza)
+    ctx.fillRect(250 * scaleX, 220 * scaleY, 380 * scaleX, 260 * scaleY);
+    // Tiền Trang (North-East)
+    ctx.fillRect(1520 * scaleX, 260 * scaleY, 260 * scaleX, 140 * scaleY);
+    // Tiểu Viễn Lâu (South-West)
+    ctx.fillRect(160 * scaleX, 940 * scaleY, 220 * scaleX, 160 * scaleY);
+    // Võ Quán (South-East)
+    ctx.fillRect(1600 * scaleX, 780 * scaleY, 260 * scaleX, 160 * scaleY);
+    // Imperial Palace
+    ctx.fillStyle = "#b45309";
+    ctx.fillRect(1580 * scaleX, 180 * scaleY, 310 * scaleX, 150 * scaleY); // Hoàng Cung
+
+    // 9. Vạn Sự Thông Pavilion (Green point)
+    ctx.fillStyle = "#22c55e";
+    ctx.beginPath();
+    ctx.arc(1160 * scaleX, 440 * scaleY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 10. Bridges
+    ctx.fillStyle = "#877f72";
+    ctx.fillRect(205 * scaleX, 575 * scaleY, 75 * scaleX, 90 * scaleY);
+    ctx.fillRect(955 * scaleX, 1105 * scaleY, 90 * scaleX, 55 * scaleY);
+    ctx.fillRect(1940 * scaleX, 755 * scaleY, 70 * scaleX, 90 * scaleY);
 
     // Enemies (Red radar blips)
     if (enemies && enemies.length) {

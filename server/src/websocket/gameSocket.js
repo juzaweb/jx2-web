@@ -50,10 +50,11 @@ const ENEMY_SPAWNS = [
 
 /**
  * Build the authoritative enemy roster.
+ * @param {Array<[number, number]>} [spawns]
  * @returns {Array<Object>}
  */
-export const createEnemyState = () =>
-  ENEMY_SPAWNS.map(([x, y], id) => ({
+export const createEnemyState = (spawns = ENEMY_SPAWNS) =>
+  spawns.map(([x, y], id) => ({
     id,
     x,
     y,
@@ -76,7 +77,8 @@ export class GameSocketManager {
     this.playerById = new Map(); // key: playerId, value: { socket, data }
 
     // Server-owned enemy state: position, health, movement and respawn are shared
-    this.enemies = new Map(createEnemyState().map((enemy) => [enemy.id, enemy]));
+    const spawns = options.enemySpawns ?? (options.enemyRespawnMs ? ENEMY_SPAWNS : []);
+    this.enemies = new Map(createEnemyState(spawns).map((enemy) => [enemy.id, enemy]));
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
     this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
@@ -460,6 +462,7 @@ export class GameSocketManager {
    * monsters in the same place, whoever happens to be nearby.
    */
   startEnemyTick() {
+    if (!this.enemies.size) return;
     this.enemyTickTimer = setInterval(() => this.tickEnemies(), this.enemyTickMs);
     if (this.enemyTickTimer.unref) this.enemyTickTimer.unref();
   }
@@ -471,7 +474,7 @@ export class GameSocketManager {
    * an idle map stays quiet.
    */
   tickEnemies() {
-    if (!this.wss.clients.size) return;
+    if (!this.wss.clients.size || !this.enemies.size) return;
 
     const players = Array.from(this.players.values());
     const moved = [];

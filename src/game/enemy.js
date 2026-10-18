@@ -266,19 +266,9 @@ export class EnemyManager {
   }
 
   /**
-   * @param {Array<[number, number]>} positions spawn points, kept in sync with the
-   * server's `ENEMY_SPAWNS` in `server/src/websocket/gameSocket.js` (id = index)
+   * @param {Array<[number, number]>} positions spawn points; empty by default in peaceful cities like Biện Kinh
    */
-  create(positions = [
-    [840, 600],
-    [950, 670],
-    [1110, 590],
-    [1260, 650],
-    [1380, 590],
-    [760, 800],
-    [1050, 820],
-    [1320, 790]
-  ]) {
+  create(positions = []) {
     this.group = this.scene.physics.add.group();
     positions.forEach((pos, i) => {
       const wolf = new Wolf(this.scene, pos[0], pos[1], i);

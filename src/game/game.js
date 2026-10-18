@@ -69,13 +69,15 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.player = new Player(this, 640, 620, initialName);
     this.enemyManager = new EnemyManager(this);
-    this.enemyManager.create();
+    this.enemyManager.create([]);
 
     // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();
     if (obstacles) {
       this.physics.add.collider(this.player.sprite, obstacles);
-      this.physics.add.collider(this.enemyManager.group, obstacles);
+      if (this.enemyManager?.group) {
+        this.physics.add.collider(this.enemyManager.group, obstacles);
+      }
     }
 
     // UI Bridge Adapter to communicate with React components
@@ -235,6 +237,24 @@ export class JiangHuScene extends Phaser.Scene {
           this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
           this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
         }
+        return;
+      }
+
+      // Check if clicking directly on an NPC
+      const npcs = this.worldManager?.getNPCs?.() || [];
+      const clickedNPC = npcs.find(
+        (npc) => Phaser.Math.Distance.Between(worldX, worldY, npc.x, npc.y) < 42
+      );
+
+      if (clickedNPC) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedNPC.x, clickedNPC.y);
+        if (dist > 75) {
+          this.player.moveTo(clickedNPC.x, clickedNPC.y);
+          this.showClickIndicator(clickedNPC.x, clickedNPC.y, 0x22c55e);
+        } else {
+          this.player.stopMovement();
+        }
+        this.uiBridge.addLog(clickedNPC.dialogue, "near");
         return;
       }
 
@@ -453,11 +473,11 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     if (slot === 4) {
-      // Hồi Thành Phù (Về điểm hồi sinh Trường An)
+      // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
       this.player.setPosition(640, 620);
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Trường An`, "#ffdd59");
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
-      this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
+      this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
       return true;
     }
 
@@ -628,7 +648,7 @@ export class JiangHuScene extends Phaser.Scene {
         "system"
       );
     } else {
-      this.uiBridge.addLog("Bạn đã đặt chân đến Trường An. Chúc hiệp khách hành tẩu bình an.", "system");
+      this.uiBridge.addLog("Bạn đã đặt chân đến Biện Kinh. Chúc hiệp khách hành tẩu bình an.", "system");
       this.player.setPosition(640, 620);
     }
 
