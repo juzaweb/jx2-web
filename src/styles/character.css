@@ -1,20 +1,21 @@
 /* ====================================================
-   Character sheet ("Nhân vật") — centered JX2 panel
+   Character sheet ("Nhân vật") — left-docked panel
 ==================================================== */
 .char-modal-overlay {
   position: absolute;
-  inset: 0;
+  top: 110px;
+  left: 12px;
+  bottom: 64px;
   z-index: 45;
-  display: grid;
-  place-items: center;
-  padding: 12px;
+  display: flex;
+  align-items: flex-start;
   pointer-events: none;
 }
 
 .char-panel {
   pointer-events: auto;
-  width: min(600px, calc(100vw - 24px));
-  max-height: calc(100vh - 48px);
+  width: min(560px, calc(100vw - 24px));
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -75,6 +76,16 @@
 .char-icon-btn.close:hover {
   border-color: #e57373;
   box-shadow: 0 0 6px rgba(229, 115, 115, 0.55);
+}
+
+.char-hint {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: #d7dcce;
+  background: rgba(8, 12, 15, 0.85);
+  border-bottom: 1px solid #3a2f1f;
 }
 
 .char-body {
@@ -160,15 +171,16 @@
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.85);
   border-radius: 2px;
 }
-.equip-slot::after {
-  content: "";
-  width: 55%;
-  height: 55%;
-  opacity: 0.28;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M16 4 L27 16 L16 28 L5 16 Z" fill="none" stroke="%23c9b48a" stroke-width="1.8"/><circle cx="16" cy="16" r="4.5" fill="none" stroke="%23c9b48a" stroke-width="1.6"/></svg>');
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
+.equip-slot-icon {
+  width: 64%;
+  height: 64%;
+  color: #7fb0a6;
+  opacity: 0.32;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 /* Direction hint arrows flanking each column, like the original sheet */
@@ -304,18 +316,17 @@
   color: #ffd43b;
 }
 
-@media (max-width: 640px) {
-.char-hint {
-  flex-shrink: 0;
-  padding: 8px 12px;
-  font-size: 10.5px;
-  line-height: 1.55;
-  color: #d7dcce;
-  background: rgba(8, 12, 15, 0.85);
-  border-bottom: 1px solid #3a2f1f;
-}
-
-.char-body {
+@media (max-width: 720px) {
+  .char-modal-overlay {
+    left: 12px;
+    right: 12px;
+    top: 150px;
+    bottom: 150px;
+  }
+  .char-panel {
+    width: 100%;
+  }
+  .char-body {
     flex-direction: column;
   }
   .char-model img {
