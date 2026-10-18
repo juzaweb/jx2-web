@@ -78,7 +78,7 @@ if git branch --list 'loop/*' | grep -q .; then
   exit 0
 fi
 
-if git worktree list | grep -qE '/loop/|/jx2-'; then
+if [[ $(git worktree list | wc -l) -gt 1 ]]; then
   say "leftover loop worktree present; skip"
   exit 0
 fi
