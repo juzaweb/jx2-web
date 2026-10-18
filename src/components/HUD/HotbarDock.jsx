@@ -109,15 +109,6 @@ export function HotbarDock({
         <div className="system-icons-tray">
           <button
             className="sys-btn"
-            id="save-btn"
-            title="Lưu tiến trình vào trình duyệt (localStorage)"
-            onClick={onSave}
-          >
-            <span className="sys-ico">💾</span>
-            <span className="sys-lbl">Lưu</span>
-          </button>
-          <button
-            className="sys-btn"
             id="char-btn"
             title="Nhân Vật (F3)"
             onClick={onCharacter}
@@ -143,33 +134,10 @@ export function HotbarDock({
             <span className="sys-ico">📜</span>
             <span className="sys-lbl">Cẩm Nang</span>
           </button>
-          <button
-            className="sys-btn"
-            id="sound-btn"
-            title="Cài đặt âm thanh"
-            style={{ opacity: audioEnabled ? 1 : 0.6 }}
-            onClick={onToggleAudio}
-          >
-            <span className="sys-ico">🔊</span>
-            <span className="sys-lbl">
-              {audioEnabled ? "Âm Thanh" : "Tắt Âm"}
-            </span>
-          </button>
           <button className="sys-btn pk-mode" title="Trạng thái PK Hòa Bình">
             <span className="sys-ico">⚔️</span>
             <span className="sys-lbl">Hòa Bình</span>
           </button>
-          {onLogout && (
-            <button
-              className="sys-btn"
-              id="logout-btn"
-              title="Đăng xuất khỏi tài khoản"
-              onClick={onLogout}
-            >
-              <span className="sys-ico">🚪</span>
-              <span className="sys-lbl">Đăng Xuất</span>
-            </button>
-          )}
         </div>
       </div>
     </section>

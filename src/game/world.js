@@ -5,9 +5,12 @@ import { toIso, isoDepth } from "./isoProjection.js";
 const FLOOR_TILE = 76;
 
 export const WORLD_CONFIG = {
-  width: 2200,
-  height: 1250
+  width: 4400,
+  height: 2500
 };
+
+/** Ground rectangle enclosed by the Biện Kinh city walls. */
+export const CITY_BOUNDS = { x0: 90, y0: 60, x1: 2110, y1: 1190 };
 
 export const NPC_DATA = [
   {
@@ -81,6 +84,7 @@ export class WorldManager {
   create() {
     this.obstacles = this.scene.physics.add.staticGroup();
     this.drawPavedGround();
+    this.drawCityWalls();
     this.drawApothecaryShop();
     this.drawBankShop();
     this.drawTavernShop();
@@ -102,26 +106,54 @@ export class WorldManager {
     return obj;
   }
 
+  isInsideCity(gx, gy) {
+    return gx >= CITY_BOUNDS.x0 && gx < CITY_BOUNDS.x1 && gy >= CITY_BOUNDS.y0 && gy < CITY_BOUNDS.y1;
+  }
+
   /**
-   * Authentic JX2 Biện Kinh grand stone plaza floor
-   * Large isometric sandstone slabs with subtle gradients, bevels, and curb transition
+   * Biện Kinh floor: grass / forest terrain across the whole map, with the warm
+   * sandstone plaza paving only inside the city walls.
    */
   drawPavedGround() {
     const g = this.scene.add.graphics();
     const W = this.width;
     const H = this.height;
+    const C = CITY_BOUNDS;
 
     const rng = (seed) => {
       const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
     };
 
-    // 1. Base warm sandstone: the whole ground rectangle, isometrically projected.
-    g.fillStyle(0xd9d3c7, 1);
+    const diamond = (gx, gy) => [
+      toIso(gx, gy),
+      toIso(gx + FLOOR_TILE, gy),
+      toIso(gx + FLOOR_TILE, gy + FLOOR_TILE),
+      toIso(gx, gy + FLOOR_TILE)
+    ];
+
+    // 1. Grass terrain base over the whole map.
+    g.fillStyle(0x35503a, 1);
     g.fillPoints([toIso(0, 0), toIso(W, 0), toIso(W, H), toIso(0, H)], true);
 
-    // 2. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner,
-    //    defined on the ground plane and then projected.
+    // Grass / forest speckles outside the city.
+    const grassPalette = [0x2f4a35, 0x28412f, 0x3a5a40, 0x27402c];
+    for (let gy = 0; gy < H; gy += FLOOR_TILE) {
+      for (let gx = 0; gx < W; gx += FLOOR_TILE) {
+        if (this.isInsideCity(gx, gy)) continue;
+        const val = rng(gx * 13 + gy * 7);
+        if (val > 0.45) {
+          g.fillStyle(grassPalette[Math.floor(val * 40) % grassPalette.length], 0.55);
+          g.fillPoints(diamond(gx, gy), true);
+        }
+      }
+    }
+
+    // 2. City plaza sandstone paving.
+    g.fillStyle(0xd9d3c7, 1);
+    g.fillPoints([toIso(C.x0, C.y0), toIso(C.x1, C.y0), toIso(C.x1, C.y1), toIso(C.x0, C.y1)], true);
+
+    // 3. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner.
     const porchPoly = [
       { x: 0, y: 0 },
       { x: 740, y: 0 },
@@ -154,7 +186,7 @@ export class WorldManager {
       }
     }
 
-    // 3. Diagonal stone curb step separating the shop porch from the plaza.
+    // 4. Diagonal stone curb step separating the shop porch from the plaza.
     const curb = [
       { x: 120, y: 560 },
       { x: 740, y: 240 },
@@ -185,44 +217,78 @@ export class WorldManager {
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
-    // 4. Grand isometric diamond paving grid over the whole plaza.
+    // 5. Isometric diamond paving grid inside the city.
     g.lineStyle(1.2, 0xb8b0a1, 0.7);
-    for (let gx = 0; gx <= W; gx += FLOOR_TILE) {
-      const a = toIso(gx, 0);
-      const b = toIso(gx, H);
+    for (let gx = C.x0; gx <= C.x1; gx += FLOOR_TILE) {
+      const a = toIso(gx, C.y0);
+      const b = toIso(gx, C.y1);
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
-    for (let gy = 0; gy <= H; gy += FLOOR_TILE) {
-      const a = toIso(0, gy);
-      const b = toIso(W, gy);
+    for (let gy = C.y0; gy <= C.y1; gy += FLOOR_TILE) {
+      const a = toIso(C.x0, gy);
+      const b = toIso(C.x1, gy);
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
-    // 5. Stone slab lighting & natural variations.
-    for (let row = 0; row * FLOOR_TILE < H; row++) {
-      for (let col = 0; col * FLOOR_TILE < W; col++) {
-        const gx = col * FLOOR_TILE;
-        const gy = row * FLOOR_TILE;
-
+    // 6. Stone slab lighting & natural variations.
+    for (let gy = C.y0; gy < C.y1; gy += FLOOR_TILE) {
+      for (let gx = C.x0; gx < C.x1; gx += FLOOR_TILE) {
         // Skip slabs covered by Dược Điếm cobblestone foundation
         if (gx < 740 && gy < 560 && gx < 740 - ((gy - 240) * (620 / 320))) {
           continue;
         }
 
-        const val = rng(row * 47 + col * 93);
+        const val = rng((gy / FLOOR_TILE) * 47 + (gx / FLOOR_TILE) * 93);
         if (val > 0.55) {
           const tint = val > 0.85 ? 0xeae5dc : val > 0.7 ? 0xd0c9bd : 0xe0dad0;
           g.fillStyle(tint, 0.5);
-          g.fillPoints(
-            [
-              toIso(gx, gy),
-              toIso(gx + FLOOR_TILE, gy),
-              toIso(gx + FLOOR_TILE, gy + FLOOR_TILE),
-              toIso(gx, gy + FLOOR_TILE)
-            ],
-            true
-          );
+          g.fillPoints(diamond(gx, gy), true);
         }
+      }
+    }
+  }
+
+  /**
+   * Projected corners of an isometric box. `b*` are the ground footprint
+   * corners, `t*` the same corners lifted by `height`.
+   */
+  isoCorners(x, y, w, d, height) {
+    const bA = toIso(x, y);
+    const bB = toIso(x + w, y);
+    const bC = toIso(x + w, y + d);
+    const bD = toIso(x, y + d);
+    const lift = (p, h = height) => ({ x: p.x, y: p.y - h });
+    return { bA, bB, bC, bD, tA: lift(bA), tB: lift(bB), tC: lift(bC), tD: lift(bD), lift };
+  }
+
+  lerpPoint(p, q, t) {
+    return { x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t };
+  }
+
+  /** Paint the two camera-facing walls (front-left and front-right) of a box. */
+  drawPrismWalls(g, c, leftColor, rightColor) {
+    g.fillStyle(leftColor, 1);
+    g.fillPoints([c.bD, c.bC, c.tC, c.tD], true);
+    g.fillStyle(rightColor, 1);
+    g.fillPoints([c.bB, c.bC, c.tC, c.tB], true);
+  }
+
+  /** Crenellations along the four top edges of an isometric box. */
+  drawMerlons(g, c, merlonHeight, color) {
+    const edges = [
+      [c.tA, c.tB],
+      [c.tB, c.tC],
+      [c.tC, c.tD],
+      [c.tD, c.tA]
+    ];
+    g.fillStyle(color, 1);
+    for (const [p, q] of edges) {
+      const len = Math.hypot(q.x - p.x, q.y - p.y);
+      const count = Math.max(2, Math.round(len / 34));
+      for (let i = 0; i < count; i++) {
+        const a = this.lerpPoint(p, q, i / count);
+        const b = this.lerpPoint(p, q, (i + 0.6) / count);
+        g.fillPoints([a, b, c.lift(b, merlonHeight), c.lift(a, merlonHeight)], true);
       }
     }
   }
@@ -233,47 +299,31 @@ export class WorldManager {
    * front face. Returns the (already depth-sorted) container.
    */
   drawIsoBuilding({ x, y, w, d, height, wallLeft, wallRight, roof, roofEdge, label, labelColor = "#ffdf7a" }) {
-    const bA = toIso(x, y);
-    const bB = toIso(x + w, y);
-    const bC = toIso(x + w, y + d);
-    const bD = toIso(x, y + d);
-    const lift = (p, h = height) => ({ x: p.x, y: p.y - h });
-    const lerp = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
-
-    const tA = lift(bA);
-    const tB = lift(bB);
-    const tC = lift(bC);
-    const tD = lift(bD);
-
+    const c = this.isoCorners(x, y, w, d, height);
     const g = this.scene.add.graphics();
-
-    // Walls (only the two camera-facing sides are visible)
-    g.fillStyle(wallLeft, 1);
-    g.fillPoints([bD, bC, tC, tD], true);
-    g.fillStyle(wallRight, 1);
-    g.fillPoints([bB, bC, tC, tB], true);
+    this.drawPrismWalls(g, c, wallLeft, wallRight);
 
     // Door on the front-right wall
     const doorTop = height * 0.58;
-    const doorA = lerp(bC, bB, 0.4);
-    const doorB = lerp(bC, bB, 0.68);
+    const doorA = this.lerpPoint(c.bC, c.bB, 0.4);
+    const doorB = this.lerpPoint(c.bC, c.bB, 0.68);
     g.fillStyle(0x241a12, 1);
-    g.fillPoints([doorA, doorB, lift(doorB, doorTop), lift(doorA, doorTop)], true);
+    g.fillPoints([doorA, doorB, c.lift(doorB, doorTop), c.lift(doorA, doorTop)], true);
     g.lineStyle(1.5, 0x120b06, 0.9);
-    g.strokePoints([doorA, doorB, lift(doorB, doorTop), lift(doorA, doorTop)], true, true);
+    g.strokePoints([doorA, doorB, c.lift(doorB, doorTop), c.lift(doorA, doorTop)], true, true);
 
     // Overhanging tiled roof (expanded diamond)
-    const rcx = (tA.x + tC.x) / 2;
-    const rcy = (tA.y + tC.y) / 2;
+    const rcx = (c.tA.x + c.tC.x) / 2;
+    const rcy = (c.tA.y + c.tC.y) / 2;
     const expand = (p, k) => ({ x: rcx + (p.x - rcx) * (1 + k), y: rcy + (p.y - rcy) * (1 + k) });
-    const rA = expand(tA, 0.16);
-    const rB = expand(tB, 0.16);
-    const rC = expand(tC, 0.16);
-    const rD = expand(tD, 0.16);
+    const rA = expand(c.tA, 0.16);
+    const rB = expand(c.tB, 0.16);
+    const rC = expand(c.tC, 0.16);
+    const rD = expand(c.tD, 0.16);
 
     // Eave shadow cast on the wall top
     g.fillStyle(0x000000, 0.16);
-    g.fillPoints([tA, tB, tC, tD], true);
+    g.fillPoints([c.tA, c.tB, c.tC, c.tD], true);
 
     g.fillStyle(roof, 1);
     g.fillPoints([rA, rB, rC, rD], true);
@@ -281,8 +331,8 @@ export class WorldManager {
     g.strokePoints([rA, rB, rC, rD], true, true);
 
     // Roof ridge
-    const ridgeA = lerp(rA, rB, 0.5);
-    const ridgeB = lerp(rD, rC, 0.5);
+    const ridgeA = this.lerpPoint(rA, rB, 0.5);
+    const ridgeB = this.lerpPoint(rD, rC, 0.5);
     g.lineStyle(3, roofEdge, 0.75);
     g.lineBetween(ridgeA.x, ridgeA.y, ridgeB.x, ridgeB.y);
 
@@ -290,14 +340,14 @@ export class WorldManager {
 
     if (label) {
       const sy = height * 0.66;
-      const sA = lerp(bC, bB, 0.32);
-      const sB = lerp(bC, bB, 0.8);
+      const sA = this.lerpPoint(c.bC, c.bB, 0.32);
+      const sB = this.lerpPoint(c.bC, c.bB, 0.8);
       const plaque = this.scene.add.graphics();
       plaque.fillStyle(0x18140f, 1);
-      plaque.fillPoints([sA, sB, lift(sB, sy + 22), lift(sA, sy + 22)], true);
+      plaque.fillPoints([sA, sB, c.lift(sB, sy + 22), c.lift(sA, sy + 22)], true);
       plaque.lineStyle(2, 0xd4af37, 1);
-      plaque.strokePoints([sA, sB, lift(sB, sy + 22), lift(sA, sy + 22)], true, true);
-      const mid = lift(lerp(sA, sB, 0.5), sy + 11);
+      plaque.strokePoints([sA, sB, c.lift(sB, sy + 22), c.lift(sA, sy + 22)], true, true);
+      const mid = c.lift(this.lerpPoint(sA, sB, 0.5), sy + 11);
       const text = this.scene.add
         .text(mid.x, mid.y, label, {
           fontFamily: "Arial, Tahoma, sans-serif",
@@ -311,6 +361,104 @@ export class WorldManager {
 
     container.setDepth(isoDepth(x + w, y + d));
     return container;
+  }
+
+  /**
+   * A crenellated isometric stone wall segment.
+   */
+  drawIsoWall({ x, y, w, d, height, top, left, right, merlonHeight = 0 }) {
+    const c = this.isoCorners(x, y, w, d, height);
+    const g = this.scene.add.graphics();
+    this.drawPrismWalls(g, c, left, right);
+    g.fillStyle(top, 1);
+    g.fillPoints([c.tA, c.tB, c.tC, c.tD], true);
+    if (merlonHeight > 0) this.drawMerlons(g, c, merlonHeight, top);
+
+    const container = this.scene.add.container(0, 0, [g]);
+    container.setDepth(isoDepth(x + w, y + d));
+    return container;
+  }
+
+  /**
+   * A taller crenellated gate tower with an arched opening on both visible faces.
+   */
+  drawIsoGate({ x, y, w, d, height, top, left, right }) {
+    const c = this.isoCorners(x, y, w, d, height);
+    const g = this.scene.add.graphics();
+    this.drawPrismWalls(g, c, left, right);
+    g.fillStyle(top, 1);
+    g.fillPoints([c.tA, c.tB, c.tC, c.tD], true);
+
+    const archHeight = height * 0.72;
+    this.drawArch(g, c, c.bD, c.bC, archHeight);
+    this.drawArch(g, c, c.bB, c.bC, archHeight);
+    this.drawMerlons(g, c, height * 0.14, top);
+
+    const container = this.scene.add.container(0, 0, [g]);
+    container.setDepth(isoDepth(x + w, y + d));
+    return container;
+  }
+
+  /** A dark arched opening on the wall face spanning ground edge p -> q. */
+  drawArch(g, c, p, q, archHeight) {
+    const a = this.lerpPoint(p, q, 0.4);
+    const b = this.lerpPoint(p, q, 0.6);
+    g.fillStyle(0x140f0a, 1);
+    g.fillPoints([a, b, c.lift(b, archHeight), c.lift(a, archHeight)], true);
+    g.fillPoints([c.lift(a, archHeight), c.lift(b, archHeight), c.lift(this.lerpPoint(a, b, 0.5), archHeight + 16)], true);
+  }
+
+  /**
+   * Biện Kinh city ramparts: four crenellated stone walls enclosing the plaza,
+   * with gate towers on each side. Split into segments so each sorts correctly.
+   */
+  drawCityWalls() {
+    const { x0, y0, x1, y1 } = CITY_BOUNDS;
+    const t = 40;
+    const height = 86;
+    const merlon = 20;
+    const SEG = 150;
+
+    const top = 0x9a8f78;
+    const left = 0x8a7f69;
+    const right = 0x6e6353;
+    const gateTop = 0x9a8f78;
+    const gateLeft = 0x8f8470;
+    const gateRight = 0x726757;
+
+    for (let xa = x0; xa < x1; xa += SEG) {
+      const w = Math.min(SEG, x1 - xa);
+      this.drawIsoWall({ x: xa, y: y0, w, d: t, height, top, left, right, merlonHeight: merlon });
+      this.drawIsoWall({ x: xa, y: y1 - t, w, d: t, height, top, left, right, merlonHeight: merlon });
+    }
+    for (let ya = y0; ya < y1; ya += SEG) {
+      const d = Math.min(SEG, y1 - ya);
+      this.drawIsoWall({ x: x0, y: ya, w: t, d, height, top, left, right, merlonHeight: merlon });
+      this.drawIsoWall({ x: x1 - t, y: ya, w: t, d, height, top, left, right, merlonHeight: merlon });
+    }
+
+    const mx = (x0 + x1) / 2;
+    const my = (y0 + y1) / 2;
+    const gw = 180;
+    const gh = 150;
+    const gate = { w: gw, d: t + 32, height: gh, top: gateTop, left: gateLeft, right: gateRight };
+    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y0 - 16 });
+    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y1 - t - 16 });
+    this.drawIsoGate({ ...gate, x: x0 - 16, y: my - gw / 2, w: t + 32, d: gw });
+    this.drawIsoGate({ ...gate, x: x1 - t - 16, y: my - gw / 2, w: t + 32, d: gw });
+
+    if (this.obstacles) {
+      const body = (cx, cy, bw, bh) => {
+        const col = this.obstacles.create(cx, cy, "entity-dot");
+        col.setSize(bw, bh);
+        col.setVisible(false);
+        col.refreshBody();
+      };
+      body(mx, y0 + t / 2, x1 - x0, t);
+      body(mx, y1 - t / 2, x1 - x0, t);
+      body(x0 + t / 2, my, t, y1 - y0);
+      body(x1 - t / 2, my, t, y1 - y0);
+    }
   }
 
   /**

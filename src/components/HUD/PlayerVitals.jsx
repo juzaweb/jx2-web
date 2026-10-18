@@ -35,26 +35,6 @@ export function PlayerVitals({ stats, playerName, onLogout }) {
           >
             ⚔ {playerName}
           </span>
-          {onLogout && (
-            <button
-              type="button"
-              className="btn-logout"
-              onClick={onLogout}
-              title="Đăng xuất khỏi tài khoản"
-              style={{
-                background: "rgba(60, 20, 20, 0.9)",
-                border: "1px solid #991b1b",
-                color: "#fecaca",
-                fontSize: "10px",
-                padding: "1px 5px",
-                borderRadius: "2px",
-                cursor: "pointer",
-                lineHeight: "1.2"
-              }}
-            >
-              Đăng xuất
-            </button>
-          )}
         </div>
       )}
       <div className="status-bracket">

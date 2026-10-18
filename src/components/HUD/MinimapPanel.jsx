@@ -38,15 +38,6 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
             >
               ?
             </button>
-            <button
-              id="map-sound-btn"
-              className="mini-btn"
-              title="Bật / Tắt âm thanh"
-              style={{ color: audioEnabled ? "#ffd43b" : "#888" }}
-              onClick={onToggleAudio}
-            >
-              ♫
-            </button>
           </div>
         </div>
 

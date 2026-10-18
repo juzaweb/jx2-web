@@ -31,7 +31,7 @@ export function HelpModal({ isOpen, onClose, onReset }) {
             <b>Túi đồ & Tiền bạc:</b> Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.
           </p>
           <p>
-            <b>Lưu tiến trình:</b> Bấm nút <b>Lưu</b> ở góc dưới hoặc hệ thống tự động lưu mỗi 15 giây.
+            <b>Lưu tiến trình:</b> Hệ thống tự động lưu mỗi 15 giây.
           </p>
           <p>
             <b>Tạm dừng:</b> Nhấn <b>Esc</b> hoặc mở bảng Hướng Dẫn để tạm dừng game.
