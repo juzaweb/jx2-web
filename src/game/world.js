@@ -318,13 +318,6 @@ export class WorldManager {
    * umbrella, medicine table, baskets, jars and lantern on the forecourt.
    */
   drawApothecaryShop() {
-    const place = (obj, gx, gy) => {
-      const p = toIso(gx, gy);
-      obj.setPosition(p.x, p.y);
-      obj.setDepth(isoDepth(gx, gy));
-      return obj;
-    };
-
     this.drawIsoBuilding({
       x: 140,
       y: 30,
@@ -339,17 +332,17 @@ export class WorldManager {
     });
 
     // Forecourt props (upright billboards standing on the paved porch).
-    place(this.createSunshadeUmbrella(0, 0), 250, 470);
-    place(this.createMedicineTable(), 390, 485);
-    place(this.createStrawMat(), 300, 525);
-    place(this.createHerbBasket(0, 0, 0x4d7c0f), 400, 400);
-    place(this.createHerbBasket(0, 0, 0xd97706), 470, 445);
-    place(this.createHerbBasket(0, 0, 0x15803d), 520, 410);
-    place(this.createHerbBasket(0, 0, 0xb91c1c), 565, 455);
-    place(this.createCeramicJar(0, 0, 0x78350f, 20, 28), 500, 505);
-    place(this.createCeramicJar(0, 0, 0x92400e, 24, 32), 545, 515);
-    place(this.createCeramicJar(0, 0, 0xd97706, 18, 24), 335, 505);
-    place(this.createStonePagodaLantern(0, 0), 375, 565);
+    this.placeProp(this.createSunshadeUmbrella(0, 0), 250, 470);
+    this.placeProp(this.createMedicineTable(), 390, 485);
+    this.placeProp(this.createStrawMat(), 300, 525);
+    this.placeProp(this.createHerbBasket(0, 0, 0x4d7c0f), 400, 400);
+    this.placeProp(this.createHerbBasket(0, 0, 0xd97706), 470, 445);
+    this.placeProp(this.createHerbBasket(0, 0, 0x15803d), 520, 410);
+    this.placeProp(this.createHerbBasket(0, 0, 0xb91c1c), 565, 455);
+    this.placeProp(this.createCeramicJar(0, 0, 0x78350f, 20, 28), 500, 505);
+    this.placeProp(this.createCeramicJar(0, 0, 0x92400e, 24, 32), 545, 515);
+    this.placeProp(this.createCeramicJar(0, 0, 0xd97706, 18, 24), 335, 505);
+    this.placeProp(this.createStonePagodaLantern(0, 0), 375, 565);
 
     // Static physics collider over the shop footprint (ground coordinates)
     if (this.obstacles) {
@@ -504,7 +497,6 @@ export class WorldManager {
     g.strokeCircle(0, -35, 4);
 
     c.add(g);
-    c.setDepth(y + 30);
     return c;
   }
 
@@ -1048,14 +1040,6 @@ export class WorldManager {
       true
     );
   }
-
-  /**
-   * Backward-compatible methods
-   */
-  drawRoad() {}
-  drawRiver() {}
-  drawBuildings() {}
-  drawStreetLanterns() {}
 
   /**
    * Get static physics group containing world obstacles

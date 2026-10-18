@@ -16,9 +16,6 @@
 /** Ratio of the diamond: 2 means width is twice the height. */
 export const ISO_RATIO = 2;
 
-/** Grid size (ground units) that maps to one on-screen diamond. */
-export const ISO_TILE = 64;
-
 const HALF = 1 / ISO_RATIO;
 const QUARTER = 1 / (ISO_RATIO * 2);
 
