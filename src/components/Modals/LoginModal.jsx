@@ -166,15 +166,17 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         }, 600);
       }
     } catch (err) {
-      const msg = err.message || "Không thể kết nối đến máy chủ. Vui lòng thử lại!";
-      setError(msg);
-      if (
-        msg.includes("Failed to fetch") ||
-        msg.includes("NetworkError") ||
-        msg.includes("fetch failed") ||
-        err.name === "TypeError"
-      ) {
+      const isNetworkError =
+        err.name === "TypeError" ||
+        err.message?.includes("Failed to fetch") ||
+        err.message?.includes("NetworkError") ||
+        err.message?.includes("fetch failed");
+
+      if (isNetworkError) {
+        setError("Chưa bật máy chủ Backend (Port 5000). Hãy chạy backend hoặc chọn vào chế độ Khách bên dưới!");
         setCanGuestLogin(true);
+      } else {
+        setError(err.message || "Không thể kết nối đến máy chủ. Vui lòng thử lại!");
       }
     } finally {
       setLoading(false);
