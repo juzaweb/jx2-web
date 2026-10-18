@@ -4,7 +4,7 @@ import http from "node:http";
 import { WebSocket } from "ws";
 import { createApp } from "../src/app.js";
 import { initGameSocket, ENEMY_MAX_HP } from "../src/websocket/gameSocket.js";
-import { ENEMY_TUNING } from "../src/enemyAi.js";
+import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { DROP_TABLE } from "../../src/game/items.js";
 
 const createTestClient = async (url) => {
@@ -287,6 +287,13 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({ type: "enemy_hit", payload: { id: 99, damage: 10 } });
     client1.send({ type: "enemy_hit", payload: { id: 0, damage: -50 } });
     client1.send({ type: "enemy_move", payload: {} });
+
+    // Damage cannot move a wolf: wolf 6 sits at its home (1050, 820), out of every
+    // player's range, and a hit carrying a bogus position must not relocate it
+    client1.send({ type: "enemy_hit", payload: { id: 6, damage: 1, x: 10, y: 10 } });
+    const hitWolf6 = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 6);
+    assert.equal(hitWolf6.payload.x, 1050, "The server keeps its own enemy position");
+    assert.equal(hitWolf6.payload.y, 820);
 
     // Movement is server-owned: a client's own position report changes nothing.
     // Wolf 5 sits at its home (760, 800) with nobody in range, so it must stay there.

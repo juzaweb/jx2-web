@@ -287,12 +287,10 @@ export class CombatSystem {
     this.showFloatText(wolf.x, wolf.y - 30, floatText, floatColor);
     playTone(isCrit ? 180 : 120, 0.06, "square", isCrit ? 0.025 : 0.012);
 
-    // Let the server own the health pool so nearby players see the same damage
+    // The server owns the wolf's health and position, so a hit reports damage only
     this.scene.networkClient?.sendEnemyHit?.({
       id: wolf.id,
-      damage,
-      x: Math.round(wolf.x),
-      y: Math.round(wolf.y)
+      damage
     });
 
     if (wolf.hp <= 0) {

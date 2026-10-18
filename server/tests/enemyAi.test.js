@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ENEMY_TUNING, nearestPlayerInRange, stepEnemy } from "../src/enemyAi.js";
+import { ENEMY_TUNING, nearestPlayerInRange, stepEnemy } from "../../src/game/enemyAi.js";
 
 const wolf = () => ({ id: 0, x: 840, y: 600, homeX: 840, homeY: 600 });
 
@@ -12,8 +12,8 @@ test("Enemy AI suite", async (t) => {
     assert.equal(nearestPlayerInRange(wolf(), [far, near]).id, "near");
 
     const next = stepEnemy(wolf(), [near], 100);
-    // 43 px/s over 100 ms = 4 px, rounded onto the broadcast grid
-    assert.equal(next.x, 844);
+    // 43 px/s over 100 ms, straight toward the player (positions stay unrounded here)
+    assert.ok(Math.abs(next.x - 844.3) < 1e-9);
     assert.equal(next.y, 600);
   });
 
@@ -46,7 +46,7 @@ test("Enemy AI suite", async (t) => {
 
     // 22 px/s: one second of idle walking, straight toward home
     assert.deepEqual(stepEnemy(away, [], 1000), { x: 918, y: 600 });
-    assert.deepEqual(stepEnemy({ ...away, x: 870 }, [], 300), { x: 863, y: 600 });
+    assert.ok(Math.abs(stepEnemy({ ...away, x: 870 }, [], 300).x - 863.4) < 1e-9);
 
     // Inside the home epsilon it stops moving, so an idle map broadcasts nothing
     assert.deepEqual(stepEnemy({ ...away, x: 848 }, [], 1000), { x: 848, y: 600 });

@@ -13,7 +13,7 @@ import { Wolf } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
 
 /** Minimal Phaser scene stub: the wolf only needs sprites, containers and a clock. */
-const createScene = () => {
+const createScene = ({ isConnected = false } = {}) => {
   const chainable = () => {
     const node = {
       add: () => node,
@@ -61,6 +61,7 @@ const createScene = () => {
 
   return {
     sprite,
+    networkClient: { isConnected },
     physics: {
       add: {
         sprite: (x, y) => {
@@ -83,24 +84,41 @@ const createScene = () => {
   };
 };
 
-const createWolf = () => {
-  const scene = createScene();
+const createWolf = ({ isConnected = true } = {}) => {
+  const scene = createScene({ isConnected });
   return { scene, wolf: new Wolf(scene, 840, 600, 0) };
 };
 
 const player = (x, y) => ({ x, y, sprite: { x, y } });
 
 describe("Wolf movement is server-owned", () => {
-  it("never steers itself toward the player it renders next to", () => {
+  it("never steers itself while the server owns movement", () => {
     const { scene, wolf } = createWolf();
 
     for (let frame = 0; frame < 60; frame++) {
-      wolf.update(frame * 16, 16, player(2000, 2000), () => {});
+      wolf.update(frame * 16, 16, player(880, 600), () => {});
     }
 
     expect(scene.sprite.x).toBe(840);
     expect(scene.sprite.y).toBe(600);
     expect(scene.sprite.body.velocity).toEqual({ x: 0, y: 0 });
+  });
+
+  it("chases the player itself when no server owns the roster", () => {
+    const { scene, wolf } = createWolf({ isConnected: false });
+    const target = player(940, 600);
+    const bites = vi.fn();
+
+    for (let frame = 0; frame < 240; frame++) {
+      wolf.update(frame * 16, 16, target, bites);
+    }
+
+    // 43 px/s closes the 48 px gap and then holds at the stop distance
+    const distance = Math.hypot(scene.sprite.x - target.x, scene.sprite.y - target.y);
+    expect(scene.sprite.x).toBeGreaterThan(840);
+    expect(distance).toBeLessThanOrEqual(53);
+    expect(distance).toBeGreaterThanOrEqual(51);
+    expect(bites).toHaveBeenCalled();
   });
 
   it("follows the authoritative position smoothly and settles exactly on it", () => {

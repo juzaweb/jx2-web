@@ -1,10 +1,11 @@
 /**
- * Server-side enemy AI. Enemy movement used to run on every client, which meant
- * two players watching the same wolf saw it pulled toward their own character;
- * the server now owns it and ships positions on a fixed tick.
+ * Enemy AI for the wolf roster, shared by both runtimes:
+ * - online: the server steps it on a fixed tick (`server/src/websocket/gameSocket.js`)
+ *   and ships positions, so every player sees the same monsters move the same way;
+ * - offline: the client steps it itself with the local player as the only target.
  *
- * Tuning mirrors the original client AI (src/game/enemy.js) so the monsters feel
- * unchanged. Kept free of transport/Phaser so the rules can be unit tested.
+ * Tuning mirrors the AI that used to live in src/game/enemy.js. Kept free of
+ * Phaser/transport so the rules can be unit tested.
  */
 
 /** Aggro/chase/home tuning shared by the server tick. */
@@ -41,8 +42,8 @@ export function nearestPlayerInRange(enemy, players = []) {
 
 /**
  * Move `maxStep` px from the enemy toward (targetX, targetY) without overshooting.
- * Rounded to the 1 px grid the server broadcasts, so the next tick compares
- * exactly and an enemy at rest stops producing updates.
+ * Returns unrounded positions: the caller decides the grid it stores (the server
+ * broadcasts whole pixels, the offline client keeps the smooth float).
  * @returns {{x:number, y:number}}
  */
 const moveToward = (enemy, targetX, targetY, maxStep) => {
@@ -51,13 +52,13 @@ const moveToward = (enemy, targetX, targetY, maxStep) => {
   const distance = Math.hypot(dx, dy);
 
   if (distance === 0 || maxStep <= 0) {
-    return { x: Math.round(enemy.x), y: Math.round(enemy.y) };
+    return { x: enemy.x, y: enemy.y };
   }
 
   const step = Math.min(maxStep, distance);
   return {
-    x: Math.round(enemy.x + (dx / distance) * step),
-    y: Math.round(enemy.y + (dy / distance) * step)
+    x: enemy.x + (dx / distance) * step,
+    y: enemy.y + (dy / distance) * step
   };
 };
 
@@ -76,7 +77,7 @@ export function stepEnemy(enemy, players = [], deltaMs = 0) {
   if (target) {
     const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
     if (distance <= ENEMY_TUNING.stopDistance) {
-      return { x: Math.round(enemy.x), y: Math.round(enemy.y) };
+      return { x: enemy.x, y: enemy.y };
     }
     // Stop at the stop distance: a long tick must not walk the wolf onto the player
     const advance = Math.min(
@@ -88,7 +89,7 @@ export function stepEnemy(enemy, players = [], deltaMs = 0) {
 
   const homeDistance = Math.hypot(enemy.homeX - enemy.x, enemy.homeY - enemy.y);
   if (homeDistance <= ENEMY_TUNING.homeEpsilon) {
-    return { x: Math.round(enemy.x), y: Math.round(enemy.y) };
+    return { x: enemy.x, y: enemy.y };
   }
   return moveToward(enemy, enemy.homeX, enemy.homeY, ENEMY_TUNING.idleSpeed * seconds);
 }

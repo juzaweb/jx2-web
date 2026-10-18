@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { rollEnemyReward } from "../rewards.js";
-import { stepEnemy } from "../enemyAi.js";
+import { stepEnemy } from "../../../src/game/enemyAi.js";
 
 /**
  * Clean sanitization for player strings
@@ -403,8 +403,8 @@ export class GameSocketManager {
       return;
     }
 
-    enemy.x = clampNum(payload.x, 0, WORLD_WIDTH, enemy.x);
-    enemy.y = clampNum(payload.y, 0, WORLD_HEIGHT, enemy.y);
+    // Position stays server-owned: a hit only applies damage, so a client cannot
+    // drag the monster around the map by reporting the spot it rendered
     enemy.hp = Math.max(0, enemy.hp - damage);
 
     const killed = enemy.hp <= 0;
@@ -443,8 +443,9 @@ export class GameSocketManager {
 
   /**
    * Step every living enemy once and broadcast only the ones that actually moved.
-   * A wolf at rest (walked home or holding at its stop distance) produces no
-   * traffic, so an idle map stays quiet.
+   * Positions are stored and sent on a whole-pixel grid, so an enemy at rest
+   * (walked home or holding at its stop distance) produces no traffic at all and
+   * an idle map stays quiet.
    */
   tickEnemies() {
     if (!this.wss.clients.size) return;
@@ -456,8 +457,8 @@ export class GameSocketManager {
       if (enemy.isDead) return;
 
       const next = stepEnemy(enemy, players, this.enemyTickMs);
-      const x = clampNum(next.x, 0, WORLD_WIDTH, enemy.x);
-      const y = clampNum(next.y, 0, WORLD_HEIGHT, enemy.y);
+      const x = clampNum(Math.round(next.x), 0, WORLD_WIDTH, enemy.x);
+      const y = clampNum(Math.round(next.y), 0, WORLD_HEIGHT, enemy.y);
       if (x === enemy.x && y === enemy.y) return;
 
       enemy.x = x;

@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { stepEnemy } from "./enemyAi.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
 
 export class Wolf {
@@ -77,8 +78,13 @@ export class Wolf {
   update(time, delta, player, onBite) {
     if (!this.sprite.active || this.isDead) return;
 
-    // The server owns movement (see server/src/enemyAi.js); render its lead
-    this.followServerPosition(delta);
+    // Online the server steps the AI and this render follows its lead; offline the
+    // client steps the same shared AI with the local player as the only target
+    if (this.usesServerMovement()) {
+      this.followServerPosition(delta);
+    } else {
+      this.stepLocally(delta, player);
+    }
 
     const x = this.sprite.x;
     const y = this.sprite.y;
@@ -95,8 +101,6 @@ export class Wolf {
     this.nameText.setPosition(x, y - 29);
     this.nameText.setDepth(y + 3);
 
-    // The server drives the AI (see server/src/enemyAi.js); the client renders the
-    // authoritative position and only bites when the wolf is close enough
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
 
     if (distance < 55 && time > this.nextBite) {
@@ -108,22 +112,57 @@ export class Wolf {
   }
 
   /**
-   * Smoothly follow the authoritative position for this frame.
+   * True while a server owns the roster; movement then arrives as snapshots
+   * instead of being simulated here.
+   * @returns {boolean}
+   */
+  usesServerMovement() {
+    return this.scene?.networkClient?.isConnected === true;
+  }
+
+  /**
+   * Online: render the position the server is leading towards.
    * @param {number} deltaMs
    */
   followServerPosition(deltaMs) {
     if (!Number.isFinite(this.targetX) || !Number.isFinite(this.targetY)) return;
 
-    const next = interpolateEnemyPosition(
-      { x: this.x, y: this.y },
-      { x: this.targetX, y: this.targetY },
+    this.applyStep(
+      interpolateEnemyPosition(
+        { x: this.x, y: this.y },
+        { x: this.targetX, y: this.targetY },
+        deltaMs
+      )
+    );
+  }
+
+  /**
+   * Offline: step the shared AI (src/game/enemyAi.js) against the local player.
+   * @param {number} deltaMs
+   * @param {{x:number, y:number}} player
+   */
+  stepLocally(deltaMs, player) {
+    const next = stepEnemy(
+      { x: this.x, y: this.y, homeX: this.homeX, homeY: this.homeY },
+      [{ x: player.x, y: player.y }],
       deltaMs
     );
-    if (next.x === this.x && next.y === this.y) return;
+
+    this.applyStep(next);
+  }
+
+  /**
+   * Place the wolf (and its body) on an already-decided position and face the way
+   * it moved.
+   * @param {{x:number, y:number}} next
+   */
+  applyStep(next) {
+    const previousX = this.x;
+    if (next.x === previousX && next.y === this.y) return;
 
     this.placeAt(next.x, next.y);
-    if (Math.abs(this.targetX - next.x) > 1) {
-      this.wolfVisual.setScale(this.targetX < next.x ? -1 : 1, 1);
+    if (Math.abs(next.x - previousX) > 1) {
+      this.wolfVisual.setScale(next.x < previousX ? -1 : 1, 1);
     }
   }
 

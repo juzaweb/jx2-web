@@ -83,7 +83,9 @@ src/
     ├── game.js           # Phaser Scene & game factory
     ├── world.js          # Map rendering & terrain layout
     ├── player.js         # Player physics, sprite, and controls
-    ├── enemy.js          # Wolf entities and AI aggro
+    ├── enemy.js          # Wolf entities (rendering + bite checks)
+    ├── enemyAi.js        # Shared enemy AI: server tick + offline fallback
+    ├── enemySync.js      # Pure rules for server-authoritative enemy state
     ├── combat.js         # Combat system, sound synth, and drops
     └── storage.js        # Progress persistence
 ```
