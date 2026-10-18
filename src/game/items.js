@@ -150,6 +150,78 @@ export function getQuantities() {
 }
 
 /**
+ * Add `amount` to the shared in-memory quantity for `id`, seeding the store from
+ * catalog defaults first when nothing has been loaded yet. Missing ids start at 0.
+ * Invalid input (non-string/empty id, or an amount that is not a finite number > 0)
+ * is ignored without throwing and leaves the store untouched.
+ * @param {string} id - Catalog item id
+ * @param {number} [amount=1] - Positive quantity to add
+ * @returns {number} The resulting non-negative integer quantity for `id`
+ */
+export function addQuantity(id, amount = 1) {
+  const hasValidId = typeof id === "string" && id.length > 0;
+  if (!hasValidId) {
+    return 0;
+  }
+
+  if (currentQuantities === null) {
+    setQuantities();
+  }
+
+  const stored = currentQuantities[id];
+  const base =
+    typeof stored === "number" && Number.isFinite(stored)
+      ? Math.max(0, Math.floor(stored))
+      : 0;
+
+  const hasValidAmount =
+    typeof amount === "number" && Number.isFinite(amount) && amount > 0;
+  if (!hasValidAmount) {
+    return base;
+  }
+
+  currentQuantities[id] = base + Math.floor(amount);
+  return currentQuantities[id];
+}
+
+/**
+ * Weighted loot table for enemy drops. Every `id` exists in the catalog.
+ * `weight` is relative (higher = more common); `qty` is the stack size granted.
+ * @type {Array<{id:string, name:string, weight:number, qty:number}>}
+ */
+export const DROP_TABLE = [
+  { id: "tui-bac", name: "Túi Bạc", weight: 50, qty: 1 },
+  { id: "linh-duong", name: "Thịt Rừng", weight: 30, qty: 2 },
+  { id: "yeu-dan", name: "Yêu Đan", weight: 15, qty: 1 },
+  { id: "huyen-kim-thach", name: "Huyễn Kim Thạch", weight: 5, qty: 1 }
+];
+
+/**
+ * Pick a loot entry from DROP_TABLE with a weighted roll. Pure and deterministic:
+ * the same rng value always yields the same entry, and the final bucket is
+ * clamped so floating-point drift or a roll of 1 can never return an unknown id.
+ * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
+ * @returns {{ id: string, qty: number }}
+ */
+export function rollDrop(rng = Math.random) {
+  const totalWeight = DROP_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
+  const drawn = typeof rng === "function" ? rng() : rng;
+  const roll = typeof drawn === "number" && Number.isFinite(drawn) ? drawn : 0;
+  const target = Math.min(Math.max(roll, 0), 1) * totalWeight;
+
+  let cursor = 0;
+  for (let i = 0; i < DROP_TABLE.length; i++) {
+    cursor += DROP_TABLE[i].weight;
+    if (target < cursor) {
+      return { id: DROP_TABLE[i].id, qty: DROP_TABLE[i].qty };
+    }
+  }
+
+  const last = DROP_TABLE[DROP_TABLE.length - 1];
+  return { id: last.id, qty: last.qty };
+}
+
+/**
  * Resolve the catalog into render-ready arrays with persisted quantities applied.
  * Inventory items with no saved or default quantity are returned unchanged.
  * @param {Record<string, number>} [quantities]

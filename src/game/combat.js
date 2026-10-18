@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { addQuantity, rollDrop, DROP_TABLE } from "./items.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -392,11 +393,17 @@ export class CombatSystem {
   }
 
   spawnDrop(x, y) {
+    const loot = rollDrop();
+    const dropEntry = DROP_TABLE.find((entry) => entry.id === loot.id);
+
     const drop = {
       x,
       y,
       phase: Math.random() * 6,
-      active: true
+      active: true,
+      itemId: loot.id,
+      qty: loot.qty,
+      name: dropEntry ? dropEntry.name : loot.id
     };
 
     drop.visual = this.scene.add.container(x, y).setDepth(y + 5);
@@ -439,7 +446,10 @@ export class CombatSystem {
       this.player.stats.mp + 5
     );
 
-    this.ui.addLog("Nhặt được Túi Bạc: +5 bạc, +5 nội lực.");
+    addQuantity(drop.itemId, drop.qty);
+
+    const dropName = drop.name || drop.itemId;
+    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 bạc, +5 nội lực.`);
     this.ui.updateHud(this.player.stats);
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
