@@ -26,6 +26,8 @@ const SAMPLE = {
 describe("StorageManager", () => {
   beforeEach(() => {
     localStorage.clear();
+    StorageManager.setUserId(null);
+    StorageManager.setCharacterId(null);
   });
 
   it("round-trips a save payload", () => {
@@ -76,45 +78,63 @@ describe("StorageManager", () => {
   });
 
   it("round-trips persisted stack quantities", () => {
-    StorageManager.save({
-      ...SAMPLE,
-      inventory: { "kim-sang-duoc": 42, "tui-bac": 7 }
-    });
+    StorageManager.saveInventory({ "kim-sang-duoc": 42, "tui-bac": 7 });
 
-    expect(StorageManager.load().inventory).toEqual({
+    expect(StorageManager.loadInventory()).toEqual({
       "kim-sang-duoc": 42,
       "tui-bac": 7
     });
   });
 
   it("sanitizes invalid inventory entries on save", () => {
-    StorageManager.save({
-      ...SAMPLE,
-      inventory: {
-        good: 3,
-        neg: -1,
-        str: "5",
-        nan: NaN,
-        inf: Infinity,
-        ["__proto__"]: 9
-      }
+    StorageManager.saveInventory({
+      good: 3,
+      neg: -1,
+      str: "5",
+      nan: NaN,
+      inf: Infinity,
+      ["__proto__"]: 9
     });
 
-    expect(StorageManager.load().inventory).toEqual({ good: 3 });
+    expect(StorageManager.loadInventory()).toEqual({ good: 3 });
   });
 
-  it("preserves existing inventory when a later save omits it", () => {
-    StorageManager.save({ ...SAMPLE, inventory: { "tui-bac": 5 } });
-    StorageManager.save({ ...SAMPLE, stats: { ...SAMPLE.stats, coins: 999 } });
-
-    expect(StorageManager.load().inventory).toEqual({ "tui-bac": 5 });
-  });
-
-  it("loadInventory merges saved values over the provided defaults", () => {
-    StorageManager.save({ ...SAMPLE, inventory: { "kim-sang-duoc": 12 } });
+  it("merges saved values over the provided defaults", () => {
+    StorageManager.saveInventory({ "kim-sang-duoc": 12 });
 
     expect(
       StorageManager.loadInventory({ "kim-sang-duoc": 99, "dai-hoan-dan": 86 })
     ).toEqual({ "kim-sang-duoc": 12, "dai-hoan-dan": 86 });
+  });
+
+  it("keeps each character's bag separate", () => {
+    StorageManager.setCharacterId("char_a");
+    StorageManager.saveInventory({ "tui-bac": 5 });
+
+    StorageManager.setCharacterId("char_b");
+    expect(StorageManager.loadInventory({ "tui-bac": 21 })).toEqual({ "tui-bac": 21 });
+
+    StorageManager.setCharacterId("char_a");
+    expect(StorageManager.loadInventory({ "tui-bac": 21 })).toEqual({ "tui-bac": 5 });
+  });
+
+  it("falls back to the account key when no character is active", () => {
+    StorageManager.setUserId("user_x");
+    StorageManager.setCharacterId(null);
+    StorageManager.saveInventory({ "tui-bac": 9 });
+
+    StorageManager.setUserId("user_y");
+    expect(StorageManager.loadInventory({ "tui-bac": 21 })).toEqual({ "tui-bac": 21 });
+  });
+
+  it("clearInventory removes only the active character's bag", () => {
+    StorageManager.setCharacterId("char_a");
+    StorageManager.saveInventory({ "tui-bac": 5 });
+    StorageManager.clearInventory();
+    expect(StorageManager.loadInventory({ "tui-bac": 21 })).toEqual({ "tui-bac": 21 });
+  });
+
+  it("returns defaults when no inventory is stored", () => {
+    expect(StorageManager.loadInventory({ "tui-bac": 21 })).toEqual({ "tui-bac": 21 });
   });
 });

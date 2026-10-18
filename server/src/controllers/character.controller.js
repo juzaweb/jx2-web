@@ -17,8 +17,7 @@ export const listCharacters = async (req, res, next) => {
       success: true,
       data: {
         characters: characterDb.listByUser(userId),
-        maxSlots: MAX_CHARACTER_SLOTS,
-        deletedCount: characterDb.countDeletedByUser(userId)
+        maxSlots: MAX_CHARACTER_SLOTS
       }
     });
   } catch (error) {
@@ -62,7 +61,7 @@ export const createCharacter = async (req, res, next) => {
 };
 
 /**
- * Soft-delete a character so it can be restored later.
+ * Permanently delete a character.
  */
 export const deleteCharacter = async (req, res, next) => {
   try {
@@ -74,7 +73,7 @@ export const deleteCharacter = async (req, res, next) => {
       });
     }
 
-    const deleted = characterDb.softDelete(userId, characterId);
+    const deleted = characterDb.remove(userId, characterId);
     if (!deleted) {
       return res.status(404).json({
         success: false,
@@ -86,49 +85,10 @@ export const deleteCharacter = async (req, res, next) => {
       success: true,
       message: "Đã xoá nhân vật.",
       data: {
-        characters: characterDb.listByUser(userId),
-        deletedCount: characterDb.countDeletedByUser(userId)
+        characters: characterDb.listByUser(userId)
       }
     });
   } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Restore the most recently deleted character for a user.
- */
-export const restoreCharacter = async (req, res, next) => {
-  try {
-    const { userId } = req.params;
-    if (!isValidUserId(userId)) {
-      return res.status(400).json({
-        success: false,
-        error: "Mã tài khoản (userId) không hợp lệ."
-      });
-    }
-
-    const character = characterDb.restoreLast(userId);
-    if (!character) {
-      return res.status(404).json({
-        success: false,
-        error: "Không có nhân vật nào để khôi phục."
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Khôi phục nhân vật thành công!",
-      data: {
-        character,
-        characters: characterDb.listByUser(userId),
-        deletedCount: characterDb.countDeletedByUser(userId)
-      }
-    });
-  } catch (error) {
-    if (error.code === "SLOT_LIMIT" || error.code === "NAME_TAKEN") {
-      return res.status(409).json({ success: false, error: error.message });
-    }
     next(error);
   }
 };

@@ -582,6 +582,7 @@ export class CombatSystem {
     const dropName = drop.name || drop.itemId;
     this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 bạc, +5 nội lực.`);
     this.ui.updateHud(this.player.stats);
+    this.ui.updateInventory();
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
     }

@@ -37,7 +37,6 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   const [characters, setCharacters] = useState([]);
   const [maxSlots, setMaxSlots] = useState(3);
-  const [deletedCount, setDeletedCount] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const [mode, setMode] = useState("select"); // "select" | "create"
   const [nameInput, setNameInput] = useState("");
@@ -51,7 +50,6 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
     const list = Array.isArray(data?.characters) ? data.characters : [];
     setCharacters(list);
     if (typeof data?.maxSlots === "number") setMaxSlots(data.maxSlots);
-    setDeletedCount(typeof data?.deletedCount === "number" ? data.deletedCount : 0);
     setSelectedId((prev) => (list.some((c) => c.id === prev) ? prev : list[0]?.id || ""));
   }, []);
 
@@ -134,7 +132,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       setError("Vui lòng chọn một nhân vật để xoá.");
       return;
     }
-    if (!window.confirm(`Bạn có chắc muốn xoá nhân vật "${selected.name}" không?`)) return;
+    if (!window.confirm(`Bạn có chắc muốn xoá vĩnh viễn nhân vật "${selected.name}" không?`)) return;
 
     setBusy(true);
     setError("");
@@ -142,25 +140,9 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
     try {
       await apiClient.deleteCharacter(user.id, selected.id);
       await reload();
-      setNotice(`Đã xoá nhân vật "${selected.name}". Bạn có thể khôi phục lại.`);
+      setNotice(`Đã xoá nhân vật "${selected.name}".`);
     } catch (err) {
       setError(err.message || "Không thể xoá nhân vật.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleRestore = async () => {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const data = await apiClient.restoreCharacter(user.id);
-      await reload();
-      if (data?.character?.id) setSelectedId(data.character.id);
-      setNotice(`Đã khôi phục nhân vật "${data?.character?.name || ""}".`);
-    } catch (err) {
-      setError(err.message || "Không có nhân vật để khôi phục.");
     } finally {
       setBusy(false);
     }
@@ -331,14 +313,6 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                     disabled={busy || !selected}
                   >
                     Xoá nhân vật
-                  </button>
-                  <button
-                    type="button"
-                    className="jx2-btn-action"
-                    onClick={handleRestore}
-                    disabled={busy || deletedCount === 0}
-                  >
-                    Khôi phục nhân vật
                   </button>
                   <button
                     type="button"

@@ -222,7 +222,7 @@ export class ApiClient {
   /**
    * List the characters owned by a user account
    * @param {string} userId
-   * @returns {Promise<{ characters: Object[], maxSlots: number, deletedCount: number }>}
+   * @returns {Promise<{ characters: Object[], maxSlots: number }>}
    */
   async listCharacters(userId) {
     const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`);
@@ -255,10 +255,10 @@ export class ApiClient {
   }
 
   /**
-   * Soft-delete a character (restorable)
+   * Permanently delete a character
    * @param {string} userId
    * @param {string} characterId
-   * @returns {Promise<{ characters: Object[], deletedCount: number }>}
+   * @returns {Promise<{ characters: Object[] }>}
    */
   async deleteCharacter(userId, characterId) {
     const res = await fetch(
@@ -268,23 +268,6 @@ export class ApiClient {
     const json = await this._parseJson(res);
     if (!res.ok) {
       throw new Error(json?.error || `Xoá nhân vật thất bại (HTTP ${res.status})`);
-    }
-    return json.data;
-  }
-
-  /**
-   * Restore the most recently deleted character
-   * @param {string} userId
-   * @returns {Promise<{ character: Object, characters: Object[], deletedCount: number }>}
-   */
-  async restoreCharacter(userId) {
-    const res = await fetch(
-      `${this.baseUrl}/users/${encodeURIComponent(userId)}/characters/restore`,
-      { method: "POST" }
-    );
-    const json = await this._parseJson(res);
-    if (!res.ok) {
-      throw new Error(json?.error || `Khôi phục nhân vật thất bại (HTTP ${res.status})`);
     }
     return json.data;
   }

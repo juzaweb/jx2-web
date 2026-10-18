@@ -3,6 +3,9 @@
  * The catalog itself is static; stack quantities are persisted via src/game/storage.js.
  */
 
+/** Keys that would poison a plain-object quantity map if copied verbatim. */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
  * Quick-slot consumables bound to hotbar keys 1-4.
  * `useSlot` maps to the slot handled by JiangHuScene.useItem().
@@ -182,6 +185,69 @@ export function addQuantity(id, amount = 1) {
 
   currentQuantities[id] = base + Math.floor(amount);
   return currentQuantities[id];
+}
+
+/**
+ * Coerce an arbitrary value into a safe id -> non-negative integer map, or null
+ * when it is not a plain object. Shared by localStorage persistence and the server
+ * inventory sync, so both reject prototype keys and negative / non-finite stacks
+ * identically.
+ * @param {*} value
+ * @returns {Record<string, number>|null}
+ */
+export function sanitizeQuantities(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const out = {};
+  for (const [id, qty] of Object.entries(value)) {
+    if (DANGEROUS_KEYS.has(id)) continue;
+    if (typeof qty !== "number" || !Number.isFinite(qty) || qty < 0) continue;
+    out[id] = Math.floor(qty);
+  }
+  return out;
+}
+
+/**
+ * Current stack quantity for `id` as a non-negative integer, or 0 when the id is
+ * invalid or carries no quantity. Never mutates the store.
+ * @param {string} id - Catalog item id
+ * @returns {number}
+ */
+export function getQuantity(id) {
+  if (typeof id !== "string" || id.length === 0) {
+    return 0;
+  }
+  const store = currentQuantities || defaultQuantities();
+  const stored = store[id];
+  return typeof stored === "number" && Number.isFinite(stored)
+    ? Math.max(0, Math.floor(stored))
+    : 0;
+}
+
+/**
+ * Attempt to remove `amount` of `id` from the shared in-memory store. The removal
+ * is all-or-nothing: an invalid id/amount, or a stack smaller than `amount`, leaves
+ * the store untouched (so an item can never be consumed into a negative quantity).
+ * @param {string} id - Catalog item id
+ * @param {number} [amount=1] - Positive quantity to remove
+ * @returns {{ ok: boolean, quantity: number }} Whether it was removed and the
+ *   resulting quantity (the current quantity when the removal was rejected)
+ */
+export function consumeQuantity(id, amount = 1) {
+  if (currentQuantities === null) {
+    setQuantities();
+  }
+
+  const current = getQuantity(id);
+  const hasValidAmount =
+    typeof amount === "number" && Number.isFinite(amount) && amount > 0;
+  if (!hasValidAmount || current < amount) {
+    return { ok: false, quantity: current };
+  }
+
+  const next = current - Math.floor(amount);
+  currentQuantities[id] = next;
+  return { ok: true, quantity: next };
 }
 
 /**
