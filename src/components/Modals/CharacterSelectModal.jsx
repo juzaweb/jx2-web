@@ -6,14 +6,12 @@ const NAME_MIN = 2;
 const NAME_MAX = 16;
 
 /**
- * Character creation portraits. Each tile maps to a gender; the tile index is
- * stored as the character's appearance so the chosen face can be restored.
+ * Character creation choices: just the two genders. The tile index is stored as
+ * the character's appearance so the chosen face can be restored.
  */
 const PORTRAITS = [
   { index: 0, gender: "nam", label: "Nam", glyph: "♂" },
-  { index: 1, gender: "nam", label: "Nam", glyph: "♂" },
-  { index: 2, gender: "nu", label: "Nữ", glyph: "♀" },
-  { index: 3, gender: "nu", label: "Nữ", glyph: "♀" }
+  { index: 1, gender: "nu", label: "Nữ", glyph: "♀" }
 ];
 
 const GENDER_LABEL = { nam: "Nam", nu: "Nữ" };
