@@ -55,7 +55,7 @@ export class UIBridgeAdapter {
     bridge.emit(EVENTS.AUDIO_CHANGED, isEnabled);
   }
 
-  drawMinimap(player, enemies, worldConfig) {
+  drawMinimap(player, enemies, worldConfig, remotePlayers = []) {
     if (!this.minimapCtx || !player || !worldConfig) return;
 
     const ctx = this.minimapCtx;
@@ -104,6 +104,25 @@ export class UIBridgeAdapter {
         ctx.fillStyle = "#ff4d4f";
         ctx.beginPath();
         ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Remote Players (Cyan radar blips)
+    if (remotePlayers && remotePlayers.length) {
+      remotePlayers.forEach((rp) => {
+        if (!rp.sprite || !rp.sprite.active) return;
+        const rx = rp.x * scaleX;
+        const ry = rp.y * scaleY;
+
+        ctx.fillStyle = "rgba(0, 210, 211, 0.25)";
+        ctx.beginPath();
+        ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#00d2d3";
+        ctx.beginPath();
+        ctx.arc(rx, ry, 3, 0, Math.PI * 2);
         ctx.fill();
       });
     }

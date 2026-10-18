@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { reconcileEnemyState } from "./enemySync.js";
 
 export class Wolf {
   /**
@@ -45,14 +46,14 @@ export class Wolf {
     this.wolfVisual = this.scene.add.container(x, y).setDepth(y);
     this.drawWolf(this.wolfVisual);
 
-    this.hpBack = this.scene.add.rectangle(x, y - 35, 42, 4, 0x1b1714).setDepth(y + 1);
-    this.hpFill = this.scene.add.rectangle(x, y - 35, 40, 2, 0xc94a3f).setDepth(y + 2);
-    this.nameText = this.scene.add.text(x, y - 48, "Sói Xám", {
-      fontFamily: "Arial",
+    this.hpBack = this.scene.add.rectangle(x, y - 20, 38, 4, 0x1b1714).setDepth(y + 1);
+    this.hpFill = this.scene.add.rectangle(x, y - 20, 36, 2, 0xc94a3f).setDepth(y + 2);
+    this.nameText = this.scene.add.text(x, y - 29, "Sói Xám", {
+      fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "10px",
       color: "#e5d6bb",
       stroke: "#1c201a",
-      strokeThickness: 3
+      strokeThickness: 2
     }).setOrigin(0.5).setDepth(y + 3);
   }
 
@@ -80,20 +81,23 @@ export class Wolf {
     this.wolfVisual.setPosition(x, y);
     this.wolfVisual.setDepth(y);
 
-    this.hpBack.setPosition(x, y - 35);
-    this.hpFill.setPosition(x - 21 + (this.hp / this.maxHp) * 21, y - 35);
-    this.hpFill.width = Math.max(0.5, 40 * (this.hp / this.maxHp));
-    this.nameText.setPosition(x, y - 48);
+    this.hpBack.setPosition(x, y - 20);
+    this.hpBack.setDepth(y + 1);
+    this.hpFill.setPosition(x - 19 + (this.hp / this.maxHp) * 19, y - 20);
+    this.hpFill.setDepth(y + 2);
+    this.hpFill.width = Math.max(0.5, 36 * (this.hp / this.maxHp));
+    this.nameText.setPosition(x, y - 29);
+    this.nameText.setDepth(y + 3);
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
 
     // AI Aggro range
     if (distance < 210) {
-      this.scene.physics.moveToObject(this.sprite, player.sprite, distance > 40 ? 43 : 0);
+      this.scene.physics.moveToObject(this.sprite, player.sprite, distance > 52 ? 43 : 0);
       // Flip wolf facing player
       this.wolfVisual.setScale(player.x < x ? -1 : 1, 1);
 
-      if (distance < 42 && time > this.nextBite) {
+      if (distance < 55 && time > this.nextBite) {
         this.nextBite = time + 1400;
         if (typeof onBite === "function") {
           onBite(this);
@@ -123,6 +127,29 @@ export class Wolf {
         this.wolfVisual.setAlpha(1);
       }
     });
+  }
+
+  /**
+   * Apply an authoritative server snapshot: health always, position only when far off.
+   * @param {{x?:number,y?:number,hp?:number,isDead?:boolean}} state
+   */
+  applyServerState(state = {}) {
+    if (!this.sprite.active) return;
+
+    const next = reconcileEnemyState(
+      { x: this.x, y: this.y, hp: this.hp, maxHp: this.maxHp, isDead: this.isDead },
+      state
+    );
+
+    this.hp = next.hp;
+
+    if (next.isDead) {
+      if (!this.isDead) this.die();
+    } else if (this.isDead) {
+      this.revive();
+    } else if (next.snap && this.sprite.body) {
+      this.sprite.body.reset(state.x, state.y);
+    }
   }
 
   die() {
@@ -170,6 +197,10 @@ export class EnemyManager {
     this.group = null;
   }
 
+  /**
+   * @param {Array<[number, number]>} positions spawn points, kept in sync with the
+   * server's `ENEMY_SPAWNS` in `server/src/websocket/gameSocket.js` (id = index)
+   */
   create(positions = [
     [840, 600],
     [950, 670],
@@ -208,5 +239,31 @@ export class EnemyManager {
 
   getAlive() {
     return this.enemies.filter((w) => w.active && !w.isDead);
+  }
+
+  /**
+   * @param {number} id
+   * @returns {Wolf|null}
+   */
+  getById(id) {
+    return this.enemies.find((wolf) => wolf.id === id) || null;
+  }
+
+  /**
+   * Apply one authoritative enemy update (a hit or a respawn)
+   * @param {Object} state
+   */
+  applyEnemyState(state = {}) {
+    const wolf = this.getById(state.id);
+    if (wolf) wolf.applyServerState(state);
+  }
+
+  /**
+   * Apply a list of authoritative snapshots: the world-init roster or relayed positions
+   * @param {Array<Object>} enemies
+   */
+  applyServerSnapshot(enemies) {
+    if (!Array.isArray(enemies)) return;
+    enemies.forEach((enemy) => this.applyEnemyState(enemy));
   }
 }

@@ -106,6 +106,9 @@ export function App() {
 
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
+      if (currentUser?.displayName || currentUser?.username) {
+        bridge.emit(EVENTS.SET_PLAYER_NAME, currentUser.displayName || currentUser.username);
+      }
     });
 
     return () => {
@@ -188,21 +191,25 @@ export function App() {
   }, []);
 
   const handleSendMessage = useCallback((text) => {
+    const sender = currentUser?.displayName || currentUser?.username || "Lãng Khách";
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
-      text: `${currentUser?.displayName || currentUser?.username || "Lãng Khách"}: ${text}`,
+      text: `${sender}: ${text}`,
       type: "near"
     });
+    bridge.emit(EVENTS.ACTION_CHAT, { text, sender });
   }, [currentUser]);
 
   const handleLoginSuccess = useCallback((session) => {
+    const playerName = session.user.displayName || session.user.username;
     setCurrentUser(session.user);
     StorageManager.setUserId(session.user.id);
     setIsLoginOpen(false);
+    bridge.emit(EVENTS.SET_PLAYER_NAME, playerName);
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `login-${Date.now()}`,
-      text: `Hiệp khách ${session.user.displayName || session.user.username} đã gia nhập ${session.server || "Giang Hồ"}!`,
+      text: `Hiệp khách ${playerName} đã gia nhập ${session.server || "Giang Hồ"}!`,
       type: "system"
     });
   }, []);
@@ -213,6 +220,7 @@ export function App() {
       setCurrentUser(null);
       StorageManager.setUserId(null);
       setIsLoginOpen(true);
+      bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
     }
   }, []);

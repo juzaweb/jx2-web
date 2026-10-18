@@ -41,6 +41,16 @@ describe("GameEventBridge", () => {
     error.mockRestore();
   });
 
+  it("delivers SET_PLAYER_NAME event with player name", () => {
+    const handler = vi.fn();
+    bridge.on(EVENTS.SET_PLAYER_NAME, handler);
+
+    bridge.emit(EVENTS.SET_PLAYER_NAME, "ZzGaMaVipZz");
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith("ZzGaMaVipZz");
+  });
+
   it("is a no-op when emitting with no subscribers", () => {
     expect(() => bridge.emit(EVENTS.GAME_PAUSED, true)).not.toThrow();
   });
