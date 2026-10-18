@@ -191,11 +191,13 @@ export function App() {
   }, []);
 
   const handleSendMessage = useCallback((text) => {
+    const sender = currentUser?.displayName || currentUser?.username || "Lãng Khách";
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
-      text: `${currentUser?.displayName || currentUser?.username || "Lãng Khách"}: ${text}`,
+      text: `${sender}: ${text}`,
       type: "near"
     });
+    bridge.emit(EVENTS.ACTION_CHAT, { text, sender });
   }, [currentUser]);
 
   const handleLoginSuccess = useCallback((session) => {

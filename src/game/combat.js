@@ -72,6 +72,14 @@ export class CombatSystem {
     const facingRight = this.player.visual.scaleX >= 0;
     const slashOffsetX = facingRight ? 16 : -16;
 
+    // Broadcast attack to other players via network
+    this.scene.networkClient?.sendAttack?.({
+      skill: "normal",
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight
+    });
+
     const slash = this.scene.add
       .arc(
         this.player.x + slashOffsetX,
@@ -130,6 +138,14 @@ export class CombatSystem {
     this.player.stats.mp -= 15;
     playTone(420, 0.18, "triangle", 0.035);
 
+    // Broadcast skill to other players via network
+    this.scene.networkClient?.sendAttack?.({
+      skill: "kiem_khi",
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight: this.player.visual.scaleX >= 0
+    });
+
     const ring = this.scene.add
       .circle(this.player.x, this.player.y, 24, 0x80d7e9, 0.2)
       .setStrokeStyle(4, 0xb8e9f0, 0.9)
@@ -165,6 +181,14 @@ export class CombatSystem {
     wolf.takeHit(damage);
     this.showFloatText(wolf.x, wolf.y - 30, `-${damage}`, "#ffb49a");
     playTone(120, 0.06, "square", 0.012);
+
+    // Let the server own the health pool so nearby players see the same damage
+    this.scene.networkClient?.sendEnemyHit?.({
+      id: wolf.id,
+      damage,
+      x: Math.round(wolf.x),
+      y: Math.round(wolf.y)
+    });
 
     if (wolf.hp <= 0) {
       this.handleWolfKill(wolf);
