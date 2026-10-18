@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 
 export class Player {
   /**
@@ -68,6 +69,29 @@ export class Player {
       strokeThickness: 2,
       fontStyle: "bold"
     }).setOrigin(0.5).setDepth(y + 100);
+
+    // Health bar sits between the name and the character's head
+    const healthBar = createHealthBar(this.scene, x, y);
+    this.hpBack = healthBar.back;
+    this.hpFill = healthBar.fill;
+    this.updateHealthBar(x, y);
+  }
+
+  /**
+   * Reposition and redraw the overhead health bar from the current stats.
+   * @param {number} x
+   * @param {number} y - world Y the bar is drawn relative to (follows the walk bob)
+   * @param {number} [depthBase=y] - stable Y used for depth sorting
+   */
+  updateHealthBar(x, y, depthBase = y) {
+    layoutHealthBar(
+      { back: this.hpBack, fill: this.hpFill },
+      x,
+      y,
+      depthBase,
+      this.stats.hp,
+      this.stats.maxHp
+    );
   }
 
   drawHero(container) {
@@ -344,6 +368,7 @@ export class Player {
     this.visual.setDepth(this.sprite.y);
     this.nameText.setPosition(this.sprite.x, this.sprite.y - 60 + this.body.y * 0.35);
     this.nameText.setDepth(this.sprite.y + 100);
+    this.updateHealthBar(this.sprite.x, this.sprite.y + this.body.y * 0.35, this.sprite.y);
   }
 
   spawnFootstepDust(x, y, vx, vy) {
@@ -489,6 +514,7 @@ export class Player {
     this.visual.setPosition(x, y);
     this.nameText.setPosition(x, y - 60);
     this.nameText.setDepth(y + 100);
+    this.updateHealthBar(x, y);
   }
 
   respawn() {
