@@ -165,6 +165,22 @@ export class ApiClient {
   }
 
   /**
+   * Fetch the authoritative user profile from the backend
+   * @param {string} userId
+   * @returns {Promise<Object>} User profile (id, username, displayName, ...)
+   */
+  async getProfile(userId) {
+    const res = await fetch(`${this.baseUrl}/users/me?userId=${encodeURIComponent(userId)}`);
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      const error = new Error(json?.error || `Không tải được thông tin tài khoản (HTTP ${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
+    return json.data.user;
+  }
+
+  /**
    * Register a new user
    * @param {string} username
    * @param {string} password

@@ -154,5 +154,36 @@ describe("ApiClient", () => {
       "http://mock-api:5000/api/users/check-username?username=hero_name"
     );
   });
+
+  it("getProfile fetches the authoritative profile for a user id", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          user: { id: "u1", username: "hiepkhat99", displayName: "Hiệp Khách Vô Danh" }
+        }
+      })
+    });
+
+    const user = await client.getProfile("u1");
+    expect(user.displayName).toBe("Hiệp Khách Vô Danh");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/me?userId=u1"
+    );
+  });
+
+  it("getProfile exposes the HTTP status so callers can detect a deleted account", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        success: false,
+        error: "Không tìm thấy thông tin tài khoản."
+      })
+    });
+
+    await expect(client.getProfile("gone")).rejects.toMatchObject({ status: 404 });
+  });
 });
 

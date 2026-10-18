@@ -1,4 +1,5 @@
 import { store } from "../data/store.js";
+import { userDb } from "../data/userDb.js";
 
 export const getSave = async (req, res, next) => {
   try {
@@ -24,7 +25,10 @@ export const getSave = async (req, res, next) => {
 export const saveProgress = async (req, res, next) => {
   try {
     const { playerId } = req.params;
-    const result = await store.setSave(playerId, req.body);
+    const body = req.body || {};
+    // Registered accounts own their display name; the payload only supplies it for guests.
+    const displayName = userDb.resolveDisplayName(playerId, body.playerName);
+    const result = await store.setSave(playerId, displayName ? { ...body, playerName: displayName } : body);
 
     res.json({
       success: true,

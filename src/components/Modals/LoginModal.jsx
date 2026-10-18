@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { apiClient } from "../../game/apiClient.js";
+import { writeSession } from "../../game/session.js";
 import "../../styles/login.css";
 
 const SERVERS = [
@@ -161,7 +162,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           server: selectedServer.name,
           loggedInAt: Date.now()
         };
-        localStorage.setItem("jx2_user_session", JSON.stringify(session));
+        writeSession(session);
 
         setSuccessMsg("Đăng nhập thành công! Đang chuyển vào thế giới Giang Hồ...");
         setTimeout(() => {
@@ -184,7 +185,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           server: selectedServer.name,
           loggedInAt: Date.now()
         };
-        localStorage.setItem("jx2_user_session", JSON.stringify(session));
+        writeSession(session);
 
         setSuccessMsg("Đăng ký tài khoản thành công! Đang chuẩn bị hành trang...");
         setTimeout(() => {
