@@ -83,6 +83,18 @@ export class RemotePlayerManager {
   }
 
   /**
+   * Player health updated (relayed by the server)
+   * @param {Object} payload
+   */
+  handlePlayerStats(payload = {}) {
+    if (!payload.id) return;
+    const player = this.players.get(payload.id);
+    if (player) {
+      player.applyStats(payload);
+    }
+  }
+
+  /**
    * Player performed an attack or skill
    * @param {Object} payload
    */

@@ -1,7 +1,42 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — direct request (fix): an HMR / canvas remount left an orphaned `NetworkClient` reconnecting forever
-(Prior run: F3 server-authoritative enemy movement, PR #19 merged; before that: character select/create.)
+Last run: 2026-10-18 — direct request (fix): other players did not appear on the minimap
+(Prior run: direct request (fix) — minimap stayed blank because its one-shot registration was lost.)
+
+## Remote players missing from the minimap (2026-10-18, direct request)
+
+- Report: teammates/other players were not shown as blips on the minimap.
+- Cause: `uiBridgeAdapter.drawMinimap` guarded the remote-player loop with `if (!rp.sprite || !rp.sprite.active)`. A `RemotePlayer` renders through a `container` (no physics `sprite`), so `rp.sprite` was always `undefined` and every remote player was skipped.
+- Fix: guard on `rp.container?.active` (a destroyed player has already nulled its container). The old test passed only because it fed the loop a fake `sprite` — switched the test to the real `container` shape and added a negative case for a destroyed player.
+- Verify: `npm run build` ✅ · `npm test` ✅ **149 passed / 149** (15 files).
+
+## Blank minimap fix (2026-10-18, direct request)
+
+- Report: the HUD minimap rendered empty.
+- Cause: `MinimapPanel` emits `ACTION_REGISTER_MINIMAP` once in a mount `useEffect`. Phaser's `Game.boot()` waits on `TextureEvents.READY` before `start()`, so `JiangHuScene.create()` — where `UIBridgeAdapter` subscribes — runs on the first RAF frame, *after* React's effects. The registration was emitted into the void, `minimapCtx` stayed `null`, and `drawMinimap` returned early every frame.
+- Fix: two-way handshake over the existing bridge. `UIBridgeAdapter` now (after subscribing) emits a new `ACTION_REQUEST_MINIMAP`; `MinimapPanel` answers it by re-sending its canvas. This covers both mount orders: panel-first (adapter requests → panel resends) and adapter-first (panel's own mount emit is caught). Extracted `attachMinimap()` for the bind. No new global/singleton state.
+- Verify: `npm run build` ✅ · `npm test` ✅ **148 passed / 148** (15 files; +4: new `uiBridgeAdapter.test.js` covering re-request, late registration, drawing, and pre-bind no-op).
+
+## Peer health bars + HP relay (2026-10-18, direct request)
+
+- Request: "nhân vật ko nhìn thấy máu của nhau" — a player could see only their own overhead bar; peers had none.
+- Cause: HP was purely local. `RemotePlayer` carried `hp`/`maxHp` from the join snapshot but they were never updated, and the client never reported HP changes, so there was no channel to keep peers in sync.
+- Change:
+  - **Client→server:** `NetworkClient.sendStats()` → new `player_stats` message. `game.js:update()` reports `{hp, maxHp}` inside the 50 ms throttle window only when they changed (tracked via `lastReportedHp`/`lastReportedMaxHp`).
+  - **Server:** `GameSocketManager.handlePlayerStats` clamps `hp`→[0,9999] / `maxHp`→[1,9999], ignores un-joined sockets, and relays `player_stats` to everyone **except** the sender.
+  - **Server→client:** `RemotePlayer.applyStats()` updates `hp`/`maxHp` (ignoring unusable values) and `RemotePlayer` now draws an overhead bar mirroring the local one (shared `HEALTH_BAR_WIDTH/HEIGHT` + `healthBarStyle` from `src/game/healthBar.js`). `remotePlayerManager.handlePlayerStats` routes the packet; `game.js` subscribes to `player_stats`.
+  - Initial HP already rides the join snapshot (`init_world` / `player_joined`), so a bar is correct from first sight.
+- Design note: HP stays client-authoritative for players (wolf bites are still computed on the hitter's client), so a peer's bar reflects what that player *reports*. Making player HP server-authoritative is a separate backlog item.
+- Review (code-review-and-quality): flagged the near-duplicate `updateHealthBar`/rect-creation in `Player` and `RemotePlayer` (~20 identical lines with geometry that could drift). Extracted the rendering glue into `src/game/healthBarView.js` (`createHealthBar` + `layoutHealthBar`); the pure rules stay in `healthBar.js` (same pure/glue split as `enemySync.js` ↔ `enemy.js`). Also fixed `RemotePlayer`'s join HP fallback (`data.hp || 100` → numeric check, so a reported `0` is honoured). Added `healthBarView.test.js` (stub scene/rects, no Phaser).
+- Verify: `npm run build` ✅ · `npm test` ✅ **144 passed / 144** (14 files) · `npm run server:test` ✅ **50 passed / 50**.
+
+## Player overhead health bar + respawn position sync (2026-10-18, direct request)
+
+- Request 1: show a health bar above the local character's head. Added `hpBack`/`hpFill` to `Player.createVisuals()` (between the name and the head) and a `updateHealthBar(x, y)` that sizes the fill from `hp/maxHp` and recolours green → amber → red; repositioned every frame in `update()`/`setPosition()`.
+- Request 2 (bug): after a player died and respawned at Trường An, a peer standing in the city never saw them. Cause: `game.js:update()` gated the outbound `player_move` on `isMoving || wasMovingLastSync`, so a respawn / Hồi Thành Phù teleport — a jump while stationary — was never reported; the server kept the pre-respawn coordinates and peers kept rendering the stale position. Also, peers interpolated (Linear 0.22) and would have slid across the map on a large jump.
+- Fix: new pure helper `src/game/positionSync.js` (`shouldReportPosition` + `TELEPORT_REPORT_THRESHOLD = 120`) forces a packet on a teleport-sized jump; `game.js` tracks `lastReportedPos` through it. `remotePlayer.js` snaps (>200 px) on a large jump so a respawn appears instantly instead of sliding.
+- Review (code-review-and-quality): confirmed Phaser 3.90's Rectangle renderers draw from `src.width`, so `hpFill.width = …` is a valid resize on both WebGL and Canvas. Extracted the ratio/colour rule into `src/game/healthBar.js` (`healthBarStyle`) so the previously untested logic has coverage; fixed the bar's depth to use a stable anchor (`sprite.y`) so it no longer oscillates with the walk bob; de-nested the colour ternary and named the `reportPosition` decision in `game.js`.
+- Verify: `npm run build` ✅ · `npm test` ✅ **138 passed / 138** (13 files; +11: `positionSync.test.js`, `healthBar.test.js`).
 
 ## HMR reconnect loop (2026-10-18, direct request — PR #22)
 

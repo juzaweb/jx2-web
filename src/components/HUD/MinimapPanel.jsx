@@ -6,12 +6,20 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
   const coordsRef = useRef(null);
 
   useEffect(() => {
-    if (canvasRef.current) {
-      bridge.emit(EVENTS.ACTION_REGISTER_MINIMAP, {
-        canvas: canvasRef.current,
-        coordsEl: coordsRef.current
-      });
-    }
+    // Register on mount, and again whenever the game asks (the Phaser scene may
+    // have been created after this panel mounted, so its initial registration was
+    // emitted before anyone was listening).
+    const registerMinimap = () => {
+      if (canvasRef.current) {
+        bridge.emit(EVENTS.ACTION_REGISTER_MINIMAP, {
+          canvas: canvasRef.current,
+          coordsEl: coordsRef.current
+        });
+      }
+    };
+
+    registerMinimap();
+    return bridge.on(EVENTS.ACTION_REQUEST_MINIMAP, registerMinimap);
   }, []);
 
   return (

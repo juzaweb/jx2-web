@@ -182,6 +182,10 @@ export class GameSocketManager {
         this.handlePlayerMove(ws, msg.payload);
         break;
 
+      case "player_stats":
+        this.handlePlayerStats(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
@@ -300,6 +304,25 @@ export class GameSocketManager {
         direction: player.direction,
         stance: player.stance
       }
+    });
+  }
+
+  /**
+   * Relay a player's health so peers can render each other's overhead bars.
+   * Values are clamped server-side; a report from an un-joined socket is ignored.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerStats(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    player.hp = clampNum(payload.hp, 0, 9999, player.hp);
+    player.maxHp = clampNum(payload.maxHp, 1, 9999, player.maxHp);
+
+    this.broadcast(ws, {
+      type: "player_stats",
+      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
     });
   }
 
