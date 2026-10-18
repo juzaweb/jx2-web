@@ -14,7 +14,7 @@ vi.mock("phaser", () => ({
 }));
 
 import { CombatSystem, computeDamage } from "./combat.js";
-import { DROP_TABLE } from "./items.js";
+import { DROP_TABLE, getQuantities } from "./items.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 
@@ -263,16 +263,28 @@ describe("CombatSystem kill rewards", () => {
   const makeCombat = ({ isConnected = false, playerId = null } = {}) => {
     const player = makePlayer();
     const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn() };
+    const visualStub = () => {
+      const node = {
+        add: () => node,
+        setDepth: () => node,
+        setStrokeStyle: () => node,
+        setPosition: () => node,
+        setAlpha: () => node,
+        destroy: () => {}
+      };
+      return node;
+    };
     const scene = {
       networkClient: { isConnected },
       time: { delayedCall: vi.fn() },
-      add: {}
+      add: { container: visualStub, circle: visualStub, polygon: visualStub }
     };
     const onStateChange = vi.fn();
     const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui, onStateChange);
 
     combat.setLocalPlayerId(playerId);
-    vi.spyOn(combat, "spawnDrop").mockImplementation(() => {});
+    // Real spawnDrop (drop objects are asserted below), float text stubbed
+    vi.spyOn(combat, "spawnDrop");
     vi.spyOn(combat, "showFloatText").mockImplementation(() => {});
 
     return { combat, player, ui, onStateChange };
@@ -351,5 +363,49 @@ describe("CombatSystem kill rewards", () => {
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
     expect(combat.spawnDrop).not.toHaveBeenCalled();
+  });
+
+  it("marks the kill's drop collectable only for the attributed killer", () => {
+    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    killer.applyServerReward(serverReward());
+
+    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    bystander.applyServerReward(serverReward());
+
+    expect(killer.drops).toHaveLength(1);
+    expect(killer.drops[0].collectable).toBe(true);
+    expect(bystander.drops).toHaveLength(1);
+    expect(bystander.drops[0].collectable).toBe(false);
+  });
+
+  it("does not let a bystander pick up another player's kill loot", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+    combat.applyServerReward(serverReward());
+
+    const drop = combat.drops[0];
+    const before = getQuantities()[drop.itemId] ?? 0;
+    player.x = drop.x;
+    player.y = drop.y;
+    combat.updateDrops(0);
+
+    expect(drop.active).toBe(true);
+    expect(player.stats.coins).toBe(10);
+    expect(getQuantities()[drop.itemId]).toBe(before);
+  });
+
+  it("still lets the killer pick up the loot the server rolled", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    combat.applyServerReward(serverReward());
+
+    const drop = combat.drops[0];
+    const before = getQuantities()[drop.itemId] ?? 0;
+    player.x = drop.x;
+    player.y = drop.y;
+    combat.updateDrops(0);
+
+    expect(drop.active).toBe(false);
+    // 10 starting bạc + 7 from the kill + 5 pickup bonus
+    expect(player.stats.coins).toBe(22);
+    expect(getQuantities()[drop.itemId]).toBe(before + drop.qty);
   });
 });

@@ -327,12 +327,15 @@ export class CombatSystem {
 
     const x = reward.x ?? this.player.x;
     const y = reward.y ?? this.player.y;
+    const killedByMe = this.isLocalKiller(reward.attackerId);
 
     if (reward.drop) {
-      this.spawnDrop(x, y, reward.drop);
+      // Every client renders the kill's loot, but only the attributed killer may
+      // pick it up, so bystanders cannot duplicate the reward
+      this.spawnDrop(x, y, reward.drop, { collectable: killedByMe });
     }
 
-    if (!this.isLocalKiller(reward.attackerId)) return;
+    if (!killedByMe) return;
 
     this.grantKillReward(
       { exp: reward.exp, coins: reward.coins },
@@ -500,8 +503,10 @@ export class CombatSystem {
    * @param {number} x
    * @param {number} y
    * @param {?{id:string, qty:number}} [loot]
+   * @param {{collectable?:boolean}} [options] - `collectable: false` renders loot
+   *   owned by another player, which only shows up in the world
    */
-  spawnDrop(x, y, loot = null) {
+  spawnDrop(x, y, loot = null, { collectable = true } = {}) {
     const rolled = loot || rollDrop();
     const dropEntry = DROP_TABLE.find((entry) => entry.id === rolled.id);
 
@@ -510,12 +515,16 @@ export class CombatSystem {
       y,
       phase: Math.random() * 6,
       active: true,
+      collectable,
       itemId: rolled.id,
       qty: rolled.qty ?? dropEntry?.qty ?? 1,
       name: dropEntry ? dropEntry.name : rolled.id
     };
 
     drop.visual = this.scene.add.container(x, y).setDepth(y + 5);
+    if (!collectable) {
+      drop.visual.setAlpha(0.55);
+    }
     drop.visual.add(this.scene.add.circle(0, 0, 13, 0xe9bd59, 0.12));
     drop.visual.add(
       this.scene.add
@@ -545,7 +554,7 @@ export class CombatSystem {
   }
 
   collectDrop(drop) {
-    if (!drop.active) return;
+    if (!drop.active || !drop.collectable) return;
     drop.active = false;
     drop.visual.destroy();
 
