@@ -1,6 +1,6 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — feature pipeline cycle (L2, item F2 — server-authoritative kill rewards)
+Last run: 2026-10-18 — docs follow-up on merged F2: F3 (server-authoritative enemy movement) filed as `proposed`, position-gap known limitation recorded
 
 ## Project Snapshot
 
@@ -18,8 +18,9 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item F2 — server-authorit
 - [x] C2 is merged to `develop` (`182e8c8`, PR #7).
 - [ ] Next loop item after C2: pick highest-priority `todo` in `BACKLOG.md` (A1, A2, B4 at P1; E3 is P1 but needs Playwright → `package.json` humanMergeRequired).
 - [ ] Enable branch protection requirements so CI must pass before merge on `develop`.
-- [ ] F1 (server-synced enemy state) is rebased onto `develop` on this branch, waiting on a PR/merge.
-- [ ] F2 (server-authoritative kill rewards) is implemented on `loop/f2-server-rewards` (PR #15 → `develop`); CI green, waiting on a **human merge** (diff exceeds `gate.yaml:maxFiles`).
+- [x] F1 (server-synced enemy state) is on `develop`.
+- [x] F2 (server-authoritative kill rewards) merged to `develop` — PR #15, squash commit `171359ab` (13-file diff exceeded `gate.yaml:maxFiles`, so a human merged it).
+- [ ] F3 (server-authoritative enemy movement) filed as `proposed` — enemy positions stay loosely synced until a human promotes it to `todo` after spec review.
 
 ## Watch List
 
@@ -79,9 +80,11 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item F2 — server-authorit
 
 - Item: **F2 — Server-authoritative kill rewards (EXP / bạc / drops)** (spec added to `BACKLOG.md` under EPIC F; `SPEC GATE: PASS` inline).
 - Change: new `server/src/rewards.js` rolls the reward from the shared client catalog; `server/src/websocket/gameSocket.js` broadcasts `enemy_reward` once per kill from its own HP pool, attributed to the killing blow. Client: new pure `src/game/rewardSync.js` validates the payload, `CombatSystem.applyServerReward` renders the shared drop on every client but pays EXP/bạc/kill only to the attributed killer (`grantKillReward` also owns level-up, quest and save), `handleWolfKill` keeps the local roll only while offline, `game.js` wires `enemy_reward` and passes the joined player id down.
-- Verify: `npm run build` ✅ · `npm test` ✅ **92 passed / 92** (8 files; +18 new across `rewardSync.test.js`, `items.test.js`, `combat.test.js`) · `npm run server:test` ✅ **29 passed / 29** (+4: `rewards.test.js`, `enemy_reward` broadcast + no-double-reward in `websocket.test.js`).
+- Verify: `npm run build` ✅ · `npm test` ✅ **94 passed / 94** (8 files; +20 new across `rewardSync.test.js`, `items.test.js`, `combat.test.js`) · `npm run server:test` ✅ **29 passed / 29** (+4: `rewards.test.js`, `enemy_reward` broadcast + no-double-reward in `websocket.test.js`).
 - Verifier (code-review sub-agent, 2026-10-18): REQUEST CHANGES on one medium finding — the shared drop was spawned collectable on every client, so a bystander could pick up another player's kill loot (+5 bạc and the catalog item), duplicating the reward per client. Fixed: `spawnDrop(..., { collectable })` and `collectDrop` refuse drops this client does not own; only the attributed killer's copy is collectable (+3 tests).
 - Diff: 13 files (> `gate.yaml:maxFiles` 10) ⇒ **escalated to a human merge**; all paths allowlisted (`src/**`, `**/*.test.js`, `**/*.md`), none in `humanMergeRequired`, no denylist paths.
+- Review follow-up (code-review-and-quality, 2026-10-18, `1ec1ecf`): removed the optional drop branch from `grantKillReward` (the caller now rolls and spawns its own drop), bounded the remembered drop list and expired loot this client cannot collect, filed **E4** for splitting the drop concern out of `CombatSystem` ⇒ 94/94 client tests, 29/29 server tests.
+- Known limitation (filed as F3 `proposed`, 2026-10-18): enemy **positions** are only loosely shared. Each client still runs the AI, so an aggroed wolf is pulled toward that client's own player; the server relays only ≥40 px drift and a receiver snaps only beyond 90 px, so two screens can show the same wolf ~90 px apart, with a jump at each correction. Idle wolves converge (both clients walk them home). Fixing it means moving movement to the server — see `BACKLOG.md` F3 (spec pending review).
 - Known remaining local mint (out of scope, filed for a follow-up): `collectDrop` still grants +5 bạc / +5 nội lực to whoever picks a drop up, so a doctored client could still mint on pickup.
 - Tooling note: the backend SQLite test suite can flake with `database is locked` when `api.test.js` and `websocket.test.js` open `server/data/jx2.sqlite` as parallel `node --test` workers; 4 subsequent runs were clean.
 
