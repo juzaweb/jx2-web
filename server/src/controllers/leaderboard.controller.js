@@ -1,4 +1,5 @@
 import { store } from "../data/store.js";
+import { userDb } from "../data/userDb.js";
 
 export const getLeaderboard = async (req, res, next) => {
   try {
@@ -22,8 +23,10 @@ export const submitScore = async (req, res, next) => {
   try {
     const { playerId, playerName, level, kills, coins, exp } = req.body;
 
-    const safePlayerName = (typeof playerName === "string" && playerName.trim())
-      ? playerName.trim().slice(0, 50)
+    // Registered accounts own their display name; the payload only supplies it for guests.
+    const resolvedName = userDb.resolveDisplayName(playerId, playerName);
+    const safePlayerName = resolvedName
+      ? resolvedName.slice(0, 50)
       : `Thiếu Hiệp ${playerId.slice(0, 5)}`;
 
     const entry = {

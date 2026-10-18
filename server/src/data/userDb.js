@@ -198,6 +198,23 @@ export class UserDatabase {
   }
 
   /**
+   * Resolve the authoritative display name for a player identifier.
+   * Registered accounts win over the caller-supplied name so that renaming a
+   * user propagates to stored saves and the leaderboard.
+   * @param {string} playerId Registered user id (`users.id`). Guest and composite
+   *   ids have no account row, so the supplied name is used instead.
+   * @param {string} [fallback] Display name supplied by the client
+   * @returns {string}
+   */
+  resolveDisplayName(playerId, fallback = "") {
+    if (typeof playerId === "string" && playerId.trim()) {
+      const user = this.getUserById(playerId.trim());
+      if (user?.displayName) return user.displayName;
+    }
+    return typeof fallback === "string" ? fallback.trim() : "";
+  }
+
+  /**
    * Clear all records in users table (useful for test resets)
    */
   clear() {

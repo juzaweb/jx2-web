@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { GameCanvas } from "./components/GameCanvas.jsx";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
@@ -15,6 +15,13 @@ import {
   setQuantities as rememberQuantities
 } from "./game/items.js";
 import { StorageManager } from "./game/storage.js";
+import { apiClient } from "./game/apiClient.js";
+import {
+  readSession,
+  persistSessionUser,
+  isSessionUser,
+  clearSession
+} from "./game/session.js";
 
 const INITIAL_LOGS = [
   {
@@ -36,22 +43,17 @@ const INITIAL_LOGS = [
 
 export function App() {
   const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem("jx2_user_session");
-      if (!saved) return null;
-      const parsed = JSON.parse(saved);
-      if (parsed?.token === "offline-guest-token" || String(parsed?.user?.id || "").startsWith("guest_")) {
-        localStorage.removeItem("jx2_user_session");
-        return null;
-      }
-      if (parsed?.user?.id) {
-        StorageManager.setUserId(parsed.user.id);
-        return parsed.user;
-      }
-      return null;
-    } catch {
+    const session = readSession();
+    if (!session) return null;
+    if (session.token === "offline-guest-token" || String(session?.user?.id || "").startsWith("guest_")) {
+      clearSession();
       return null;
     }
+    if (session?.user?.id) {
+      StorageManager.setUserId(session.user.id);
+      return session.user;
+    }
+    return null;
   });
   const [isLoginOpen, setIsLoginOpen] = useState(() => !currentUser);
   const [isStarted, setIsStarted] = useState(true);
@@ -87,6 +89,52 @@ export function App() {
     )
   );
 
+  // Bridge subscriptions live for the whole session, so they read the latest user
+  // through this ref instead of a stale render's closure.
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  // Re-sync the cached session against the authoritative profile so an out-of-band
+  // rename in the users table reaches the HUD, the game scene and the network join.
+  useEffect(() => {
+    const sessionUser = currentUserRef.current;
+    if (!sessionUser?.id) return;
+
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const profile = await apiClient.getProfile(sessionUser.id);
+        // The cached session may have been replaced (logout, account switch) while
+        // the request was in flight; never overwrite a newer session with an older one.
+        if (!isMounted || !profile || !isSessionUser(sessionUser.id)) return;
+
+        const nextUser = { ...sessionUser, ...profile };
+        const nextName = nextUser.displayName || nextUser.username;
+        if (nextName === (sessionUser.displayName || sessionUser.username)) return;
+
+        persistSessionUser(nextUser);
+        setCurrentUser((prev) => (prev?.id === sessionUser.id ? nextUser : prev));
+        bridge.emit(EVENTS.SET_PLAYER_NAME, nextName);
+      } catch (error) {
+        if (error?.status === 404 && isMounted && isSessionUser(sessionUser.id)) {
+          // The account no longer exists: drop the stale session and ask to log in again.
+          clearSession();
+          setCurrentUser(null);
+          setIsLoginOpen(true);
+        }
+        // Otherwise the backend is unreachable: keep the cached profile.
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+    // Runs once on mount with the session cached at page load.
+  }, []);
+
   useEffect(() => {
     const unsubStats = bridge.on(EVENTS.STATS_UPDATED, (newStats) => {
       setStats((prev) => ({ ...prev, ...newStats }));
@@ -106,8 +154,9 @@ export function App() {
 
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
-      if (currentUser?.displayName || currentUser?.username) {
-        bridge.emit(EVENTS.SET_PLAYER_NAME, currentUser.displayName || currentUser.username);
+      const user = currentUserRef.current;
+      if (user?.displayName || user?.username) {
+        bridge.emit(EVENTS.SET_PLAYER_NAME, user.displayName || user.username);
       }
     });
 
@@ -216,7 +265,7 @@ export function App() {
 
   const handleLogout = useCallback(() => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?")) {
-      localStorage.removeItem("jx2_user_session");
+      clearSession();
       setCurrentUser(null);
       StorageManager.setUserId(null);
       setIsLoginOpen(true);

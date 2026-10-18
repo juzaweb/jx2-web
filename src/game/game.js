@@ -9,6 +9,7 @@ import { bridge, EVENTS } from "./bridge.js";
 import { getQuantities } from "./items.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
+import { readSession } from "./session.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -48,18 +49,12 @@ export class JiangHuScene extends Phaser.Scene {
     this.worldManager = new WorldManager(this);
     this.worldManager.create();
 
-    // Resolve initial player name from active session if available
+    // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
+    // has refreshed the profile from the backend.
     let initialName = "Lãng Khách";
-    try {
-      const sessionStr = typeof localStorage !== "undefined" ? localStorage.getItem("jx2_user_session") : null;
-      if (sessionStr) {
-        const parsed = JSON.parse(sessionStr);
-        if (parsed?.user?.displayName || parsed?.user?.username) {
-          initialName = parsed.user.displayName || parsed.user.username;
-        }
-      }
-    } catch {
-      // fallback to default
+    const sessionUser = readSession()?.user;
+    if (sessionUser?.displayName || sessionUser?.username) {
+      initialName = sessionUser.displayName || sessionUser.username;
     }
 
     this.player = new Player(this, 640, 620, initialName);
@@ -475,18 +470,11 @@ export class JiangHuScene extends Phaser.Scene {
     let username = this.player.name || "Lãng Khách";
     let displayName = username;
 
-    try {
-      const sessionStr = typeof localStorage !== "undefined" ? localStorage.getItem("jx2_user_session") : null;
-      if (sessionStr) {
-        const parsed = JSON.parse(sessionStr);
-        if (parsed?.user?.id) {
-          playerId = `${parsed.user.id}_${tabId}`;
-          username = parsed.user.username || username;
-          displayName = parsed.user.displayName || username;
-        }
-      }
-    } catch {
-      // fallback
+    const sessionUser = readSession()?.user;
+    if (sessionUser?.id) {
+      playerId = `${sessionUser.id}_${tabId}`;
+      username = sessionUser.username || username;
+      displayName = sessionUser.displayName || username;
     }
 
     this.remotePlayerManager.setLocalPlayerId(playerId);

@@ -100,6 +100,28 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 
 ---
 
+#### 🔹 Lấy hồ sơ hiện tại (dùng để đồng bộ tên hiển thị)
+- **URL:** `GET /api/users/me?userId=user_1700000000_abcd`
+- **Ghi chú:** đây là nguồn dữ liệu chuẩn (authoritative) cho `displayName`. Client gọi endpoint này khi tải trang để cập nhật lại tên đã cache trong `localStorage`.
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user_1700000000_abcd",
+      "username": "hiepkhat99",
+      "displayName": "Hiệp Khách Vô Danh",
+      "createdAt": 1700000000000,
+      "lastLogin": 1700000010000
+    }
+  }
+}
+```
+- **Lỗi:** `400` khi thiếu `userId`, `404` khi tài khoản không còn tồn tại.
+
+---
+
 ### 2. Kiểm tra trạng thái máy chủ (Health Check)
 - **URL:** `GET /api/health`
 - **Response mẫu:**
@@ -148,6 +170,7 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 
 #### 🔹 Lưu tiến trình (Tự động đồng bộ lên Bảng xếp hạng)
 - **URL:** `POST /api/save/:playerId`
+- **Ghi chú:** nếu `:playerId` trùng `users.id` của một tài khoản đã đăng ký, `display_name` trong bảng `users` sẽ được dùng làm `playerName` thay cho giá trị client gửi lên (nhờ vậy đổi tên tài khoản là tiến trình đã lưu và bảng xếp hạng tự hiện tên mới). Với khách vãng lai (`guest_*`, id ghép thêm tab), giá trị `playerName` trong body được giữ nguyên.
 - **Body:**
 ```json
 {
@@ -206,6 +229,7 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 
 #### 🔹 Gửi điểm trực tiếp lên bảng xếp hạng
 - **URL:** `POST /api/leaderboard/submit`
+- **Ghi chú:** `playerName` bị bỏ qua nếu `playerId` là `users.id` của tài khoản đã đăng ký — bảng xếp hạng luôn dùng `display_name` trong bảng `users`.
 - **Body:**
 ```json
 {

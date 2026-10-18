@@ -3,19 +3,23 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { createApp } from "../src/app.js";
-import { userDb } from "../src/data/userDb.js";
 
 describe("Giang Ho Backend API Test Suite", () => {
   let server;
   let baseUrl;
   let testDataDir;
+  let userDb;
 
   before(async () => {
-    // Setup temporary test data directory
+    // Setup temporary test data directory and point every store at it BEFORE the
+    // app modules load, so tests never write to the development database.
     testDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-test-"));
     process.env.DATA_PATH = path.join(testDataDir, "test-db.json");
+    process.env.DB_PATH = path.join(testDataDir, "test-users.sqlite");
     process.env.NODE_ENV = "test";
+
+    const { createApp } = await import("../src/app.js");
+    ({ userDb } = await import("../src/data/userDb.js"));
 
     // Clean user table for test isolation
     userDb.clear();
@@ -244,6 +248,82 @@ describe("Giang Ho Backend API Test Suite", () => {
     // Ensure password_hash and salt are not exposed in response
     assert.equal(json.data.user.password_hash, undefined);
     assert.equal(json.data.user.salt, undefined);
+  });
+
+  test("Users: renaming display_name propagates to saves and leaderboard", async () => {
+    const registerRes = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "theanh",
+        password: "secretpassword123",
+        displayName: "theanh"
+      })
+    });
+    assert.equal(registerRes.status, 201);
+    const registerJson = await registerRes.json();
+    const userId = registerJson.data.user.id;
+
+    const firstSave = await fetch(`${baseUrl}/save/${userId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerName: "theanh",
+        stats: { level: 12, hp: 100, mp: 50, exp: 200, coins: 30, kills: 4 }
+      })
+    });
+    const firstJson = await firstSave.json();
+    assert.equal(firstJson.data.playerName, "theanh");
+
+    // Simulate an out-of-band rename straight in the users table
+    userDb.db.prepare("UPDATE users SET display_name = ? WHERE id = ?").run("Hiệp Khách Vô Danh", userId);
+
+    const renameSave = await fetch(`${baseUrl}/save/${userId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerName: "theanh",
+        stats: { level: 13, hp: 110, mp: 55, exp: 260, coins: 40, kills: 5 }
+      })
+    });
+    const renameJson = await renameSave.json();
+    assert.equal(renameJson.data.playerName, "Hiệp Khách Vô Danh");
+
+    const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=50`);
+    const lbJson = await lbRes.json();
+    const entry = lbJson.data.rankings.find((r) => r.playerId === userId);
+    assert.ok(entry, "Renamed player should appear in the leaderboard");
+    assert.equal(entry.playerName, "Hiệp Khách Vô Danh");
+  });
+
+  test("Leaderboard: submit uses the registered display name over the payload name", async () => {
+    const registerRes = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "bx_hiep_si",
+        password: "secretpassword123",
+        displayName: "Bạch Y Hiệp Sĩ"
+      })
+    });
+    const registerJson = await registerRes.json();
+    const userId = registerJson.data.user.id;
+
+    const submitRes = await fetch(`${baseUrl}/leaderboard/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playerId: userId,
+        playerName: "Tên Giả",
+        level: 42,
+        kills: 120,
+        coins: 5000,
+        exp: 21000
+      })
+    });
+    assert.equal(submitRes.status, 200);
+    const submitJson = await submitRes.json();
+    assert.equal(submitJson.data.playerName, "Bạch Y Hiệp Sĩ");
   });
 
   test("Users: Register rejects duplicate username", async () => {
