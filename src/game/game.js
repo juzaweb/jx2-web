@@ -46,7 +46,21 @@ export class JiangHuScene extends Phaser.Scene {
     this.worldManager = new WorldManager(this);
     this.worldManager.create();
 
-    this.player = new Player(this, 640, 620);
+    // Resolve initial player name from active session if available
+    let initialName = "Lãng Khách";
+    try {
+      const sessionStr = typeof localStorage !== "undefined" ? localStorage.getItem("jx2_user_session") : null;
+      if (sessionStr) {
+        const parsed = JSON.parse(sessionStr);
+        if (parsed?.user?.displayName || parsed?.user?.username) {
+          initialName = parsed.user.displayName || parsed.user.username;
+        }
+      }
+    } catch {
+      // fallback to default
+    }
+
+    this.player = new Player(this, 640, 620, initialName);
     this.enemyManager = new EnemyManager(this);
     this.enemyManager.create();
 
@@ -213,7 +227,10 @@ export class JiangHuScene extends Phaser.Scene {
         this.uiBridge.updateSoundButton(isEnabled);
         this.saveGame(false);
       }),
-      bridge.on(EVENTS.ACTION_SET_PAUSED, (paused) => this.setPaused(paused))
+      bridge.on(EVENTS.ACTION_SET_PAUSED, (paused) => this.setPaused(paused)),
+      bridge.on(EVENTS.SET_PLAYER_NAME, (name) => {
+        if (this.player) this.player.setName(name);
+      })
     );
 
     // Enemy respawn loop
@@ -264,7 +281,7 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
       const healed = this.player.heal(35);
-      this.combat.showFloatText(this.player.x, this.player.y - 45, `+${healed} HP`, "#69db7c");
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `+${healed} HP`, "#69db7c");
       playTone(520, 0.12, "triangle", 0.03);
       this.uiBridge.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
       this.uiBridge.updateHud(this.player.stats);
@@ -276,7 +293,7 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
       const restored = this.player.restoreMp(25);
-      this.combat.showFloatText(this.player.x, this.player.y - 45, `+${restored} MP`, "#74c0fc");
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `+${restored} MP`, "#74c0fc");
       playTone(580, 0.12, "sine", 0.03);
       this.uiBridge.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
       this.uiBridge.updateHud(this.player.stats);
@@ -285,7 +302,7 @@ export class JiangHuScene extends Phaser.Scene {
       // Nữ Nhi Hồng (+50 HP & +30 MP)
       const healed = this.player.heal(50);
       const restored = this.player.restoreMp(30);
-      this.combat.showFloatText(this.player.x, this.player.y - 50, `Ấm lòng! +HP +MP`, "#ffd43b");
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `Ấm lòng! +HP +MP`, "#ffd43b");
       playTone(440, 0.15, "triangle", 0.035);
       this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
       this.uiBridge.updateHud(this.player.stats);
@@ -293,7 +310,7 @@ export class JiangHuScene extends Phaser.Scene {
     } else if (slot === 4) {
       // Hồi Thành Phù (Về điểm hồi sinh Trường An)
       this.player.setPosition(640, 620);
-      this.combat.showFloatText(this.player.x, this.player.y - 45, `Về Trường An`, "#ffdd59");
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Trường An`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
       this.saveGame(false);
@@ -344,7 +361,13 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   updateCameraZoom() {
-    const zoom = Math.min(this.scale.width / 1000, this.scale.height / 570, 1.15);
+    // Reference resolution: 800 x 600 (classic JX2 viewport)
+    // In original JX2, character height is ~82px in a 600px tall frame (82/600 ~= 13.67%).
+    // Setting zoom proportional to frame height maintains the exact 13.67% character-to-frame ratio across all screens.
+    const h = this.scale.height || 600;
+    const w = this.scale.width || 800;
+    const targetZoom = Math.min(h / 600, w / 480);
+    const zoom = Phaser.Math.Clamp(targetZoom, 0.65, 4.0);
     this.cameras.main.setZoom(zoom);
   }
 

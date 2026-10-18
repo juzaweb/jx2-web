@@ -5,11 +5,13 @@ export class Player {
    * @param {Phaser.Scene} scene
    * @param {number} x
    * @param {number} y
+   * @param {string} [name]
    */
-  constructor(scene, x = 640, y = 620) {
+  constructor(scene, x = 640, y = 620, name = "Lãng Khách") {
     this.scene = scene;
     this.spawnX = x;
     this.spawnY = y;
+    this.name = name;
 
     this.stats = {
       level: 1,
@@ -36,7 +38,6 @@ export class Player {
     // Movement & wuxia animation states
     this.stepPhase = 0;
     this.lastDustTime = 0;
-    this.lastTrailTime = 0;
     this.currentStance = "front"; // "front" | "side"
 
     this.createPhysicsSprite(x, y);
@@ -59,19 +60,19 @@ export class Player {
     this.visual.setDepth(y);
     this.drawHero(this.visual);
 
-    this.nameText = this.scene.add.text(x, y - 42, "Lãng Khách", {
-      fontFamily: "Arial",
+    this.nameText = this.scene.add.text(x, y - 60, this.name, {
+      fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "12px",
-      color: "#fff0c5",
-      stroke: "#1c211c",
-      strokeThickness: 3,
+      color: "#5cfc5c",
+      stroke: "#081008",
+      strokeThickness: 2,
       fontStyle: "bold"
-    }).setOrigin(0.5).setDepth(700);
+    }).setOrigin(0.5).setDepth(y + 100);
   }
 
   drawHero(container) {
-    // 1. Soft ground shadow
-    this.shadow = this.scene.add.ellipse(0, 34, 40, 13, 0x090e0c, 0.45);
+    // 1. Soft ground shadow under character feet
+    this.shadow = this.scene.add.ellipse(0, 41, 42, 13, 0x090e0c, 0.45);
 
     // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
     this.body = this.scene.add.container(0, 0);
@@ -88,12 +89,11 @@ export class Player {
 
     // 2. High-definition character visuals (Clean 2-leg authentic models)
     if (this.scene.textures.exists("hero-sprite")) {
-      this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
       this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
-      this.heroImage.setDisplaySize(28, 76);
+      this.heroImage.setDisplaySize(30, 82);
       this.heroImage.setOrigin(0.5, 0.5);
 
-      this.body.add([this.aura, this.heroImage]);
+      this.body.add([this.heroImage]);
       container.add([this.shadow, this.body]);
       return;
     }
@@ -248,7 +248,7 @@ export class Player {
     if (stance === "side") {
       if (this.scene.textures.exists("hero-side-walk")) {
         this.heroImage.setTexture("hero-side-walk", 0);
-        this.heroImage.setDisplaySize(67, 76);
+        this.heroImage.setDisplaySize(73, 82);
         this.heroImage.setOrigin(0.44, 0.5);
       }
     } else {
@@ -257,7 +257,7 @@ export class Player {
       }
       if (this.scene.textures.exists("hero-sprite")) {
         this.heroImage.setTexture("hero-sprite");
-        this.heroImage.setDisplaySize(28, 76);
+        this.heroImage.setDisplaySize(30, 82);
         this.heroImage.setOrigin(0.5, 0.5);
       }
     }
@@ -315,13 +315,7 @@ export class Player {
       // Footstep dust puff when foot strikes the road
       if (time - this.lastDustTime > 190) {
         this.lastDustTime = time;
-        this.spawnFootstepDust(this.sprite.x, this.sprite.y + 32, vx, vy);
-      }
-
-      // Wuxia Qinggong ghost afterimage trail
-      if (speed > 40 && time - this.lastTrailTime > 68) {
-        this.lastTrailTime = time;
-        this.spawnGhostTrail(this.sprite.x, this.sprite.y, this.visual.scaleX, this.body.rotation, this.body.y);
+        this.spawnFootstepDust(this.sprite.x, this.sprite.y + 40, vx, vy);
       }
     } else {
       // Stopped moving - reset walk animation
@@ -348,32 +342,8 @@ export class Player {
     this.sprite.setDepth(this.sprite.y);
     this.visual.setPosition(this.sprite.x, this.sprite.y);
     this.visual.setDepth(this.sprite.y);
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 56 + this.body.y * 0.35);
-  }
-
-  spawnGhostTrail(x, y, facing, rotation, bodyOffsetY) {
-    if (!this.heroImage) return;
-
-    const currentTexture = this.heroImage.texture.key;
-    const currentFrame = this.heroImage.frame ? this.heroImage.frame.name : 0;
-    const ghost = this.scene.add.sprite(x, y + bodyOffsetY, currentTexture, currentFrame);
-    ghost.setDisplaySize(this.heroImage.displayWidth, this.heroImage.displayHeight);
-    ghost.setOrigin(this.heroImage.originX, this.heroImage.originY);
-    ghost.setScale(facing * (this.heroImage.displayWidth / (ghost.width || 1)), this.heroImage.displayHeight / (ghost.height || 1));
-    ghost.setRotation(rotation);
-    ghost.setDepth(y - 1);
-    ghost.setTint(0x38bdf8); // Azure martial sword qi tint
-    ghost.setAlpha(0.38);
-
-    this.scene.tweens.add({
-      targets: ghost,
-      alpha: 0,
-      scaleX: facing * (this.heroImage.displayWidth / (ghost.width || 1)) * 1.05,
-      scaleY: (this.heroImage.displayHeight / (ghost.height || 1)) * 1.05,
-      duration: 250,
-      ease: "Cubic.easeOut",
-      onComplete: () => ghost.destroy()
-    });
+    this.nameText.setPosition(this.sprite.x, this.sprite.y - 60 + this.body.y * 0.35);
+    this.nameText.setDepth(this.sprite.y + 100);
   }
 
   spawnFootstepDust(x, y, vx, vy) {
@@ -505,11 +475,20 @@ export class Player {
     }
   }
 
+  setName(name) {
+    if (!name) return;
+    this.name = name;
+    if (this.nameText) {
+      this.nameText.setText(name);
+    }
+  }
+
   setPosition(x, y) {
     this.stopMovement();
     this.sprite.setPosition(x, y);
     this.visual.setPosition(x, y);
-    this.nameText.setPosition(x, y - 55);
+    this.nameText.setPosition(x, y - 60);
+    this.nameText.setDepth(y + 100);
   }
 
   respawn() {
