@@ -541,6 +541,16 @@ export class GameSocketManager {
       this.players.delete(ws);
       this.playerById.delete(player.id);
 
+      // When all players have left the map, reset living enemies to their home positions
+      if (this.players.size === 0) {
+        this.enemies.forEach((enemy) => {
+          if (!enemy.isDead) {
+            enemy.x = enemy.homeX;
+            enemy.y = enemy.homeY;
+          }
+        });
+      }
+
       // Notify other players that this player has left the map
       this.broadcast(ws, {
         type: "player_left",

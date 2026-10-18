@@ -249,8 +249,12 @@ export class JiangHuScene extends Phaser.Scene {
       if (clickedNPC) {
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedNPC.x, clickedNPC.y);
         if (dist > 75) {
-          this.player.moveTo(clickedNPC.x, clickedNPC.y);
-          this.showClickIndicator(clickedNPC.x, clickedNPC.y, 0x22c55e);
+          const angle = Phaser.Math.Angle.Between(clickedNPC.x, clickedNPC.y, this.player.x, this.player.y);
+          const approachDist = 60;
+          const targetX = clickedNPC.x + Math.cos(angle) * approachDist;
+          const targetY = clickedNPC.y + Math.sin(angle) * approachDist;
+          this.player.moveTo(targetX, targetY);
+          this.showClickIndicator(targetX, targetY, 0x22c55e);
         } else {
           this.player.stopMovement();
         }

@@ -1073,6 +1073,6 @@ export class WorldManager {
    * @returns {Array<object>}
    */
   getNPCs() {
-    return this.npcs;
+    return this.npcs ? [...this.npcs] : [];
   }
 }
