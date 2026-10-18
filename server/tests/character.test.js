@@ -251,7 +251,7 @@ describe("CharacterDatabase schema migration", () => {
     // Two accounts own the same name; the older row keeps it, the newer is renamed.
     legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c1', 'u1', 'Trùng', 1, 100)");
     legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c2', 'u2', 'Trùng', 1, 200)");
-    // A soft-deleted row must be purged, freeing nothing but leaving no orphan.
+    // A soft-deleted row must be purged rather than left orphaned.
     legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at, deleted_at) VALUES ('c3', 'u3', 'Đã Xoá', 1, 300, 400)");
     legacy.close();
 
@@ -266,6 +266,38 @@ describe("CharacterDatabase schema migration", () => {
     assert.throws(() => db.create("u4", "trùng"), (err) => err.code === "NAME_TAKEN");
     // The purged name is free to use again.
     assert.equal(db.create("u3", "Đã Xoá").name, "Đã Xoá");
+
+    db.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  test("dedupes cross-account names even when the deleted_at column is already gone", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-mig-nosoft-"));
+    const dbPath = path.join(dir, "legacy-no-soft.sqlite");
+
+    const { DatabaseSync } = await import("node:sqlite");
+    const legacy = new DatabaseSync(dbPath);
+    legacy.exec(`
+      CREATE TABLE characters (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        gender TEXT NOT NULL DEFAULT 'nam',
+        appearance INTEGER NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        last_played INTEGER
+      );
+    `);
+    legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c1', 'u1', 'Song Sinh', 1, 100)");
+    legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c2', 'u2', 'Song Sinh', 1, 200)");
+    legacy.close();
+
+    const { CharacterDatabase } = await import("../src/data/characterDb.js");
+    const db = new CharacterDatabase(dbPath);
+
+    assert.equal(db.listByUser("u1")[0].name, "Song Sinh", "oldest keeps the name");
+    assert.equal(db.listByUser("u2")[0].name, "Song Sinh-2", "duplicate renamed before the index is built");
 
     db.close();
     await fs.rm(dir, { recursive: true, force: true });

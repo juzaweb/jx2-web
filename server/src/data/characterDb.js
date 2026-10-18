@@ -12,6 +12,29 @@ const MAX_NAME_LENGTH = 16;
 const GENDERS = ["nam", "nu"];
 const DEFAULT_GENDER = "nam";
 const MAX_APPEARANCE = 3;
+// SQLite extended result code for a UNIQUE constraint violation.
+const SQLITE_CONSTRAINT_UNIQUE = 2067;
+
+/**
+ * True when a SQLite error is a UNIQUE-constraint violation.
+ * @param {*} error
+ * @returns {boolean}
+ */
+const isUniqueViolation = (error) =>
+  Boolean(error) &&
+  (error.errcode === SQLITE_CONSTRAINT_UNIQUE ||
+    /UNIQUE constraint failed/i.test(error.message || ""));
+
+/**
+ * Build the product-facing NAME_TAKEN error used by both the pre-check and the
+ * unique-index backstop.
+ * @returns {Error}
+ */
+const nameTakenError = () => {
+  const err = new Error("Tên nhân vật này đã được sử dụng.");
+  err.code = "NAME_TAKEN";
+  return err;
+};
 
 /**
  * Validate a user/account id shared by the character store and its controller.
@@ -21,7 +44,7 @@ const MAX_APPEARANCE = 3;
 export const isValidUserId = (id) => typeof id === "string" && USER_ID_REGEX.test(id);
 
 /**
- * A user may hold up to MAX_SLOTS active (non-deleted) characters.
+ * A user may hold up to MAX_CHARACTER_SLOTS characters.
  */
 export const MAX_CHARACTER_SLOTS = 3;
 
@@ -92,7 +115,7 @@ export class CharacterDatabase {
       );
     `);
 
-    this._migrateLegacySchema();
+    this._migrateSchema();
 
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_characters_user ON characters(user_id);
@@ -133,27 +156,83 @@ export class CharacterDatabase {
   }
 
   /**
-   * Migrate a legacy database that carries the removed soft-delete column:
-   * purge soft-deleted rows, drop the per-account index, rename cross-account
-   * duplicates (oldest keeps its name), then drop `deleted_at` so the global
-   * unique-name index can be created.
+   * Bring an existing database in line with the current schema before the
+   * global unique-name index is created: purge soft-deleted rows, drop the
+   * obsolete per-account index, rename cross-account duplicates (oldest keeps
+   * its name), then drop the removed `deleted_at` column. No-ops (and takes no
+   * write lock) once the schema is current, so workers sharing a database file
+   * only contend on the very first, real migration. Runs in one transaction so
+   * a failure leaves the database untouched.
    */
-  _migrateLegacySchema() {
+  _migrateSchema() {
+    if (!this._needsMigration()) return;
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this._purgeSoftDeleted();
+      this._dedupeNames();
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * True when the database still carries the legacy soft-delete shape or holds
+   * cross-account name duplicates that would block the unique index.
+   * @returns {boolean}
+   */
+  _needsMigration() {
+    const hasDeletedAt = this.db
+      .prepare("PRAGMA table_info(characters)")
+      .all()
+      .some((c) => c.name === "deleted_at");
+    if (hasDeletedAt) return true;
+
+    const indexes = this.db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+      .all()
+      .map((row) => row.name);
+    if (indexes.includes("idx_characters_user_name")) return true;
+    // Once the global unique index exists, duplicate names are impossible, so
+    // there is nothing to scan for or migrate.
+    if (indexes.includes("idx_characters_name")) return false;
+
+    const duplicate = this.db
+      .prepare("SELECT name FROM characters GROUP BY name COLLATE NOCASE HAVING COUNT(*) > 1 LIMIT 1")
+      .get();
+    return Boolean(duplicate);
+  }
+
+  /**
+   * Drop the obsolete per-account index and, when present, the soft-delete
+   * rows and column.
+   */
+  _purgeSoftDeleted() {
+    this.db.exec("DROP INDEX IF EXISTS idx_characters_user_name");
+
     const columns = this.db
       .prepare("PRAGMA table_info(characters)")
       .all()
       .map((c) => c.name);
-    if (!columns.includes("deleted_at")) {
-      this.db.exec("DROP INDEX IF EXISTS idx_characters_user_name");
-      return;
-    }
+    if (!columns.includes("deleted_at")) return;
 
     this.db.exec("DELETE FROM characters WHERE deleted_at IS NOT NULL");
-    this.db.exec("DROP INDEX IF EXISTS idx_characters_user_name");
+    this.db.exec("ALTER TABLE characters DROP COLUMN deleted_at");
+  }
 
+  /**
+   * Rename cross-account duplicates so the global unique-name index can be
+   * created. The oldest row of each group keeps its name; later rows gain a
+   * `-<n>` suffix.
+   */
+  _dedupeNames() {
     const duplicates = this.db
       .prepare("SELECT name FROM characters GROUP BY name COLLATE NOCASE HAVING COUNT(*) > 1")
       .all();
+    if (duplicates.length === 0) return;
+
     const rowsByName = this.db.prepare(
       "SELECT id, name FROM characters WHERE name = ? COLLATE NOCASE ORDER BY created_at ASC, id ASC"
     );
@@ -168,8 +247,6 @@ export class CharacterDatabase {
         rename.run(this._uniqueName(loser.name, nameTaken), loser.id);
       }
     }
-
-    this.db.exec("ALTER TABLE characters DROP COLUMN deleted_at");
   }
 
   /**
@@ -255,14 +332,19 @@ export class CharacterDatabase {
     }
 
     if (this.stmtFindByName.get(cleanName)) {
-      const err = new Error("Tên nhân vật này đã được sử dụng.");
-      err.code = "NAME_TAKEN";
-      throw err;
+      throw nameTakenError();
     }
 
     const id = `char_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
-    this.stmtInsert.run(id, userId, cleanName, cleanGender, cleanAppearance, 1, createdAt, createdAt);
+    try {
+      this.stmtInsert.run(id, userId, cleanName, cleanGender, cleanAppearance, 1, createdAt, createdAt);
+    } catch (error) {
+      // The unique index is the ultimate guard: a concurrent writer (multiple
+      // server processes sharing the file) can slip past the check above.
+      if (isUniqueViolation(error)) throw nameTakenError();
+      throw error;
+    }
 
     return mapRow(this.stmtFindById.get(id, userId));
   }
