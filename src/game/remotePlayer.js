@@ -1,4 +1,8 @@
 import * as Phaser from "phaser";
+import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
+
+/** Distance (px) a packet may move a peer before it is treated as a teleport. */
+const TELEPORT_SNAP_THRESHOLD = 200;
 
 /**
  * RemotePlayer
@@ -23,8 +27,8 @@ export class RemotePlayer {
     this.direction = data.direction === "left" ? "left" : "right";
     this.stance = data.stance === "side" ? "side" : "front";
     this.level = data.level || 1;
-    this.hp = data.hp || 100;
-    this.maxHp = data.maxHp || 100;
+    this.hp = Number.isFinite(data.hp) ? data.hp : 100;
+    this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
 
     this.stepPhase = 0;
     this.createVisuals();
@@ -75,6 +79,11 @@ export class RemotePlayer {
       .setOrigin(0.5)
       .setDepth(this.y + 100);
 
+    const healthBar = createHealthBar(this.scene, this.x, this.y);
+    this.hpBack = healthBar.back;
+    this.hpFill = healthBar.fill;
+    this.updateHealthBar(this.x, this.y);
+
     this.applyStance(this.stance);
     this.applyDirection(this.direction);
   }
@@ -110,6 +119,29 @@ export class RemotePlayer {
   }
 
   /**
+   * Reposition and redraw the overhead health bar from the reported HP.
+   * @param {number} x
+   * @param {number} y
+   */
+  updateHealthBar(x, y) {
+    layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, this.y, this.hp, this.maxHp);
+  }
+
+  /**
+   * Apply an authoritative HP report relayed by the server so peers see each
+   * other's health. Unusable values are ignored rather than clearing the bar.
+   * @param {{hp?:number, maxHp?:number}} stats
+   */
+  applyStats(stats = {}) {
+    if (Number.isFinite(stats.maxHp) && stats.maxHp > 0) {
+      this.maxHp = stats.maxHp;
+    }
+    if (Number.isFinite(stats.hp)) {
+      this.hp = stats.hp;
+    }
+  }
+
+  /**
    * Update position and animation from network packet
    * @param {Object} moveData
    */
@@ -124,6 +156,14 @@ export class RemotePlayer {
     }
     if (moveData.stance && moveData.stance !== this.stance) {
       this.applyStance(moveData.stance);
+    }
+
+    // A respawn or teleport arrives as one large jump; snap there at once so the
+    // peer appears in the new spot instead of sliding across the whole map.
+    if (Phaser.Math.Distance.Between(this.x, this.y, this.targetX, this.targetY) > TELEPORT_SNAP_THRESHOLD) {
+      this.x = this.targetX;
+      this.y = this.targetY;
+      if (this.container) this.container.setPosition(this.x, this.y);
     }
   }
 
@@ -222,6 +262,8 @@ export class RemotePlayer {
       this.titleText.setPosition(this.x, this.y - 74 + (this.body?.y || 0) * 0.35);
       this.titleText.setDepth(this.y + 101);
     }
+
+    this.updateHealthBar(this.x, this.y + (this.body?.y || 0) * 0.35);
   }
 
   destroy() {
@@ -236,6 +278,14 @@ export class RemotePlayer {
     if (this.titleText) {
       this.titleText.destroy();
       this.titleText = null;
+    }
+    if (this.hpBack) {
+      this.hpBack.destroy();
+      this.hpBack = null;
+    }
+    if (this.hpFill) {
+      this.hpFill.destroy();
+      this.hpFill = null;
     }
   }
 }

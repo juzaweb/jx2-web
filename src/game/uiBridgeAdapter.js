@@ -8,11 +8,25 @@ export class UIBridgeAdapter {
     this.coordsElement = null;
 
     // Listen for canvas attachment from React Minimap component
-    this.unsubMinimap = bridge.on(EVENTS.ACTION_REGISTER_MINIMAP, ({ canvas, coordsEl }) => {
-      this.minimapCanvas = canvas;
-      this.minimapCtx = canvas ? canvas.getContext("2d") : null;
-      this.coordsElement = coordsEl;
+    this.unsubMinimap = bridge.on(EVENTS.ACTION_REGISTER_MINIMAP, (registration) => {
+      this.attachMinimap(registration);
     });
+
+    // React effects run before Phaser's first frame, so the MinimapPanel may have
+    // already fired its one-shot registration before this adapter existed and the
+    // event was dropped. Ask any mounted panel to (re)send its canvas.
+    bridge.emit(EVENTS.ACTION_REQUEST_MINIMAP);
+  }
+
+  /**
+   * Bind the React minimap canvas/coords nodes for drawing.
+   * @param {{canvas?: HTMLCanvasElement, coordsEl?: HTMLElement}|null} registration
+   */
+  attachMinimap(registration) {
+    const canvas = registration?.canvas;
+    this.minimapCanvas = canvas || null;
+    this.minimapCtx = canvas ? canvas.getContext("2d") : null;
+    this.coordsElement = registration?.coordsEl || null;
   }
 
   setQuestRewarded(rewarded) {
@@ -111,7 +125,9 @@ export class UIBridgeAdapter {
     // Remote Players (Cyan radar blips)
     if (remotePlayers && remotePlayers.length) {
       remotePlayers.forEach((rp) => {
-        if (!rp.sprite || !rp.sprite.active) return;
+        // A RemotePlayer renders through `container` (it has no physics `sprite`);
+        // a destroyed one has already nulled it.
+        if (!rp.container || !rp.container.active) return;
         const rx = rp.x * scaleX;
         const ry = rp.y * scaleY;
 

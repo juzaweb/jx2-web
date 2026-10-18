@@ -159,6 +159,14 @@ export class NetworkClient {
   }
 
   /**
+   * Report the local player's health so peers can render each other's bars
+   * @param {Object} statsData
+   */
+  sendStats(statsData) {
+    this.send("player_stats", statsData);
+  }
+
+  /**
    * Send attack / skill action
    * @param {Object} attackData
    */

@@ -10,6 +10,7 @@ import { getQuantities } from "./items.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
 import { readSession } from "./session.js";
+import { shouldReportPosition } from "./positionSync.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -122,6 +123,10 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("player_moved", (payload) => {
       this.remotePlayerManager.handlePlayerMoved(payload);
+    });
+
+    this.networkClient.on("player_stats", (payload) => {
+      this.remotePlayerManager.handlePlayerStats(payload);
     });
 
     this.networkClient.on("player_attacked", (payload) => {
@@ -560,20 +565,42 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.networkClient?.isConnected) {
       if (!this.lastNetworkMoveTime || time - this.lastNetworkMoveTime > 50) {
         this.lastNetworkMoveTime = time;
+        const px = Math.round(this.player.x);
+        const py = Math.round(this.player.y);
         const vx = Math.round(this.player.sprite?.body?.velocity?.x || 0);
         const vy = Math.round(this.player.sprite?.body?.velocity?.y || 0);
         const isMoving = Math.abs(vx) > 5 || Math.abs(vy) > 5;
 
-        if (isMoving || this.wasMovingLastSync) {
+        // Movement, the stop transition, and respawn/teleport jumps are all
+        // reported; a plain "isMoving" gate would leave peers rendering the
+        // player at its pre-respawn position (see positionSync.shouldReportPosition).
+        const reportPosition = shouldReportPosition({
+          isMoving,
+          wasMoving: this.wasMovingLastSync,
+          x: px,
+          y: py,
+          lastReported: this.lastReportedPos
+        });
+
+        if (reportPosition) {
           this.wasMovingLastSync = isMoving;
+          this.lastReportedPos = { x: px, y: py };
           this.networkClient.sendMove({
-            x: Math.round(this.player.x),
-            y: Math.round(this.player.y),
+            x: px,
+            y: py,
             vx,
             vy,
             direction: this.player.visual?.scaleX < 0 ? "left" : "right",
             stance: this.player.currentStance || "front"
           });
+        }
+
+        // Report health changes so peers can render each other's overhead bars
+        const { hp, maxHp } = this.player.stats;
+        if (hp !== this.lastReportedHp || maxHp !== this.lastReportedMaxHp) {
+          this.lastReportedHp = hp;
+          this.lastReportedMaxHp = maxHp;
+          this.networkClient.sendStats({ hp, maxHp });
         }
       }
     }

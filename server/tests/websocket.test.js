@@ -208,6 +208,54 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.close();
   });
 
+  await t.test("Player health is relayed so peers can render each other's bars", async () => {
+    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    client1.send({ type: "player_join", payload: { id: "usr_hp1", username: "Hp1", x: 640, y: 620, hp: 100, maxHp: 100 } });
+    await client1.waitFor((m) => m.type === "init_world");
+    client2.send({ type: "player_join", payload: { id: "usr_hp2", username: "Hp2", x: 660, y: 620, hp: 80, maxHp: 120 } });
+    await client2.waitFor((m) => m.type === "init_world");
+    await client1.waitFor((m) => m.type === "player_joined");
+
+    // The joiner already carries its health in the join snapshot
+    const joinBroadcast = client1.messages.find((m) => m.type === "player_joined");
+    assert.equal(joinBroadcast.payload.player.hp, 80);
+    assert.equal(joinBroadcast.payload.player.maxHp, 120);
+
+    // A health report reaches peers (not the sender) and is relayed verbatim
+    client2.send({ type: "player_stats", payload: { hp: 40, maxHp: 120 } });
+    const stats = await client1.waitFor((m) => m.type === "player_stats" && m.payload.id === "usr_hp2");
+    assert.equal(stats.payload.hp, 40);
+    assert.equal(stats.payload.maxHp, 120);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(
+      client2.messages.filter((m) => m.type === "player_stats").length,
+      0,
+      "The reporter does not receive its own health back"
+    );
+
+    // Out-of-range health is clamped into a usable range
+    client2.send({ type: "player_stats", payload: { hp: 99999, maxHp: -5 } });
+    const clamped = await client1.waitFor((m) => m.type === "player_stats" && m.payload.hp === 9999);
+    assert.equal(clamped.payload.maxHp, 1);
+
+    // Sockets that never joined cannot report health
+    const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    spectator.send({ type: "player_stats", payload: { hp: 1, maxHp: 1 } });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(
+      client1.messages.filter((m) => m.type === "player_stats" && m.payload.hp === 1).length,
+      0,
+      "An un-joined socket's health report is ignored"
+    );
+
+    await spectator.close();
+    await client2.close();
+    await client1.close();
+  });
+
   await t.test("Heartbeat ping-pong responds", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
