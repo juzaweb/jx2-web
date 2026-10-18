@@ -15,7 +15,7 @@ const VK_ROW1 = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"];
 const VK_ROW2 = ["a", "s", "d", "f", "g", "h", "j", "k", "l"];
 const VK_ROW3 = ["z", "x", "c", "v", "b", "n", "m", "_"];
 
-export function LoginModal({ isOpen, onLoginSuccess }) {
+export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
   if (!isOpen) return null;
 
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -30,6 +30,7 @@ export function LoginModal({ isOpen, onLoginSuccess }) {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [canGuestLogin, setCanGuestLogin] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleGuestLogin = () => {
     const cleanUser = username.trim() || "HiepKhach";
@@ -101,8 +102,19 @@ export function LoginModal({ isOpen, onLoginSuccess }) {
     setError("");
     setSuccessMsg("");
 
-    if (!username.trim() || !password) {
+    const cleanUser = username.trim();
+    if (!cleanUser || !password) {
       setError("Vui lòng điền đầy đủ tài khoản và mật khẩu.");
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUser)) {
+      setError("Tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Mật khẩu phải có độ dài tối thiểu 6 ký tự.");
       return;
     }
 
@@ -176,6 +188,9 @@ export function LoginModal({ isOpen, onLoginSuccess }) {
     setSuccessMsg("");
     if (!rememberAccount) {
       setUsername("");
+    }
+    if (onClose) {
+      onClose();
     }
   };
 

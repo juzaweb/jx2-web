@@ -195,7 +195,7 @@ export function App() {
     setCurrentUser(session.user);
     StorageManager.setUserId(session.user.id);
     setIsLoginOpen(false);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+    bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `login-${Date.now()}`,
       text: `Hiệp khách ${session.user.displayName || session.user.username} đã gia nhập ${session.server || "Giang Hồ"}!`,

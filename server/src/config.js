@@ -11,4 +11,5 @@ export const config = {
   env: process.env.NODE_ENV || "development",
   dataPath: process.env.DATA_PATH || path.resolve(__dirname, "../data/db.json"),
   dbPath: process.env.DB_PATH || path.resolve(__dirname, "../data/jx2.sqlite"),
+  sessionSecret: process.env.SESSION_SECRET || "jx2-wuxia-secret-salt-2026",
 };

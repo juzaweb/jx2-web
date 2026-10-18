@@ -276,6 +276,14 @@ describe("Giang Ho Backend API Test Suite", () => {
       body: JSON.stringify({ username: "bad user!", password: "validpassword" })
     });
     assert.equal(res2.status, 400);
+
+    // Password too long (> 128 chars)
+    const res3 = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "longpassuser", password: "a".repeat(130) })
+    });
+    assert.equal(res3.status, 400);
   });
 
   test("Users: Login with valid credentials succeeds", async () => {

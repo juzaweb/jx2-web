@@ -1,13 +1,14 @@
 import { userDb } from "../data/userDb.js";
+import { config } from "../config.js";
 import crypto from "node:crypto";
 
 /**
- * Generate a lightweight signed session token
+ * Generate a lightweight HMAC-signed session token
  */
 const generateSessionToken = (userId) => {
   const payload = `${userId}:${Date.now()}`;
-  const random = crypto.randomBytes(16).toString("hex");
-  return `${Buffer.from(payload).toString("base64url")}.${random}`;
+  const hmac = crypto.createHmac("sha256", config.sessionSecret).update(payload).digest("hex");
+  return `${Buffer.from(payload).toString("base64url")}.${hmac}`;
 };
 
 /**
@@ -17,10 +18,15 @@ export const registerUser = async (req, res, next) => {
   try {
     const { username, password, displayName } = req.body || {};
 
-    if (!username || !password) {
+    if (
+      !username ||
+      !password ||
+      typeof username !== "string" ||
+      typeof password !== "string"
+    ) {
       return res.status(400).json({
         success: false,
-        error: "Vui lòng nhập đầy đủ tài khoản và mật khẩu."
+        error: "Vui lòng nhập đầy đủ tài khoản và mật khẩu hợp lệ."
       });
     }
 
@@ -59,10 +65,15 @@ export const loginUser = async (req, res, next) => {
   try {
     const { username, password } = req.body || {};
 
-    if (!username || !password) {
+    if (
+      !username ||
+      !password ||
+      typeof username !== "string" ||
+      typeof password !== "string"
+    ) {
       return res.status(400).json({
         success: false,
-        error: "Vui lòng nhập đầy đủ tài khoản và mật khẩu."
+        error: "Vui lòng nhập đầy đủ tài khoản và mật khẩu hợp lệ."
       });
     }
 
@@ -117,3 +128,4 @@ export const getProfile = async (req, res, next) => {
     next(error);
   }
 };
+

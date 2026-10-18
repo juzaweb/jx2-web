@@ -359,7 +359,25 @@ export class JiangHuScene extends Phaser.Scene {
   startGame() {
     this.started = true;
     this.setPaused(false);
-    this.player.sprite.body.enable = true;
+    if (this.player?.sprite?.body) {
+      this.player.sprite.body.enable = true;
+    }
+
+    // Reload save for the active user session
+    this.savedData = StorageManager.load();
+    if (this.savedData) {
+      if (this.savedData.stats) {
+        this.player.loadStats(this.savedData.stats);
+      }
+      if (this.savedData.position && typeof this.savedData.position.x === "number") {
+        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+      }
+      if (this.savedData.questRewarded !== undefined) {
+        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
+      }
+      this.uiBridge.updateHud(this.player.stats);
+    }
+
     bridge.emit(EVENTS.GAME_STARTED);
 
     if (this.savedData) {

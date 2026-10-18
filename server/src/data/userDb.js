@@ -6,6 +6,7 @@ import { config } from "../config.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 const MIN_PASSWORD_LENGTH = 6;
+const MAX_PASSWORD_LENGTH = 128;
 const MAX_DISPLAY_NAME_LENGTH = 50;
 
 /**
@@ -78,6 +79,12 @@ export class UserDatabase {
       throw err;
     }
 
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      const err = new Error(`Mật khẩu không được vượt quá ${MAX_PASSWORD_LENGTH} ký tự.`);
+      err.code = "INVALID_PASSWORD";
+      throw err;
+    }
+
     const cleanUsername = username.trim().toLowerCase();
     const existing = this.stmtFindByUsername.get(cleanUsername);
     if (existing) {
@@ -113,8 +120,14 @@ export class UserDatabase {
    * @returns {Object} Sanitized user profile
    */
   login(username, password) {
-    if (!username || !password || typeof username !== "string" || typeof password !== "string") {
-      const err = new Error("Vui lòng nhập đầy đủ tài khoản và mật khẩu.");
+    if (
+      !username ||
+      !password ||
+      typeof username !== "string" ||
+      typeof password !== "string" ||
+      password.length > MAX_PASSWORD_LENGTH
+    ) {
+      const err = new Error("Tài khoản hoặc mật khẩu không chính xác.");
       err.code = "INVALID_CREDENTIALS";
       throw err;
     }
@@ -129,13 +142,10 @@ export class UserDatabase {
     }
 
     const candidateHash = crypto.scryptSync(password, user.salt, 64).toString("hex");
+    const candidateBuf = Buffer.from(candidateHash, "hex");
+    const storedBuf = Buffer.from(user.password_hash, "hex");
 
-    const hashMatch = crypto.timingSafeEqual(
-      Buffer.from(candidateHash, "hex"),
-      Buffer.from(user.password_hash, "hex")
-    );
-
-    if (!hashMatch) {
+    if (candidateBuf.length !== storedBuf.length || !crypto.timingSafeEqual(candidateBuf, storedBuf)) {
       const err = new Error("Tài khoản hoặc mật khẩu không chính xác.");
       err.code = "INVALID_CREDENTIALS";
       throw err;
