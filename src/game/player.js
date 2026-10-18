@@ -2,6 +2,20 @@ import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { EQUIPMENT_SLOTS, defaultEquipment, equippedIn } from "./equipment.js";
+import {
+  directionFromVelocity,
+  idleFrame,
+  walkAnimKey,
+  ensureHeroWalkAnims,
+  HERO8_DISPLAY,
+  HERO8_FOOT_Y
+} from "./heroDirections.js";
+
+/**
+ * Hero sprite display size (front stance). Full-canvas equipment art (116x320
+ * like hero.png) is drawn at the same size so it lines up with the body.
+ */
+const HERO_DISPLAY = { w: 30, h: 82 };
 
 /**
  * Per-slot placeholder geometry, in body-local coordinates (same space as the
@@ -76,6 +90,8 @@ export class Player {
     this.stepPhase = 0;
     this.lastDustTime = 0;
     this.currentStance = "front"; // "front" | "side"
+    // Sprite column (0..7) the hero currently faces on the 8-direction sheet.
+    this.facingColumn = 0;
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
@@ -138,17 +154,24 @@ export class Player {
     // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
     this.body = this.scene.add.container(0, 0);
 
-    // Register side walk animation (Clean 2-frame strides)
-    if (this.scene.textures.exists("hero-side-walk") && !this.scene.anims.exists("player-side-walk")) {
-      this.scene.anims.create({
-        key: "player-side-walk",
-        frames: this.scene.anims.generateFrameNumbers("hero-side-walk", { start: 0, end: 1 }),
-        frameRate: 6,
-        repeat: -1
-      });
+    // 2. Animated 8-direction hero. Every direction's walk cycle is registered
+    //    once here; the current facing chooses which one plays.
+    this.has8Dir = this.scene.textures.exists("hero-8dir");
+    ensureHeroWalkAnims(this.scene);
+
+    if (this.has8Dir) {
+      this.heroImage = this.scene.add.sprite(0, 0, "hero-8dir", idleFrame(this.facingColumn));
+      this.heroImage.setOrigin(0.5, 1);
+      this.heroImage.setDisplaySize(HERO8_DISPLAY.w, HERO8_DISPLAY.h);
+      this.heroImage.y = HERO8_FOOT_Y;
+
+      this.body.add([this.heroImage]);
+      this.createEquipmentLayers();
+      container.add([this.shadow, this.body]);
+      return;
     }
 
-    // 2. High-definition character visuals (Clean 2-leg authentic models)
+    // Fallback: static single-frame art if the 8-direction sheet is missing.
     if (this.scene.textures.exists("hero-sprite")) {
       this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
       this.heroImage.setDisplaySize(30, 82);
@@ -305,14 +328,14 @@ export class Player {
   }
 
   /**
-   * Build one placeholder sprite per equipment slot, stacked over the body in
-   * layer order. These are the "empty" layers real layered art will eventually
-   * replace: an equipped slot just swaps the layer's texture (see
-   * {@link Player.applyEquipment}). They start hidden.
+   * Build one sprite per equipment slot, stacked over the body in layer order.
+   * A slot shows real art when a texture `equip-<slot>-<itemId>` is loaded;
+   * otherwise it falls back to a tinted placeholder block. Layers start hidden.
    */
   createEquipmentLayers() {
     if (this.equipLayers) return;
     this.equipLayers = {};
+    this.equipArt = {};
 
     const defaultTexture = this.scene.textures.exists("equip-placeholder")
       ? "equip-placeholder"
@@ -320,6 +343,7 @@ export class Player {
 
     EQUIPMENT_SLOTS.forEach(({ key }) => {
       const layer = this.scene.add.sprite(0, 0, defaultTexture);
+      layer.setOrigin(0.5, 0.5);
       layer.setVisible(false);
       this.body.add(layer);
       this.equipLayers[key] = layer;
@@ -329,88 +353,109 @@ export class Player {
   }
 
   /**
-   * Position/size every equipment layer for the current stance. Called on
-   * creation, on stance change, and after each equip.
+   * Position/size every equipment layer for the current stance and visibility.
+   * Real art is a full-canvas overlay drawn at the hero's size (front stance
+   * only, until side art exists); placeholders use the per-slot boxes.
    */
   layoutEquipment() {
     if (!this.equipLayers) return;
-    const layout = this.currentStance === "side" ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front;
+
+    // The 8-direction art bakes the full outfit into the sprite, and the legacy
+    // 116x320 overlays no longer line up with it, so keep them hidden while the
+    // animated hero is in use. Equipment data/UI are unaffected.
+    if (this.has8Dir) {
+      EQUIPMENT_SLOTS.forEach(({ key }) => this.equipLayers[key]?.setVisible(false));
+      return;
+    }
+
+    const side = this.currentStance === "side";
+    const box = side ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front;
 
     EQUIPMENT_SLOTS.forEach(({ key }) => {
       const layer = this.equipLayers[key];
-      const box = layout[key];
-      if (!layer || !box) return;
-      layer.setPosition(box.x, box.y);
-      layer.setAngle(box.angle || 0);
-      // Real layered art keeps its own native size; only the placeholders are
-      // stretched to the slot box.
-      const key_ = layer.texture?.key;
-      if (key_ === "equip-placeholder" || key_ === "entity-dot") {
-        layer.setDisplaySize(box.w, box.h);
+      if (!layer) return;
+      const equipped = Boolean(equippedIn(this.equipment, key));
+      const hasArt = Boolean(this.equipArt?.[key]);
+
+      if (hasArt) {
+        layer.setPosition(0, 0);
+        layer.setAngle(0);
+        layer.setDisplaySize(HERO_DISPLAY.w, HERO_DISPLAY.h);
+        layer.setVisible(equipped && !side);
+        return;
       }
+
+      const b = box[key];
+      if (!b) return;
+      layer.setPosition(b.x, b.y);
+      layer.setAngle(b.angle || 0);
+      layer.setDisplaySize(b.w, b.h);
+      layer.setVisible(equipped);
     });
   }
 
   /**
-   * Show the worn items and, for any slot without real art yet, fall back to a
-   * tinted placeholder block. Real art is picked up automatically when a
-   * texture named `equip-<slot>-<itemId>` exists.
+   * Show the worn items: real layered art when available, otherwise a tinted
+   * placeholder block. Safe to call repeatedly (stance changes re-run it).
    * @param {Record<string, string|null>} [equipment]
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
     if (!this.equipLayers) return;
-    this.layoutEquipment();
 
+    this.equipArt = {};
     EQUIPMENT_SLOTS.forEach(({ key }) => {
       const layer = this.equipLayers[key];
       if (!layer) return;
 
       const itemId = equippedIn(this.equipment, key);
-      if (!itemId) {
-        layer.setVisible(false);
-        return;
-      }
+      const artKey = itemId ? `equip-${key}-${itemId}` : null;
+      const hasArt = Boolean(artKey && this.scene.textures.exists(artKey));
+      this.equipArt[key] = hasArt ? artKey : null;
 
-      const artKey = `equip-${key}-${itemId}`;
-      if (this.scene.textures.exists(artKey)) {
+      if (hasArt) {
         layer.setTexture(artKey);
-        layer.setDisplaySize(layer.width, layer.height);
         layer.clearTint();
       } else {
         layer.setTexture(
           this.scene.textures.exists("equip-placeholder") ? "equip-placeholder" : "entity-dot"
         );
-        const box = (this.currentStance === "side" ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front)[key];
-        if (box) layer.setDisplaySize(box.w, box.h);
         layer.setTint(EQUIPMENT_LAYOUT.color[key]);
       }
-      layer.setVisible(true);
     });
-  }
-
-  setStance(stance) {
-    if (this.currentStance === stance || !this.heroImage) return;
-    this.currentStance = stance;
-
-    if (stance === "side") {
-      if (this.scene.textures.exists("hero-side-walk")) {
-        this.heroImage.setTexture("hero-side-walk", 0);
-        this.heroImage.setDisplaySize(73, 82);
-        this.heroImage.setOrigin(0.44, 0.5);
-      }
-    } else {
-      if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-      }
-      if (this.scene.textures.exists("hero-sprite")) {
-        this.heroImage.setTexture("hero-sprite");
-        this.heroImage.setDisplaySize(30, 82);
-        this.heroImage.setOrigin(0.5, 0.5);
-      }
-    }
 
     this.layoutEquipment();
+  }
+
+  /**
+   * Turn the hero to a sprite column (0..7) and start that direction's walk
+   * cycle. Also keeps `currentStance` in sync for equipment gating and the
+   * network report.
+   * @param {number} column
+   */
+  faceDirection(column) {
+    if (!this.heroImage || !this.has8Dir) return;
+
+    this.facingColumn = column;
+    const nextStance = column === 0 ? "front" : "side";
+    if (nextStance !== this.currentStance) {
+      this.currentStance = nextStance;
+      this.layoutEquipment();
+    }
+
+    const key = walkAnimKey(column);
+    if (this.scene.anims.exists(key)) {
+      this.heroImage.play(key, true);
+    }
+  }
+
+  /** Stop the walk cycle and hold the idle pose for the current direction. */
+  idlePose() {
+    if (!this.heroImage || !this.has8Dir) return;
+    if (this.heroImage.anims.isPlaying) {
+      this.heroImage.stop();
+    }
+    this.heroImage.setFrame(idleFrame(this.facingColumn));
   }
 
   createKeyboard() {
@@ -427,40 +472,21 @@ export class Player {
     const speed = this.sprite.body.velocity.length();
 
     if (speed > 15) {
-      // Prioritize side profile view when moving horizontally (turn sideways, not crab walking)
-      const isHorizontal = Math.abs(vx) >= Math.abs(vy) * 0.65;
-      this.setStance(isHorizontal ? "side" : "front");
-
-      if (this.currentStance === "side") {
-        if (this.scene.anims.exists("player-side-walk") && !this.heroImage.anims.isPlaying) {
-          this.heroImage.play("player-side-walk");
-        }
+      if (this.has8Dir) {
+        // Face the way we move on screen; the sheet's own walk cycle carries the
+        // legwork, so no procedural bob/squash is layered on top of it.
+        this.faceDirection(directionFromVelocity(vx, vy));
+        this.body.y = Phaser.Math.Linear(this.body.y, 0, 0.35);
       } else {
-        if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
-          this.heroImage.stop();
-        }
+        // Legacy fallback: procedural bob over the static art.
+        this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
+        this.body.y = -Math.abs(Math.sin(this.stepPhase)) * 4.5;
       }
 
-      // Advance walk cycle synchronized with actual movement velocity
-      this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
-
-      // Dynamic bobbing: natural arc of legs pushing up and landing
-      const sinStep = Math.sin(this.stepPhase);
-      const bounceY = -Math.abs(sinStep) * 4.5;
-
-      // Natural stride stretch & compression along movement pace (2 legs only, no 3rd leg)
-      const strideScale = Math.sin(this.stepPhase * 2) * 0.035;
-      this.body.setScale(1 + strideScale, 1 - strideScale);
-
-      // Subtle forward lean / aerodynamic sprint tilt
-      const targetTilt = 0.065;
-      this.body.rotation = Phaser.Math.Linear(this.body.rotation, targetTilt, 0.18);
-      this.body.y = bounceY;
-
-      // Dynamic ground shadow responds to elevation
-      const shadowFactor = 1 - (Math.abs(bounceY) / 4.5) * 0.22;
-      this.shadow.setScale(shadowFactor, shadowFactor);
-      this.shadow.setAlpha(0.48 * shadowFactor);
+      this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.2);
+      this.body.setScale(1, 1);
+      this.shadow.setScale(1, 1);
+      this.shadow.setAlpha(0.45);
 
       // Footstep dust puff when foot strikes the road
       if (time - this.lastDustTime > 190) {
@@ -468,11 +494,8 @@ export class Player {
         this.spawnFootstepDust(this.sprite.x, this.sprite.y + 40, vx, vy);
       }
     } else {
-      // Stopped moving - reset walk animation
-      if (this.currentStance === "side" && this.heroImage.anims && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-        this.heroImage.setFrame(0);
-      }
+      // Stopped moving - hold the idle pose facing the last direction
+      this.idlePose();
 
       // Idle breathing cycle (Qi Gong internal breathing)
       const breath = Math.sin(time * 0.0035);
@@ -582,10 +605,6 @@ export class Player {
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
-
-      if (vx !== 0) {
-        this.visual.setScale(vx < 0 ? -1 : 1, 1);
-      }
       return;
     }
 
@@ -603,10 +622,6 @@ export class Player {
       const vy = Math.sin(angle) * 175;
 
       this.sprite.setVelocity(vx, vy);
-
-      if (Math.abs(vx) > 10) {
-        this.visual.setScale(vx < 0 ? -1 : 1, 1);
-      }
       return;
     }
 
@@ -709,6 +724,11 @@ export class Player {
 
   get y() {
     return this.sprite ? this.sprite.y : this.spawnY;
+  }
+
+  /** Coarse left/right facing derived from the current sprite column. */
+  get facing() {
+    return this.facingColumn >= 5 ? "left" : "right";
   }
 
   get attack() {

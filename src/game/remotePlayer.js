@@ -1,6 +1,14 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
+import {
+  directionFromVelocity,
+  idleFrame,
+  walkAnimKey,
+  ensureHeroWalkAnims,
+  HERO8_DISPLAY,
+  HERO8_FOOT_Y
+} from "./heroDirections.js";
 
 /** Distance (px) a packet may move a peer before it is treated as a teleport. */
 const TELEPORT_SNAP_THRESHOLD = 200;
@@ -27,6 +35,8 @@ export class RemotePlayer {
     this.vy = data.vy || 0;
     this.direction = data.direction === "left" ? "left" : "right";
     this.stance = data.stance === "side" ? "side" : "front";
+    /** Sprite column (0..7) the peer currently faces on the 8-direction sheet. */
+    this.facingColumn = 0;
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
     this.pkFlag = data.pkFlag === true;
@@ -46,8 +56,17 @@ export class RemotePlayer {
     // 2. Body container for animations
     this.body = this.scene.add.container(0, 0);
 
-    // 3. Hero sprite
-    if (this.scene.textures.exists("hero-sprite")) {
+    // 3. Animated 8-direction hero (falls back to the static sprite)
+    this.has8Dir = this.scene.textures.exists("hero-8dir");
+    ensureHeroWalkAnims(this.scene);
+
+    if (this.has8Dir) {
+      this.heroImage = this.scene.add.sprite(0, 0, "hero-8dir", idleFrame(this.facingColumn));
+      this.heroImage.setOrigin(0.5, 1);
+      this.heroImage.setDisplaySize(HERO8_DISPLAY.w, HERO8_DISPLAY.h);
+      this.heroImage.y = HERO8_FOOT_Y;
+      this.body.add(this.heroImage);
+    } else if (this.scene.textures.exists("hero-sprite")) {
       this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
       this.heroImage.setDisplaySize(30, 82);
       this.heroImage.setOrigin(0.5, 0.5);
@@ -73,39 +92,29 @@ export class RemotePlayer {
     this.hpBack = healthBar.back;
     this.hpFill = healthBar.fill;
     this.updateHealthBar(iso.x, iso.y);
-
-    this.applyStance(this.stance);
-    this.applyDirection(this.direction);
   }
 
-  applyDirection(dir) {
-    this.direction = dir;
-    const facing = dir === "left" ? -1 : 1;
-    if (this.body) {
-      this.body.setScale(facing, 1);
+  /**
+   * Turn the peer to a sprite column (0..7) and start that direction's walk
+   * cycle.
+   * @param {number} column
+   */
+  faceDirection(column) {
+    if (!this.heroImage || !this.has8Dir) return;
+    this.facingColumn = column;
+    const key = walkAnimKey(column);
+    if (this.scene.anims.exists(key)) {
+      this.heroImage.play(key, true);
     }
   }
 
-  applyStance(stance) {
-    this.stance = stance;
-    if (!this.heroImage) return;
-
-    if (stance === "side") {
-      if (this.scene.textures.exists("hero-side-walk")) {
-        this.heroImage.setTexture("hero-side-walk", 0);
-        this.heroImage.setDisplaySize(73, 82);
-        this.heroImage.setOrigin(0.44, 0.5);
-      }
-    } else {
-      if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-      }
-      if (this.scene.textures.exists("hero-sprite")) {
-        this.heroImage.setTexture("hero-sprite");
-        this.heroImage.setDisplaySize(30, 82);
-        this.heroImage.setOrigin(0.5, 0.5);
-      }
+  /** Stop the walk cycle and hold the idle pose for the current direction. */
+  idlePose() {
+    if (!this.heroImage || !this.has8Dir) return;
+    if (this.heroImage.anims.isPlaying) {
+      this.heroImage.stop();
     }
+    this.heroImage.setFrame(idleFrame(this.facingColumn));
   }
 
   /**
@@ -151,13 +160,6 @@ export class RemotePlayer {
     if (typeof moveData.y === "number") this.targetY = moveData.y;
     if (typeof moveData.vx === "number") this.vx = moveData.vx;
     if (typeof moveData.vy === "number") this.vy = moveData.vy;
-
-    if (moveData.direction && moveData.direction !== this.direction) {
-      this.applyDirection(moveData.direction);
-    }
-    if (moveData.stance && moveData.stance !== this.stance) {
-      this.applyStance(moveData.stance);
-    }
 
     // A respawn or teleport arrives as one large jump; snap there at once so the
     // peer appears in the new spot instead of sliding across the whole map.
@@ -233,24 +235,28 @@ export class RemotePlayer {
       this.x = Phaser.Math.Linear(this.x, this.targetX, 0.22);
       this.y = Phaser.Math.Linear(this.y, this.targetY, 0.22);
 
-      this.stepPhase += delta * 0.012;
-      const bounceY = -Math.abs(Math.sin(this.stepPhase)) * 3.5;
-      if (this.body) this.body.y = bounceY;
+      // Prefer the reported network velocity for facing; fall back to the
+      // direction of travel while catching up to the target.
+      let mdx = this.vx;
+      let mdy = this.vy;
+      if (Math.hypot(mdx, mdy) < 1) {
+        mdx = this.targetX - this.x;
+        mdy = this.targetY - this.y;
+      }
 
-      if (this.stance === "side" && this.heroImage && this.scene.anims.exists("player-side-walk")) {
-        if (!this.heroImage.anims.isPlaying) {
-          this.heroImage.play("player-side-walk");
-        }
+      if (this.has8Dir) {
+        this.faceDirection(directionFromVelocity(mdx, mdy));
+        if (this.body) this.body.y = Phaser.Math.Linear(this.body.y, 0, 0.3);
+      } else {
+        this.stepPhase += delta * 0.012;
+        const bounceY = -Math.abs(Math.sin(this.stepPhase)) * 3.5;
+        if (this.body) this.body.y = bounceY;
       }
     } else {
       this.x = this.targetX;
       this.y = this.targetY;
       if (this.body) this.body.y = 0;
-
-      if (this.stance === "side" && this.heroImage && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-        this.heroImage.setFrame(0);
-      }
+      this.idlePose();
     }
 
     // Depth sorting (isometric)

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trang bị mẫu — Giang Hồ</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at 50% 0%, #1b262d, #0a0e10 70%);
+        color: #e8f0ea;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 16px 40px;
+      }
+      h1 { font-size: 18px; margin: 0; letter-spacing: 1px; }
+      p.sub { margin: 0; font-size: 12px; color: #8a9aa3; text-align: center; }
+
+      .stage {
+        position: relative;
+        width: 232px;
+        height: 640px;
+        background:
+          linear-gradient(rgba(255,255,255,0.02), rgba(0,0,0,0.25)),
+          repeating-linear-gradient(45deg, #12191d 0 12px, #0e1417 12px 24px);
+        border: 2px solid #8e7343;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .stage img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .stage img.layer { transition: opacity 0.15s; }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+        max-width: 360px;
+      }
+      label.toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        background: #1b262d;
+        border: 1px solid #35424b;
+        border-radius: 6px;
+      }
+      label.toggle input { width: 18px; height: 18px; accent-color: #ffd43b; }
+      .dot { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+
+      .row-actions { display: flex; gap: 8px; }
+      button {
+        padding: 9px 14px;
+        font-size: 13px;
+        color: #ffe9a8;
+        background: #23303a;
+        border: 1px solid #a88741;
+        border-radius: 6px;
+      }
+      button:active { transform: scale(0.97); }
+      .hint { font-size: 11px; color: #6f7d85; max-width: 360px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Trang bị mẫu — ghép lớp</h1>
+    <p class="sub">Bật/tắt từng món để xem lớp đồ phủ lên nhân vật.</p>
+
+    <div class="stage" id="stage">
+      <img src="/hero.png" alt="Nhân vật" />
+      <img class="layer" id="l-helmet" src="/equipment/helmet-phuong-vu-bao.svg" alt="Mũ" />
+      <img class="layer" id="l-armor" src="/equipment/armor-cam-y-bao.svg" alt="Giáp" />
+      <img class="layer" id="l-weapon" src="/equipment/weapon-hac-ung-kiem.svg" alt="Vũ khí" />
+      <img class="layer" id="l-boots" src="/equipment/boots-van-ly-hai.svg" alt="Giày" />
+      <img class="layer" id="l-accessory" src="/equipment/accessory-ngoc-nhan.svg" alt="Trang sức" />
+    </div>
+
+    <div class="controls" id="controls">
+      <label class="toggle"><input type="checkbox" data-slot="helmet" checked /><span class="dot" style="background:#c9a24a"></span>Mũ — Phượng Vũ Bào</label>
+      <label class="toggle"><input type="checkbox" data-slot="armor" checked /><span class="dot" style="background:#2563eb"></span>Giáp — Cẩm Y Bào</label>
+      <label class="toggle"><input type="checkbox" data-slot="weapon" checked /><span class="dot" style="background:#d7e3e8"></span>Vũ khí — Hắc Ưng Kiếm</label>
+      <label class="toggle"><input type="checkbox" data-slot="boots" checked /><span class="dot" style="background:#577a4a"></span>Giày — Vân Lý Hài</label>
+      <label class="toggle"><input type="checkbox" data-slot="accessory" checked /><span class="dot" style="background:#6ac9b0"></span>Trang sức — Ngọc Nhẫn</label>
+    </div>
+
+    <div class="row-actions">
+      <button id="all-on">Mặc hết</button>
+      <button id="all-off">Tháo hết</button>
+      <button id="toggle-hero">Ẩn/hiện nhân vật</button>
+    </div>
+
+    <p class="hint">
+      Art mẫu là SVG cùng khổ 116×320 với hero.png, nên ghép lớp khớp vị trí cơ thể.
+      Thêm món mới: vẽ SVG cùng khổ, bỏ vào public/equipment/, khai báo trong EQUIPMENT_ALIGNED_ART (src/game/game.js).
+    </p>
+
+    <script>
+      const boxes = [...document.querySelectorAll('input[data-slot]')];
+      const layer = (slot) => document.getElementById('l-' + slot);
+
+      const sync = () => {
+        boxes.forEach((box) => {
+          const el = layer(box.dataset.slot);
+          if (el) el.style.display = box.checked ? 'block' : 'none';
+        });
+      };
+      boxes.forEach((box) => box.addEventListener('change', sync));
+
+      document.getElementById('all-on').onclick = () => {
+        boxes.forEach((b) => (b.checked = true));
+        sync();
+      };
+      document.getElementById('all-off').onclick = () => {
+        boxes.forEach((b) => (b.checked = false));
+        sync();
+      };
+      document.getElementById('toggle-hero').onclick = () => {
+        const heroImg = document.querySelector('.stage img:not(.layer)');
+        heroImg.style.display = heroImg.style.display === 'none' ? 'block' : 'none';
+      };
+
+      sync();
+    </script>
+  </body>
+</html>

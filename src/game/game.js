@@ -20,6 +20,20 @@ import { PVP_ATTACK_RANGE } from "./pvp.js";
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
 
+/**
+ * Example layered-equipment art shipped with the demo. One overlay per slot,
+ * each authored on the same 116x320 canvas as hero.png so it lines up once the
+ * hero is scaled to its display size. Add an entry here (and the SVG in
+ * public/equipment/) to give another item real art.
+ */
+const EQUIPMENT_ALIGNED_ART = [
+  { slot: "helmet", itemId: "phuong-vu-bao", url: "/equipment/helmet-phuong-vu-bao.svg" },
+  { slot: "armor", itemId: "cam-y-bao", url: "/equipment/armor-cam-y-bao.svg" },
+  { slot: "weapon", itemId: "hac-ung-kiem", url: "/equipment/weapon-hac-ung-kiem.svg" },
+  { slot: "boots", itemId: "van-ly-hai", url: "/equipment/boots-van-ly-hai.svg" },
+  { slot: "accessory", itemId: "ngoc-nhan", url: "/equipment/accessory-ngoc-nhan.svg" }
+];
+
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
     super("JiangHuScene");
@@ -36,7 +50,21 @@ export class JiangHuScene extends Phaser.Scene {
       frameWidth: 284,
       frameHeight: 320
     });
+    // 8-direction VLTK2-style sheet: 8 direction columns x 6 rows (idle + 5 walk
+    // steps), 64x96 per frame. Drives the hero + peer walking animation.
+    this.load.spritesheet("hero-8dir", "/hero_8dir.png", {
+      frameWidth: 64,
+      frameHeight: 96
+    });
     this.load.image("hero-portrait", "/hero_portrait.png");
+
+    // Layered equipment art. Each texture is a full 116x320 transparent overlay
+    // aligned with hero.png, keyed `equip-<slot>-<itemId>` so applyEquipment()
+    // picks it up automatically. Items without art fall back to a placeholder.
+    EQUIPMENT_ALIGNED_ART.forEach(({ slot, itemId, url }) => {
+      if (this.textures.exists(`equip-${slot}-${itemId}`)) return;
+      this.load.svg(`equip-${slot}-${itemId}`, url, { width: 116, height: 320 });
+    });
   }
 
   create() {
@@ -834,7 +862,7 @@ export class JiangHuScene extends Phaser.Scene {
       y: Math.round(this.player.y),
       vx: 0,
       vy: 0,
-      direction: this.player.visual?.scaleX < 0 ? "left" : "right",
+      direction: this.player.facing,
       stance: this.player.currentStance || "front",
       level: this.player.stats?.level || 1,
       hp: this.player.stats?.hp || 100,
@@ -936,7 +964,7 @@ export class JiangHuScene extends Phaser.Scene {
             y: py,
             vx,
             vy,
-            direction: this.player.visual?.scaleX < 0 ? "left" : "right",
+            direction: this.player.facing,
             stance: this.player.currentStance || "front"
           });
         }
