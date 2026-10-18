@@ -11,7 +11,7 @@ and tags each with a rough fit for the current codebase.
 Fit legend: `[core]` fits the existing demo directly · `[stretch]` needs new systems · `[skip]` out of scope for a web demo.
 
 ## Factions & Classes (Môn phái)
-- `[stretch]` Playable sect selection at start: Thiếu Lâm, Võ Đang, Nga My, Cái Bang, Đường Môn, Côn Lôn, Thiên Vương, Ngũ Độc, Thúy Yên, Côn Lôn.
+- `[stretch]` Playable sect selection at start, limited to four sects: Thiếu Lâm (quyền), Võ Đang (kiếm), Nga My (kiếm), Ngũ Độc (chảo).
 - `[core]` Sect affects starting stats and one signature skill.
 - `[stretch]` Sect-locked skills and equipment.
 
