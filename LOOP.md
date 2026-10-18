@@ -49,6 +49,45 @@ triage ──► feature-propose ──► spec-review ──(/FAIL stop)──�
 - Max 3 fix attempts per item.
 - If token spend hits 80% of daily cap, switch to report-only.
 
+## Automatic Cadence (cron)
+
+Run the guarded runner `scripts/loop-cron.sh` from cron. It enforces the
+cadence and every safety precondition before a cycle starts.
+
+Recommended cadence:
+
+- **Feature pipeline (L2):** hourly inside the day window (`08:00–22:00`, up to
+  14 cycles/day). Each cycle is small (one item, one PR merged into `develop`).
+- **Night (`22:00–08:00`):** `loop-triage` in report-only (L1) only — no code.
+- **Warm-up:** start at 2h intervals for 2–3 days, watch for conflicts,
+  duplicate/low-value items, and rising test time, then move to hourly.
+- Never faster than 1 run/hour; offset the minute so runs never overlap.
+
+Guardrails the script applies (all must hold or it skips):
+
+- single-instance lock (`flock`) — no concurrent cycles;
+- on `develop` with a **clean** working tree;
+- no leftover `loop/*` branch or loop worktree (interrupted run);
+- `develop` fast-forwards cleanly from `origin/develop`;
+- hard per-run `timeout` (default 30m) so a stuck cycle cannot hang cron.
+
+Hard requirements this depends on (do not automate without them):
+
+- CI (`build-and-test`) required + branch protection on `develop`;
+- an actually-independent verifier — the same model must not write and sign off;
+- token budget cap → report-only at 80% (see Budget above);
+- review `develop` at least once per day; treat `develop` as integration and
+  `main` as the human-approved branch.
+
+Example crontab (hourly at :05, log to `/tmp/jx2-loop-cron.log`):
+
+```cron
+5 8-21 * * * /home/theanh/projects/jx2-web/scripts/loop-cron.sh
+```
+
+Override defaults with env vars: `JX2_START_HOUR`, `JX2_END_HOUR`,
+`JX2_TIMEOUT`, `JX2_MODEL`, `JX2_AGENT`, `JX2_LOG`, `JX2_AUTO_FLAG`.
+
 ## Links
 
 - Policy: [gate.yaml](./gate.yaml) · [docs/safety.md](./docs/safety.md)
