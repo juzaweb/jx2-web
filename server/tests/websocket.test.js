@@ -208,7 +208,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.close();
   });
 
-  await t.test("Player health is relayed so peers can render each other's bars", async () => {
+  await t.test("Player HP is server-authoritative (stats set the ceiling, heals clamp)", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
@@ -223,37 +223,59 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(joinBroadcast.payload.player.hp, 80);
     assert.equal(joinBroadcast.payload.player.maxHp, 120);
 
-    // A health report reaches peers (not the sender) and is relayed verbatim
-    client2.send({ type: "player_stats", payload: { hp: 40, maxHp: 120 } });
-    const stats = await client1.waitFor((m) => m.type === "player_stats" && m.payload.id === "usr_hp2");
-    assert.equal(stats.payload.hp, 40);
+    // A client cannot set its own HP through a stats report: hp is ignored
+    client2.send({ type: "player_stats", payload: { hp: 9999, maxHp: 120 } });
+    const stats = await client1.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_hp2");
+    assert.equal(stats.payload.hp, 80, "The reported hp is ignored; the server keeps its own");
     assert.equal(stats.payload.maxHp, 120);
 
+    // A raised ceiling (level-up) heals to full on the server
+    client2.send({ type: "player_stats", payload: { maxHp: 150 } });
+    const grown = await client1.waitFor((m) => m.type === "player_hp" && m.payload.maxHp === 150);
+    assert.equal(grown.payload.hp, 150);
+
+    // A heal is clamped to the ceiling, never past it
+    client2.send({ type: "player_heal", payload: { amount: 9999 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(
-      client2.messages.filter((m) => m.type === "player_stats").length,
+      client2.messages.filter((m) => m.type === "player_hp" && m.payload.hp > 150).length,
       0,
-      "The reporter does not receive its own health back"
+      "A heal can never overflow the ceiling"
     );
 
-    // Out-of-range health is clamped into a usable range
-    client2.send({ type: "player_stats", payload: { hp: 99999, maxHp: -5 } });
-    const clamped = await client1.waitFor((m) => m.type === "player_stats" && m.payload.hp === 9999);
-    assert.equal(clamped.payload.maxHp, 1);
-
-    // Sockets that never joined cannot report health
+    // Sockets that never joined cannot report stats or heal
     const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    spectator.send({ type: "player_stats", payload: { hp: 1, maxHp: 1 } });
+    spectator.send({ type: "player_stats", payload: { maxHp: 1 } });
+    spectator.send({ type: "player_heal", payload: { amount: 50 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(
-      client1.messages.filter((m) => m.type === "player_stats" && m.payload.hp === 1).length,
+      client1.messages.filter((m) => m.type === "player_hp" && m.payload.maxHp === 1).length,
       0,
-      "An un-joined socket's health report is ignored"
+      "An un-joined socket's report is ignored"
     );
 
     await spectator.close();
     await client2.close();
     await client1.close();
+  });
+
+  await t.test("Wolves bite on the server and stream authoritative HP", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    // Stand on wolf 0's home; it settles within bite range immediately
+    client.send({
+      type: "player_join",
+      payload: { id: "usr_bite", username: "Bite", x: 840, y: 600, hp: 100, maxHp: 100, defense: 6 }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    const bite = await client.waitFor((m) => m.type === "player_hp" && m.payload.damage > 0, 3000);
+    assert.equal(bite.payload.id, "usr_bite");
+    assert.equal(bite.payload.sourceName, "Sói Xám");
+    assert.ok(bite.payload.damage >= 1);
+    assert.equal(bite.payload.hp, 100 - bite.payload.damage, "HP reflects the server-rolled bite");
+
+    await client.close();
   });
 
   await t.test("Heartbeat ping-pong responds", async () => {
@@ -411,6 +433,110 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     await client1.close();
     await client2.close();
+  });
+
+  await t.test("PvP: the server applies damage, gates on PK flag and range, and respawns the loser", async () => {
+    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    // Client 1 joins with the PK flag on
+    client1.send({
+      type: "player_join",
+      payload: { id: "usr_pk1", username: "Pk1", displayName: "Kiếm Khách", x: 500, y: 500, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await client1.waitFor((m) => m.type === "init_world");
+
+    // Client 2 joins flagged too, close to client 1
+    client2.send({
+      type: "player_join",
+      payload: { id: "usr_pk2", username: "Pk2", displayName: "Đao Khách", x: 540, y: 520, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    const init2 = await client2.waitFor((m) => m.type === "init_world");
+    assert.equal(init2.payload.players[0].pkFlag, true, "The PK flag travels in the world snapshot");
+
+    const joined2 = await client1.waitFor((m) => m.type === "player_joined");
+    assert.equal(joined2.payload.player.pkFlag, true);
+
+    // A flagged hit inside range is applied by the server and streamed as HP
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 20 } });
+    const hit = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0);
+    assert.equal(hit.payload.hp, 80);
+    assert.equal(hit.payload.damage, 20);
+    assert.equal(hit.payload.sourceName, "Kiếm Khách");
+
+    // The immunity window blocks an immediate follow-up hit
+    const hitsSoFar = client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0).length;
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 20 } });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(
+      client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0).length,
+      hitsSoFar,
+      "A hit during the immunity window is ignored"
+    );
+
+    // A peaceful target cannot be hit
+    const peaceful = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    peaceful.send({
+      type: "player_join",
+      payload: { id: "usr_peace", username: "Peace", x: 500, y: 520, hp: 100, maxHp: 100, pkFlag: false }
+    });
+    await peaceful.waitFor((m) => m.type === "init_world");
+    await client1.waitFor((m) => m.type === "player_joined" && m.payload.player.id === "usr_peace");
+
+    client1.send({ type: "player_hit", payload: { targetId: "usr_peace", damage: 30 } });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(
+      peaceful.messages.filter((m) => m.type === "player_hp" && m.payload.damage > 0).length,
+      0,
+      "A player without the PK flag is immune"
+    );
+
+    // Self-hits, unknown targets and negative damage never land
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk1", damage: 10 } });
+    client1.send({ type: "player_hit", payload: { targetId: "nobody", damage: 10 } });
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: -5 } });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(
+      client2.messages.filter((m) => m.type === "player_hp" && m.payload.damage === 10).length,
+      0,
+      "Self, unknown and negative hits never land"
+    );
+
+    // Damage is clamped and a lethal blow respawns the victim at Biện Kinh
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 9999 } });
+    const lethal = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 0);
+    assert.equal(lethal.payload.damage, 200, "Damage is clamped to the shared ceiling");
+
+    const defeat = await client2.waitFor((m) => m.type === "player_defeated");
+    assert.equal(defeat.payload.victimId, "usr_pk2");
+    assert.equal(defeat.payload.attackerId, "usr_pk1");
+    assert.equal(defeat.payload.attackerName, "Kiếm Khách");
+    assert.deepEqual(defeat.payload.respawn, { x: 640, y: 620 });
+
+    const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
+    assert.equal(restored.payload.maxHp, 100);
+
+    // The victim is now at the respawn point, out of the attacker's range
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    const afterRespawn = client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2").length;
+    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 10 } });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(
+      client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2").length,
+      afterRespawn,
+      "A hit beyond the melee range is dropped"
+    );
+
+    // PK flag toggles are relayed
+    client1.send({ type: "player_pk", payload: { pkFlag: false } });
+    const pk = await client2.waitFor((m) => m.type === "player_pk");
+    assert.equal(pk.payload.id, "usr_pk1");
+    assert.equal(pk.payload.pkFlag, false);
+
+    await peaceful.close();
+    await client2.close();
+    await client1.close();
   });
 
   await t.test("Teardown test server", async () => {

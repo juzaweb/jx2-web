@@ -14,6 +14,7 @@ import { shouldReportPosition } from "./positionSync.js";
 import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
+import { PVP_ATTACK_RANGE } from "./pvp.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
@@ -160,12 +161,22 @@ export class JiangHuScene extends Phaser.Scene {
       this.remotePlayerManager.handlePlayerMoved(payload);
     });
 
-    this.networkClient.on("player_stats", (payload) => {
-      this.remotePlayerManager.handlePlayerStats(payload);
-    });
-
     this.networkClient.on("player_attacked", (payload) => {
       this.remotePlayerManager.handlePlayerAttacked(payload);
+    });
+
+    this.networkClient.on("player_pk", (payload) => {
+      this.remotePlayerManager.handlePlayerPk(payload);
+    });
+
+    // Server-authoritative health. The server owns every player's HP and streams
+    // the result here, so the client only renders it (never decides it).
+    this.networkClient.on("player_hp", (payload) => {
+      this.handlePlayerHp(payload);
+    });
+
+    this.networkClient.on("player_defeated", (payload) => {
+      this.handlePlayerDefeated(payload);
     });
 
     this.networkClient.on("player_left", (payload) => {
@@ -246,6 +257,32 @@ export class JiangHuScene extends Phaser.Scene {
         } else {
           this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
           this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
+        }
+        return;
+      }
+
+      // Check if clicking directly on another player (PvP)
+      const clickedPlayer = this.remotePlayerManager
+        .getAll()
+        .find(
+          (rp) =>
+            rp.container?.active &&
+            Phaser.Math.Distance.Between(worldX, worldY, rp.x, rp.y) < 42
+        );
+
+      if (clickedPlayer) {
+        const dist = Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          clickedPlayer.x,
+          clickedPlayer.y
+        );
+        if (dist <= PVP_ATTACK_RANGE) {
+          this.player.stopMovement();
+          this.combat.performPvpAttack(clickedPlayer);
+        } else {
+          this.player.moveTo(clickedPlayer.x, clickedPlayer.y);
+          this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xff5252);
         }
         return;
       }
@@ -333,6 +370,10 @@ export class JiangHuScene extends Phaser.Scene {
       if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
     });
 
+    this.input.keyboard.on("keydown-P", () => {
+      if (!isTyping() && this.started) this.togglePk();
+    });
+
     // Listen to React UI Actions via Game Bridge
     this.unsubscribers.push(
       bridge.on(EVENTS.ACTION_START, () => this.startGame()),
@@ -356,6 +397,7 @@ export class JiangHuScene extends Phaser.Scene {
         this.saveGame(false);
       }),
       bridge.on(EVENTS.ACTION_SET_PAUSED, (paused) => this.setPaused(paused)),
+      bridge.on(EVENTS.ACTION_TOGGLE_PK, () => this.togglePk()),
       bridge.on(EVENTS.SET_PLAYER_NAME, (name) => {
         if (this.player) {
           this.player.setName(name);
@@ -448,6 +490,8 @@ export class JiangHuScene extends Phaser.Scene {
         return false;
       }
       const healed = this.player.heal(35);
+      // The server owns HP, so mirror the heal into the authoritative pool too.
+      this.networkClient?.sendHeal?.({ amount: 35 });
       this.combat.showFloatText(this.player.x, this.player.y - 68, `+${healed} HP`, "#69db7c");
       playTone(520, 0.12, "triangle", 0.03);
       this.uiBridge.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
@@ -480,6 +524,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
       const healed = this.player.heal(50);
       const restored = this.player.restoreMp(30);
+      this.networkClient?.sendHeal?.({ amount: 50 });
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Ấm lòng! +HP +MP`, "#ffd43b");
       playTone(440, 0.15, "triangle", 0.035);
       this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
@@ -584,6 +629,104 @@ export class JiangHuScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Toggle the local player's PK flag: update the visual, tell the HUD and inform
+   * the server so peers can gate their attacks against us.
+   * @returns {boolean} the new flag state
+   */
+  togglePk() {
+    if (!this.player) return false;
+
+    const next = !this.player.pkFlag;
+    this.player.setPkFlag(next);
+    bridge.emit(EVENTS.PK_CHANGED, next);
+    this.networkClient?.sendPk?.({ pkFlag: next });
+
+    this.uiBridge.addLog(
+      next
+        ? "Đã bật cờ PK — từ nay có thể tỷ thí cùng cao thủ khác."
+        : "Đã tắt cờ PK — trở về trạng thái hòa bình.",
+      "system"
+    );
+    return next;
+  }
+
+  /**
+   * Apply the server's authoritative HP for a player. For the local player this
+   * drives the HUD (and the hit feedback); for anyone else it drives their bar.
+   * @param {{id?:string, hp?:number, maxHp?:number, damage?:number, sourceName?:string}} payload
+   */
+  handlePlayerHp(payload = {}) {
+    if (!payload.id || !Number.isFinite(payload.hp)) return;
+
+    const isLocal =
+      payload.id === this.combat?.localPlayerId ||
+      payload.id === this.remotePlayerManager?.localPlayerId;
+
+    if (!isLocal) {
+      this.remotePlayerManager.handlePlayerHp(payload);
+      return;
+    }
+
+    const prevHp = this.player.stats.hp;
+    if (Number.isFinite(payload.maxHp) && payload.maxHp > 0) {
+      this.player.stats.maxHp = payload.maxHp;
+    }
+    this.player.stats.hp = payload.hp;
+
+    const damage = Number(payload.damage);
+    if (Number.isFinite(damage) && damage > 0 && payload.hp < prevHp) {
+      this.player.flashHit?.();
+      this.combat.showFloatText(this.player.x, this.player.y - 45, `-${damage}`, "#ff7777");
+      this.uiBridge.addLog(
+        `Bị ${payload.sourceName || "đối thủ"} đánh trúng! -${damage} HP.`,
+        "combat"
+      );
+    }
+
+    this.uiBridge.updateHud(this.player.stats);
+  }
+
+  /**
+   * The server declared a player defeated. The victim is teleported to the respawn
+   * point; the killer gets credit and everyone else sees the outcome.
+   * @param {{victimId?:string, victimName?:string, attackerId?:string, attackerName?:string, respawn?:{x:number,y:number}}} payload
+   */
+  handlePlayerDefeated(payload = {}) {
+    if (!payload.victimId) return;
+
+    const isLocal =
+      payload.victimId === this.combat?.localPlayerId ||
+      payload.victimId === this.remotePlayerManager?.localPlayerId;
+
+    if (isLocal) {
+      this.player.stats.hp = this.player.stats.maxHp;
+      this.player.invulnerable = false;
+      this.player.visual.setAlpha(1);
+      if (payload.respawn) {
+        this.player.setPosition(payload.respawn.x, payload.respawn.y);
+      } else {
+        this.player.respawn();
+      }
+      this.uiBridge.updateHud(this.player.stats);
+      this.uiBridge.addLog("Bạn đã bị đánh bại và hồi sinh tại Biện Kinh.", "combat");
+      // Persist the full-HP respawn state.
+      this.saveGame(false);
+    }
+
+    if (payload.attackerId && payload.attackerId === this.combat?.localPlayerId) {
+      this.uiBridge.addLog(
+        `Bạn đã đánh bại ${payload.victimName || "đối thủ"}!`,
+        "combat"
+      );
+    } else if (!isLocal) {
+      this.uiBridge.addLog(
+        `${payload.victimName || "Một hiệp khách"} đã bị ${payload.attackerName || "đối thủ"} đánh bại.`,
+        "near"
+      );
+    }
+  }
+
   sendNetworkJoin() {
     if (!this.player || !this.networkClient?.isConnected) return;
 
@@ -623,7 +766,9 @@ export class JiangHuScene extends Phaser.Scene {
       stance: this.player.currentStance || "front",
       level: this.player.stats?.level || 1,
       hp: this.player.stats?.hp || 100,
-      maxHp: this.player.stats?.maxHp || 100
+      maxHp: this.player.stats?.maxHp || 100,
+      defense: this.player.stats?.defense ?? 6,
+      pkFlag: this.player.pkFlag === true
     });
   }
 
@@ -720,22 +865,21 @@ export class JiangHuScene extends Phaser.Scene {
           });
         }
 
-        // Report health changes so peers can render each other's overhead bars
-        const { hp, maxHp } = this.player.stats;
-        if (hp !== this.lastReportedHp || maxHp !== this.lastReportedMaxHp) {
-          this.lastReportedHp = hp;
+        // Report the parts of the player block the client owns (HP ceiling from
+        // level-ups, defense for wolf bites). The server owns the current HP.
+        const { maxHp, defense, level } = this.player.stats;
+        if (maxHp !== this.lastReportedMaxHp || defense !== this.lastReportedDefense) {
           this.lastReportedMaxHp = maxHp;
-          this.networkClient.sendStats({ hp, maxHp });
+          this.lastReportedDefense = defense;
+          this.networkClient.sendStats({ maxHp, defense, level });
         }
       }
     }
 
-    // Update enemies and check attacks against player
-    this.enemyManager.update(time, delta, this.player, (wolf) => {
-      if (this.started && !this.isPaused) {
-        this.combat.damagePlayer(7);
-      }
-    });
+    // Render enemies. Player health is server-authoritative now, so the client no
+    // longer applies bite damage locally — the server tick bites and streams the
+    // resulting `player_hp` back (see server gameSocket.tickBites).
+    this.enemyManager.update(time, delta, this.player);
 
     // Update collectible loot drops
     this.combat.updateDrops(time);

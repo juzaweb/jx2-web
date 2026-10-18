@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { stepEnemy } from "./enemyAi.js";
+import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "./enemyAi.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 
@@ -17,16 +17,11 @@ export class Wolf {
     this.homeY = y;
     this.hp = 45;
     this.maxHp = 45;
-    this.attack = 12;
-    this.defense = 3;
-    this.critRate = 0.05;
-    this.critDamage = 1.5;
-    this.stats = {
-      attack: 12,
-      defense: 3,
-      critRate: 0.05,
-      critDamage: 1.5
-    };
+    this.attack = WOLF_COMBAT.attack;
+    this.defense = WOLF_COMBAT.defense;
+    this.critRate = WOLF_COMBAT.critRate;
+    this.critDamage = WOLF_COMBAT.critDamage;
+    this.stats = { ...WOLF_COMBAT };
     this.isDead = false;
     this.nextBite = 0;
     // Where the server last reported this wolf (see applyServerState). Left null
@@ -108,8 +103,8 @@ export class Wolf {
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
 
-    if (distance < 55 && time > this.nextBite) {
-      this.nextBite = time + 1400;
+    if (distance < BITE_TUNING.range && time > this.nextBite) {
+      this.nextBite = time + BITE_TUNING.cooldownMs;
       if (typeof onBite === "function") {
         onBite(this);
       }

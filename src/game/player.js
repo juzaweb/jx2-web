@@ -33,6 +33,8 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
+    // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
+    this.pkFlag = false;
     this.targetX = null;
     this.targetY = null;
     this.isMovingToTarget = false;
@@ -509,6 +511,31 @@ export class Player {
     this.name = name;
     if (this.nameText) {
       this.nameText.setText(name);
+    }
+  }
+
+  /**
+   * Brief hit reaction driven by a server HP drop: flicker the body and grant a
+   * short local immunity window so the render matches the server's i-frames.
+   */
+  flashHit() {
+    if (!this.visual) return;
+    this.invulnerable = true;
+    this.visual.setAlpha(0.45);
+    this.scene.time.delayedCall(700, () => {
+      this.invulnerable = false;
+      if (this.visual) this.visual.setAlpha(1);
+    });
+  }
+
+  /**
+   * Set the PK opt-in flag and reflect it on the overhead name (red when flagged).
+   * @param {boolean} flagged
+   */
+  setPkFlag(flagged) {
+    this.pkFlag = flagged === true;
+    if (this.nameText) {
+      this.nameText.setColor(this.pkFlag ? "#ff5555" : "#5cfc5c");
     }
   }
 

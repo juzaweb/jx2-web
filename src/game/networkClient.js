@@ -159,11 +159,20 @@ export class NetworkClient {
   }
 
   /**
-   * Report the local player's health so peers can render each other's bars
-   * @param {Object} statsData
+   * Report the parts of the player block the client owns (HP ceiling + defense).
+   * The server owns the current HP itself.
+   * @param {{maxHp:number, defense:number, level?:number}} statsData
    */
   sendStats(statsData) {
     this.send("player_stats", statsData);
+  }
+
+  /**
+   * Request a heal (potion, level-up). The server clamps it to the HP ceiling.
+   * @param {{amount:number}} healData
+   */
+  sendHeal(healData) {
+    this.send("player_heal", healData);
   }
 
   /**
@@ -172,6 +181,22 @@ export class NetworkClient {
    */
   sendAttack(attackData) {
     this.send("player_attack", attackData);
+  }
+
+  /**
+   * Toggle the local player's PK flag on the server
+   * @param {{pkFlag:boolean}} pkData
+   */
+  sendPk(pkData) {
+    this.send("player_pk", pkData);
+  }
+
+  /**
+   * Report a PvP hit on another player
+   * @param {{targetId:string, damage:number}} hitData
+   */
+  sendPlayerHit(hitData) {
+    this.send("player_hit", hitData);
   }
 
   /**

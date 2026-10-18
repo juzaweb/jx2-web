@@ -90,6 +90,7 @@ export function App() {
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [pkEnabled, setPkEnabled] = useState(false);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -182,6 +183,10 @@ export function App() {
       setAudioEnabled(enabled);
     });
 
+    const unsubPk = bridge.on(EVENTS.PK_CHANGED, (enabled) => {
+      setPkEnabled(enabled);
+    });
+
     const unsubInventory = bridge.on(EVENTS.INVENTORY_UPDATED, (next) => {
       if (next) setInventory(next);
     });
@@ -204,6 +209,7 @@ export function App() {
       unsubQuest();
       unsubLog();
       unsubAudio();
+      unsubPk();
       unsubInventory();
       unsubStarted();
     };
@@ -316,6 +322,10 @@ export function App() {
     bridge.emit(EVENTS.ACTION_TOGGLE_AUDIO);
   }, []);
 
+  const handleTogglePk = useCallback(() => {
+    bridge.emit(EVENTS.ACTION_TOGGLE_PK);
+  }, []);
+
   const handleOpenHelp = useCallback(() => {
     setIsInventoryOpen(false);
     setIsCharacterOpen(false);
@@ -414,6 +424,8 @@ export function App() {
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
           onLogout={handleLogout}
+          onTogglePk={handleTogglePk}
+          pkEnabled={pkEnabled}
         />
 
         <MobileControls

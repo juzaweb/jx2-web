@@ -1,6 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { rollEnemyReward } from "../rewards.js";
-import { stepEnemy } from "../../../src/game/enemyAi.js";
+import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.js";
+import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
+import { computeDamage } from "../../../src/game/damage.js";
 
 /**
  * Clean sanitization for player strings
@@ -35,6 +37,12 @@ export const ENEMY_MAX_HP = 45;
 export const ENEMY_RESPAWN_MS = 10000;
 /** Server AI tick (10 Hz): fast enough to look continuous, cheap enough to share. */
 export const ENEMY_TICK_MS = 100;
+
+/** Invulnerability window (ms) granted after any hit the server applies. */
+export const PLAYER_IFRAME_MS = 700;
+
+/** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
+export const PLAYER_SPAWN = { x: 640, y: 620 };
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
@@ -188,12 +196,24 @@ export class GameSocketManager {
         this.handlePlayerStats(ws, msg.payload);
         break;
 
+      case "player_heal":
+        this.handlePlayerHeal(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
 
       case "player_chat":
         this.handlePlayerChat(ws, msg.payload);
+        break;
+
+      case "player_pk":
+        this.handlePlayerPk(ws, msg.payload);
+        break;
+
+      case "player_hit":
+        this.handlePlayerHit(ws, msg.payload);
         break;
 
       case "enemy_hit":
@@ -243,9 +263,19 @@ export class GameSocketManager {
       direction: payload.direction === "left" ? "left" : "right",
       stance: payload.stance === "side" ? "side" : "front",
       level: clampNum(payload.level, 1, 150, 1),
-      hp: clampNum(payload.hp, 0, 9999, 100),
-      maxHp: clampNum(payload.maxHp, 1, 9999, 100)
+      // Server-authoritative health. The join snapshot seeds it; every later
+      // change is driven by the server (bite, PvP hit, heal), never by a raw
+      // client HP report.
+      maxHp: clampNum(payload.maxHp, 1, 9999, 100),
+      hp: 0,
+      // Reported purely so the server can roll wolf bites against it.
+      defense: clampNum(payload.defense, 0, 9999, 6),
+      pkFlag: payload.pkFlag === true,
+      invulnerableUntil: 0,
+      nextBiteAt: 0
     };
+
+    playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
 
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
@@ -254,7 +284,7 @@ export class GameSocketManager {
     const existingPlayers = [];
     this.players.forEach((p, clientWs) => {
       if (clientWs !== ws) {
-        existingPlayers.push(p);
+        existingPlayers.push(this.playerSnapshot(p));
       }
     });
 
@@ -270,8 +300,32 @@ export class GameSocketManager {
     // 2. Announce the new player to everyone else in the world
     this.broadcast(ws, {
       type: "player_joined",
-      payload: { player: playerData }
+      payload: { player: this.playerSnapshot(playerData) }
     });
+  }
+
+  /**
+   * Public shape of one player, safe to send over the wire. Keeps the internal
+   * timers (immunity/bite) and combat tuning (defense) off the wire.
+   * @param {Object} player
+   * @returns {Object}
+   */
+  playerSnapshot(player) {
+    return {
+      id: player.id,
+      username: player.username,
+      displayName: player.displayName,
+      x: player.x,
+      y: player.y,
+      vx: player.vx,
+      vy: player.vy,
+      direction: player.direction,
+      stance: player.stance,
+      level: player.level,
+      hp: player.hp,
+      maxHp: player.maxHp,
+      pkFlag: player.pkFlag === true
+    };
   }
 
   /**
@@ -310,8 +364,10 @@ export class GameSocketManager {
   }
 
   /**
-   * Relay a player's health so peers can render each other's overhead bars.
-   * Values are clamped server-side; a report from an un-joined socket is ignored.
+   * Update the parts of a player's block the server trusts the client to own: the
+   * HP ceiling (grows on level-up) and defense (used for wolf bites). The current
+   * HP itself is never taken from the client — only the server changes it.
+   * A level-up (a higher maxHp) heals the player to full, matching the client.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -319,11 +375,40 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    player.hp = clampNum(payload.hp, 0, 9999, player.hp);
-    player.maxHp = clampNum(payload.maxHp, 1, 9999, player.maxHp);
+    const maxHp = clampNum(payload.maxHp, 1, 9999, player.maxHp);
+    const grew = maxHp > player.maxHp;
+    player.maxHp = maxHp;
+    player.defense = clampNum(payload.defense, 0, 9999, player.defense);
 
-    this.broadcast(ws, {
-      type: "player_stats",
+    if (grew) {
+      player.hp = player.maxHp;
+    } else if (player.hp > player.maxHp) {
+      player.hp = player.maxHp;
+    }
+
+    this.broadcastAll({
+      type: "player_hp",
+      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+    });
+  }
+
+  /**
+   * Apply a heal the client requested (potion, level-up, etc.). The server clamps
+   * it to the ceiling, so a client can never heal past its own maxHp.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerHeal(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const amount = clampNum(payload.amount, 0, 9999, 0);
+    if (amount <= 0) return;
+
+    player.hp = Math.min(player.maxHp, player.hp + amount);
+
+    this.broadcastAll({
+      type: "player_hp",
       payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
     });
   }
@@ -351,6 +436,114 @@ export class GameSocketManager {
         y,
         facingRight
       }
+    });
+  }
+
+  /**
+   * Toggle a player's PK flag. Only flagged players may fight or be fought, so the
+   * flag is broadcast to everyone (peers render it and gate their own attacks).
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerPk(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    player.pkFlag = payload.pkFlag === true;
+
+    this.broadcastAll({
+      type: "player_pk",
+      payload: { id: player.id, pkFlag: player.pkFlag }
+    });
+  }
+
+  /**
+   * Apply an authoritative PvP hit. The client reports the damage number, but the
+   * server clamps it, checks flags/range/immunity, and applies it to the target's
+   * own HP. The resulting HP is broadcast, so no client can decide its own health.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerHit(ws, payload = {}) {
+    const attacker = this.players.get(ws);
+    if (!attacker) return;
+
+    const targetEntry = this.playerById.get(payload.targetId);
+    const target = targetEntry?.data;
+    if (!target) return;
+
+    const damage = clampPvpDamage(payload.damage);
+    if (damage === null) return;
+
+    const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
+    if (!canPvpAttack(attacker, target, distance)) return;
+
+    this.applyPlayerDamage(target, damage, attacker, "pvp");
+  }
+
+  /**
+   * Deal server-authoritative damage to a player, broadcast the new HP and, when
+   * it drops to zero, respawn them. Immunity and death are decided here, not by
+   * any client.
+   * @param {Object} target - server player object
+   * @param {number} damage
+   * @param {?Object} attacker - server player object that caused it
+   * @param {"pvp"|"wolf"} source
+   * @returns {boolean} whether the hit landed
+   */
+  applyPlayerDamage(target, damage, attacker = null, source = "wolf") {
+    const now = Date.now();
+    if (now < target.invulnerableUntil) return false;
+
+    target.hp = Math.max(0, target.hp - damage);
+    target.invulnerableUntil = now + PLAYER_IFRAME_MS;
+
+    this.broadcastAll({
+      type: "player_hp",
+      payload: {
+        id: target.id,
+        hp: target.hp,
+        maxHp: target.maxHp,
+        damage,
+        source,
+        sourceName: source === "wolf" ? "Sói Xám" : attacker ? attacker.displayName || attacker.username : "Đối thủ"
+      }
+    });
+
+    if (target.hp <= 0) {
+      this.respawnPlayer(target, attacker, source);
+    }
+    return true;
+  }
+
+  /**
+   * Respawn a defeated player at the fixed Biện Kinh point with full health and
+   * announce the defeat. Attacker credit (when any) rides on the broadcast.
+   * @param {Object} victim - server player object
+   * @param {?Object} attacker
+   * @param {"pvp"|"wolf"} source
+   */
+  respawnPlayer(victim, attacker = null, source = "wolf") {
+    victim.hp = victim.maxHp;
+    victim.x = PLAYER_SPAWN.x;
+    victim.y = PLAYER_SPAWN.y;
+    victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
+
+    this.broadcastAll({
+      type: "player_defeated",
+      payload: {
+        victimId: victim.id,
+        victimName: victim.displayName || victim.username,
+        attackerId: attacker?.id || null,
+        attackerName: attacker ? attacker.displayName || attacker.username : null,
+        source,
+        respawn: { ...PLAYER_SPAWN }
+      }
+    });
+
+    this.broadcastAll({
+      type: "player_hp",
+      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
     });
   }
 
@@ -495,6 +688,40 @@ export class GameSocketManager {
     if (moved.length) {
       this.broadcastAll({ type: "enemy_moved", payload: { enemies: moved } });
     }
+
+    // Player health is server-owned, so the wolves bite on the server clock too.
+    this.tickBites(players);
+  }
+
+  /**
+   * Apply wolf bites to nearby players on the server tick. One bite per player per
+   * cooldown (whichever wolf is closest), respecting the shared immunity window.
+   * @param {Array<Object>} players
+   */
+  tickBites(players) {
+    const now = Date.now();
+    const wolves = Array.from(this.enemies.values()).filter((enemy) => !enemy.isDead);
+    if (!wolves.length) return;
+
+    players.forEach((player) => {
+      if (now < player.nextBiteAt || now < player.invulnerableUntil) return;
+
+      let nearest = null;
+      let nearestDistance = Infinity;
+      wolves.forEach((wolf) => {
+        const distance = Math.hypot(wolf.x - player.x, wolf.y - player.y);
+        if (distance < BITE_TUNING.range && distance < nearestDistance) {
+          nearest = wolf;
+          nearestDistance = distance;
+        }
+      });
+      if (!nearest) return;
+
+      player.nextBiteAt = now + BITE_TUNING.cooldownMs;
+
+      const result = computeDamage(WOLF_COMBAT, { defense: player.defense }, Math.random);
+      this.applyPlayerDamage(player, result.damage, null, "wolf");
+    });
   }
 
   /**

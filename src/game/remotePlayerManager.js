@@ -83,14 +83,26 @@ export class RemotePlayerManager {
   }
 
   /**
-   * Player health updated (relayed by the server)
+   * Authoritative HP pushed by the server; drives the peer's overhead bar.
    * @param {Object} payload
    */
-  handlePlayerStats(payload = {}) {
+  handlePlayerHp(payload = {}) {
     if (!payload.id) return;
     const player = this.players.get(payload.id);
     if (player) {
       player.applyStats(payload);
+    }
+  }
+
+  /**
+   * A player toggled their PK flag
+   * @param {Object} payload
+   */
+  handlePlayerPk(payload = {}) {
+    if (!payload.id) return;
+    const player = this.players.get(payload.id);
+    if (player) {
+      player.applyPkFlag(payload.pkFlag === true);
     }
   }
 

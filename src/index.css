@@ -686,6 +686,13 @@ body {
 .sys-btn.pk-mode .sys-lbl {
   color: #81c784;
 }
+.sys-btn.pk-mode.pk-active {
+  border-color: #d32f2f;
+  background: linear-gradient(180deg, #4a1c1c 0%, #200c0c 100%);
+}
+.sys-btn.pk-mode.pk-active .sys-lbl {
+  color: #ff8a80;
+}
 
 /* ====================================================
    Mobile Touch On-Screen Controls

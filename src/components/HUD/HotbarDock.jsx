@@ -13,6 +13,8 @@ export function HotbarDock({
   onOpenHelp,
   onToggleAudio,
   onLogout,
+  onTogglePk,
+  pkEnabled = false,
   items = QUICK_ITEMS
 }) {
   return (
@@ -134,9 +136,14 @@ export function HotbarDock({
             <span className="sys-ico">📜</span>
             <span className="sys-lbl">Cẩm Nang</span>
           </button>
-          <button className="sys-btn pk-mode" title="Trạng thái PK Hòa Bình">
+          <button
+            className={`sys-btn pk-mode${pkEnabled ? " pk-active" : ""}`}
+            id="pk-btn"
+            title="Bật/tắt cờ PK (Phím P)"
+            onClick={onTogglePk}
+          >
             <span className="sys-ico">⚔️</span>
-            <span className="sys-lbl">Hòa Bình</span>
+            <span className="sys-lbl">{pkEnabled ? "PK" : "Hòa Bình"}</span>
           </button>
         </div>
       </div>

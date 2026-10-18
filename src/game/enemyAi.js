@@ -18,6 +18,23 @@ export const ENEMY_TUNING = {
 };
 
 /**
+ * The wolf's combat block, owned here so the client renderer (`src/game/enemy.js`)
+ * and the server bite roll (`server/.../gameSocket.js`) can never drift apart.
+ */
+export const WOLF_COMBAT = {
+  attack: 12,
+  defense: 3,
+  critRate: 0.05,
+  critDamage: 1.5
+};
+
+/** How close a wolf must be to bite, and how often it may (both client & server). */
+export const BITE_TUNING = {
+  range: 55,
+  cooldownMs: 1400
+};
+
+/**
  * Nearest living player inside the aggro range.
  * @param {{x:number, y:number}} enemy
  * @param {Array<{id:string, x:number, y:number}>} players

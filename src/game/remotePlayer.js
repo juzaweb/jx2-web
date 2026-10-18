@@ -29,6 +29,7 @@ export class RemotePlayer {
     this.stance = data.stance === "side" ? "side" : "front";
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
+    this.pkFlag = data.pkFlag === true;
 
     this.stepPhase = 0;
     this.createVisuals();
@@ -60,7 +61,7 @@ export class RemotePlayer {
       .text(iso.x, iso.y - 60, this.displayName, {
         fontFamily: "Arial, Tahoma, sans-serif",
         fontSize: "12px",
-        color: "#5cfc5c",
+        color: this.pkFlag ? "#ff5555" : "#5cfc5c",
         stroke: "#081008",
         strokeThickness: 2,
         fontStyle: "bold"
@@ -121,6 +122,17 @@ export class RemotePlayer {
    * other's health. Unusable values are ignored rather than clearing the bar.
    * @param {{hp?:number, maxHp?:number}} stats
    */
+  /**
+   * Update this peer's PK flag and recolour the overhead name accordingly.
+   * @param {boolean} flagged
+   */
+  applyPkFlag(flagged) {
+    this.pkFlag = flagged === true;
+    if (this.nameText) {
+      this.nameText.setColor(this.pkFlag ? "#ff5555" : "#5cfc5c");
+    }
+  }
+
   applyStats(stats = {}) {
     if (Number.isFinite(stats.maxHp) && stats.maxHp > 0) {
       this.maxHp = stats.maxHp;

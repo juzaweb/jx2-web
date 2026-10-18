@@ -2,6 +2,8 @@ import * as Phaser from "phaser";
 import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
 import { toIso, isoDepth } from "./isoProjection.js";
+import { canPvpAttack } from "./pvp.js";
+import { computeDamage } from "./damage.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -38,84 +40,6 @@ export function playTone(frequency = 220, duration = 0.07, type = "sine", volume
     oscillator.start();
     oscillator.stop(audioContext.currentTime + duration);
   } catch (_) {}
-}
-
-/**
- * Pure combat damage calculation applying attack-minus-defense mitigation,
- * critical strike roll, variance, and a minimum floor of 1 damage.
- *
- * @param {Object} attacker - Attacker entity or stats object
- * @param {Object} defender - Defender entity or stats object
- * @param {Function|number} [rng=Math.random] - RNG function returning [0, 1) or static number
- * @param {Object} [options={}] - Optional modifiers and overrides
- * @param {number} [options.attack] - Override attacker attack power
- * @param {number} [options.baseDamage] - Alias override for attack power
- * @param {number} [options.defense] - Override defender defense
- * @param {number} [options.critRate] - Override attacker crit rate
- * @param {number} [options.critDamage] - Override attacker crit multiplier
- * @param {number} [options.skillMult=1] - Skill multiplier applied to mitigated damage
- * @param {number} [options.variance=0.1] - Variance fraction (e.g. 0.1 for ±10%, 0 to disable)
- * @param {number} [options.critRoll] - Explicit roll for crit check (< critRate)
- * @param {number} [options.varianceRoll] - Explicit roll for variance ([0, 1])
- * @returns {{ damage: number, crit: boolean }}
- */
-export function computeDamage(attacker, defender, rng = Math.random, options = {}) {
-  const nextRng = () => {
-    if (typeof rng === "function") return rng();
-    if (typeof rng === "number") return rng;
-    return Math.random();
-  };
-
-  const attackerAttack =
-    options.attack ??
-    options.baseDamage ??
-    attacker?.attack ??
-    attacker?.stats?.attack ??
-    10;
-  const defenderDefense =
-    options.defense ??
-    defender?.defense ??
-    defender?.stats?.defense ??
-    0;
-  const skillMult = typeof options.skillMult === "number" ? options.skillMult : 1;
-
-  const critRate =
-    options.critRate ??
-    attacker?.critRate ??
-    attacker?.stats?.critRate ??
-    0.05;
-  const critDamage =
-    options.critDamage ??
-    attacker?.critDamage ??
-    attacker?.stats?.critDamage ??
-    1.5;
-
-  // 1. Critical strike roll (< critRate)
-  const critRoll = options.critRoll !== undefined ? options.critRoll : nextRng();
-  const isCrit = critRoll < critRate;
-
-  // 2. Base mitigated damage with floor of 1
-  const rawMitigated = Math.max(1, (attackerAttack - defenderDefense) * skillMult);
-
-  // 3. Variance roll (e.g. ±10%)
-  const variance = options.variance !== undefined ? options.variance : 0.1;
-  let varianceFactor = 1;
-  if (variance > 0) {
-    const varRoll = options.varianceRoll !== undefined ? options.varianceRoll : nextRng();
-    varianceFactor = 1 + (varRoll * 2 - 1) * variance;
-  }
-
-  let finalDamage = Math.max(1, rawMitigated * varianceFactor);
-
-  // 4. Critical damage multiplier applied on crit
-  if (isCrit) {
-    finalDamage = Math.max(1, finalDamage * critDamage);
-  }
-
-  return {
-    damage: Math.max(1, Math.round(finalDamage)),
-    crit: Boolean(isCrit)
-  };
 }
 
 /**
@@ -281,6 +205,93 @@ export class CombatSystem {
     this.ui.updateHud(this.player.stats);
   }
 
+  /**
+   * Strike another player. Both fighters must fly the PK flag. The damage is
+   * computed here as an optimistic estimate, but the server re-validates it and
+   * applies it to the target's authoritative HP — this client only reports intent.
+   * @param {import("./remotePlayer.js").RemotePlayer} target
+   */
+  performPvpAttack(target) {
+    if (!this.attackReady) return;
+    if (!this.scene.networkClient?.isConnected) {
+      this.ui.addLog("Cần kết nối máy chủ để tỷ thí cùng cao thủ.");
+      return;
+    }
+
+    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
+    const defender = { id: target?.id, pkFlag: target?.pkFlag === true };
+    const distance = target
+      ? Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y)
+      : Number.NaN;
+
+    if (!canPvpAttack(attacker, defender, distance)) {
+      this.ui.addLog(
+        this.player.pkFlag === true
+          ? `${target?.displayName || "Đối thủ"} chưa bật cờ PK.`
+          : "Hãy bật cờ PK trước khi tấn công người chơi khác."
+      );
+      return;
+    }
+
+    this.attackReady = false;
+    this.scene.time.delayedCall(330, () => {
+      this.attackReady = true;
+    });
+
+    this.player.playAttackMotion?.();
+    playTone(300, 0.07, "sawtooth", 0.022);
+
+    const facingRight = target.x >= this.player.x;
+    const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.player.x, this.player.y);
+
+    this.scene.networkClient?.sendAttack?.({
+      skill: "normal",
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight
+    });
+
+    const slash = this.scene.add
+      .arc(
+        base.x + slashOffsetX,
+        base.y - 7,
+        34,
+        facingRight ? -70 : 110,
+        facingRight ? 70 : 250,
+        false,
+        0xe9d59c,
+        0.9
+      )
+      .setStrokeStyle(5, 0xf2e3bd, 0.95)
+      .setDepth(isoDepth(this.player.x, this.player.y) + 10);
+
+    this.scene.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.4,
+      duration: 190,
+      onComplete: () => slash.destroy()
+    });
+
+    const result = computeDamage(this.player, target, Math.random);
+    this.scene.networkClient?.sendPlayerHit?.({
+      targetId: target.id,
+      damage: result.damage
+    });
+
+    // Optimistic feedback; the authoritative HP arrives back from the server.
+    this.showFloatText(
+      target.x,
+      target.y - 30,
+      result.crit ? `-${result.damage} BẠO KÍCH!` : `-${result.damage}`,
+      result.crit ? "#ffcc00" : "#ffb49a"
+    );
+    this.ui.addLog(
+      `${result.crit ? "Chí mạng! " : ""}Kiếm chiêu chém tới ${target.displayName || "đối thủ"}!`
+    );
+  }
+
   damageEnemy(wolf, damage, isCrit = false) {
     if (wolf.isDead) return;
 
@@ -414,63 +425,6 @@ export class CombatSystem {
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
     }
-  }
-
-  onBite(wolf) {
-    const result = computeDamage(wolf, this.player, Math.random);
-    this.damagePlayer(result.damage, result.crit);
-  }
-
-  damagePlayer(amountOrEnemy = 7, isCrit = false) {
-    if (this.player.invulnerable) return;
-
-    let amount = 7;
-    let crit = Boolean(isCrit);
-
-    if (typeof amountOrEnemy === "number") {
-      amount = amountOrEnemy;
-      if (amount === 7 && !isCrit) {
-        const bitingWolf = this.enemyManager
-          ?.getAlive?.()
-          ?.find((w) => Phaser.Math.Distance.Between(this.player.x, this.player.y, w.x, w.y) < 55);
-        if (bitingWolf) {
-          const res = computeDamage(bitingWolf, this.player, Math.random);
-          amount = res.damage;
-          crit = res.crit;
-        }
-      }
-    } else if (amountOrEnemy && typeof amountOrEnemy === "object") {
-      const res = computeDamage(amountOrEnemy, this.player, Math.random);
-      amount = res.damage;
-      crit = res.crit;
-    }
-
-    this.player.stats.hp = Math.max(0, this.player.stats.hp - amount);
-    this.player.invulnerable = true;
-    this.player.visual.setAlpha(0.45);
-
-    this.scene.time.delayedCall(700, () => {
-      this.player.invulnerable = false;
-      this.player.visual.setAlpha(1);
-    });
-
-    const critPrefix = crit ? "Chí mạng! " : "";
-    this.ui.addLog(`${critPrefix}Bị Sói Xám cắn! -${amount} HP.`);
-    this.showFloatText(
-      this.player.x,
-      this.player.y - 45,
-      `-${amount}${crit ? " CHÍ MẠNG!" : ""}`,
-      crit ? "#ff3333" : "#ff7777"
-    );
-
-    if (this.player.stats.hp <= 0) {
-      this.player.stats.hp = this.player.stats.maxHp;
-      this.player.stats.mp = Math.max(20, this.player.stats.mp);
-      this.player.respawn();
-      this.ui.addLog("Bạn được đưa về điểm hồi sinh tại Biện Kinh.");
-    }
-
-    this.ui.updateHud(this.player.stats);
   }
 
   checkLevelUp() {

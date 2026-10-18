@@ -13,7 +13,8 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { CombatSystem, computeDamage } from "./combat.js";
+import { CombatSystem } from "./combat.js";
+import { computeDamage } from "./damage.js";
 import { DROP_TABLE, getQuantities } from "./items.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
