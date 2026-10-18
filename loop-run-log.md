@@ -17,6 +17,18 @@ Append one entry per run. Prune entries older than 30 days.
 }
 ```
 
-## Recent Runs
-
 <!-- Loop appends below this line -->
+
+```json
+{
+  "run_id": "2026-10-18T04:00:00Z",
+  "pattern": "loop-feature",
+  "item": "A4",
+  "pr": 5,
+  "commit": "e5933ca",
+  "files_touched": 4,
+  "tests_passing": 43,
+  "outcome": "merged",
+  "target": "develop"
+}
+```
