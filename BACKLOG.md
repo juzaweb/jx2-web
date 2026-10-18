@@ -176,7 +176,7 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 
 ## EPIC F — Multiplayer & Server Sync
 
-### F1 — Server-synced enemy state (position + HP) · `in-progress` · P1
+### F1 — Server-synced enemy state (position + HP) · `done` · P1
 - **Why:** Each client runs its own `EnemyManager`, so a wolf killed on one screen keeps full HP on the screen next to it; the shared world (already live for player positions/chat) is missing its monster state.
 - **Acceptance:**
   - A joining client receives the authoritative enemy roster (position, HP, dead flag) in `init_world`.
