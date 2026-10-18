@@ -155,6 +155,93 @@ describe("ApiClient", () => {
     );
   });
 
+  it("listCharacters returns characters, slots and deleted count", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { characters: [{ id: "c1", name: "Tiêu Phong" }], maxSlots: 3, deletedCount: 1 }
+      })
+    });
+
+    const res = await client.listCharacters("u1");
+    expect(res.characters).toHaveLength(1);
+    expect(res.maxSlots).toBe(3);
+    expect(res.deletedCount).toBe(1);
+    expect(global.fetch).toHaveBeenCalledWith("http://mock-api:5000/api/users/u1/characters");
+  });
+
+  it("createCharacter posts the name and returns the created character", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { character: { id: "c1", name: "Độc Cô Cầu Bại", gender: "nu" } }
+      })
+    });
+
+    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "nu", 2);
+    expect(res.character.id).toBe("c1");
+    expect(res.character.gender).toBe("nu");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/u1/characters",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "Độc Cô Cầu Bại", gender: "nu", appearance: 2 })
+      })
+    );
+  });
+
+  it("createCharacter surfaces the backend error message on conflict", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ success: false, error: "Tên nhân vật này đã tồn tại trong tài khoản." })
+    });
+
+    await expect(client.createCharacter("u1", "Trùng Tên")).rejects.toThrow(
+      "Tên nhân vật này đã tồn tại trong tài khoản."
+    );
+  });
+
+  it("deleteCharacter issues a DELETE and returns the updated list", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { characters: [], deletedCount: 1 }
+      })
+    });
+
+    const res = await client.deleteCharacter("u1", "c1");
+    expect(res.characters).toEqual([]);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/u1/characters/c1",
+      expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
+  it("restoreCharacter posts to the restore endpoint and returns the character", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          character: { id: "c1", name: "Tiêu Phong" },
+          characters: [{ id: "c1", name: "Tiêu Phong" }],
+          deletedCount: 0
+        }
+      })
+    });
+
+    const res = await client.restoreCharacter("u1");
+    expect(res.character.name).toBe("Tiêu Phong");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/u1/characters/restore",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
   it("getProfile fetches the authoritative profile for a user id", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -1,0 +1,353 @@
+/* ====================================================
+   JX2 Character Selection & Creation Screen
+   Builds on the shared .jx2-login-overlay backdrop.
+==================================================== */
+
+#jx2-character-overlay {
+  flex-direction: column;
+}
+
+/* Top status bar (account / server), echoing the in-game header */
+.jx2-cs-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: linear-gradient(180deg, rgba(20, 30, 28, 0.95), rgba(8, 14, 13, 0.85));
+  border-bottom: 1px solid rgba(110, 231, 183, 0.25);
+  color: #ffe9a8;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px #000;
+  z-index: 3;
+}
+
+/* Main ornate panel */
+.jx2-cs-box {
+  position: relative;
+  width: min(720px, 94vw);
+  max-height: 90vh;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(12, 22, 20, 0.92), rgba(6, 12, 11, 0.96));
+  border: 2px solid #4d8f81;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), 0 12px 40px rgba(0, 0, 0, 0.8),
+    inset 0 0 30px rgba(39, 82, 73, 0.35);
+  z-index: 4;
+}
+
+.jx2-cs-title {
+  align-self: center;
+  padding: 4px 34px;
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffd84d;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px #000, 0 0 10px rgba(255, 216, 77, 0.5);
+  background: linear-gradient(180deg, #275249, #0d2621);
+  border: 1.5px solid #6ee7b7;
+  border-radius: 4px;
+}
+
+.jx2-cs-body {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Left stage: selected character preview */
+.jx2-cs-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: radial-gradient(circle at 50% 65%, rgba(110, 231, 183, 0.12), transparent 60%),
+    rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(110, 231, 183, 0.2);
+  border-radius: 4px;
+}
+
+.jx2-cs-portrait {
+  width: 132px;
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 216, 77, 0.22), rgba(0, 0, 0, 0.7) 70%);
+  border: 2px solid #6ee7b7;
+  box-shadow: 0 0 26px rgba(110, 231, 183, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.jx2-cs-portrait.nu {
+  border-color: #f0a6c8;
+  background: radial-gradient(circle at 50% 40%, rgba(240, 166, 200, 0.28), rgba(0, 0, 0, 0.7) 70%);
+  box-shadow: 0 0 26px rgba(240, 166, 200, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.jx2-cs-portrait.nam {
+  border-color: #7fb8ff;
+  background: radial-gradient(circle at 50% 40%, rgba(127, 184, 255, 0.28), rgba(0, 0, 0, 0.7) 70%);
+  box-shadow: 0 0 26px rgba(127, 184, 255, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
+}
+
+.jx2-cs-portrait-glyph {
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 66px;
+  font-weight: 900;
+  color: #ffd84d;
+  text-shadow: 0 3px 6px #000, 0 0 14px rgba(255, 216, 77, 0.7);
+}
+
+.jx2-cs-portrait-glyph.empty {
+  color: #5b6b67;
+}
+
+.jx2-cs-stage-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffe9a8;
+  text-shadow: 0 2px 4px #000;
+  text-align: center;
+}
+
+.jx2-cs-stage-meta {
+  font-size: 12px;
+  color: #9fb8b2;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* Right panel: character slots + actions */
+.jx2-cs-panel {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jx2-cs-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6ee7b7;
+  letter-spacing: 1px;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+}
+
+.jx2-cs-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jx2-cs-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(30, 44, 41, 0.9), rgba(12, 20, 18, 0.9));
+  border: 1.5px solid #3b5a54;
+  border-radius: 3px;
+  color: #e6f2ef;
+  transition: all 0.15s ease;
+}
+
+.jx2-cs-slot:hover:not(:disabled) {
+  border-color: #6ee7b7;
+  box-shadow: 0 0 8px rgba(110, 231, 183, 0.4);
+}
+
+.jx2-cs-slot.selected {
+  border-color: #ffd84d;
+  background: linear-gradient(180deg, rgba(60, 52, 20, 0.9), rgba(26, 22, 8, 0.9));
+  box-shadow: 0 0 10px rgba(255, 216, 77, 0.5);
+}
+
+.jx2-cs-slot.empty {
+  cursor: default;
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.jx2-cs-slot-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffd84d;
+  text-shadow: 0 1px 3px #000;
+}
+
+.jx2-cs-slot-info {
+  font-size: 12px;
+  color: #c8dbd6;
+}
+
+.jx2-cs-slot-date {
+  font-size: 11px;
+  color: #8aa39d;
+}
+
+.jx2-cs-slot-empty {
+  font-size: 12px;
+  color: #7c8c88;
+  font-style: italic;
+}
+
+.jx2-cs-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.jx2-cs-actions .jx2-btn-action {
+  flex: none;
+  max-width: none;
+  width: 100%;
+  height: 34px;
+  font-size: 13px;
+}
+
+/* Start button (bottom center) */
+.jx2-cs-start {
+  align-self: center;
+  min-width: 220px;
+  height: 42px;
+  background: linear-gradient(180deg, #7a2f00 0%, #4a1c00 50%, #2c1000 100%);
+  border: 1.5px solid #ffd84d;
+  border-radius: 4px;
+  color: #ffe9a8;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-shadow: 0 2px 4px #000, 0 0 8px rgba(255, 216, 77, 0.6);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.15s ease;
+}
+
+.jx2-cs-start:hover:not(:disabled) {
+  background: linear-gradient(180deg, #a03e00 0%, #622600 50%, #3a1500 100%);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 216, 77, 0.7);
+  transform: translateY(-1px);
+}
+
+.jx2-cs-start:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+/* Create-character form (rendered inside the right panel) */
+.jx2-cs-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jx2-cs-portraits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.jx2-cs-portrait-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 74px;
+  cursor: pointer;
+  border: 2px solid #3b5a54;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(30, 44, 41, 0.9), rgba(12, 20, 18, 0.9));
+  transition: all 0.15s ease;
+}
+
+.jx2-cs-portrait-tile:hover {
+  border-color: #6ee7b7;
+}
+
+.jx2-cs-portrait-tile.nam {
+  border-color: #3b5a7a;
+}
+
+.jx2-cs-portrait-tile.nam.selected {
+  border-color: #7fb8ff;
+  background: linear-gradient(180deg, rgba(30, 52, 80, 0.95), rgba(10, 22, 36, 0.95));
+  box-shadow: 0 0 12px rgba(127, 184, 255, 0.6);
+}
+
+.jx2-cs-portrait-tile.nu {
+  border-color: #7a3b5a;
+}
+
+.jx2-cs-portrait-tile.nu.selected {
+  border-color: #f0a6c8;
+  background: linear-gradient(180deg, rgba(80, 30, 52, 0.95), rgba(36, 10, 22, 0.95));
+  box-shadow: 0 0 12px rgba(240, 166, 200, 0.6);
+}
+
+.jx2-cs-portrait-tile-glyph {
+  font-size: 30px;
+  font-weight: 900;
+  color: #fff9e6;
+  text-shadow: 0 2px 4px #000;
+}
+
+.jx2-cs-portrait-tile-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #c8dbd6;
+  letter-spacing: 1px;
+}
+
+.jx2-cs-create-hint {
+  font-size: 11px;
+  color: #8aa39d;
+}
+
+.jx2-cs-create-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.jx2-cs-create-actions .jx2-btn-action {
+  flex: 1;
+  max-width: none;
+  width: auto;
+  height: 34px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .jx2-cs-body {
+    flex-direction: column;
+  }
+  .jx2-cs-panel {
+    width: 100%;
+  }
+  .jx2-cs-stage {
+    padding: 10px;
+  }
+}

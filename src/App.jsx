@@ -8,6 +8,7 @@ import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
+import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import {
   defaultQuantities,
@@ -18,6 +19,7 @@ import { StorageManager } from "./game/storage.js";
 import { apiClient } from "./game/apiClient.js";
 import {
   readSession,
+  writeSession,
   persistSessionUser,
   isSessionUser,
   clearSession
@@ -41,11 +43,15 @@ const INITIAL_LOGS = [
   }
 ];
 
+const isGuestSession = (session) =>
+  session?.token === "offline-guest-token" ||
+  String(session?.user?.id || "").startsWith("guest_");
+
 export function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     const session = readSession();
     if (!session) return null;
-    if (session.token === "offline-guest-token" || String(session?.user?.id || "").startsWith("guest_")) {
+    if (isGuestSession(session)) {
       clearSession();
       return null;
     }
@@ -56,6 +62,14 @@ export function App() {
     return null;
   });
   const [isLoginOpen, setIsLoginOpen] = useState(() => !currentUser);
+  const [activeCharacter, setActiveCharacter] = useState(() => {
+    const session = readSession();
+    if (!isGuestSession(session) && session?.activeCharacter?.id && session.activeCharacter.name) {
+      return session.activeCharacter;
+    }
+    return null;
+  });
+  const [serverName, setServerName] = useState(() => readSession()?.server || "");
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
@@ -112,8 +126,10 @@ export function App() {
         if (!isMounted || !profile || !isSessionUser(sessionUser.id)) return;
 
         const nextUser = { ...sessionUser, ...profile };
-        const nextName = nextUser.displayName || nextUser.username;
-        if (nextName === (sessionUser.displayName || sessionUser.username)) return;
+        const activeName = readSession()?.activeCharacter?.name;
+        const nextName = activeName || nextUser.displayName || nextUser.username;
+        const prevName = activeName || sessionUser.displayName || sessionUser.username;
+        if (nextName === prevName) return;
 
         persistSessionUser(nextUser);
         setCurrentUser((prev) => (prev?.id === sessionUser.id ? nextUser : prev));
@@ -155,8 +171,13 @@ export function App() {
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
       const user = currentUserRef.current;
-      if (user?.displayName || user?.username) {
-        bridge.emit(EVENTS.SET_PLAYER_NAME, user.displayName || user.username);
+      const session = readSession();
+      const name =
+        session?.activeCharacter?.name ||
+        user?.displayName ||
+        user?.username;
+      if (name) {
+        bridge.emit(EVENTS.SET_PLAYER_NAME, name);
       }
     });
 
@@ -240,33 +261,47 @@ export function App() {
   }, []);
 
   const handleSendMessage = useCallback((text) => {
-    const sender = currentUser?.displayName || currentUser?.username || "Lãng Khách";
+    const sender =
+      activeCharacter?.name || currentUser?.displayName || currentUser?.username || "Lãng Khách";
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
       text: `${sender}: ${text}`,
       type: "near"
     });
     bridge.emit(EVENTS.ACTION_CHAT, { text, sender });
-  }, [currentUser]);
+  }, [activeCharacter, currentUser]);
 
   const handleLoginSuccess = useCallback((session) => {
-    const playerName = session.user.displayName || session.user.username;
     setCurrentUser(session.user);
+    setActiveCharacter(null);
+    setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
     setIsLoginOpen(false);
-    bridge.emit(EVENTS.SET_PLAYER_NAME, playerName);
+  }, []);
+
+  const handleCharacterStart = useCallback((character) => {
+    writeSession({
+      ...(readSession() || {}),
+      activeCharacter: character,
+      characterChosenAt: Date.now()
+    });
+
+    setActiveCharacter(character);
+    bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
-      id: `login-${Date.now()}`,
-      text: `Hiệp khách ${playerName} đã gia nhập ${session.server || "Giang Hồ"}!`,
+      id: `character-${Date.now()}`,
+      text: `Hiệp khách ${character.name} đã gia nhập ${serverName || "Giang Hồ"}!`,
       type: "system"
     });
-  }, []);
+  }, [serverName]);
 
   const handleLogout = useCallback(() => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?")) {
       clearSession();
       setCurrentUser(null);
+      setActiveCharacter(null);
+      setServerName("");
       StorageManager.setUserId(null);
       setIsLoginOpen(true);
       bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
@@ -283,7 +318,7 @@ export function App() {
       <div className="hud-overlay" id="hud-overlay">
         <PlayerVitals
           stats={stats}
-          currentUser={currentUser}
+          playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
           onLogout={handleLogout}
         />
 
@@ -318,10 +353,23 @@ export function App() {
       </div>
 
       {/* JX2 Authentic Login Modal */}
-      <LoginModal
-        isOpen={isLoginOpen}
-        onLoginSuccess={handleLoginSuccess}
-      />
+      {isLoginOpen && (
+        <LoginModal
+          isOpen={isLoginOpen}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
+
+      {/* JX2 Character Selection & Creation */}
+      {!!currentUser && !activeCharacter && !isLoginOpen && (
+        <CharacterSelectModal
+          isOpen={true}
+          user={currentUser}
+          server={serverName}
+          onStart={handleCharacterStart}
+          onLogout={handleLogout}
+        />
+      )}
 
       {/* Help & Guide Modal */}
       <HelpModal

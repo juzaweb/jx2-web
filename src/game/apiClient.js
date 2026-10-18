@@ -218,6 +218,76 @@ export class ApiClient {
     }
     return json.data;
   }
+
+  /**
+   * List the characters owned by a user account
+   * @param {string} userId
+   * @returns {Promise<{ characters: Object[], maxSlots: number, deletedCount: number }>}
+   */
+  async listCharacters(userId) {
+    const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`);
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `Không tải được danh sách nhân vật (HTTP ${res.status})`);
+    }
+    return json.data;
+  }
+
+  /**
+   * Create a new character for a user account
+   * @param {string} userId
+   * @param {string} name
+   * @param {"nam"|"nu"} [gender="nam"]
+   * @param {number} [appearance=0]
+   * @returns {Promise<Object>} The created character
+   */
+  async createCharacter(userId, name, gender = "nam", appearance = 0) {
+    const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, gender, appearance }),
+    });
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `Tạo nhân vật thất bại (HTTP ${res.status})`);
+    }
+    return json.data;
+  }
+
+  /**
+   * Soft-delete a character (restorable)
+   * @param {string} userId
+   * @param {string} characterId
+   * @returns {Promise<{ characters: Object[], deletedCount: number }>}
+   */
+  async deleteCharacter(userId, characterId) {
+    const res = await fetch(
+      `${this.baseUrl}/users/${encodeURIComponent(userId)}/characters/${encodeURIComponent(characterId)}`,
+      { method: "DELETE" }
+    );
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `Xoá nhân vật thất bại (HTTP ${res.status})`);
+    }
+    return json.data;
+  }
+
+  /**
+   * Restore the most recently deleted character
+   * @param {string} userId
+   * @returns {Promise<{ character: Object, characters: Object[], deletedCount: number }>}
+   */
+  async restoreCharacter(userId) {
+    const res = await fetch(
+      `${this.baseUrl}/users/${encodeURIComponent(userId)}/characters/restore`,
+      { method: "POST" }
+    );
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `Khôi phục nhân vật thất bại (HTTP ${res.status})`);
+    }
+    return json.data;
+  }
 }
 
 export const apiClient = new ApiClient();
