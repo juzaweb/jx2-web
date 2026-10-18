@@ -1,0 +1,606 @@
+/* ====================================================
+   JX2 (Võ Lâm Truyền Kỳ 2) Authentic Login Screen Styles
+==================================================== */
+
+.jx2-login-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url('/login_bg.png') no-repeat center center;
+  background-size: cover;
+  user-select: none;
+  font-family: 'Be Vietnam Pro', 'Noto Serif SC', 'Cinzel', serif;
+}
+
+/* Dark vignette overlay for depth */
+.jx2-login-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0.65) 100%);
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------
+   Top-Right Game Logo Emblem (VL2 Hảo Kiệt Lôi Tranh)
+---------------------------------------------------- */
+.jx2-login-logo {
+  position: absolute;
+  top: 24px;
+  right: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.jx2-logo-title-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jx2-logo-sword-icon {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 0 8px rgba(255, 60, 0, 0.8));
+}
+
+.jx2-logo-text {
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff9e6;
+  text-shadow: 0 0 10px rgba(255, 120, 30, 0.9), 0 2px 4px #000, 2px 2px 0 #801000;
+  letter-spacing: 1px;
+}
+
+.jx2-logo-subtitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffcc66;
+  text-shadow: 0 1px 3px #000, 0 0 8px rgba(255, 204, 102, 0.7);
+  letter-spacing: 2px;
+  margin-top: -2px;
+}
+
+.jx2-logo-domain {
+  font-size: 11px;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
+/* ----------------------------------------------------
+   Center Login Modal Box
+---------------------------------------------------- */
+.jx2-login-box {
+  position: relative;
+  z-index: 20;
+  width: 380px;
+  max-width: min(380px, 94vw);
+  background: linear-gradient(180deg, #1b2c2a 0%, #111e1c 60%, #0a1413 100%);
+  border: 2px solid #4d7a70;
+  outline: 1.5px solid #162623;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85),
+              inset 0 1px 0 rgba(140, 215, 195, 0.3),
+              inset 0 0 20px rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  padding: 8px 12px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Metallic corner ornaments */
+.jx2-corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: #7bc4b2;
+  border-style: solid;
+  pointer-events: none;
+}
+.jx2-corner.top-left { top: 2px; left: 2px; border-width: 2px 0 0 2px; }
+.jx2-corner.top-right { top: 2px; right: 2px; border-width: 2px 2px 0 0; }
+.jx2-corner.bottom-left { bottom: 2px; left: 2px; border-width: 0 0 2px 2px; }
+.jx2-corner.bottom-right { bottom: 2px; right: 2px; border-width: 0 2px 2px 0; }
+
+/* ----------------------------------------------------
+   Header Banner: "Máy chủ đã đăng nhập"
+---------------------------------------------------- */
+.jx2-box-header {
+  background: linear-gradient(180deg, #28443e 0%, #162925 100%);
+  border: 1px solid #4a756b;
+  border-radius: 3px;
+  padding: 6px 12px;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.jx2-box-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #c9ede2;
+  letter-spacing: 0.8px;
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(110, 231, 183, 0.4);
+}
+
+/* ----------------------------------------------------
+   Server Selection Preview Card
+---------------------------------------------------- */
+.jx2-server-card {
+  position: relative;
+  background: #091210;
+  border: 1.5px solid #2d4c44;
+  border-radius: 3px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+}
+
+.jx2-server-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, rgba(30, 52, 47, 0.85) 0%, rgba(12, 23, 21, 0.95) 100%);
+  border: 1px solid #3c6b5f;
+  border-radius: 2px;
+}
+
+.jx2-server-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffd84d;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 3px #000, 0 0 8px rgba(255, 216, 77, 0.6);
+}
+
+.jx2-server-diamond {
+  color: #6ee7b7;
+  font-size: 11px;
+}
+
+.jx2-server-artwork {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  background: #050a09 url('/hero_portrait.png') no-repeat center center;
+  background-size: contain;
+  border: 1px solid #1a2d28;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.jx2-server-artwork::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+.jx2-btn-server-select {
+  width: 100%;
+  padding: 5px 0;
+  background: linear-gradient(180deg, #244b42 0%, #142f29 100%);
+  border: 1px solid #4a8274;
+  border-radius: 3px;
+  color: #bbf7d0;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.15s ease;
+}
+
+.jx2-btn-server-select:hover {
+  background: linear-gradient(180deg, #2e6054 0%, #1a3c35 100%);
+  border-color: #6ee7b7;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(110, 231, 183, 0.5);
+}
+
+/* Server Switcher Dropdown Modal */
+.jx2-server-list {
+  position: absolute;
+  top: 40px;
+  left: 8px;
+  right: 8px;
+  z-index: 50;
+  background: #0b1715;
+  border: 2px solid #5aa595;
+  border-radius: 3px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.95);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.jx2-server-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #162925;
+  cursor: pointer;
+  background: #0e1d1a;
+  transition: background 0.15s;
+}
+
+.jx2-server-item:hover {
+  background: #1c3b34;
+}
+
+.jx2-server-item.active {
+  background: #234d43;
+}
+
+.jx2-server-item-name {
+  color: #ffd84d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.jx2-server-item-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.jx2-server-item-tag.recommended {
+  background: #854d0e;
+  color: #fef08a;
+  border: 1px solid #ca8a04;
+}
+
+.jx2-server-item-tag.crowded {
+  background: #7f1d1d;
+  color: #fca5a5;
+  border: 1px solid #dc2626;
+}
+
+.jx2-server-item-tag.normal {
+  background: #14532d;
+  color: #86efac;
+  border: 1px solid #16a34a;
+}
+
+/* ----------------------------------------------------
+   Mode Switch Tabs: Đăng Nhập / Đăng Ký
+---------------------------------------------------- */
+.jx2-auth-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #2d4c44;
+  padding-bottom: 4px;
+}
+
+.jx2-auth-tab {
+  flex: 1;
+  padding: 5px 0;
+  background: #12211e;
+  border: 1px solid #233e38;
+  border-radius: 3px 3px 0 0;
+  color: #8aa69f;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.jx2-auth-tab:hover {
+  color: #c9ede2;
+  background: #172b27;
+}
+
+.jx2-auth-tab.active {
+  background: linear-gradient(180deg, #244b42 0%, #152f2a 100%);
+  border-color: #4a8274;
+  border-bottom: 1px solid #152f2a;
+  color: #fde047;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* ----------------------------------------------------
+   Form Controls (Inputs & Labels)
+---------------------------------------------------- */
+.jx2-form-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jx2-form-label {
+  width: 90px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #d1fae5;
+  text-shadow: 0 1px 2px #000;
+  flex-shrink: 0;
+}
+
+.jx2-form-input {
+  flex: 1;
+  background: rgba(6, 15, 13, 0.9);
+  border: 1.5px solid #31584f;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.jx2-form-input:focus {
+  border-color: #6ee7b7;
+  box-shadow: 0 0 6px rgba(110, 231, 183, 0.4);
+}
+
+.jx2-form-input::placeholder {
+  color: #52756d;
+}
+
+/* Checkboxes Row */
+.jx2-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
+  padding-left: 98px;
+  margin-top: 2px;
+}
+
+.jx2-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #a7d3c8;
+}
+
+.jx2-checkbox {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #091412;
+  border: 1.5px solid #3c6b5f;
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.jx2-checkbox:checked {
+  background: #10b981;
+  border-color: #6ee7b7;
+}
+
+.jx2-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: -3px;
+  left: 2px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* ----------------------------------------------------
+   Virtual Keyboard ("Bàn phím ảo")
+---------------------------------------------------- */
+.jx2-vk-container {
+  background: #0d1a18;
+  border: 1.5px solid #3c6b5f;
+  border-radius: 4px;
+  padding: 8px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  animation: jx2FadeIn 0.2s ease-out;
+}
+
+.jx2-vk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1f3832;
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.jx2-vk-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.jx2-vk-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.jx2-vk-row {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+}
+
+.jx2-vk-key {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  background: linear-gradient(180deg, #24433c 0%, #142a25 100%);
+  border: 1px solid #3a685e;
+  border-radius: 2px;
+  color: #ecfdf5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.1s;
+}
+
+.jx2-vk-key:hover {
+  background: linear-gradient(180deg, #325e54 0%, #1e3d36 100%);
+  border-color: #6ee7b7;
+  color: #fff;
+}
+
+.jx2-vk-key:active {
+  transform: translateY(1px);
+}
+
+.jx2-vk-key.special {
+  background: linear-gradient(180deg, #3a3b30 0%, #21221b 100%);
+  border-color: #68694d;
+  color: #fef08a;
+  min-width: 48px;
+  font-size: 11px;
+}
+
+/* ----------------------------------------------------
+   Feedback Alerts (Error / Success banner)
+---------------------------------------------------- */
+.jx2-alert-banner {
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  animation: jx2FadeIn 0.2s ease-out;
+}
+
+.jx2-alert-banner.error {
+  background: rgba(127, 29, 29, 0.85);
+  border: 1px solid #ef4444;
+  color: #fecaca;
+  text-shadow: 0 1px 2px #000;
+}
+
+.jx2-alert-banner.success {
+  background: rgba(20, 83, 45, 0.85);
+  border: 1px solid #22c55e;
+  color: #bbf7d0;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* ----------------------------------------------------
+   Action Buttons: Đồng ý / Trở lại
+---------------------------------------------------- */
+.jx2-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.jx2-btn-action {
+  flex: 1;
+  max-width: 150px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #275249 0%, #153832 50%, #0d2621 100%);
+  border: 1.5px solid #4d8f81;
+  border-radius: 3px;
+  color: #ffd84d;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-shadow: 0 1px 3px #000, 0 0 4px rgba(255, 216, 77, 0.5);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.15s ease;
+}
+
+.jx2-btn-action:hover {
+  background: linear-gradient(180deg, #32695e 0%, #1c4840 50%, #11332c 100%);
+  border-color: #6ee7b7;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(110, 231, 183, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.jx2-btn-action:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.jx2-btn-action.secondary {
+  background: linear-gradient(180deg, #2b3936 0%, #182321 50%, #0f1615 100%);
+  border-color: #4b615d;
+  color: #cbd5e1;
+  text-shadow: 0 1px 2px #000;
+}
+
+.jx2-btn-action.secondary:hover {
+  background: linear-gradient(180deg, #374945 0%, #202e2b 50%, #151e1c 100%);
+  border-color: #94a3b8;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(148, 163, 184, 0.4);
+}
+
+.jx2-btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+@keyframes jx2FadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .jx2-login-logo {
+    top: 10px;
+    right: 12px;
+    transform: scale(0.8);
+    transform-origin: top right;
+  }
+  .jx2-options-row {
+    padding-left: 16px;
+    gap: 12px;
+  }
+}
+
+@media (max-height: 600px) {
+  .jx2-login-logo {
+    display: none;
+  }
+  .jx2-server-artwork {
+    height: 70px;
+  }
+  .jx2-login-box {
+    gap: 6px;
+    padding: 6px 10px;
+  }
+}
+

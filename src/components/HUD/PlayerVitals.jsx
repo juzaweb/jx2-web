@@ -1,6 +1,6 @@
 import React from "react";
 
-export function PlayerVitals({ stats }) {
+export function PlayerVitals({ stats, currentUser, onLogout }) {
   const hpPercent = Math.max(0, Math.min(100, (stats.hp / stats.maxHp) * 100));
   const mpPercent = Math.max(0, Math.min(100, (stats.mp / stats.maxMp) * 100));
   const staPercent = Math.max(0, Math.min(100, ((stats.sta || 100) / (stats.maxSta || 100)) * 100));
@@ -9,6 +9,54 @@ export function PlayerVitals({ stats }) {
 
   return (
     <section className="top-left-panel" id="player-hud">
+      {currentUser && (
+        <div
+          className="player-meta-info"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginBottom: "4px",
+            background: "rgba(10, 20, 18, 0.75)",
+            padding: "2px 8px",
+            borderRadius: "3px",
+            border: "1px solid rgba(110, 231, 183, 0.25)",
+            width: "fit-content"
+          }}
+        >
+          <span
+            className="player-name"
+            style={{
+              color: "#ffd84d",
+              fontWeight: "700",
+              fontSize: "12px",
+              textShadow: "0 1px 2px #000"
+            }}
+          >
+            ⚔ {currentUser.displayName || currentUser.username}
+          </span>
+          {onLogout && (
+            <button
+              type="button"
+              className="btn-logout"
+              onClick={onLogout}
+              title="Đăng xuất khỏi tài khoản"
+              style={{
+                background: "rgba(60, 20, 20, 0.9)",
+                border: "1px solid #991b1b",
+                color: "#fecaca",
+                fontSize: "10px",
+                padding: "1px 5px",
+                borderRadius: "2px",
+                cursor: "pointer",
+                lineHeight: "1.2"
+              }}
+            >
+              Đăng xuất
+            </button>
+          )}
+        </div>
+      )}
       <div className="status-bracket">
         <div className="level-box" id="level-badge" title="Đẳng cấp nhân vật">
           {stats.level}

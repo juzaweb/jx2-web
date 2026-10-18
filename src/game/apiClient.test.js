@@ -69,4 +69,90 @@ describe("ApiClient", () => {
       "http://mock-api:5000/api/leaderboard?sortBy=kills&limit=5"
     );
   });
+
+  it("register posts credentials and returns user and token", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          user: { id: "u1", username: "tieuvotruong", displayName: "Tiêu Võ Trưởng" },
+          token: "token-123"
+        }
+      })
+    });
+
+    const res = await client.register("tieuvotruong", "pass123456", "Tiêu Võ Trưởng");
+    expect(res.user.username).toBe("tieuvotruong");
+    expect(res.token).toBe("token-123");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/register",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          username: "tieuvotruong",
+          password: "pass123456",
+          displayName: "Tiêu Võ Trưởng"
+        })
+      })
+    );
+  });
+
+  it("login posts credentials and returns user and token", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          user: { id: "u1", username: "tieuvotruong" },
+          token: "token-123"
+        }
+      })
+    });
+
+    const res = await client.login("tieuvotruong", "pass123456");
+    expect(res.user.username).toBe("tieuvotruong");
+    expect(res.token).toBe("token-123");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/login",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          username: "tieuvotruong",
+          password: "pass123456"
+        })
+      })
+    );
+  });
+
+  it("login throws descriptive error when server returns non-JSON HTML error", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError("Unexpected token '<'");
+      }
+    });
+
+    await expect(client.login("user", "pass")).rejects.toThrow(
+      "Máy chủ phản hồi không đúng định dạng (HTTP 502)"
+    );
+  });
+
+  it("checkUsername queries endpoint and returns availability data", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { available: true, reason: "Tài khoản có thể sử dụng." }
+      })
+    });
+
+    const res = await client.checkUsername("hero_name");
+    expect(res.available).toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/check-username?username=hero_name"
+    );
+  });
 });
+

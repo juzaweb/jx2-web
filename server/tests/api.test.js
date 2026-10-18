@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createApp } from "../src/app.js";
+import { userDb } from "../src/data/userDb.js";
 
 describe("Giang Ho Backend API Test Suite", () => {
   let server;
@@ -15,6 +16,9 @@ describe("Giang Ho Backend API Test Suite", () => {
     testDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-test-"));
     process.env.DATA_PATH = path.join(testDataDir, "test-db.json");
     process.env.NODE_ENV = "test";
+
+    // Clean user table for test isolation
+    userDb.clear();
 
     const app = createApp();
     await new Promise((resolve) => {
@@ -218,6 +222,135 @@ describe("Giang Ho Backend API Test Suite", () => {
     });
     assert.equal(res.status, 200);
     assert.equal(({}).admin, undefined, "Prototype pollution must be neutralized");
+  });
+
+  test("Users: Register a new user successfully", async () => {
+    const res = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "hiepkhat99",
+        password: "secretpassword123",
+        displayName: "Hiệp Khách Vô Danh"
+      })
+    });
+    assert.equal(res.status, 201);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.user.username, "hiepkhat99");
+    assert.equal(json.data.user.displayName, "Hiệp Khách Vô Danh");
+    assert.ok(json.data.user.id);
+    assert.ok(json.data.token);
+    // Ensure password_hash and salt are not exposed in response
+    assert.equal(json.data.user.password_hash, undefined);
+    assert.equal(json.data.user.salt, undefined);
+  });
+
+  test("Users: Register rejects duplicate username", async () => {
+    const res = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "hiepkhat99",
+        password: "anotherpassword456"
+      })
+    });
+    assert.equal(res.status, 409);
+    const json = await res.json();
+    assert.equal(json.success, false);
+  });
+
+  test("Users: Check username availability returns status and reason", async () => {
+    // Taken username (hiepkhat99 was registered in previous test)
+    const takenRes = await fetch(`${baseUrl}/users/check-username?username=hiepkhat99`);
+    assert.equal(takenRes.status, 200);
+    const takenJson = await takenRes.json();
+    assert.equal(takenJson.success, true);
+    assert.equal(takenJson.data.available, false);
+
+    // Available username
+    const availRes = await fetch(`${baseUrl}/users/check-username?username=brand_new_hero_123`);
+    assert.equal(availRes.status, 200);
+    const availJson = await availRes.json();
+    assert.equal(availJson.success, true);
+    assert.equal(availJson.data.available, true);
+
+    // Invalid format username
+    const invalidRes = await fetch(`${baseUrl}/users/check-username?username=a!b`);
+    assert.equal(invalidRes.status, 200);
+    const invalidJson = await invalidRes.json();
+    assert.equal(invalidJson.data.available, false);
+  });
+
+  test("Users: Register validates username and password requirements", async () => {
+    // Short password
+    const res1 = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "validuser", password: "123" })
+    });
+    assert.equal(res1.status, 400);
+
+    // Invalid username with spaces or special chars
+    const res2 = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "bad user!", password: "validpassword" })
+    });
+    assert.equal(res2.status, 400);
+
+    // Password too long (> 128 chars)
+    const res3 = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "longpassuser", password: "a".repeat(130) })
+    });
+    assert.equal(res3.status, 400);
+  });
+
+  test("Users: Login with valid credentials succeeds", async () => {
+    const res = await fetch(`${baseUrl}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "hiepkhat99",
+        password: "secretpassword123"
+      })
+    });
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.user.username, "hiepkhat99");
+    assert.ok(json.data.user.lastLogin);
+    assert.ok(json.data.token);
+  });
+
+  test("Users: Login with incorrect password fails", async () => {
+    const res = await fetch(`${baseUrl}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "hiepkhat99",
+        password: "wrongpassword"
+      })
+    });
+    assert.equal(res.status, 401);
+    const json = await res.json();
+    assert.equal(json.success, false);
+  });
+
+  test("Users: Login with non-existent user fails", async () => {
+    const res = await fetch(`${baseUrl}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "ghost_user_not_exist",
+        password: "anypassword"
+      })
+    });
+    assert.equal(res.status, 401);
+    const json = await res.json();
+    assert.equal(json.success, false);
   });
 
   test("Concurrency: handles concurrent saves without race conditions or file corruption", async () => {

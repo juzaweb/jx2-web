@@ -155,33 +155,40 @@ export class JiangHuScene extends Phaser.Scene {
       this.isPointerMoving = false;
     });
 
+    // Allow standard typing in HTML form inputs (e.g. login form, chat)
+    this.input.keyboard.preventDefault = false;
+    const isTyping = () => {
+      const tag = typeof document !== "undefined" && document.activeElement?.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA";
+    };
+
     // Keyboard Hotkeys
     this.input.keyboard.on("keydown-SPACE", () => {
-      if (this.started && !this.isPaused) this.combat.performAttack();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performAttack();
     });
 
     this.input.keyboard.on("keydown-Q", () => {
-      if (this.started && !this.isPaused) this.combat.performSkill();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
     });
 
     this.input.keyboard.on("keydown-ONE", () => {
-      if (this.started && !this.isPaused) this.useItem(1);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
     });
 
     this.input.keyboard.on("keydown-TWO", () => {
-      if (this.started && !this.isPaused) this.useItem(2);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(2);
     });
 
     this.input.keyboard.on("keydown-THREE", () => {
-      if (this.started && !this.isPaused) this.useItem(3);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(3);
     });
 
     this.input.keyboard.on("keydown-FOUR", () => {
-      if (this.started && !this.isPaused) this.useItem(4);
+      if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
     });
 
     this.input.keyboard.on("keydown-EIGHT", () => {
-      if (this.started && !this.isPaused) this.combat.performSkill();
+      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
     });
 
     // Listen to React UI Actions via Game Bridge
@@ -359,7 +366,25 @@ export class JiangHuScene extends Phaser.Scene {
   startGame() {
     this.started = true;
     this.setPaused(false);
-    this.player.sprite.body.enable = true;
+    if (this.player?.sprite?.body) {
+      this.player.sprite.body.enable = true;
+    }
+
+    // Reload save for the active user session
+    this.savedData = StorageManager.load();
+    if (this.savedData) {
+      if (this.savedData.stats) {
+        this.player.loadStats(this.savedData.stats);
+      }
+      if (this.savedData.position && typeof this.savedData.position.x === "number") {
+        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+      }
+      if (this.savedData.questRewarded !== undefined) {
+        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
+      }
+      this.uiBridge.updateHud(this.player.stats);
+    }
+
     bridge.emit(EVENTS.GAME_STARTED);
 
     if (this.savedData) {

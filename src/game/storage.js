@@ -19,6 +19,24 @@ const sanitizeInventory = (value) => {
 };
 
 export class StorageManager {
+  static activeUserId = null;
+
+  /**
+   * Set active user ID to isolate saved progress per user
+   * @param {string|null} id
+   */
+  static setUserId(id) {
+    this.activeUserId = id || null;
+  }
+
+  /**
+   * Get the active storage key
+   * @returns {string}
+   */
+  static getKey() {
+    return this.activeUserId ? `${STORAGE_KEY}_${this.activeUserId}` : STORAGE_KEY;
+  }
+
   /**
    * Save game state to localStorage
    * @param {Object} data
@@ -47,7 +65,7 @@ export class StorageManager {
         inventory: sanitizeInventory(inventory),
         savedAt: Date.now()
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(this.getKey(), JSON.stringify(payload));
       return true;
     } catch (error) {
       console.warn("StorageManager: Failed to save game state:", error);
@@ -61,7 +79,7 @@ export class StorageManager {
    */
   static load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(this.getKey());
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data || typeof data !== "object" || !data.stats) {
@@ -92,7 +110,7 @@ export class StorageManager {
    */
   static clear() {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(this.getKey());
       return true;
     } catch (error) {
       console.warn("StorageManager: Failed to clear save data:", error);
@@ -106,7 +124,7 @@ export class StorageManager {
    */
   static exists() {
     try {
-      return !!localStorage.getItem(STORAGE_KEY);
+      return !!localStorage.getItem(this.getKey());
     } catch {
       return false;
     }

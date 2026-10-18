@@ -41,7 +41,66 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 
 ## 📡 Danh sách API Endpoints
 
-### 1. Kiểm tra trạng thái máy chủ (Health Check)
+### 1. Tài khoản & Đăng nhập (Users & Authentication)
+
+#### 🔹 Đăng ký tài khoản
+- **URL:** `POST /api/users/register`
+- **Body:**
+```json
+{
+  "username": "hiepkhat99",
+  "password": "secretpassword123",
+  "displayName": "Hiệp Khách Vô Danh"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "message": "Đăng ký tài khoản thành công!",
+  "data": {
+    "user": {
+      "id": "user_1700000000_abcd",
+      "username": "hiepkhat99",
+      "displayName": "Hiệp Khách Vô Danh",
+      "createdAt": 1700000000000,
+      "lastLogin": null
+    },
+    "token": "..."
+  }
+}
+```
+
+#### 🔹 Đăng nhập
+- **URL:** `POST /api/users/login`
+- **Body:**
+```json
+{
+  "username": "hiepkhat99",
+  "password": "secretpassword123"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "message": "Đăng nhập thành công!",
+  "data": {
+    "user": {
+      "id": "user_1700000000_abcd",
+      "username": "hiepkhat99",
+      "displayName": "Hiệp Khách Vô Danh",
+      "createdAt": 1700000000000,
+      "lastLogin": 1700000010000
+    },
+    "token": "..."
+  }
+}
+```
+
+---
+
+### 2. Kiểm tra trạng thái máy chủ (Health Check)
 - **URL:** `GET /api/health`
 - **Response mẫu:**
 ```json
