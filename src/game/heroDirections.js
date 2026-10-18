@@ -3,8 +3,9 @@
  *
  * The hero is drawn from an isometric sheet laid out as 8 direction columns
  * (each 45 deg apart) x 6 animation rows (row 0 = idle, rows 1..5 = the walk
- * cycle). Columns are indexed 0..7 clockwise from "facing the camera" and the
- * sheets are read row-major, so frame = row * 8 + column.
+ * cycle). Columns are indexed 0..7 counter-clockwise from "facing the camera"
+ * (down, down-right, right, ...) and the sheet is read row-major, so
+ * frame = row * 8 + column.
  *
  * Facing is derived from the *screen-space* movement direction (the sprite is
  * screen art), which means world velocity goes through the same isometric

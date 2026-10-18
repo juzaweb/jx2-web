@@ -334,6 +334,12 @@ export class Player {
    */
   createEquipmentLayers() {
     if (this.equipLayers) return;
+
+    // The 8-direction art already bakes the full outfit into the sprite and the
+    // legacy 116x320 overlays no longer line up with it, so no layers are built
+    // while the animated hero is in use. Equipment data/UI are unaffected.
+    if (this.has8Dir) return;
+
     this.equipLayers = {};
     this.equipArt = {};
 
@@ -359,15 +365,6 @@ export class Player {
    */
   layoutEquipment() {
     if (!this.equipLayers) return;
-
-    // The 8-direction art bakes the full outfit into the sprite, and the legacy
-    // 116x320 overlays no longer line up with it, so keep them hidden while the
-    // animated hero is in use. Equipment data/UI are unaffected.
-    if (this.has8Dir) {
-      EQUIPMENT_SLOTS.forEach(({ key }) => this.equipLayers[key]?.setVisible(false));
-      return;
-    }
-
     const side = this.currentStance === "side";
     const box = side ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front;
 

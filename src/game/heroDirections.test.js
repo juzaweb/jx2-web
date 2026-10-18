@@ -34,6 +34,11 @@ describe("directionFromVelocity", () => {
       expect(column).toBeLessThanOrEqual(7);
     }
   });
+
+  it("handles a zero velocity without throwing", () => {
+    expect(directionFromVelocity(0, 0)).toBeGreaterThanOrEqual(0);
+    expect(directionFromVelocity(0, 0)).toBeLessThanOrEqual(7);
+  });
 });
 
 describe("frame layout", () => {

@@ -6,7 +6,7 @@ Input : a reference sheet laid out as 8 direction columns x 6 animation rows
 Output: public/hero_8dir.png - a spritesheet of 8 cols x 6 rows at 64x96 per
         frame, background keyed out and every frame anchored at the feet.
 
-Run: python3 scripts/extract_hero_8dir.py
+Run: pip install Pillow numpy && python3 scripts/extract_hero_8dir.py
 """
 
 import os

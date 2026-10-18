@@ -46,10 +46,6 @@ export class JiangHuScene extends Phaser.Scene {
 
   preload() {
     this.load.image("hero-sprite", "/hero.png");
-    this.load.spritesheet("hero-side-walk", "/hero_side_walk.png", {
-      frameWidth: 284,
-      frameHeight: 320
-    });
     // 8-direction VLTK2-style sheet: 8 direction columns x 6 rows (idle + 5 walk
     // steps), 64x96 per frame. Drives the hero + peer walking animation.
     this.load.spritesheet("hero-8dir", "/hero_8dir.png", {

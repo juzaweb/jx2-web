@@ -33,8 +33,6 @@ export class RemotePlayer {
     this.targetY = this.y;
     this.vx = data.vx || 0;
     this.vy = data.vy || 0;
-    this.direction = data.direction === "left" ? "left" : "right";
-    this.stance = data.stance === "side" ? "side" : "front";
     /** Sprite column (0..7) the peer currently faces on the 8-direction sheet. */
     this.facingColumn = 0;
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
