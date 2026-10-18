@@ -496,9 +496,10 @@ export class JiangHuScene extends Phaser.Scene {
         y: Math.round(this.player.y)
       },
       questRewarded: this.uiBridge.questRewarded,
-      audioEnabled: isAudioEnabled(),
-      inventory: getQuantities()
+      audioEnabled: isAudioEnabled()
     });
+    // The bag is character-scoped, so it is persisted under the active character.
+    StorageManager.saveInventory(getQuantities());
 
     // Mirror the bag to the character's server inventory. Deduped by signature, so
     // a save that did not touch items (e.g. a kill) sends no request.
@@ -517,6 +518,7 @@ export class JiangHuScene extends Phaser.Scene {
 
   resetGame() {
     StorageManager.clear();
+    StorageManager.clearInventory();
     window.location.reload();
   }
 
@@ -591,6 +593,8 @@ export class JiangHuScene extends Phaser.Scene {
 
   startGame() {
     this.started = true;
+    // Scope the bag to the active character before any load/save touches it.
+    StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
     // Re-entering (or switching characters) must re-read before any upload, so the
     // initial save below cannot clobber the new character's server bag.
     this.inventorySync?.reset();

@@ -94,14 +94,15 @@ export function App() {
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
 
-  // Inventory stack quantities are persisted in the same save slot as stats and
-  // mirrored to the character's server bag. Live edits (use / loot) arrive over
-  // the bridge, so the HUD is no longer a mount-time snapshot.
-  const [inventory, setInventory] = useState(() =>
-    applyQuantities(
+  // Inventory stack quantities are persisted per character and mirrored to that
+  // character's server bag. Live edits (use / loot) arrive over the bridge, so the
+  // HUD is no longer a mount-time snapshot.
+  const [inventory, setInventory] = useState(() => {
+    StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
+    return applyQuantities(
       rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
-    )
-  );
+    );
+  });
 
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
@@ -281,6 +282,7 @@ export function App() {
     setActiveCharacter(null);
     setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
+    StorageManager.setCharacterId(null);
     setIsLoginOpen(false);
   }, []);
 
@@ -292,6 +294,14 @@ export function App() {
     });
 
     setActiveCharacter(character);
+    // Switch the shared bag store to this character's own inventory before the
+    // scene enters the world, so the server fallback can never leak another
+    // character's items.
+    StorageManager.setCharacterId(character.id);
+    const quantities = StorageManager.loadInventory(defaultQuantities());
+    rememberQuantities(quantities);
+    setInventory(applyQuantities(quantities));
+
     bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
@@ -308,6 +318,7 @@ export function App() {
       setActiveCharacter(null);
       setServerName("");
       StorageManager.setUserId(null);
+      StorageManager.setCharacterId(null);
       setIsLoginOpen(true);
       bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
