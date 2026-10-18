@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { stepEnemy } from "./enemyAi.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
+import { toIso, isoDepth } from "./isoProjection.js";
 
 export class Wolf {
   /**
@@ -48,18 +49,20 @@ export class Wolf {
   }
 
   createVisuals(x, y) {
-    this.wolfVisual = this.scene.add.container(x, y).setDepth(y);
+    const iso = toIso(x, y);
+    const depth = isoDepth(x, y);
+    this.wolfVisual = this.scene.add.container(iso.x, iso.y).setDepth(depth);
     this.drawWolf(this.wolfVisual);
 
-    this.hpBack = this.scene.add.rectangle(x, y - 20, 38, 4, 0x1b1714).setDepth(y + 1);
-    this.hpFill = this.scene.add.rectangle(x, y - 20, 36, 2, 0xc94a3f).setDepth(y + 2);
-    this.nameText = this.scene.add.text(x, y - 29, "Sói Xám", {
+    this.hpBack = this.scene.add.rectangle(iso.x, iso.y - 20, 38, 4, 0x1b1714).setDepth(depth + 1);
+    this.hpFill = this.scene.add.rectangle(iso.x, iso.y - 20, 36, 2, 0xc94a3f).setDepth(depth + 2);
+    this.nameText = this.scene.add.text(iso.x, iso.y - 29, "Sói Xám", {
       fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "10px",
       color: "#e5d6bb",
       stroke: "#1c201a",
       strokeThickness: 2
-    }).setOrigin(0.5).setDepth(y + 3);
+    }).setOrigin(0.5).setDepth(depth + 3);
   }
 
   drawWolf(container) {
@@ -89,18 +92,19 @@ export class Wolf {
 
     const x = this.sprite.x;
     const y = this.sprite.y;
+    const iso = toIso(x, y);
+    const depth = isoDepth(x, y);
 
-    this.sprite.setDepth(y);
-    this.wolfVisual.setPosition(x, y);
-    this.wolfVisual.setDepth(y);
+    this.wolfVisual.setPosition(iso.x, iso.y);
+    this.wolfVisual.setDepth(depth);
 
-    this.hpBack.setPosition(x, y - 20);
-    this.hpBack.setDepth(y + 1);
-    this.hpFill.setPosition(x - 19 + (this.hp / this.maxHp) * 19, y - 20);
-    this.hpFill.setDepth(y + 2);
+    this.hpBack.setPosition(iso.x, iso.y - 20);
+    this.hpBack.setDepth(depth + 1);
+    this.hpFill.setPosition(iso.x - 19 + (this.hp / this.maxHp) * 19, iso.y - 20);
+    this.hpFill.setDepth(depth + 2);
     this.hpFill.width = Math.max(0.5, 36 * (this.hp / this.maxHp));
-    this.nameText.setPosition(x, y - 29);
-    this.nameText.setDepth(y + 3);
+    this.nameText.setPosition(iso.x, iso.y - 29);
+    this.nameText.setDepth(depth + 3);
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
 

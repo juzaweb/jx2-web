@@ -13,6 +13,7 @@ import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
 import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
+import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
@@ -49,8 +50,16 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.destroy();
     }
 
-    // Configure world and camera bounds
-    this.cameras.main.setBounds(0, 0, WORLD_CONFIG.width, WORLD_CONFIG.height);
+    // Configure world and camera bounds. Physics/collisions stay in the flat
+    // "ground" plane; the camera lives in isometric screen space, so its bounds
+    // come from the projected diamond that contains the whole ground rectangle.
+    const isoBox = isoBounds(WORLD_CONFIG.width, WORLD_CONFIG.height);
+    this.cameras.main.setBounds(
+      isoBox.minX - 400,
+      isoBox.minY - 400,
+      isoBox.maxX - isoBox.minX + 800,
+      isoBox.maxY - isoBox.minY + 800
+    );
     this.physics.world.setBounds(0, 0, WORLD_CONFIG.width, WORLD_CONFIG.height);
 
     // Initialize subsystems
@@ -127,8 +136,8 @@ export class JiangHuScene extends Phaser.Scene {
       }
     }
 
-    // Camera follow player
-    this.cameras.main.startFollow(this.player.sprite, true, 0.08, 0.08);
+    // Camera follows the isometric visual (the sprite stays in ground space)
+    this.cameras.main.startFollow(this.player.visual, true, 0.08, 0.08);
     this.updateCameraZoom();
 
     // Scale resize handler
@@ -220,8 +229,9 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
+      const ground = fromIso(pointer.worldX, pointer.worldY);
+      const worldX = ground.x;
+      const worldY = ground.y;
 
       // Check if clicking directly on a living enemy
       const clickedEnemy = this.enemyManager
@@ -279,7 +289,8 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      this.player.moveTo(pointer.worldX, pointer.worldY);
+      const ground = fromIso(pointer.worldX, pointer.worldY);
+      this.player.moveTo(ground.x, ground.y);
     });
 
     this.input.on("pointerup", () => {
@@ -558,9 +569,10 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   showClickIndicator(x, y, color = 0xffdd59) {
-    const ring = this.add.circle(x, y, 5, color, 0.25);
+    const base = toIso(x, y);
+    const ring = this.add.circle(base.x, base.y, 5, color, 0.25);
     ring.setStrokeStyle(2, color, 0.95);
-    ring.setDepth(y);
+    ring.setDepth(isoDepth(x, y));
 
     this.tweens.add({
       targets: ring,

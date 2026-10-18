@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
+import { toIso, isoDepth } from "./isoProjection.js";
 
 /** Distance (px) a packet may move a peer before it is treated as a teleport. */
 const TELEPORT_SNAP_THRESHOLD = 200;
@@ -34,8 +35,9 @@ export class RemotePlayer {
   }
 
   createVisuals() {
-    this.container = this.scene.add.container(this.x, this.y);
-    this.container.setDepth(this.y);
+    const iso = toIso(this.x, this.y);
+    this.container = this.scene.add.container(iso.x, iso.y);
+    this.container.setDepth(isoDepth(this.x, this.y));
 
     // 1. Soft ground shadow under feet
     this.shadow = this.scene.add.ellipse(0, 41, 42, 13, 0x090e0c, 0.45);
@@ -55,7 +57,7 @@ export class RemotePlayer {
 
     // 4. Overhead name (authentic JX2 style)
     this.nameText = this.scene.add
-      .text(this.x, this.y - 60, this.displayName, {
+      .text(iso.x, iso.y - 60, this.displayName, {
         fontFamily: "Arial, Tahoma, sans-serif",
         fontSize: "12px",
         color: "#5cfc5c",
@@ -64,12 +66,12 @@ export class RemotePlayer {
         fontStyle: "bold"
       })
       .setOrigin(0.5)
-      .setDepth(this.y + 100);
+      .setDepth(isoDepth(this.x, this.y) + 100);
 
-    const healthBar = createHealthBar(this.scene, this.x, this.y);
+    const healthBar = createHealthBar(this.scene, iso.x, iso.y);
     this.hpBack = healthBar.back;
     this.hpFill = healthBar.fill;
-    this.updateHealthBar(this.x, this.y);
+    this.updateHealthBar(iso.x, iso.y);
 
     this.applyStance(this.stance);
     this.applyDirection(this.direction);
@@ -111,7 +113,7 @@ export class RemotePlayer {
    * @param {number} y
    */
   updateHealthBar(x, y) {
-    layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, this.y, this.hp, this.maxHp);
+    layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, isoDepth(this.x, this.y), this.hp, this.maxHp);
   }
 
   /**
@@ -150,7 +152,8 @@ export class RemotePlayer {
     if (Phaser.Math.Distance.Between(this.x, this.y, this.targetX, this.targetY) > TELEPORT_SNAP_THRESHOLD) {
       this.x = this.targetX;
       this.y = this.targetY;
-      if (this.container) this.container.setPosition(this.x, this.y);
+      const snapIso = toIso(this.x, this.y);
+      if (this.container) this.container.setPosition(snapIso.x, snapIso.y);
     }
   }
 
@@ -160,10 +163,11 @@ export class RemotePlayer {
    */
   playAttack(facingRight = true) {
     const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.x, this.y);
     const slash = this.scene.add
       .arc(
-        this.x + slashOffsetX,
-        this.y - 7,
+        base.x + slashOffsetX,
+        base.y - 7,
         34,
         facingRight ? -70 : 110,
         facingRight ? 70 : 250,
@@ -172,7 +176,7 @@ export class RemotePlayer {
         0.9
       )
       .setStrokeStyle(5, 0xf2e3bd, 0.95)
-      .setDepth(this.y + 10);
+      .setDepth(isoDepth(this.x, this.y) + 10);
 
     this.scene.tweens.add({
       targets: slash,
@@ -187,10 +191,11 @@ export class RemotePlayer {
    * Play visual Kiếm Khí skill ring
    */
   playSkill() {
+    const base = toIso(this.x, this.y);
     const ring = this.scene.add
-      .circle(this.x, this.y, 24, 0x80d7e9, 0.2)
+      .circle(base.x, base.y, 24, 0x80d7e9, 0.2)
       .setStrokeStyle(4, 0xb8e9f0, 0.9)
-      .setDepth(this.y + 5);
+      .setDepth(isoDepth(this.x, this.y) + 5);
 
     this.scene.tweens.add({
       targets: ring,
@@ -236,16 +241,18 @@ export class RemotePlayer {
       }
     }
 
-    // Depth sorting
-    this.container.setPosition(this.x, this.y);
-    this.container.setDepth(this.y);
+    // Depth sorting (isometric)
+    const iso = toIso(this.x, this.y);
+    const depth = isoDepth(this.x, this.y);
+    this.container.setPosition(iso.x, iso.y);
+    this.container.setDepth(depth);
 
     if (this.nameText) {
-      this.nameText.setPosition(this.x, this.y - 60 + (this.body?.y || 0) * 0.35);
-      this.nameText.setDepth(this.y + 100);
+      this.nameText.setPosition(iso.x, iso.y - 60 + (this.body?.y || 0) * 0.35);
+      this.nameText.setDepth(depth + 100);
     }
 
-    this.updateHealthBar(this.x, this.y + (this.body?.y || 0) * 0.35);
+    this.updateHealthBar(iso.x, iso.y + (this.body?.y || 0) * 0.35);
   }
 
   destroy() {

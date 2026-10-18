@@ -1,4 +1,8 @@
 import * as Phaser from "phaser";
+import { toIso, isoDepth } from "./isoProjection.js";
+
+/** Ground tile size (world units) that renders as one 76x38 iso diamond. */
+const FLOOR_TILE = 76;
 
 export const WORLD_CONFIG = {
   width: 2200,
@@ -88,66 +92,86 @@ export class WorldManager {
   }
 
   /**
+   * Place a billboard prop (already built in local space) on a ground position,
+   * projecting to iso and depth-sorting it.
+   */
+  placeProp(obj, gx, gy) {
+    const p = toIso(gx, gy);
+    obj.setPosition(p.x, p.y);
+    obj.setDepth(isoDepth(gx, gy));
+    return obj;
+  }
+
+  /**
    * Authentic JX2 Biện Kinh grand stone plaza floor
    * Large isometric sandstone slabs with subtle gradients, bevels, and curb transition
    */
   drawPavedGround() {
     const g = this.scene.add.graphics();
+    const W = this.width;
+    const H = this.height;
 
-    // 1. Base warm sandstone color
-    g.fillStyle(0xd9d3c7, 1);
-    g.fillRect(0, 0, this.width, this.height);
-
-    // 2. Cobblestone / Flagstone foundation for Dược Điếm in top-left
-    // Matches the reference screenshot where under the shop awning is cobblestone/slate paving
-    g.fillStyle(0x756f64, 1);
-    g.fillPoints([
-      { x: 0, y: 0 },
-      { x: 740, y: 0 },
-      { x: 740, y: 240 },
-      { x: 120, y: 560 },
-      { x: 0, y: 560 }
-    ], true);
-
-    // Irregular cobblestone stones inside Dược Điếm porch area
     const rng = (seed) => {
       const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
     };
 
+    // 1. Base warm sandstone: the whole ground rectangle, isometrically projected.
+    g.fillStyle(0xd9d3c7, 1);
+    g.fillPoints([toIso(0, 0), toIso(W, 0), toIso(W, H), toIso(0, H)], true);
+
+    // 2. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner,
+    //    defined on the ground plane and then projected.
+    const porchPoly = [
+      { x: 0, y: 0 },
+      { x: 740, y: 0 },
+      { x: 740, y: 240 },
+      { x: 120, y: 560 },
+      { x: 0, y: 560 }
+    ].map((p) => toIso(p.x, p.y));
+    g.fillStyle(0x756f64, 1);
+    g.fillPoints(porchPoly, true);
+
+    // Irregular cobblestone stones inside Dược Điếm porch area
     g.lineStyle(1.5, 0x474239, 0.7);
     for (let py = 20; py < 540; py += 32) {
       for (let px = 20; px < 720; px += 36) {
-        // Only draw if inside shop perimeter
         if (px < 740 - ((py - 240) * (620 / 320))) {
           const val = rng(px * 17 + py * 43);
           const stoneColor = val > 0.6 ? 0x8a8477 : val > 0.3 ? 0x6e685c : 0x7e786b;
+          const w = 26 + val * 8;
+          const h = 18 + val * 6;
+          const corners = [
+            toIso(px - w / 2, py - h / 2),
+            toIso(px + w / 2, py - h / 2),
+            toIso(px + w / 2, py + h / 2),
+            toIso(px - w / 2, py + h / 2)
+          ];
           g.fillStyle(stoneColor, 0.85);
-          const w = 26 + (val * 8);
-          const h = 18 + (val * 6);
-          g.fillRoundedRect(px - w / 2, py - h / 2, w, h, 6);
-          g.strokeRoundedRect(px - w / 2, py - h / 2, w, h, 6);
+          g.fillPoints(corners, true);
+          g.strokePoints(corners, true, true);
         }
       }
     }
 
-    // 3. Diagonal Stone Curb Steps (Bậc thềm đá hoa cương phân cách vỉa hè tiệm và quảng trường)
-    // Runs from (120, 560) diagonally to (740, 240)
-    g.fillStyle(0x8a8477, 1);
-    g.fillPoints([
+    // 3. Diagonal stone curb step separating the shop porch from the plaza.
+    const curb = [
       { x: 120, y: 560 },
       { x: 740, y: 240 },
       { x: 765, y: 252 },
       { x: 145, y: 572 }
-    ], true);
-    // Curb top highlight
+    ].map((p) => toIso(p.x, p.y));
+    g.fillStyle(0x8a8477, 1);
+    g.fillPoints(curb, true);
+    const curbTopA = toIso(120, 560);
+    const curbTopB = toIso(740, 240);
+    const curbShadowA = toIso(145, 572);
+    const curbShadowB = toIso(765, 252);
     g.lineStyle(2, 0xbeb7a9, 0.9);
-    g.lineBetween(120, 560, 740, 240);
-    // Curb shadow line
+    g.lineBetween(curbTopA.x, curbTopA.y, curbTopB.x, curbTopB.y);
     g.lineStyle(2, 0x484339, 0.8);
-    g.lineBetween(145, 572, 765, 252);
+    g.lineBetween(curbShadowA.x, curbShadowA.y, curbShadowB.x, curbShadowB.y);
 
-    // Chiseled joints along the curb stones
     const curbSteps = 24;
     for (let i = 0; i <= curbSteps; i++) {
       const t = i / curbSteps;
@@ -155,107 +179,192 @@ export class WorldManager {
       const ky1 = 560 + t * (240 - 560);
       const kx2 = 145 + t * (765 - 145);
       const ky2 = 572 + t * (252 - 572);
+      const a = toIso(kx1, ky1);
+      const b = toIso(kx2, ky2);
       g.lineStyle(1.5, 0x484339, 0.7);
-      g.lineBetween(kx1, ky1, kx2, ky2);
+      g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
-    // 4. Grand Isometric Stone Paving Diamond Grid for Central Plaza (76px width, 38px height)
-    const tileW = 76;
-    const tileH = 38;
-
-    // Subtle mortar lines
+    // 4. Grand isometric diamond paving grid over the whole plaza.
     g.lineStyle(1.2, 0xb8b0a1, 0.7);
-
-    // Diagonal lines Set 1: Down-Right
-    const totalDiagonals = Math.ceil((this.width + this.height * 2) / tileW) + 12;
-    for (let i = -12; i < totalDiagonals; i++) {
-      const startX = i * tileW;
-      g.lineBetween(startX, 0, startX + this.height * 2, this.height);
+    for (let gx = 0; gx <= W; gx += FLOOR_TILE) {
+      const a = toIso(gx, 0);
+      const b = toIso(gx, H);
+      g.lineBetween(a.x, a.y, b.x, b.y);
+    }
+    for (let gy = 0; gy <= H; gy += FLOOR_TILE) {
+      const a = toIso(0, gy);
+      const b = toIso(W, gy);
+      g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
-    // Diagonal lines Set 2: Down-Left
-    for (let i = -12; i < totalDiagonals; i++) {
-      const startX = i * tileW;
-      g.lineBetween(startX, 0, startX - this.height * 2, this.height);
-    }
-
-    // 5. Authentic stone slab lighting & natural variations
-    for (let row = 0; row < Math.ceil(this.height / tileH); row++) {
-      for (let col = 0; col < Math.ceil(this.width / tileW) + 2; col++) {
-        const cx = col * tileW + (row % 2 === 0 ? 0 : tileW / 2);
-        const cy = row * tileH;
+    // 5. Stone slab lighting & natural variations.
+    for (let row = 0; row * FLOOR_TILE < H; row++) {
+      for (let col = 0; col * FLOOR_TILE < W; col++) {
+        const gx = col * FLOOR_TILE;
+        const gy = row * FLOOR_TILE;
 
         // Skip slabs covered by Dược Điếm cobblestone foundation
-        if (cx < 740 && cy < 560 && cx < 740 - ((cy - 240) * (620 / 320))) {
+        if (gx < 740 && gy < 560 && gx < 740 - ((gy - 240) * (620 / 320))) {
           continue;
         }
 
         const val = rng(row * 47 + col * 93);
         if (val > 0.55) {
-          // Subtle warm beige / cool granite tint
           const tint = val > 0.85 ? 0xeae5dc : val > 0.7 ? 0xd0c9bd : 0xe0dad0;
           g.fillStyle(tint, 0.5);
-          g.fillPoints([
-            { x: cx, y: cy - tileH / 2 },
-            { x: cx + tileW / 2, y: cy },
-            { x: cx, y: cy + tileH / 2 },
-            { x: cx - tileW / 2, y: cy }
-          ], true);
+          g.fillPoints(
+            [
+              toIso(gx, gy),
+              toIso(gx + FLOOR_TILE, gy),
+              toIso(gx + FLOOR_TILE, gy + FLOOR_TILE),
+              toIso(gx, gy + FLOOR_TILE)
+            ],
+            true
+          );
         }
       }
     }
   }
 
   /**
-   * Dược Điếm (Apothecary Shop at top-left - directly in front of the player matching user reference screenshot)
-   * Large wooden veranda, umbrella sunshade, medicine drying baskets, jars, blue brocade cloth table, and stone lantern
+   * Draw an isometric building prism: a projected ground footprint extruded
+   * upward, with an overhanging tiled roof plus a door and signboard on the
+   * front face. Returns the (already depth-sorted) container.
+   */
+  drawIsoBuilding({ x, y, w, d, height, wallLeft, wallRight, roof, roofEdge, label, labelColor = "#ffdf7a" }) {
+    const bA = toIso(x, y);
+    const bB = toIso(x + w, y);
+    const bC = toIso(x + w, y + d);
+    const bD = toIso(x, y + d);
+    const lift = (p, h = height) => ({ x: p.x, y: p.y - h });
+    const lerp = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+
+    const tA = lift(bA);
+    const tB = lift(bB);
+    const tC = lift(bC);
+    const tD = lift(bD);
+
+    const g = this.scene.add.graphics();
+
+    // Walls (only the two camera-facing sides are visible)
+    g.fillStyle(wallLeft, 1);
+    g.fillPoints([bD, bC, tC, tD], true);
+    g.fillStyle(wallRight, 1);
+    g.fillPoints([bB, bC, tC, tB], true);
+
+    // Door on the front-right wall
+    const doorTop = height * 0.58;
+    const doorA = lerp(bC, bB, 0.4);
+    const doorB = lerp(bC, bB, 0.68);
+    g.fillStyle(0x241a12, 1);
+    g.fillPoints([doorA, doorB, lift(doorB, doorTop), lift(doorA, doorTop)], true);
+    g.lineStyle(1.5, 0x120b06, 0.9);
+    g.strokePoints([doorA, doorB, lift(doorB, doorTop), lift(doorA, doorTop)], true, true);
+
+    // Overhanging tiled roof (expanded diamond)
+    const rcx = (tA.x + tC.x) / 2;
+    const rcy = (tA.y + tC.y) / 2;
+    const expand = (p, k) => ({ x: rcx + (p.x - rcx) * (1 + k), y: rcy + (p.y - rcy) * (1 + k) });
+    const rA = expand(tA, 0.16);
+    const rB = expand(tB, 0.16);
+    const rC = expand(tC, 0.16);
+    const rD = expand(tD, 0.16);
+
+    // Eave shadow cast on the wall top
+    g.fillStyle(0x000000, 0.16);
+    g.fillPoints([tA, tB, tC, tD], true);
+
+    g.fillStyle(roof, 1);
+    g.fillPoints([rA, rB, rC, rD], true);
+    g.lineStyle(2, roofEdge, 0.9);
+    g.strokePoints([rA, rB, rC, rD], true, true);
+
+    // Roof ridge
+    const ridgeA = lerp(rA, rB, 0.5);
+    const ridgeB = lerp(rD, rC, 0.5);
+    g.lineStyle(3, roofEdge, 0.75);
+    g.lineBetween(ridgeA.x, ridgeA.y, ridgeB.x, ridgeB.y);
+
+    const container = this.scene.add.container(0, 0, [g]);
+
+    if (label) {
+      const sy = height * 0.66;
+      const sA = lerp(bC, bB, 0.32);
+      const sB = lerp(bC, bB, 0.8);
+      const plaque = this.scene.add.graphics();
+      plaque.fillStyle(0x18140f, 1);
+      plaque.fillPoints([sA, sB, lift(sB, sy + 22), lift(sA, sy + 22)], true);
+      plaque.lineStyle(2, 0xd4af37, 1);
+      plaque.strokePoints([sA, sB, lift(sB, sy + 22), lift(sA, sy + 22)], true, true);
+      const mid = lift(lerp(sA, sB, 0.5), sy + 11);
+      const text = this.scene.add
+        .text(mid.x, mid.y, label, {
+          fontFamily: "Arial, Tahoma, sans-serif",
+          fontSize: "12px",
+          color: labelColor,
+          fontStyle: "bold"
+        })
+        .setOrigin(0.5);
+      container.add([plaque, text]);
+    }
+
+    container.setDepth(isoDepth(x + w, y + d));
+    return container;
+  }
+
+  /**
+   * Dược Điếm (Apothecary Shop) — rebuilt as a true isometric prism, with its
+   * umbrella, medicine table, baskets, jars and lantern on the forecourt.
    */
   drawApothecaryShop() {
-    const shop = this.scene.add.container(0, 0);
+    const place = (obj, gx, gy) => {
+      const p = toIso(gx, gy);
+      obj.setPosition(p.x, p.y);
+      obj.setDepth(isoDepth(gx, gy));
+      return obj;
+    };
 
-    // 1. Wooden wall facade along the back (warm natural cedar planks)
-    const wallGraphics = this.scene.add.graphics();
-    wallGraphics.fillStyle(0x7c5835, 1);
-    wallGraphics.fillPoints([
-      { x: 0, y: 0 },
-      { x: 640, y: 0 },
-      { x: 640, y: 150 },
-      { x: 0, y: 440 }
-    ], true);
+    this.drawIsoBuilding({
+      x: 140,
+      y: 30,
+      w: 380,
+      d: 210,
+      height: 150,
+      wallLeft: 0x6b4a2e,
+      wallRight: 0x523823,
+      roof: 0x33302c,
+      roofEdge: 0x9c7747,
+      label: "藥 舖 • DƯỢC ĐIẾM"
+    });
 
-    // Vertical plank lines
-    wallGraphics.lineStyle(1.5, 0x51351c, 0.75);
-    for (let wx = 20; wx < 640; wx += 22) {
-      wallGraphics.lineBetween(wx, 0, wx, (wx * 150) / 640 + 100);
+    // Forecourt props (upright billboards standing on the paved porch).
+    place(this.createSunshadeUmbrella(0, 0), 250, 470);
+    place(this.createMedicineTable(), 390, 485);
+    place(this.createStrawMat(), 300, 525);
+    place(this.createHerbBasket(0, 0, 0x4d7c0f), 400, 400);
+    place(this.createHerbBasket(0, 0, 0xd97706), 470, 445);
+    place(this.createHerbBasket(0, 0, 0x15803d), 520, 410);
+    place(this.createHerbBasket(0, 0, 0xb91c1c), 565, 455);
+    place(this.createCeramicJar(0, 0, 0x78350f, 20, 28), 500, 505);
+    place(this.createCeramicJar(0, 0, 0x92400e, 24, 32), 545, 515);
+    place(this.createCeramicJar(0, 0, 0xd97706, 18, 24), 335, 505);
+    place(this.createStonePagodaLantern(0, 0), 375, 565);
+
+    // Static physics collider over the shop footprint (ground coordinates)
+    if (this.obstacles) {
+      const col = this.obstacles.create(330, 135, "entity-dot");
+      col.setSize(380, 210);
+      col.setVisible(false);
+      col.refreshBody();
     }
-    shop.add(wallGraphics);
+  }
 
-    // 2. Heavy dark timber support columns
-    const c1 = this.scene.add.rectangle(180, 240, 22, 100, 0x3d2719).setStrokeStyle(2, 0x1f1108);
-    const c2 = this.scene.add.rectangle(380, 160, 22, 100, 0x3d2719).setStrokeStyle(2, 0x1f1108);
-    const c3 = this.scene.add.rectangle(570, 90, 22, 100, 0x3d2719).setStrokeStyle(2, 0x1f1108);
-    shop.add([c1, c2, c3]);
-
-    // 3. Hanging signboard "DƯỢC ĐIẾM"
-    const signBoard = this.scene.add.rectangle(480, 110, 140, 32, 0x181816).setStrokeStyle(2.5, 0xd4af37);
-    const signText = this.scene.add.text(480, 110, "藥 舖 • DƯỢC ĐIẾM", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "13px",
-      color: "#ffdf7a",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-    shop.add([signBoard, signText]);
-
-    // 4. Large rustic canvas umbrella / sunshade at (240, 430) (Dù bạt che mưa nắng)
-    const umbrella = this.createSunshadeUmbrella(240, 430);
-    shop.add(umbrella);
-
-    // 5. Merchant table with blue brocade cloth at (360, 460)
-    const tableContainer = this.scene.add.container(360, 460);
-    const tableShadow = this.scene.add.ellipse(0, 28, 130, 22, 0x161c16, 0.45);
+  createMedicineTable() {
+    const c = this.scene.add.container(0, 0);
+    c.add(this.scene.add.ellipse(0, 28, 130, 22, 0x161c16, 0.45));
 
     const tg = this.scene.add.graphics();
-    // Wooden table legs
     tg.fillStyle(0x3d2415, 1);
     tg.lineStyle(1.5, 0x24140b, 1);
     tg.fillRect(-52, 6, 10, 20);
@@ -264,74 +373,33 @@ export class WorldManager {
     tg.strokeRect(42, 6, 10, 20);
     tg.fillRect(-50, 10, 100, 6);
 
-    // Blue brocade draped cloth
     tg.fillStyle(0x1d4ed8, 1);
     tg.lineStyle(2, 0xd4af37, 1);
     tg.fillRect(-58, -16, 116, 26);
     tg.strokeRect(-58, -16, 116, 26);
-    // Draped hem hanging over front
-    tg.fillPoints([
-      { x: -58, y: 10 },
-      { x: 58, y: 10 },
-      { x: 50, y: 22 },
-      { x: -50, y: 22 }
-    ], true);
-    tg.strokePoints([
-      { x: -58, y: 10 },
-      { x: 58, y: 10 },
-      { x: 50, y: 22 },
-      { x: -50, y: 22 }
-    ], true);
+    tg.fillPoints([{ x: -58, y: 10 }, { x: 58, y: 10 }, { x: 50, y: 22 }, { x: -50, y: 22 }], true);
+    tg.strokePoints([{ x: -58, y: 10 }, { x: 58, y: 10 }, { x: 50, y: 22 }, { x: -50, y: 22 }], true);
 
-    // Gold floral cloud rosettes on cloth
     tg.fillStyle(0xfacc15, 0.85);
     tg.fillCircle(-30, -3, 9);
     tg.fillCircle(30, -1, 10);
     tg.fillStyle(0xfef08a, 0.95);
     tg.fillCircle(0, -4, 8);
 
-    // Display items on table (scrolls, medicine packet)
     const scroll1 = this.scene.add.rectangle(-36, -14, 18, 9, 0xfef3c7).setStrokeStyle(1, 0x78350f);
     const scroll2 = this.scene.add.rectangle(-16, -17, 14, 7, 0xfef3c7).setStrokeStyle(1, 0x78350f);
     const herbJar = this.scene.add.circle(38, -14, 7, 0x059669).setStrokeStyle(1.5, 0xd4af37);
 
-    tableContainer.add([tableShadow, tg, scroll1, scroll2, herbJar]);
-    shop.add(tableContainer);
+    c.add([tg, scroll1, scroll2, herbJar]);
+    return c;
+  }
 
-    // 6. Straw mat with shoes neatly arranged beside the table at (300, 500)
-    const matContainer = this.scene.add.container(300, 500);
-    const mat = this.scene.add.rectangle(0, 0, 46, 30, 0xc4b595).setStrokeStyle(1.5, 0x8a7a58);
-    const shoeL = this.scene.add.ellipse(-8, 0, 10, 16, 0x991b1b).setStrokeStyle(1, 0x450a0a);
-    const shoeR = this.scene.add.ellipse(8, 0, 10, 16, 0x991b1b).setStrokeStyle(1, 0x450a0a);
-    matContainer.add([mat, shoeL, shoeR]);
-    shop.add(matContainer);
-
-    // 7. Wicker herb drying baskets (Nong / nia phơi thảo mộc)
-    const basket1 = this.createHerbBasket(370, 390, 0x4d7c0f); // Green medicinal leaves
-    const basket2 = this.createHerbBasket(450, 430, 0xd97706); // Golden ginseng powder / root slices
-    const basket3 = this.createHerbBasket(500, 400, 0x15803d); // Dark healing herbs
-    const basket4 = this.createHerbBasket(545, 445, 0xb91c1c); // Red wolfberries (kỷ tử)
-    shop.add([basket1, basket2, basket3, basket4]);
-
-    // 8. Ceramic medicine jugs & jars (Bình gốm & vò thuốc lớn)
-    const jar1 = this.createCeramicJar(485, 470, 0x78350f, 20, 28);
-    const jar2 = this.createCeramicJar(525, 480, 0x92400e, 24, 32);
-    const jar3 = this.createCeramicJar(285, 460, 0xd97706, 18, 24);
-    shop.add([jar1, jar2, jar3]);
-
-    // 9. Ancient stone pagoda lantern at (380, 550) (Đèn đá hoa đăng cổ)
-    const stoneLantern = this.createStonePagodaLantern(380, 550);
-    shop.add(stoneLantern);
-
-    shop.setDepth(350);
-
-    // Static physics collider behind counter and shop wall
-    if (this.obstacles) {
-      const col = this.obstacles.create(320, 320, "entity-dot");
-      col.setSize(480, 220);
-      col.setVisible(false);
-      col.refreshBody();
-    }
+  createStrawMat() {
+    const c = this.scene.add.container(0, 0);
+    c.add(this.scene.add.rectangle(0, 0, 46, 30, 0xc4b595).setStrokeStyle(1.5, 0x8a7a58));
+    c.add(this.scene.add.ellipse(-8, 0, 10, 16, 0x991b1b).setStrokeStyle(1, 0x450a0a));
+    c.add(this.scene.add.ellipse(8, 0, 10, 16, 0x991b1b).setStrokeStyle(1, 0x450a0a));
+    return c;
   }
 
   createSunshadeUmbrella(x, y) {
@@ -441,142 +509,102 @@ export class WorldManager {
   }
 
   /**
-   * Tiền Trang (Bank & Treasury at north-east avenue)
+   * Tiền Trang (Bank & Treasury) — isometric prism with a red lacquered body.
    */
   drawBankShop() {
-    const bx = 1650;
-    const by = 320;
-    const group = this.scene.add.container(bx, by);
-
-    // Terrace base
-    const base = this.scene.add.rectangle(0, 70, 360, 60, 0x57534e).setStrokeStyle(2, 0x292524);
-    const steps = this.scene.add.rectangle(0, 95, 120, 20, 0x78716c).setStrokeStyle(1.5, 0x44403c);
-
-    // Wall facade
-    const wall = this.scene.add.rectangle(0, 0, 330, 110, 0x6b2e2b).setStrokeStyle(3, 0x3d1715);
-
-    // Red lacquered columns with gold bases
-    for (let i = -2; i <= 2; i++) {
-      const colX = i * 70;
-      group.add(this.scene.add.rectangle(colX, 0, 16, 110, 0x991b1b).setStrokeStyle(1.5, 0x450a0a));
-      group.add(this.scene.add.rectangle(colX, 50, 22, 10, 0xd4af37));
-    }
-
-    // Main vault door with heavy brass rings
-    const door = this.scene.add.rectangle(0, 15, 60, 75, 0x271915).setStrokeStyle(2, 0xd4af37);
-    const ringL = this.scene.add.circle(-12, 15, 5, 0xeab308);
-    const ringR = this.scene.add.circle(12, 15, 5, 0xeab308);
-
-    // Curved imperial tile roof
-    const roof = this.scene.add.triangle(0, -55, -190, 35, 0, -60, 190, 35, 0x262e38).setStrokeStyle(3, 0xd4af37);
-
-    // Plaque "TIỀN TRANG"
-    const plaque = this.scene.add.rectangle(0, -42, 130, 28, 0x181816).setStrokeStyle(2, 0xd4af37);
-    const text = this.scene.add.text(0, -42, "錢 莊 • TIỀN TRANG", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "13px",
-      color: "#ffdf7a",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-
-    group.add([base, steps, wall, door, ringL, ringR, roof, plaque, text]);
-    group.setDepth(by + 100);
+    this.drawIsoBuilding({
+      x: 1460,
+      y: 200,
+      w: 380,
+      d: 250,
+      height: 180,
+      wallLeft: 0x8a3b34,
+      wallRight: 0x6b2e2b,
+      roof: 0x262e38,
+      roofEdge: 0xd4af37,
+      label: "錢 莊 • TIỀN TRANG"
+    });
 
     if (this.obstacles) {
-      const col = this.obstacles.create(bx, by + 40, "entity-dot");
-      col.setSize(330, 90);
+      const col = this.obstacles.create(1650, 300, "entity-dot");
+      col.setSize(360, 150);
       col.setVisible(false);
       col.refreshBody();
     }
   }
 
   /**
-   * Tiểu Viễn Lâu (Famous Grand Tavern at south-west avenue)
+   * Tiểu Viễn Lâu (Famous Grand Tavern) — isometric prism with a wine flag.
    */
   drawTavernShop() {
-    const tx = 240;
-    const ty = 1020;
-    const group = this.scene.add.container(tx, ty);
+    this.drawIsoBuilding({
+      x: 70,
+      y: 900,
+      w: 340,
+      d: 230,
+      height: 200,
+      wallLeft: 0x6b432b,
+      wallRight: 0x50321f,
+      roof: 0x242d38,
+      roofEdge: 0x9c7747,
+      label: "酒 樓 • TIỂU VIỄN LÂU"
+    });
 
-    // Ground shadow
-    const shadow = this.scene.add.ellipse(0, 110, 360, 40, 0x141813, 0.4);
-    // Wooden deck
-    const deck = this.scene.add.rectangle(0, 90, 340, 40, 0x6e4e37).setStrokeStyle(2, 0x3d2719);
-    // Tavern lower floor
-    const floor1 = this.scene.add.rectangle(0, 20, 300, 110, 0x5e3a24).setStrokeStyle(2.5, 0x2e1a0d);
-    // Tavern upper floor
-    const floor2 = this.scene.add.rectangle(0, -65, 260, 80, 0x6b432b).setStrokeStyle(2, 0x2e1a0d);
-    // Upper balcony lattice railing
-    const balcony = this.scene.add.rectangle(0, -30, 270, 16, 0x3d2415).setStrokeStyle(1.5, 0xb45309);
-    // Multi-tier pagoda roof
-    const roof1 = this.scene.add.triangle(0, -20, -170, 25, 0, -35, 170, 25, 0x242d38).setStrokeStyle(2.5, 0x9c7747);
-    const roof2 = this.scene.add.triangle(0, -100, -155, 25, 0, -45, 155, 25, 0x1f2937).setStrokeStyle(2.5, 0xd4af37);
+    // Wine flag pole "酒" (Tửu) in front of the tavern
+    const flagPole = this.scene.add.container(0, 0);
+    flagPole.add(this.scene.add.rectangle(0, 0, 5, 140, 0x4a3420));
+    flagPole.add(this.scene.add.rectangle(24, -32, 45, 45, 0xdc2626).setStrokeStyle(2, 0x7f1d1d));
+    flagPole.add(
+      this.scene.add
+        .text(24, -32, "酒", { fontFamily: "serif", fontSize: "24px", color: "#ffffff", fontStyle: "bold" })
+        .setOrigin(0.5)
+    );
+    this.placeProp(flagPole, 470, 1080);
 
-    // Plaque "TIỂU VIỄN LÂU"
-    const plaque = this.scene.add.rectangle(0, 10, 140, 26, 0x181816).setStrokeStyle(2, 0xd4af37);
-    const text = this.scene.add.text(0, 10, "酒 樓 • TIỂU VIỄN LÂU", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "12px",
-      color: "#ffdf7a",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-
-    // Wine flag pole with crimson flag "酒" (Tửu)
-    const pole = this.scene.add.rectangle(160, 30, 5, 140, 0x4a3420);
-    const flag = this.scene.add.rectangle(185, -15, 45, 45, 0xdc2626).setStrokeStyle(2, 0x7f1d1d);
-    const flagText = this.scene.add.text(185, -15, "酒", {
-      fontFamily: "serif",
-      fontSize: "24px",
-      color: "#ffffff",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-
-    // Casks outside
-    const cask1 = this.scene.add.ellipse(-110, 85, 36, 26, 0x78350f).setStrokeStyle(1.5, 0x361605);
-    const cask2 = this.scene.add.ellipse(-80, 85, 36, 26, 0x78350f).setStrokeStyle(1.5, 0x361605);
-
-    group.add([shadow, deck, floor1, floor2, balcony, roof1, roof2, plaque, text, pole, flag, flagText, cask1, cask2]);
-    group.setDepth(ty + 110);
+    // Wine casks outside
+    this.placeProp(
+      this.scene.add.container(0, 0, [this.scene.add.ellipse(0, 0, 36, 26, 0x78350f).setStrokeStyle(1.5, 0x361605)]),
+      130,
+      1120
+    );
+    this.placeProp(
+      this.scene.add.container(0, 0, [this.scene.add.ellipse(0, 0, 36, 26, 0x6b2f0d).setStrokeStyle(1.5, 0x361605)]),
+      175,
+      1140
+    );
 
     if (this.obstacles) {
-      const col = this.obstacles.create(tx, ty + 50, "entity-dot");
-      col.setSize(300, 100);
+      const col = this.obstacles.create(240, 1010, "entity-dot");
+      col.setSize(320, 130);
       col.setVisible(false);
       col.refreshBody();
     }
   }
 
   /**
-   * Võ Quán Biện Kinh (Martial Arts Academy at south-east avenue)
+   * Võ Quán Biện Kinh (Martial Arts Academy) — isometric prism with training gear.
    */
   drawMartialAcademy() {
-    const mx = 1750;
-    const my = 850;
-    const group = this.scene.add.container(mx, my);
+    this.drawIsoBuilding({
+      x: 1580,
+      y: 720,
+      w: 360,
+      d: 240,
+      height: 165,
+      wallLeft: 0x6b5540,
+      wallRight: 0x4d3829,
+      roof: 0x2d3748,
+      roofEdge: 0x94a3b8,
+      label: "武 館 • VÕ QUÁN"
+    });
 
-    // Platform
-    const platform = this.scene.add.rectangle(0, 60, 380, 90, 0x574f44).setStrokeStyle(2, 0x332e27);
-    const hall = this.scene.add.rectangle(0, -10, 320, 120, 0x4d3829).setStrokeStyle(3, 0x261a11);
-    const roof = this.scene.add.triangle(0, -65, -185, 30, 0, -55, 185, 30, 0x2d3748).setStrokeStyle(3, 0x94a3b8);
-
-    const plaque = this.scene.add.rectangle(0, -35, 170, 28, 0x111827).setStrokeStyle(2, 0xf59e0b);
-    const text = this.scene.add.text(0, -35, "武 館 • VÕ QUÁN", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "13px",
-      color: "#fef08a",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-
-    const dummy1 = this.createTrainingDummy(-110, 65);
-    const dummy2 = this.createTrainingDummy(-60, 65);
-    const weaponRack = this.createHeavyWeaponRack(100, 65);
-
-    group.add([platform, hall, roof, plaque, text, dummy1, dummy2, weaponRack]);
-    group.setDepth(my + 100);
+    this.placeProp(this.createTrainingDummy(0, 0), 1650, 1030);
+    this.placeProp(this.createTrainingDummy(0, 0), 1720, 1050);
+    this.placeProp(this.createHeavyWeaponRack(0, 0), 1870, 1005);
 
     if (this.obstacles) {
-      const col = this.obstacles.create(mx, my + 30, "entity-dot");
-      col.setSize(320, 100);
+      const col = this.obstacles.create(1760, 820, "entity-dot");
+      col.setSize(340, 140);
       col.setVisible(false);
       col.refreshBody();
     }
@@ -601,65 +629,54 @@ export class WorldManager {
   }
 
   /**
-   * Vạn Sự Thông Đình Đài (Octagonal Central Pavilion)
+   * Vạn Sự Thông Đình Đài (Central Pavilion) — isometric prism, jade plaque.
    */
   drawCentralPavilion() {
-    const cx = 1160;
-    const cy = 420;
-    const group = this.scene.add.container(cx, cy);
-
-    // Podium shadow
-    const shadow = this.scene.add.ellipse(0, 65, 240, 50, 0x141813, 0.4);
-    // Octagonal granite podium
-    const base = this.scene.add.circle(0, 45, 95, 0x635b4f).setStrokeStyle(2.5, 0x3d362b);
-    const innerBase = this.scene.add.circle(0, 42, 80, 0x787063).setStrokeStyle(1.5, 0x473f33);
-
-    // Columns
-    const col1 = this.scene.add.rectangle(-55, 10, 14, 80, 0x3b2416).setStrokeStyle(1.5, 0x1f1109);
-    const col2 = this.scene.add.rectangle(55, 10, 14, 80, 0x3b2416).setStrokeStyle(1.5, 0x1f1109);
-
-    // Pagoda tile roof
-    const roof = this.scene.add.triangle(0, -35, -135, 30, 0, -65, 135, 30, 0x1e2e38).setStrokeStyle(3, 0x10b981);
-
-    // Jade plaque "VẠN SỰ THÔNG"
-    const plaque = this.scene.add.rectangle(0, -42, 140, 24, 0x064e3b).setStrokeStyle(2, 0x34d399);
-    const text = this.scene.add.text(0, -42, "萬 事 通 • VẠN SỰ THÔNG", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "11px",
-      color: "#a7f3d0",
-      fontStyle: "bold"
-    }).setOrigin(0.5);
-
-    group.add([shadow, base, innerBase, col1, col2, roof, plaque, text]);
-    group.setDepth(cy + 65);
+    this.drawIsoBuilding({
+      x: 1080,
+      y: 360,
+      w: 170,
+      d: 140,
+      height: 175,
+      wallLeft: 0x3b2416,
+      wallRight: 0x2c1b10,
+      roof: 0x1e2e38,
+      roofEdge: 0x10b981,
+      label: "萬 事 通 • VẠN SỰ THÔNG",
+      labelColor: "#a7f3d0"
+    });
 
     if (this.obstacles) {
-      const col = this.obstacles.create(cx, cy + 45, "entity-dot");
-      col.setSize(140, 60);
+      const col = this.obstacles.create(1165, 460, "entity-dot");
+      col.setSize(150, 80);
       col.setVisible(false);
       col.refreshBody();
     }
   }
 
   /**
-   * Dragon Balustrade (Lan can đá chạm rồng - matching bottom-right of user screenshot)
-   * Positioned at the bottom-right corner of the player view around (1140, 880)
+   * Dragon Balustrade — a low isometric stone platform with the carved dragon
+   * head kept as a billboard prop on its step.
    */
   drawDragonBalustrades() {
-    const rx = 1140;
-    const ry = 880;
-    const group = this.scene.add.container(rx, ry);
+    this.drawIsoBuilding({
+      x: 1060,
+      y: 860,
+      w: 170,
+      d: 120,
+      height: 34,
+      wallLeft: 0x8a8477,
+      wallRight: 0x747066,
+      roof: 0x948e82,
+      roofEdge: 0x575249,
+      label: null
+    });
 
-    // Stone ramp steps
-    const step1 = this.scene.add.rectangle(0, 20, 160, 24, 0x8a8477).setStrokeStyle(2, 0x575249);
-    const step2 = this.scene.add.rectangle(15, 36, 160, 24, 0x7a7468).setStrokeStyle(2, 0x484339);
-
-    // Carved stone dragon head & ramp balustrade
+    // Carved stone dragon head sculpture
+    const dragon = this.scene.add.container(0, 0);
     const dragonG = this.scene.add.graphics();
     dragonG.fillStyle(0x948e82, 1);
     dragonG.lineStyle(2, 0x4f4a3f, 1);
-
-    // Dragon curved balustrade body
     dragonG.fillPoints([
       { x: -50, y: 10 },
       { x: 70, y: 35 },
@@ -672,46 +689,21 @@ export class WorldManager {
       { x: 70, y: 5 },
       { x: -50, y: -20 }
     ], true);
-
-    // Dragon head sculpted finial facing North-West towards plaza
     dragonG.fillStyle(0xa8a296, 1);
     dragonG.fillCircle(-55, -22, 18);
     dragonG.strokeCircle(-55, -22, 18);
-
-    // Dragon snout, horn, and eye
-    dragonG.fillPoints([
-      { x: -75, y: -26 },
-      { x: -55, y: -34 },
-      { x: -50, y: -16 }
-    ], true);
-    dragonG.strokePoints([
-      { x: -75, y: -26 },
-      { x: -55, y: -34 },
-      { x: -50, y: -16 }
-    ], true);
-
-    // Dragon horn
     dragonG.fillStyle(0x6e685c, 1);
     dragonG.fillTriangle(-50, -36, -42, -52, -36, -34);
     dragonG.strokeTriangle(-50, -36, -42, -52, -36, -34);
-
-    // Stone Pearl in dragon's jaws
     dragonG.fillStyle(0xfef08a, 1);
     dragonG.fillCircle(-70, -20, 6);
-
-    // Dragon Eye
     dragonG.fillStyle(0x18181b, 1);
     dragonG.fillCircle(-58, -25, 3.5);
-
-    // Lotus bud baluster post
-    const post = this.scene.add.rectangle(-40, 20, 16, 44, 0x8a8477).setStrokeStyle(1.5, 0x575249);
-    const lotusBud = this.scene.add.circle(-40, -4, 10, 0xa8a296).setStrokeStyle(1.5, 0x575249);
-
-    group.add([step1, step2, dragonG, post, lotusBud]);
-    group.setDepth(ry + 20);
+    dragon.add(dragonG);
+    this.placeProp(dragon, 1130, 960);
 
     if (this.obstacles) {
-      const col = this.obstacles.create(rx, ry + 15, "entity-dot");
+      const col = this.obstacles.create(1140, 895, "entity-dot");
       col.setSize(150, 70);
       col.setVisible(false);
       col.refreshBody();
@@ -732,7 +724,8 @@ export class WorldManager {
    * Build authentic JX2 NPC figure with overhead name
    */
   createNPC(x, y, name, type = "scholar") {
-    const c = this.scene.add.container(x, y);
+    const npcAnchor = toIso(x, y);
+    const c = this.scene.add.container(npcAnchor.x, npcAnchor.y);
 
     // 1. Ground shadow
     const shadow = this.scene.add.ellipse(0, 24, 34, 12, 0x121712, 0.45);
@@ -1033,7 +1026,7 @@ export class WorldManager {
     }).setOrigin(0.5);
 
     c.add([shadow, bodyContainer, nameLabel]);
-    c.setDepth(y + 20);
+    c.setDepth(isoDepth(x, y));
 
     // Obstacle collider so players can't walk inside NPCs
     if (this.obstacles) {
@@ -1049,7 +1042,11 @@ export class WorldManager {
   drawWorldBorder() {
     const g = this.scene.add.graphics();
     g.lineStyle(4, 0x9a8657, 0.5);
-    g.strokeRect(6, 6, this.width - 12, this.height - 12);
+    g.strokePoints(
+      [toIso(6, 6), toIso(this.width - 6, 6), toIso(this.width - 6, this.height - 6), toIso(6, this.height - 6)],
+      true,
+      true
+    );
   }
 
   /**

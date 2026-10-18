@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
+import { toIso, isoDepth } from "./isoProjection.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -162,6 +163,7 @@ export class CombatSystem {
 
     const facingRight = this.player.visual.scaleX >= 0;
     const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.player.x, this.player.y);
 
     // Broadcast attack to other players via network
     this.scene.networkClient?.sendAttack?.({
@@ -173,8 +175,8 @@ export class CombatSystem {
 
     const slash = this.scene.add
       .arc(
-        this.player.x + slashOffsetX,
-        this.player.y - 7,
+        base.x + slashOffsetX,
+        base.y - 7,
         34,
         facingRight ? -70 : 110,
         facingRight ? 70 : 250,
@@ -183,7 +185,7 @@ export class CombatSystem {
         0.9
       )
       .setStrokeStyle(5, 0xf2e3bd, 0.95)
-      .setDepth(this.player.y + 10);
+      .setDepth(isoDepth(this.player.x, this.player.y) + 10);
 
     this.scene.tweens.add({
       targets: slash,
@@ -245,10 +247,11 @@ export class CombatSystem {
       facingRight: this.player.visual.scaleX >= 0
     });
 
+    const ringBase = toIso(this.player.x, this.player.y);
     const ring = this.scene.add
-      .circle(this.player.x, this.player.y, 24, 0x80d7e9, 0.2)
+      .circle(ringBase.x, ringBase.y, 24, 0x80d7e9, 0.2)
       .setStrokeStyle(4, 0xb8e9f0, 0.9)
-      .setDepth(this.player.y + 5);
+      .setDepth(isoDepth(this.player.x, this.player.y) + 5);
 
     this.scene.tweens.add({
       targets: ring,
@@ -524,7 +527,8 @@ export class CombatSystem {
       expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
     };
 
-    drop.visual = this.scene.add.container(x, y).setDepth(y + 5);
+    const dropIso = toIso(x, y);
+    drop.visual = this.scene.add.container(dropIso.x, dropIso.y).setDepth(isoDepth(x, y) + 5);
     if (!collectable) {
       drop.visual.setAlpha(0.55);
     }
@@ -553,10 +557,8 @@ export class CombatSystem {
         return;
       }
 
-      drop.visual.setPosition(
-        drop.x,
-        drop.y + Math.sin(time / 180 + drop.phase) * 4
-      );
+      const dropIso = toIso(drop.x, drop.y + Math.sin(time / 180 + drop.phase) * 4);
+      drop.visual.setPosition(dropIso.x, dropIso.y);
 
       if (
         Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38
@@ -589,8 +591,9 @@ export class CombatSystem {
   }
 
   showFloatText(x, y, text, color) {
+    const base = toIso(x, y);
     const label = this.scene.add
-      .text(x, y, text, {
+      .text(base.x, base.y, text, {
         fontFamily: "Arial",
         fontSize: "14px",
         fontStyle: "bold",
@@ -603,7 +606,7 @@ export class CombatSystem {
 
     this.scene.tweens.add({
       targets: label,
-      y: y - 35,
+      y: base.y - 35,
       alpha: 0,
       duration: 800,
       onComplete: () => label.destroy()

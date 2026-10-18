@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
+import { toIso, isoDepth } from "./isoProjection.js";
 
 export class Player {
   /**
@@ -57,24 +58,25 @@ export class Player {
   }
 
   createVisuals(x, y) {
-    this.visual = this.scene.add.container(x, y);
-    this.visual.setDepth(y);
+    const iso = toIso(x, y);
+    this.visual = this.scene.add.container(iso.x, iso.y);
+    this.visual.setDepth(isoDepth(x, y));
     this.drawHero(this.visual);
 
-    this.nameText = this.scene.add.text(x, y - 60, this.name, {
+    this.nameText = this.scene.add.text(iso.x, iso.y - 60, this.name, {
       fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "12px",
       color: "#5cfc5c",
       stroke: "#081008",
       strokeThickness: 2,
       fontStyle: "bold"
-    }).setOrigin(0.5).setDepth(y + 100);
+    }).setOrigin(0.5).setDepth(isoDepth(x, y) + 100);
 
     // Health bar sits between the name and the character's head
-    const healthBar = createHealthBar(this.scene, x, y);
+    const healthBar = createHealthBar(this.scene, iso.x, iso.y);
     this.hpBack = healthBar.back;
     this.hpFill = healthBar.fill;
-    this.updateHealthBar(x, y);
+    this.updateHealthBar(iso.x, iso.y, isoDepth(x, y));
   }
 
   /**
@@ -362,21 +364,23 @@ export class Player {
       this.shadow.setAlpha(0.45);
     }
 
-    // Depth sorting based on Y position
-    this.sprite.setDepth(this.sprite.y);
-    this.visual.setPosition(this.sprite.x, this.sprite.y);
-    this.visual.setDepth(this.sprite.y);
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 60 + this.body.y * 0.35);
-    this.nameText.setDepth(this.sprite.y + 100);
-    this.updateHealthBar(this.sprite.x, this.sprite.y + this.body.y * 0.35, this.sprite.y);
+    // Depth sorting based on the isometric position of the ground cell
+    const iso = toIso(this.sprite.x, this.sprite.y);
+    const depth = isoDepth(this.sprite.x, this.sprite.y);
+    this.visual.setPosition(iso.x, iso.y);
+    this.visual.setDepth(depth);
+    this.nameText.setPosition(iso.x, iso.y - 60 + this.body.y * 0.35);
+    this.nameText.setDepth(depth + 100);
+    this.updateHealthBar(iso.x, iso.y + this.body.y * 0.35, depth);
   }
 
   spawnFootstepDust(x, y, vx, vy) {
+    const base = toIso(x, y);
     const offsetX = -Math.sign(vx) * (7 + Math.random() * 4);
     const offsetY = (Math.random() - 0.5) * 3;
 
-    const dust = this.scene.add.ellipse(x + offsetX, y + offsetY, 7, 4, 0xc4b998, 0.42);
-    dust.setDepth(y - 2);
+    const dust = this.scene.add.ellipse(base.x + offsetX, base.y + offsetY, 7, 4, 0xc4b998, 0.42);
+    dust.setDepth(isoDepth(x, y) - 2);
 
     this.scene.tweens.add({
       targets: dust,
@@ -511,10 +515,13 @@ export class Player {
   setPosition(x, y) {
     this.stopMovement();
     this.sprite.setPosition(x, y);
-    this.visual.setPosition(x, y);
-    this.nameText.setPosition(x, y - 60);
-    this.nameText.setDepth(y + 100);
-    this.updateHealthBar(x, y);
+    const iso = toIso(x, y);
+    const depth = isoDepth(x, y);
+    this.visual.setPosition(iso.x, iso.y);
+    this.visual.setDepth(depth);
+    this.nameText.setPosition(iso.x, iso.y - 60);
+    this.nameText.setDepth(depth + 100);
+    this.updateHealthBar(iso.x, iso.y, depth);
   }
 
   respawn() {
