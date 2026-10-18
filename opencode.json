@@ -49,9 +49,9 @@
     },
     "verifier": {
       "name": "verifier",
-      "description": "Checker agent for L2+ changes. Reviews diffs and test evidence; APPROVE or REJECT only.",
+      "description": "Checker agent for L2+ changes. Applies the code-review-and-quality five-axis review to the diff and test evidence; APPROVE or REJECT only.",
       "mode": "subagent",
-      "prompt": "Review the supplied diff or worktree summary against project rules, tests, gate.yaml, and docs/safety.md. Do not edit files. Respond with APPROVE or REJECT and concise evidence.",
+      "prompt": "Read AGENTS.md, gate.yaml, docs/safety.md, the approved BACKLOG item, and skills/verifier/SKILL.md. Load the code-review-and-quality skill and run its five-axis review (correctness, readability, architecture, security, performance) on the supplied diff or worktree summary. Label findings Critical/Required/Optional/Nit/FYI. Do not edit files. Respond with APPROVE or REJECT plus concise evidence.",
       "permission": {
         "bash": "ask",
         "edit": "deny"
