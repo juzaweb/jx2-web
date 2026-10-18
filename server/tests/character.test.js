@@ -49,7 +49,6 @@ describe("Character API Test Suite", () => {
     assert.equal(json.success, true);
     assert.deepEqual(json.data.characters, []);
     assert.equal(json.data.maxSlots, 3);
-    assert.equal(json.data.deletedCount, 0);
   });
 
   test("POST /users/:id/characters creates a character", async () => {
@@ -91,7 +90,7 @@ describe("Character API Test Suite", () => {
     assert.equal(bad.status, 400);
   });
 
-  test("POST rejects a duplicate character name (409)", async () => {
+  test("POST rejects a duplicate character name in the same account (409)", async () => {
     const userId = nextUser();
     await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
@@ -102,6 +101,24 @@ describe("Character API Test Suite", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "lệnh hồ xung" })
+    });
+    assert.equal(res.status, 409);
+    const json = await res.json();
+    assert.equal(json.success, false);
+  });
+
+  test("POST rejects a name already used by another account (global uniqueness, 409)", async () => {
+    const first = await fetch(`${baseUrl}/users/${nextUser()}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Tieu Phong" })
+    });
+    assert.equal(first.status, 201);
+
+    const res = await fetch(`${baseUrl}/users/${nextUser()}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "tieu phong" })
     });
     assert.equal(res.status, 409);
     const json = await res.json();
@@ -138,12 +155,13 @@ describe("Character API Test Suite", () => {
     assert.equal(res.status, 409);
   });
 
-  test("DELETE soft-deletes a character and it can be restored", async () => {
+  test("DELETE permanently removes a character and frees its name", async () => {
+    const otherUser = nextUser();
     const userId = nextUser();
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Độc Cô Cầu Bại" })
+      body: JSON.stringify({ name: "Vô Kỵ" })
     }).then((r) => r.json());
     const { id } = created.data.character;
 
@@ -153,26 +171,22 @@ describe("Character API Test Suite", () => {
     assert.equal(delRes.status, 200);
     const delJson = await delRes.json();
     assert.deepEqual(delJson.data.characters, []);
-    assert.equal(delJson.data.deletedCount, 1);
 
-    const restoreRes = await fetch(`${baseUrl}/users/${userId}/characters/restore`, {
-      method: "POST"
+    // The name is released and can be claimed by any account afterwards.
+    const recreated = await fetch(`${baseUrl}/users/${otherUser}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Vô Kỵ" })
     });
-    assert.equal(restoreRes.status, 200);
-    const restoreJson = await restoreRes.json();
-    assert.equal(restoreJson.data.character.name, "Độc Cô Cầu Bại");
-    assert.equal(restoreJson.data.characters.length, 1);
-    assert.equal(restoreJson.data.deletedCount, 0);
+    assert.equal(recreated.status, 201);
   });
 
-  test("POST /characters/restore returns 404 when nothing to restore", async () => {
+  test("DELETE returns 404 for an unknown character", async () => {
     const userId = nextUser();
-    const res = await fetch(`${baseUrl}/users/${userId}/characters/restore`, {
-      method: "POST"
+    const res = await fetch(`${baseUrl}/users/${userId}/characters/char_missing`, {
+      method: "DELETE"
     });
     assert.equal(res.status, 404);
-    const json = await res.json();
-    assert.equal(json.success, false);
   });
 });
 
@@ -208,6 +222,50 @@ describe("CharacterDatabase schema migration", () => {
     const created = db.create("u1", "Mới", "nu", 3);
     assert.equal(created.gender, "nu");
     assert.equal(created.appearance, 3);
+
+    db.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  test("purges soft-deleted rows, renames cross-account duplicates and enforces global uniqueness", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-mig-soft-"));
+    const dbPath = path.join(dir, "legacy-soft.sqlite");
+
+    const { DatabaseSync } = await import("node:sqlite");
+    const legacy = new DatabaseSync(dbPath);
+    legacy.exec(`
+      CREATE TABLE characters (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        gender TEXT NOT NULL DEFAULT 'nam',
+        appearance INTEGER NOT NULL DEFAULT 0,
+        level INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        last_played INTEGER,
+        deleted_at INTEGER
+      );
+      CREATE UNIQUE INDEX idx_characters_user_name
+        ON characters(user_id, name COLLATE NOCASE) WHERE deleted_at IS NULL;
+    `);
+    // Two accounts own the same name; the older row keeps it, the newer is renamed.
+    legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c1', 'u1', 'Trùng', 1, 100)");
+    legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c2', 'u2', 'Trùng', 1, 200)");
+    // A soft-deleted row must be purged, freeing nothing but leaving no orphan.
+    legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at, deleted_at) VALUES ('c3', 'u3', 'Đã Xoá', 1, 300, 400)");
+    legacy.close();
+
+    const { CharacterDatabase } = await import("../src/data/characterDb.js");
+    const db = new CharacterDatabase(dbPath);
+
+    assert.equal(db.listByUser("u3").length, 0, "soft-deleted row is purged");
+    assert.equal(db.listByUser("u1")[0].name, "Trùng", "oldest row keeps the name");
+    assert.equal(db.listByUser("u2")[0].name, "Trùng-2", "newer duplicate is renamed");
+
+    // The global unique index is now active across accounts.
+    assert.throws(() => db.create("u4", "trùng"), (err) => err.code === "NAME_TAKEN");
+    // The purged name is free to use again.
+    assert.equal(db.create("u3", "Đã Xoá").name, "Đã Xoá");
 
     db.close();
     await fs.rm(dir, { recursive: true, force: true });

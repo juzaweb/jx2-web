@@ -1,7 +1,19 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — direct request (fix): other players did not appear on the minimap
-(Prior run: direct request (fix) — minimap stayed blank because its one-shot registration was lost.)
+Last run: 2026-10-18 — direct request (change): make character names globally unique + drop soft-delete.
+(Prior run: direct request (fix) — other players did not appear on the minimap.)
+
+## Globally unique character names + removed soft-delete (2026-10-18, direct request)
+
+- Request: "unique tên nhân vật" — character names must be unique across the whole server, not just within one account; clarifies to **remove soft-delete** entirely (a deleted character is gone, so its name is freed).
+- Change:
+  - **Server (`server/src/data/characterDb.js`):** the per-account partial index `idx_characters_user_name (user_id, name) WHERE deleted_at IS NULL` is replaced by a global `idx_characters_name (name COLLATE NOCASE)`; `listed/count/find` no longer filter on `deleted_at`; `softDelete` → `remove` (hard `DELETE`); `restoreLast`/`countDeletedByUser`/`deletedAt` deleted. `create` now rejects any name already used by *any* account (`NAME_TAKEN`, message "Tên nhân vật này đã được sử dụng.").
+  - **Migration (`_migrateLegacySchema`):** for a legacy DB, purge soft-deleted rows, drop the old index, rename cross-account duplicates (oldest keeps the name, later ones get `-2`, `-3`, … within the 16-char limit), then `ALTER TABLE … DROP COLUMN deleted_at` before the global unique index is created. New tables never carry `deleted_at`.
+  - **API:** `character.controller.js` drops `restoreCharacter` and all `deletedCount` fields; `character.routes.js` drops `POST …/characters/restore`.
+  - **Client:** `apiClient.restoreCharacter` removed; `CharacterSelectModal.jsx` drops the "Khôi phục nhân vật" button, `deletedCount` state, and the "Bạn có thể khôi phục lại" notice; the delete confirm now says "xoá vĩnh viễn".
+- Caveat: SQLite `COLLATE NOCASE` only folds ASCII case, so names differing only by non-ASCII casing (e.g. `Độc` vs `độc`) are treated as distinct — same as the previous per-account behavior.
+- Verify: `npm run build` ✅ · `npm test` ✅ **148 passed / 148** (15 files) · `npm run server:test` ✅ **52 passed / 52** (3 suites; new cross-account-duplicate, hard-delete-frees-name, DELETE-404, and legacy soft-delete/duplicate migration tests).
+
 
 ## Remote players missing from the minimap (2026-10-18, direct request)
 

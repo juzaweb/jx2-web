@@ -48,16 +48,15 @@ const mapRow = (row) => {
     appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
-    lastPlayed: row.last_played,
-    deletedAt: row.deleted_at
+    lastPlayed: row.last_played
   };
 };
 
 /**
  * CharacterDatabase
  * SQLite persistence layer for player characters in Giang Ho (jx2-web).
- * Characters are owned by a user account and soft-deleted so they can be
- * restored from the character-selection screen.
+ * A character belongs to a user account and is hard-deleted when removed.
+ * Character names are unique across the whole server (case-insensitive).
  */
 export class CharacterDatabase {
   constructor(dbPath = config.dbPath) {
@@ -89,13 +88,16 @@ export class CharacterDatabase {
         appearance INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
-        last_played INTEGER,
-        deleted_at INTEGER
+        last_played INTEGER
       );
+    `);
+
+    this._migrateLegacySchema();
+
+    this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_characters_user ON characters(user_id);
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_characters_user_name
-        ON characters(user_id, name COLLATE NOCASE)
-        WHERE deleted_at IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_characters_name
+        ON characters(name COLLATE NOCASE);
     `);
 
     // Migrate older databases that predate the gender/appearance columns.
@@ -111,36 +113,84 @@ export class CharacterDatabase {
     }
 
     this.stmtListByUser = this.db.prepare(
-      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played, deleted_at FROM characters WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at ASC"
+      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
     );
-    this.stmtCountActive = this.db.prepare(
-      "SELECT COUNT(*) AS count FROM characters WHERE user_id = ? AND deleted_at IS NULL"
+    this.stmtCountByUser = this.db.prepare(
+      "SELECT COUNT(*) AS count FROM characters WHERE user_id = ?"
     );
-    this.stmtCountDeleted = this.db.prepare(
-      "SELECT COUNT(*) AS count FROM characters WHERE user_id = ? AND deleted_at IS NOT NULL"
+    this.stmtFindByName = this.db.prepare(
+      "SELECT id FROM characters WHERE name = ? COLLATE NOCASE"
     );
-    this.stmtFindActiveByName = this.db.prepare(
-      "SELECT id FROM characters WHERE user_id = ? AND name = ? COLLATE NOCASE AND deleted_at IS NULL"
-    );
-    this.stmtFindActiveById = this.db.prepare(
-      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played, deleted_at FROM characters WHERE id = ? AND user_id = ? AND deleted_at IS NULL"
-    );
-    this.stmtFindLastDeleted = this.db.prepare(
-      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played, deleted_at FROM characters WHERE user_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 1"
+    this.stmtFindById = this.db.prepare(
+      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played FROM characters WHERE id = ? AND user_id = ?"
     );
     this.stmtInsert = this.db.prepare(
-      "INSERT INTO characters (id, user_id, name, gender, appearance, level, created_at, last_played, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+      "INSERT INTO characters (id, user_id, name, gender, appearance, level, created_at, last_played) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
-    this.stmtSoftDelete = this.db.prepare(
-      "UPDATE characters SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL"
-    );
-    this.stmtRestore = this.db.prepare(
-      "UPDATE characters SET deleted_at = NULL WHERE id = ? AND user_id = ?"
+    this.stmtDelete = this.db.prepare(
+      "DELETE FROM characters WHERE id = ? AND user_id = ?"
     );
   }
 
   /**
-   * List active characters for a user, oldest first.
+   * Migrate a legacy database that carries the removed soft-delete column:
+   * purge soft-deleted rows, drop the per-account index, rename cross-account
+   * duplicates (oldest keeps its name), then drop `deleted_at` so the global
+   * unique-name index can be created.
+   */
+  _migrateLegacySchema() {
+    const columns = this.db
+      .prepare("PRAGMA table_info(characters)")
+      .all()
+      .map((c) => c.name);
+    if (!columns.includes("deleted_at")) {
+      this.db.exec("DROP INDEX IF EXISTS idx_characters_user_name");
+      return;
+    }
+
+    this.db.exec("DELETE FROM characters WHERE deleted_at IS NOT NULL");
+    this.db.exec("DROP INDEX IF EXISTS idx_characters_user_name");
+
+    const duplicates = this.db
+      .prepare("SELECT name FROM characters GROUP BY name COLLATE NOCASE HAVING COUNT(*) > 1")
+      .all();
+    const rowsByName = this.db.prepare(
+      "SELECT id, name FROM characters WHERE name = ? COLLATE NOCASE ORDER BY created_at ASC, id ASC"
+    );
+    const rename = this.db.prepare("UPDATE characters SET name = ? WHERE id = ?");
+    const nameTaken = this.db.prepare(
+      "SELECT 1 AS found FROM characters WHERE name = ? COLLATE NOCASE LIMIT 1"
+    );
+
+    for (const { name } of duplicates) {
+      const [, ...losers] = rowsByName.all(name);
+      for (const loser of losers) {
+        rename.run(this._uniqueName(loser.name, nameTaken), loser.id);
+      }
+    }
+
+    this.db.exec("ALTER TABLE characters DROP COLUMN deleted_at");
+  }
+
+  /**
+   * Build a name that does not collide with an existing row, staying within
+   * MAX_NAME_LENGTH by trimming the original before appending a counter.
+   * @param {string} base
+   * @param {import("node:sqlite").StatementSync} nameTaken
+   * @returns {string}
+   */
+  _uniqueName(base, nameTaken) {
+    let n = 2;
+    for (;;) {
+      const suffix = `-${n}`;
+      const candidate = `${base.slice(0, MAX_NAME_LENGTH - suffix.length)}${suffix}`;
+      if (!nameTaken.get(candidate)) return candidate;
+      n += 1;
+    }
+  }
+
+  /**
+   * List characters owned by a user, oldest first.
    * @param {string} userId
    * @returns {Object[]}
    */
@@ -150,24 +200,13 @@ export class CharacterDatabase {
   }
 
   /**
-   * Count active characters for a user.
+   * Count characters owned by a user.
    * @param {string} userId
    * @returns {number}
    */
-  countActiveByUser(userId) {
+  countByUser(userId) {
     if (!isValidUserId(userId)) return 0;
-    const row = this.stmtCountActive.get(userId);
-    return row ? Number(row.count) : 0;
-  }
-
-  /**
-   * Count soft-deleted characters available for restore.
-   * @param {string} userId
-   * @returns {number}
-   */
-  countDeletedByUser(userId) {
-    if (!isValidUserId(userId)) return 0;
-    const row = this.stmtCountDeleted.get(userId);
+    const row = this.stmtCountByUser.get(userId);
     return row ? Number(row.count) : 0;
   }
 
@@ -209,14 +248,14 @@ export class CharacterDatabase {
     const rawAppearance = Number.isInteger(appearance) ? appearance : 0;
     const cleanAppearance = Math.min(Math.max(rawAppearance, 0), MAX_APPEARANCE);
 
-    if (this.countActiveByUser(userId) >= MAX_CHARACTER_SLOTS) {
+    if (this.countByUser(userId) >= MAX_CHARACTER_SLOTS) {
       const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
       err.code = "SLOT_LIMIT";
       throw err;
     }
 
-    if (this.stmtFindActiveByName.get(userId, cleanName)) {
-      const err = new Error("Tên nhân vật này đã tồn tại trong tài khoản.");
+    if (this.stmtFindByName.get(cleanName)) {
+      const err = new Error("Tên nhân vật này đã được sử dụng.");
       err.code = "NAME_TAKEN";
       throw err;
     }
@@ -225,48 +264,21 @@ export class CharacterDatabase {
     const createdAt = Date.now();
     this.stmtInsert.run(id, userId, cleanName, cleanGender, cleanAppearance, 1, createdAt, createdAt);
 
-    return mapRow(this.stmtFindActiveById.get(id, userId));
+    return mapRow(this.stmtFindById.get(id, userId));
   }
 
   /**
-   * Soft-delete a character.
+   * Permanently delete a character.
    * @param {string} userId
    * @param {string} characterId
    * @returns {boolean} True when a character was deleted
    */
-  softDelete(userId, characterId) {
+  remove(userId, characterId) {
     if (!isValidUserId(userId) || typeof characterId !== "string") {
       return false;
     }
-    const result = this.stmtSoftDelete.run(Date.now(), characterId, userId);
+    const result = this.stmtDelete.run(characterId, userId);
     return result.changes > 0;
-  }
-
-  /**
-   * Restore the most recently deleted character for a user.
-   * @param {string} userId
-   * @returns {Object|null} Restored character or null when none available
-   */
-  restoreLast(userId) {
-    if (!isValidUserId(userId)) return null;
-
-    const row = this.stmtFindLastDeleted.get(userId);
-    if (!row) return null;
-
-    if (this.countActiveByUser(userId) >= MAX_CHARACTER_SLOTS) {
-      const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
-      err.code = "SLOT_LIMIT";
-      throw err;
-    }
-
-    if (this.stmtFindActiveByName.get(userId, row.name)) {
-      const err = new Error("Không thể khôi phục vì đã có nhân vật trùng tên.");
-      err.code = "NAME_TAKEN";
-      throw err;
-    }
-
-    this.stmtRestore.run(row.id, userId);
-    return mapRow(this.stmtFindActiveById.get(row.id, userId));
   }
 
   /**
