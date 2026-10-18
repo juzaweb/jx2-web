@@ -7,6 +7,8 @@ import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { getQuantities } from "./items.js";
+import { NetworkClient } from "./networkClient.js";
+import { RemotePlayerManager } from "./remotePlayerManager.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -107,6 +109,65 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Scale resize handler
     this.scale.on("resize", () => this.updateCameraZoom());
+
+    // Real-time Multiplayer: Remote Player Manager & WebSocket Network Client
+    this.remotePlayerManager = new RemotePlayerManager(this, this.uiBridge);
+    this.networkClient = new NetworkClient();
+
+    this.networkClient.on("init_world", (payload) => {
+      this.remotePlayerManager.handleInitWorld(payload);
+      this.enemyManager.applyServerSnapshot(payload?.enemies);
+    });
+
+    this.networkClient.on("player_joined", (payload) => {
+      this.remotePlayerManager.handlePlayerJoined(payload);
+    });
+
+    this.networkClient.on("player_moved", (payload) => {
+      this.remotePlayerManager.handlePlayerMoved(payload);
+    });
+
+    this.networkClient.on("player_attacked", (payload) => {
+      this.remotePlayerManager.handlePlayerAttacked(payload);
+    });
+
+    this.networkClient.on("player_left", (payload) => {
+      this.remotePlayerManager.handlePlayerLeft(payload);
+    });
+
+    this.networkClient.on("player_chat", (payload) => {
+      if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
+        this.uiBridge.addLog(`${payload.sender}: ${payload.text}`, payload.channel || "near");
+      }
+    });
+
+    // Server-authoritative enemy state: damage, movement and respawn are shared
+    this.networkClient.on("enemy_hit", (payload) => {
+      this.enemyManager.applyEnemyState(payload);
+    });
+
+    this.networkClient.on("enemy_moved", (payload) => {
+      this.enemyManager.applyServerSnapshot(payload?.enemies);
+    });
+
+    this.networkClient.on("enemy_respawned", (payload) => {
+      this.enemyManager.applyEnemyState(payload);
+    });
+
+    this.networkClient.on("connected", () => {
+      this.sendNetworkJoin();
+      if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
+        this.uiBridge.addLog("Đã kết nối máy chủ Giang Hồ — Trực tuyến.", "system");
+      }
+    });
+
+    this.networkClient.on("disconnected", () => {
+      if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
+        this.uiBridge.addLog("Mất kết nối máy chủ. Đang tự động kết nối lại...", "system");
+      }
+    });
+
+    this.networkClient.connect();
 
     this.isPointerMoving = false;
 
@@ -229,16 +290,24 @@ export class JiangHuScene extends Phaser.Scene {
       }),
       bridge.on(EVENTS.ACTION_SET_PAUSED, (paused) => this.setPaused(paused)),
       bridge.on(EVENTS.SET_PLAYER_NAME, (name) => {
-        if (this.player) this.player.setName(name);
+        if (this.player) {
+          this.player.setName(name);
+          this.sendNetworkJoin();
+        }
+      }),
+      bridge.on(EVENTS.ACTION_CHAT, (payload) => {
+        if (this.networkClient?.isConnected) {
+          this.networkClient.sendChat(payload);
+        }
       })
     );
 
-    // Enemy respawn loop
+    // Enemy respawn loop (offline only — online, the server owns the respawn clock)
     this.spawnTimer = this.time.addEvent({
       delay: 9000,
       loop: true,
       callback: () => {
-        if (this.started && !this.isPaused) {
+        if (this.started && !this.isPaused && !this.networkClient?.isConnected) {
           this.enemyManager.respawnEnemies();
         }
       }
@@ -265,7 +334,12 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Initial Stats emit to React
     this.uiBridge.updateHud(this.player.stats);
-    this.uiBridge.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+    this.uiBridge.drawMinimap(
+      this.player,
+      this.enemyManager.getAll(),
+      WORLD_CONFIG,
+      this.remotePlayerManager?.getAll() || []
+    );
 
     // Auto-start game immediately without start modal
     this.startGame();
@@ -386,12 +460,60 @@ export class JiangHuScene extends Phaser.Scene {
     });
   }
 
+  sendNetworkJoin() {
+    if (!this.player || !this.networkClient?.isConnected) return;
+
+    let tabId = "";
+    if (typeof window !== "undefined") {
+      if (!window.__jx2TabSessionId) {
+        window.__jx2TabSessionId = Math.random().toString(36).slice(2, 8);
+      }
+      tabId = window.__jx2TabSessionId;
+    }
+
+    let playerId = `guest_${tabId || Math.random().toString(36).slice(2, 8)}`;
+    let username = this.player.name || "Lãng Khách";
+    let displayName = username;
+
+    try {
+      const sessionStr = typeof localStorage !== "undefined" ? localStorage.getItem("jx2_user_session") : null;
+      if (sessionStr) {
+        const parsed = JSON.parse(sessionStr);
+        if (parsed?.user?.id) {
+          playerId = `${parsed.user.id}_${tabId}`;
+          username = parsed.user.username || username;
+          displayName = parsed.user.displayName || username;
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    this.remotePlayerManager.setLocalPlayerId(playerId);
+    this.networkClient.join({
+      id: playerId,
+      username,
+      displayName,
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      vx: 0,
+      vy: 0,
+      direction: this.player.visual?.scaleX < 0 ? "left" : "right",
+      stance: this.player.currentStance || "front",
+      level: this.player.stats?.level || 1,
+      hp: this.player.stats?.hp || 100,
+      maxHp: this.player.stats?.maxHp || 100
+    });
+  }
+
   startGame() {
     this.started = true;
     this.setPaused(false);
     if (this.player?.sprite?.body) {
       this.player.sprite.body.enable = true;
     }
+
+    this.sendNetworkJoin();
 
     // Reload save for the active user session
     this.savedData = StorageManager.load();
@@ -429,6 +551,45 @@ export class JiangHuScene extends Phaser.Scene {
     // Update player movement and animation
     this.player.update(time, delta);
 
+    // Update remote players (interpolation and animations)
+    if (this.remotePlayerManager) {
+      this.remotePlayerManager.update(time, delta);
+    }
+
+    // Broadcast local player coordinates to network (throttled every 50ms)
+    if (this.networkClient?.isConnected) {
+      if (!this.lastNetworkMoveTime || time - this.lastNetworkMoveTime > 50) {
+        this.lastNetworkMoveTime = time;
+        const vx = Math.round(this.player.sprite?.body?.velocity?.x || 0);
+        const vy = Math.round(this.player.sprite?.body?.velocity?.y || 0);
+        const isMoving = Math.abs(vx) > 5 || Math.abs(vy) > 5;
+
+        if (isMoving || this.wasMovingLastSync) {
+          this.wasMovingLastSync = isMoving;
+          this.networkClient.sendMove({
+            x: Math.round(this.player.x),
+            y: Math.round(this.player.y),
+            vx,
+            vy,
+            direction: this.player.visual?.scaleX < 0 ? "left" : "right",
+            stance: this.player.currentStance || "front"
+          });
+        }
+      }
+
+      // Report enemy positions to the server (throttled) so players share one world state
+      if (!this.lastEnemySyncTime || time - this.lastEnemySyncTime > 500) {
+        this.lastEnemySyncTime = time;
+        const enemies = this.enemyManager
+          .getAlive()
+          .map((wolf) => ({ id: wolf.id, x: Math.round(wolf.x), y: Math.round(wolf.y) }));
+
+        if (enemies.length) {
+          this.networkClient.sendEnemyMove(enemies);
+        }
+      }
+    }
+
     // Update enemies and check attacks against player
     this.enemyManager.update(time, delta, this.player, (wolf) => {
       if (this.started && !this.isPaused) {
@@ -441,7 +602,12 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Update UI HUD & Minimap Radar
     this.uiBridge.updateHud(this.player.stats);
-    this.uiBridge.drawMinimap(this.player, this.enemyManager.getAll(), WORLD_CONFIG);
+    this.uiBridge.drawMinimap(
+      this.player,
+      this.enemyManager.getAll(),
+      WORLD_CONFIG,
+      this.remotePlayerManager?.getAll() || []
+    );
   }
 
   shutdown() {
@@ -451,6 +617,14 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.unsubscribers) {
       this.unsubscribers.forEach((unsub) => unsub());
       this.unsubscribers = [];
+    }
+    if (this.networkClient) {
+      this.networkClient.disconnect();
+      this.networkClient = null;
+    }
+    if (this.remotePlayerManager) {
+      this.remotePlayerManager.destroy();
+      this.remotePlayerManager = null;
     }
     if (this.uiBridge) {
       this.uiBridge.destroy();

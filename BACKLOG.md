@@ -157,6 +157,23 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ---
 
+## EPIC F — Multiplayer & Server Sync
+
+### F1 — Server-synced enemy state (position + HP) · `in-progress` · P1
+- **Why:** Each client runs its own `EnemyManager`, so a wolf killed on one screen keeps full HP on the screen next to it; the shared world (already live for player positions/chat) is missing its monster state.
+- **Acceptance:**
+  - A joining client receives the authoritative enemy roster (position, HP, dead flag) in `init_world`.
+  - Dealing damage (`damageEnemy`) reports `enemy_hit` to the server; the server owns HP and broadcasts the new value to every client, so a second player sees the same HP drop within one frame.
+  - Death and respawn are decided on the server (`enemy_hit` with `isDead`, then `enemy_respawned` after the respawn delay) so all clients agree on kill/respawn timing.
+  - Enemy positions reported by clients (`enemy_move`, throttled) are relayed to other clients when the drift is meaningful; clients only snap when the snapshot is far from their local AI position.
+  - Server input validation: unknown enemy ids, non-positive damage, un-joined sockets, and malformed position reports are ignored.
+  - Unit tests cover the client reconciliation rules (`src/game/enemySync.test.js`) and the WebSocket protocol (`server/tests/websocket.test.js`).
+- **Touches:** `server/src/websocket/gameSocket.js`, `src/game/enemy.js`, `src/game/enemySync.js`, `src/game/combat.js`, `src/game/game.js`, `src/game/networkClient.js`, tests.
+- **Maps to:** Social / MMO `[stretch]` — shared real-time world state (enemy HP/position).
+- **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
+
+---
+
 ## Definition of Done (every item)
 
 1. `npm run build` succeeds.

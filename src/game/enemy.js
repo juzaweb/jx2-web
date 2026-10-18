@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { reconcileEnemyState } from "./enemySync.js";
 
 export class Wolf {
   /**
@@ -128,6 +129,29 @@ export class Wolf {
     });
   }
 
+  /**
+   * Apply an authoritative server snapshot: health always, position only when far off.
+   * @param {{x?:number,y?:number,hp?:number,isDead?:boolean}} state
+   */
+  applyServerState(state = {}) {
+    if (!this.sprite.active) return;
+
+    const next = reconcileEnemyState(
+      { x: this.x, y: this.y, hp: this.hp, maxHp: this.maxHp, isDead: this.isDead },
+      state
+    );
+
+    this.hp = next.hp;
+
+    if (next.isDead) {
+      if (!this.isDead) this.die();
+    } else if (this.isDead) {
+      this.revive();
+    } else if (next.snap && this.sprite.body) {
+      this.sprite.body.reset(state.x, state.y);
+    }
+  }
+
   die() {
     this.isDead = true;
     this.sprite.body.enable = false;
@@ -173,6 +197,10 @@ export class EnemyManager {
     this.group = null;
   }
 
+  /**
+   * @param {Array<[number, number]>} positions spawn points, kept in sync with the
+   * server's `ENEMY_SPAWNS` in `server/src/websocket/gameSocket.js` (id = index)
+   */
   create(positions = [
     [840, 600],
     [950, 670],
@@ -211,5 +239,31 @@ export class EnemyManager {
 
   getAlive() {
     return this.enemies.filter((w) => w.active && !w.isDead);
+  }
+
+  /**
+   * @param {number} id
+   * @returns {Wolf|null}
+   */
+  getById(id) {
+    return this.enemies.find((wolf) => wolf.id === id) || null;
+  }
+
+  /**
+   * Apply one authoritative enemy update (a hit or a respawn)
+   * @param {Object} state
+   */
+  applyEnemyState(state = {}) {
+    const wolf = this.getById(state.id);
+    if (wolf) wolf.applyServerState(state);
+  }
+
+  /**
+   * Apply a list of authoritative snapshots: the world-init roster or relayed positions
+   * @param {Array<Object>} enemies
+   */
+  applyServerSnapshot(enemies) {
+    if (!Array.isArray(enemies)) return;
+    enemies.forEach((enemy) => this.applyEnemyState(enemy));
   }
 }
