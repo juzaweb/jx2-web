@@ -17,6 +17,10 @@ export class Player {
       maxHp: 100,
       mp: 60,
       maxMp: 60,
+      attack: 24,
+      defense: 6,
+      critRate: 0.12,
+      critDamage: 1.5,
       exp: 0,
       nextExp: 100,
       coins: 0,
@@ -535,5 +539,21 @@ export class Player {
 
   get y() {
     return this.sprite ? this.sprite.y : this.spawnY;
+  }
+
+  get attack() {
+    return this.stats?.attack ?? 24;
+  }
+
+  get defense() {
+    return this.stats?.defense ?? 6;
+  }
+
+  get critRate() {
+    return this.stats?.critRate ?? 0.12;
+  }
+
+  get critDamage() {
+    return this.stats?.critDamage ?? 1.5;
   }
 }

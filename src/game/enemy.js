@@ -14,6 +14,16 @@ export class Wolf {
     this.homeY = y;
     this.hp = 45;
     this.maxHp = 45;
+    this.attack = 12;
+    this.defense = 3;
+    this.critRate = 0.05;
+    this.critDamage = 1.5;
+    this.stats = {
+      attack: 12,
+      defense: 3,
+      critRate: 0.05,
+      critDamage: 1.5
+    };
     this.isDead = false;
     this.nextBite = 0;
 

@@ -37,6 +37,84 @@ export function playTone(frequency = 220, duration = 0.07, type = "sine", volume
   } catch (_) {}
 }
 
+/**
+ * Pure combat damage calculation applying attack-minus-defense mitigation,
+ * critical strike roll, variance, and a minimum floor of 1 damage.
+ *
+ * @param {Object} attacker - Attacker entity or stats object
+ * @param {Object} defender - Defender entity or stats object
+ * @param {Function|number} [rng=Math.random] - RNG function returning [0, 1) or static number
+ * @param {Object} [options={}] - Optional modifiers and overrides
+ * @param {number} [options.attack] - Override attacker attack power
+ * @param {number} [options.baseDamage] - Alias override for attack power
+ * @param {number} [options.defense] - Override defender defense
+ * @param {number} [options.critRate] - Override attacker crit rate
+ * @param {number} [options.critDamage] - Override attacker crit multiplier
+ * @param {number} [options.skillMult=1] - Skill multiplier applied to mitigated damage
+ * @param {number} [options.variance=0.1] - Variance fraction (e.g. 0.1 for ±10%, 0 to disable)
+ * @param {number} [options.critRoll] - Explicit roll for crit check (< critRate)
+ * @param {number} [options.varianceRoll] - Explicit roll for variance ([0, 1])
+ * @returns {{ damage: number, crit: boolean }}
+ */
+export function computeDamage(attacker, defender, rng = Math.random, options = {}) {
+  const nextRng = () => {
+    if (typeof rng === "function") return rng();
+    if (typeof rng === "number") return rng;
+    return Math.random();
+  };
+
+  const attackerAttack =
+    options.attack ??
+    options.baseDamage ??
+    attacker?.attack ??
+    attacker?.stats?.attack ??
+    10;
+  const defenderDefense =
+    options.defense ??
+    defender?.defense ??
+    defender?.stats?.defense ??
+    0;
+  const skillMult = typeof options.skillMult === "number" ? options.skillMult : 1;
+
+  const critRate =
+    options.critRate ??
+    attacker?.critRate ??
+    attacker?.stats?.critRate ??
+    0.05;
+  const critDamage =
+    options.critDamage ??
+    attacker?.critDamage ??
+    attacker?.stats?.critDamage ??
+    1.5;
+
+  // 1. Critical strike roll (< critRate)
+  const critRoll = options.critRoll !== undefined ? options.critRoll : nextRng();
+  const isCrit = critRoll < critRate;
+
+  // 2. Base mitigated damage with floor of 1
+  const rawMitigated = Math.max(1, (attackerAttack - defenderDefense) * skillMult);
+
+  // 3. Variance roll (e.g. ±10%)
+  const variance = options.variance !== undefined ? options.variance : 0.1;
+  let varianceFactor = 1;
+  if (variance > 0) {
+    const varRoll = options.varianceRoll !== undefined ? options.varianceRoll : nextRng();
+    varianceFactor = 1 + (varRoll * 2 - 1) * variance;
+  }
+
+  let finalDamage = Math.max(1, rawMitigated * varianceFactor);
+
+  // 4. Critical damage multiplier applied on crit
+  if (isCrit) {
+    finalDamage = Math.max(1, finalDamage * critDamage);
+  }
+
+  return {
+    damage: Math.max(1, Math.round(finalDamage)),
+    crit: Boolean(isCrit)
+  };
+}
+
 export class CombatSystem {
   /**
    * @param {Phaser.Scene} scene
@@ -109,7 +187,15 @@ export class CombatSystem {
         Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
     );
 
-    this.damageEnemy(candidates[0], Phaser.Math.Between(17, 25));
+    const targetEnemy = candidates[0];
+    const result = computeDamage(this.player, targetEnemy, Math.random);
+    this.damageEnemy(targetEnemy, result.damage, result.crit);
+
+    if (result.crit) {
+      this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương!`);
+    } else {
+      this.ui.addLog(`Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương.`);
+    }
   }
 
   performSkill() {
@@ -144,27 +230,33 @@ export class CombatSystem {
     });
 
     let hits = 0;
+    let anyCrit = false;
     this.enemyManager.getAlive().forEach((wolf) => {
       if (Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < 145) {
-        this.damageEnemy(wolf, Phaser.Math.Between(28, 36));
+        const result = computeDamage(this.player, wolf, Math.random, { skillMult: 1.4 });
+        if (result.crit) anyCrit = true;
+        this.damageEnemy(wolf, result.damage, result.crit);
         hits++;
       }
     });
 
-    this.ui.addLog(
-      hits
-        ? `Kiếm Khí quét trúng ${hits} mục tiêu!`
-        : "Kiếm Khí tung ra, nhưng không trúng kẻ địch."
-    );
+    if (hits > 0) {
+      const critText = anyCrit ? " (Chí mạng!)" : "";
+      this.ui.addLog(`Kiếm Khí quét trúng ${hits} mục tiêu!${critText}`);
+    } else {
+      this.ui.addLog("Kiếm Khí tung ra, nhưng không trúng kẻ địch.");
+    }
     this.ui.updateHud(this.player.stats);
   }
 
-  damageEnemy(wolf, damage) {
+  damageEnemy(wolf, damage, isCrit = false) {
     if (wolf.isDead) return;
 
     wolf.takeHit(damage);
-    this.showFloatText(wolf.x, wolf.y - 30, `-${damage}`, "#ffb49a");
-    playTone(120, 0.06, "square", 0.012);
+    const floatText = isCrit ? `-${damage} BẠO KÍCH!` : `-${damage}`;
+    const floatColor = isCrit ? "#ffcc00" : "#ffb49a";
+    this.showFloatText(wolf.x, wolf.y - 30, floatText, floatColor);
+    playTone(isCrit ? 180 : 120, 0.06, "square", isCrit ? 0.025 : 0.012);
 
     if (wolf.hp <= 0) {
       this.handleWolfKill(wolf);
@@ -215,8 +307,34 @@ export class CombatSystem {
     }
   }
 
-  damagePlayer(amount) {
+  onBite(wolf) {
+    const result = computeDamage(wolf, this.player, Math.random);
+    this.damagePlayer(result.damage, result.crit);
+  }
+
+  damagePlayer(amountOrEnemy = 7, isCrit = false) {
     if (this.player.invulnerable) return;
+
+    let amount = 7;
+    let crit = Boolean(isCrit);
+
+    if (typeof amountOrEnemy === "number") {
+      amount = amountOrEnemy;
+      if (amount === 7 && !isCrit) {
+        const bitingWolf = this.enemyManager
+          ?.getAlive?.()
+          ?.find((w) => Phaser.Math.Distance.Between(this.player.x, this.player.y, w.x, w.y) < 55);
+        if (bitingWolf) {
+          const res = computeDamage(bitingWolf, this.player, Math.random);
+          amount = res.damage;
+          crit = res.crit;
+        }
+      }
+    } else if (amountOrEnemy && typeof amountOrEnemy === "object") {
+      const res = computeDamage(amountOrEnemy, this.player, Math.random);
+      amount = res.damage;
+      crit = res.crit;
+    }
 
     this.player.stats.hp = Math.max(0, this.player.stats.hp - amount);
     this.player.invulnerable = true;
@@ -227,7 +345,14 @@ export class CombatSystem {
       this.player.visual.setAlpha(1);
     });
 
-    this.ui.addLog(`Bị Sói Xám cắn! -${amount} HP.`);
+    const critPrefix = crit ? "Chí mạng! " : "";
+    this.ui.addLog(`${critPrefix}Bị Sói Xám cắn! -${amount} HP.`);
+    this.showFloatText(
+      this.player.x,
+      this.player.y - 45,
+      `-${amount}${crit ? " CHÍ MẠNG!" : ""}`,
+      crit ? "#ff3333" : "#ff7777"
+    );
 
     if (this.player.stats.hp <= 0) {
       this.player.stats.hp = this.player.stats.maxHp;
