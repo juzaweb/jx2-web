@@ -262,7 +262,7 @@ describe("CombatSystem kill rewards", () => {
 
   const makeCombat = ({ isConnected = false, playerId = null } = {}) => {
     const player = makePlayer();
-    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn() };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn(), updateInventory: vi.fn() };
     const visualStub = () => {
       const node = {
         add: () => node,

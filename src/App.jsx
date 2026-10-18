@@ -94,10 +94,10 @@ export function App() {
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
 
-  // Inventory stack quantities are persisted in the same save slot as stats.
-  // Seeding the shared in-memory store here also lets the Phaser scene persist
-  // the loaded values on its first save. Resolved once at mount.
-  const [{ quickItems, inventoryItems }] = useState(() =>
+  // Inventory stack quantities are persisted in the same save slot as stats and
+  // mirrored to the character's server bag. Live edits (use / loot) arrive over
+  // the bridge, so the HUD is no longer a mount-time snapshot.
+  const [inventory, setInventory] = useState(() =>
     applyQuantities(
       rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
     )
@@ -168,6 +168,10 @@ export function App() {
       setAudioEnabled(enabled);
     });
 
+    const unsubInventory = bridge.on(EVENTS.INVENTORY_UPDATED, (next) => {
+      if (next) setInventory(next);
+    });
+
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
       const user = currentUserRef.current;
@@ -186,6 +190,7 @@ export function App() {
       unsubQuest();
       unsubLog();
       unsubAudio();
+      unsubInventory();
       unsubStarted();
     };
   }, []);
@@ -334,7 +339,7 @@ export function App() {
         <HotbarDock
           coins={stats.coins}
           audioEnabled={audioEnabled}
-          items={quickItems}
+          items={inventory.quickItems}
           onUseItem={handleUseItem}
           onAttack={handleAttack}
           onSkill={handleSkill}
@@ -384,8 +389,8 @@ export function App() {
         onClose={handleCloseInventory}
         onUseItem={handleUseItem}
         coins={stats.coins}
-        quickItems={quickItems}
-        inventoryItems={inventoryItems}
+        quickItems={inventory.quickItems}
+        inventoryItems={inventory.inventoryItems}
       />
     </main>
   );

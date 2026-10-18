@@ -6,11 +6,16 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantities } from "./items.js";
+import { getQuantities, getQuantity, consumeQuantity, setQuantities, QUICK_ITEMS } from "./items.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
 import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
+import { InventorySyncer } from "./inventorySync.js";
+import { apiClient } from "./apiClient.js";
+
+/** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
+const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -18,6 +23,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.started = false;
     this.isPaused = false;
     this.unsubscribers = [];
+    /** Server sync for the active character's bag; built in create(). */
+    this.inventorySync = null;
   }
 
   preload() {
@@ -73,6 +80,23 @@ export class JiangHuScene extends Phaser.Scene {
 
     // UI Bridge Adapter to communicate with React components
     this.uiBridge = new UIBridgeAdapter();
+
+    // Per-character bag sync; the owner (character id) is resolved from the session
+    // on every call so switching characters retargets it.
+    this.inventorySync = new InventorySyncer({
+      api: apiClient,
+      getOwnerId: () => readSession()?.activeCharacter?.id || null,
+      getQuantities,
+      setQuantities,
+      onAdopt: () => {
+        this.uiBridge.updateInventory();
+        this.uiBridge.addLog("Đã đồng bộ hành trang từ máy chủ.", "system");
+        this.saveGame(false);
+      },
+      onError: (error) => {
+        console.warn("[Inventory] Đồng bộ hành trang lên máy chủ thất bại:", error?.message || error);
+      }
+    });
 
     // Combat system with state change hook for auto-saving
     this.combat = new CombatSystem(
@@ -356,47 +380,97 @@ export class JiangHuScene extends Phaser.Scene {
   useItem(slot) {
     if (!this.player || !this.started) return;
 
+    const item = CONSUMABLE_BY_SLOT.get(slot);
+    if (!item) return;
+
+    // Refuse an empty stack before any effect runs, so a depleted consumable can
+    // never heal for free.
+    if (getQuantity(item.id) <= 0) {
+      this.uiBridge.addLog(`Hành trang đã hết ${item.name}.`, "guide");
+      return;
+    }
+
+    if (!this.applyItemEffect(slot)) return;
+
+    // Deduct only after a real use; an effect refused above (e.g. health full)
+    // returns false and leaves the stack intact. The live HUD shows the remainder.
+    const { ok } = consumeQuantity(item.id, 1);
+    if (!ok) return;
+
+    this.onInventoryChanged();
+  }
+
+  /**
+   * Run the effect for a hotbar consumable slot.
+   * @param {number} slot
+   * @returns {boolean} whether the item was actually consumed by the player
+   */
+  applyItemEffect(slot) {
     if (slot === 1) {
       // Kim Sáng Dược (+35 HP)
       if (this.player.stats.hp >= this.player.stats.maxHp) {
         this.uiBridge.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
-        return;
+        return false;
       }
       const healed = this.player.heal(35);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `+${healed} HP`, "#69db7c");
       playTone(520, 0.12, "triangle", 0.03);
       this.uiBridge.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
       this.uiBridge.updateHud(this.player.stats);
-      this.saveGame(false);
-    } else if (slot === 2) {
+      return true;
+    }
+
+    if (slot === 2) {
       // Đại Hoàn Đan (+25 MP)
       if (this.player.stats.mp >= this.player.stats.maxMp) {
         this.uiBridge.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
-        return;
+        return false;
       }
       const restored = this.player.restoreMp(25);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `+${restored} MP`, "#74c0fc");
       playTone(580, 0.12, "sine", 0.03);
       this.uiBridge.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
       this.uiBridge.updateHud(this.player.stats);
-      this.saveGame(false);
-    } else if (slot === 3) {
-      // Nữ Nhi Hồng (+50 HP & +30 MP)
+      return true;
+    }
+
+    if (slot === 3) {
+      // Nữ Nhi Hồng (+50 HP & +30 MP) — pointless and now wasteful when both are full
+      if (
+        this.player.stats.hp >= this.player.stats.maxHp &&
+        this.player.stats.mp >= this.player.stats.maxMp
+      ) {
+        this.uiBridge.addLog("Sinh lực và nội lực đều đã đầy, không cần dùng Nữ Nhi Hồng.", "guide");
+        return false;
+      }
       const healed = this.player.heal(50);
       const restored = this.player.restoreMp(30);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Ấm lòng! +HP +MP`, "#ffd43b");
       playTone(440, 0.15, "triangle", 0.035);
       this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
       this.uiBridge.updateHud(this.player.stats);
-      this.saveGame(false);
-    } else if (slot === 4) {
+      return true;
+    }
+
+    if (slot === 4) {
       // Hồi Thành Phù (Về điểm hồi sinh Trường An)
       this.player.setPosition(640, 620);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Trường An`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Trường An.", "system");
-      this.saveGame(false);
+      return true;
     }
+
+    return false;
+  }
+
+  /**
+   * React to any inventory change: refresh the HUD and persist locally, which
+   * also queues a server sync when the bag actually changed.
+   */
+  onInventoryChanged() {
+    this.uiBridge.updateInventory();
+    this.saveGame(false);
   }
 
   setPaused(paused) {
@@ -425,6 +499,10 @@ export class JiangHuScene extends Phaser.Scene {
       audioEnabled: isAudioEnabled(),
       inventory: getQuantities()
     });
+
+    // Mirror the bag to the character's server inventory. Deduped by signature, so
+    // a save that did not touch items (e.g. a kill) sends no request.
+    this.inventorySync?.sync();
 
     if (success && showFeedback) {
       this.uiBridge.addLog("Đã lưu tiến trình giang hồ thành công.", "system");
@@ -513,6 +591,9 @@ export class JiangHuScene extends Phaser.Scene {
 
   startGame() {
     this.started = true;
+    // Re-entering (or switching characters) must re-read before any upload, so the
+    // initial save below cannot clobber the new character's server bag.
+    this.inventorySync?.reset();
     this.setPaused(false);
     if (this.player?.sprite?.body) {
       this.player.sprite.body.enable = true;
@@ -548,6 +629,10 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     this.saveGame(false);
+
+    // Pull the character's server bag once the active character is known (source
+    // of truth); falls back to / pushes the local bag when the server has none.
+    this.inventorySync?.load();
   }
 
   update(time, delta) {

@@ -1,22 +1,15 @@
+import { sanitizeQuantities } from "./items.js";
+
 const STORAGE_KEY = "giang_ho_game_save_v1";
 
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
 /**
- * Coerce an arbitrary value into a safe id -> non-negative integer map.
+ * Coerce an arbitrary value into a safe id -> non-negative integer map, or
+ * undefined when it is not a plain object (so "no inventory" and "empty
+ * inventory" stay distinct). Shared with the server inventory sync.
  * @param {*} value
  * @returns {Record<string, number> | undefined}
  */
-const sanitizeInventory = (value) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const out = {};
-  Object.entries(value).forEach(([id, qty]) => {
-    if (DANGEROUS_KEYS.has(id)) return;
-    if (typeof qty !== "number" || !Number.isFinite(qty) || qty < 0) return;
-    out[id] = Math.floor(qty);
-  });
-  return out;
-};
+const sanitizeInventory = (value) => sanitizeQuantities(value) ?? undefined;
 
 export class StorageManager {
   static activeUserId = null;

@@ -17,6 +17,7 @@ vi.mock("phaser", () => ({
 
 import { NetworkClient } from "./networkClient.js";
 import { JiangHuScene } from "./game.js";
+import { setQuantities, getQuantity } from "./items.js";
 
 /** Registers the scene lifecycle hooks the way Phaser's event emitter does. */
 const bindTeardown = () => {
@@ -111,5 +112,70 @@ describe("JiangHuScene teardown", () => {
     expect(() => JiangHuScene.prototype.shutdown.call(scope)).not.toThrow();
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(destroyRemotePlayers).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Minimal scene scope that satisfies useItem() without Phaser. */
+const makeUseScene = ({ hp = 10, maxHp = 100, mp = 10, maxMp = 100 } = {}) => {
+  const addLog = vi.fn();
+  const updateInventory = vi.fn();
+  const heal = vi.fn((amount) => amount);
+  const restoreMp = vi.fn((amount) => amount);
+  const setPosition = vi.fn();
+  const scene = {
+    started: true,
+    player: { stats: { hp, maxHp, mp, maxMp }, heal, restoreMp, setPosition },
+    combat: { showFloatText: vi.fn() },
+    uiBridge: { addLog, updateHud: vi.fn(), updateInventory },
+    saveGame: vi.fn()
+  };
+  // The stubbed scope still needs the sibling prototype methods useItem calls.
+  scene.applyItemEffect = JiangHuScene.prototype.applyItemEffect;
+  scene.onInventoryChanged = JiangHuScene.prototype.onInventoryChanged;
+  return { scene, addLog, updateInventory, heal, restoreMp, setPosition };
+};
+
+describe("JiangHuScene.useItem quantity", () => {
+  it("deducts one unit and refreshes the HUD after a successful use", () => {
+    setQuantities({ "kim-sang-duoc": 3 });
+    const { scene, updateInventory } = makeUseScene();
+
+    JiangHuScene.prototype.useItem.call(scene, 1);
+
+    expect(getQuantity("kim-sang-duoc")).toBe(2);
+    expect(updateInventory).toHaveBeenCalledTimes(1);
+    expect(scene.saveGame).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not deduct when the effect is refused (health already full)", () => {
+    setQuantities({ "kim-sang-duoc": 3 });
+    const { scene, heal } = makeUseScene({ hp: 100, maxHp: 100 });
+
+    JiangHuScene.prototype.useItem.call(scene, 1);
+
+    expect(heal).not.toHaveBeenCalled();
+    expect(getQuantity("kim-sang-duoc")).toBe(3);
+    expect(scene.saveGame).not.toHaveBeenCalled();
+  });
+
+  it("refuses a depleted stack before running the effect", () => {
+    setQuantities({ "kim-sang-duoc": 0 });
+    const { scene, heal, addLog } = makeUseScene({ hp: 10, maxHp: 100 });
+
+    JiangHuScene.prototype.useItem.call(scene, 1);
+
+    expect(heal).not.toHaveBeenCalled();
+    expect(getQuantity("kim-sang-duoc")).toBe(0);
+    expect(addLog).toHaveBeenCalled();
+  });
+
+  it("consumes the teleport scroll and moves the player", () => {
+    setQuantities({ "hoi-thanh-phu": 1 });
+    const { scene, setPosition } = makeUseScene();
+
+    JiangHuScene.prototype.useItem.call(scene, 4);
+
+    expect(setPosition).toHaveBeenCalledWith(640, 620);
+    expect(getQuantity("hoi-thanh-phu")).toBe(0);
   });
 });
