@@ -10,7 +10,9 @@ const EQUIPMENT_SLOTS = {
     { key: "belt", label: "Đai lưng" },
     { key: "gloves", label: "Găng tay" },
     { key: "bracers", label: "Hộ uyển" },
-    { key: "weapon", label: "Vũ khí" }
+    { key: "weapon", label: "Vũ khí" },
+    // Sits directly above the corner "Phó mật tịch" slot.
+    { key: "secretManual", label: "Mật tịch", icon: "manual" }
   ],
   // Sits at the elbow where the vertical column meets the horizontal row.
   corner: { key: "subManual", label: "Phó mật tịch", icon: "manual" },
@@ -105,7 +107,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
   return (
     <div className="char-modal-overlay" id="character-modal">
       <div
-        className="wuxia-modal char-panel metal-card"
+        className="char-panel"
         role="dialog"
         aria-modal="false"
         aria-label="Nhân vật"
@@ -137,24 +139,24 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
           </div>
         )}
 
+        <div className="char-tabs" role="tablist">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={tab.enabled}
+              className={`char-tab${tab.enabled ? " active" : ""}`}
+              disabled={!tab.enabled}
+              title={tab.enabled ? tab.label : `${tab.label} (chưa mở)`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="char-body">
           <div className="char-side">
-            <div className="char-tabs" role="tablist">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab.enabled}
-                  className={`char-tab${tab.enabled ? " active" : ""}`}
-                  disabled={!tab.enabled}
-                  title={tab.enabled ? tab.label : `${tab.label} (chưa mở)`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
             <div className="char-stats">
               {sheet.vitals.map((row) => (
                 <div className="stat-row vital" key={row.key}>
