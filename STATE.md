@@ -1,8 +1,7 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — direct human request (L2, branch `feature/character-select`):
-character selection + creation screens, backend-persisted; display name removed from register.
-(Prior repo-wide loop run: docs follow-up on merged F2 — F3 filed as `proposed`, position-gap limitation recorded.)
+Last run: 2026-10-18 — feature pipeline cycle (L2, item F3 — server-authoritative enemy movement)
+(Prior run: direct human request — character select/create, branch `feature/character-select`.)
 
 ## Character Select & Create (2026-10-18, direct request)
 
@@ -34,7 +33,7 @@ character selection + creation screens, backend-persisted; display name removed 
 - [ ] Enable branch protection requirements so CI must pass before merge on `develop`.
 - [x] F1 (server-synced enemy state) is on `develop`.
 - [x] F2 (server-authoritative kill rewards) merged to `develop` — PR #15, squash commit `171359ab` (13-file diff exceeded `gate.yaml:maxFiles`, so a human merged it).
-- [ ] F3 (server-authoritative enemy movement) filed as `proposed` — enemy positions stay loosely synced until a human promotes it to `todo` after spec review.
+- [ ] F3 (server-authoritative enemy movement) is implemented on `loop/f3-enemy-movement` (PR #19 → `develop`); CI green, waiting on a **human merge** (12-file diff exceeds `gate.yaml:maxFiles`).
 
 ## Watch List
 
@@ -98,9 +97,18 @@ character selection + creation screens, backend-persisted; display name removed 
 - Verifier (code-review sub-agent, 2026-10-18): REQUEST CHANGES on one medium finding — the shared drop was spawned collectable on every client, so a bystander could pick up another player's kill loot (+5 bạc and the catalog item), duplicating the reward per client. Fixed: `spawnDrop(..., { collectable })` and `collectDrop` refuse drops this client does not own; only the attributed killer's copy is collectable (+3 tests).
 - Diff: 13 files (> `gate.yaml:maxFiles` 10) ⇒ **escalated to a human merge**; all paths allowlisted (`src/**`, `**/*.test.js`, `**/*.md`), none in `humanMergeRequired`, no denylist paths.
 - Review follow-up (code-review-and-quality, 2026-10-18, `1ec1ecf`): removed the optional drop branch from `grantKillReward` (the caller now rolls and spawns its own drop), bounded the remembered drop list and expired loot this client cannot collect, filed **E4** for splitting the drop concern out of `CombatSystem` ⇒ 94/94 client tests, 29/29 server tests.
-- Known limitation (filed as F3 `proposed`, 2026-10-18): enemy **positions** are only loosely shared. Each client still runs the AI, so an aggroed wolf is pulled toward that client's own player; the server relays only ≥40 px drift and a receiver snaps only beyond 90 px, so two screens can show the same wolf ~90 px apart, with a jump at each correction. Idle wolves converge (both clients walk them home). Fixing it means moving movement to the server — see `BACKLOG.md` F3 (spec pending review).
+- **Enemy movement is server-owned (F3, 2026-10-18):** `server/src/enemyAi.js` steps every living wolf on a 10 Hz tick (`gameSocket.tickEnemies`, `options.enemyTickMs`) — nearest player inside 210 px, chase 43 px/s holding at 52 px, otherwise walk home at 22 px/s — and only wolves that actually moved are broadcast, so a settled map is silent. Clients never steer a wolf: `Wolf` renders the authoritative position, snapping only on a warp (>90 px) and otherwise smoothing toward it with the pure `interpolateEnemyPosition` (tau 120 ms). The old client `enemy_move` report and its 40 px relay are gone, so two players now watch the same wolf walk to the *nearer* player. Bite damage is still applied client-side (player HP stays local).
 - Known remaining local mint (out of scope, filed for a follow-up): `collectDrop` still grants +5 bạc / +5 nội lực to whoever picks a drop up, so a doctored client could still mint on pickup.
 - Tooling note: the backend SQLite test suite can flake with `database is locked` when `api.test.js` and `websocket.test.js` open `server/data/jx2.sqlite` as parallel `node --test` workers; 4 subsequent runs were clean.
+
+## Last Run Evidence (2026-10-18, F3 cycle)
+
+- Item: **F3 — Server-authoritative enemy movement** (human promoted the `proposed` spec to `todo`; `SPEC GATE: PASS` inline).
+- Change: new pure `server/src/enemyAi.js` (`stepEnemy`/`nearestPlayerInRange` + `ENEMY_TUNING`) owns the AI; `server/src/websocket/gameSocket.js` runs a 10 Hz tick (`ENEMY_TICK_MS`, `options.enemyTickMs`), broadcasts only moved wolves and no longer accepts or relays client `enemy_move`; client `src/game/enemy.js` (`Wolf`) stops steering itself and renders the authoritative position (snap on a warp, otherwise smoothed by the new `interpolateEnemyPosition` in `src/game/enemySync.js`), keeps the bite check; `src/game/game.js` drops the 500 ms position report and `src/game/networkClient.js` drops `sendEnemyMove`.
+- Verify (after the rebase onto `develop` `18ed17a`): `npm run build` ✅ · `npm test` ✅ **120 passed / 120** (10 files; +11: new `src/game/enemy.test.js`, interpolation rules in `enemySync.test.js`) · `npm run server:test` ✅ **49 passed / 49** (+7 `server/tests/enemyAi.test.js`, +1 WebSocket subtest).
+- Protocol check: the WebSocket subtest stands one player far away and one beside wolf 1, then asserts both receive the wolf holding short of the *nearer* player, that the settled wolf stops producing `enemy_moved` traffic, and that a client-sent `enemy_move` is ignored.
+- Diff: 12 files (> `gate.yaml:maxFiles` 10) ⇒ **escalated to a human merge**; all paths allowlisted, none in `humanMergeRequired`, no denylist paths.
+- Rebase: replayed onto `develop` `18ed17a` (PR #18 character select/create) on 2026-10-18; only `STATE.md`'s header conflicted (both runs wrote the "Last run" line) — resolved by keeping this run's line and #18's section.
 
 ## Last Run Evidence (2026-10-18, prior cycle)
 

@@ -204,7 +204,7 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Evidence:** Branch `loop/f2-server-rewards` → PR #15 against `develop`; `npm run build` ✅ · `npm test` ✅ 94/94 (8 files; +20) · `npm run server:test` ✅ 29/29 (+4). Verifier (code-review, 2026-10-18) found the shared drop was collectable by bystanders, which duplicated loot per client → fixed by marking the drop `collectable` only for the attributed killer (+3 tests); a follow-up five-axis `code-review-and-quality` pass then removed the optional-drop branch from `grantKillReward` and bounded the drop list (+2 tests). Diff 13 files (> `gate.yaml:maxFiles` 10) → escalated to a human merge.
 - **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
 
-### F3 — Server-authoritative enemy movement · `proposed` · P2
+### F3 — Server-authoritative enemy movement · `done` · P2
 - **Why:** F1 gave the server authority over enemy HP, death and respawn, but **movement** still runs on each client: every client drives the local AI (chase the local player within 210 px, otherwise walk home at 22 px/s — `src/game/enemy.js`), reports all alive positions every 500 ms (`src/game/game.js`), the server records them last-writer-wins and relays only ≥40 px drift (`server/src/websocket/gameSocket.js`), and a receiver snaps only beyond 90 px (`src/game/enemySync.js`). An aggroed wolf is therefore pulled toward each client's *own* player: two players watching the same wolf see it up to ~90 px apart, permanently, with a visible jump each time a threshold is crossed. Only idle wolves converge, because both clients walk them to the same `home`. Movement is the last part of the enemy state that is per-client.
 - **Acceptance:**
   - The server runs the enemy AI on a fixed tick (order of 10 Hz) with the same tuning as today (aggro range 210 px, chase speed 43 px/s, stop distance 52 px, idle return 22 px/s), targeting the nearest player each tick; the server's enemy position is the single source of truth.
@@ -213,10 +213,11 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
   - Tick rate and interpolation bound are named constants with the bandwidth/smoothness trade-off documented; the service stays within a low single-digit KB/s per client for the current 8-enemy world.
   - Two players on opposite sides of the same wolf see it move identically, and the F1/F2 rules are preserved: HP, death, respawn timing and the kill-reward attribution still behave as specified.
   - Unit tests cover the pure server AI step (nearest-player targeting, idle return, dead enemies ignored) and the client reconciliation/interpolation rule; WebSocket tests assert the roster carries positions and that a client-sent `enemy_move` is ignored.
-- **Touches:** `server/src/websocket/gameSocket.js`, new server AI module + test, `src/game/enemy.js`, `src/game/enemySync.js`, `src/game/game.js`, `src/game/networkClient.js`, tests.
+- **Touches:** new `server/src/enemyAi.js`, `server/src/websocket/gameSocket.js`, `src/game/enemy.js`, `src/game/enemySync.js`, `src/game/game.js`, `src/game/networkClient.js`, tests.
 - **Depends on:** F1 (server enemy roster) and F2 (kill attribution must keep pointing at the killer).
 - **Maps to:** Social / MMO `[stretch]` — authoritative shared world state.
-- **Spec gate:** pending — new item awaiting `spec-review`; promote to `todo` only after a human approves the scope.
+- **Evidence:** Branch `loop/f3-enemy-movement` → PR #19 against `develop` (promoted from `proposed` to `todo` by the maintainer); `npm run build` ✅ · `npm test` ✅ 120/120 (+11: `src/game/enemy.test.js`, interpolation rules) · `npm run server:test` ✅ 49/49 (+7 `enemyAi.test.js`, +1 WebSocket subtest where a far-away player watches the wolf walk to the nearer player, a settled wolf stops producing traffic, and a client-sent `enemy_move` is ignored). Diff 12 files (> `gate.yaml:maxFiles` 10) → escalated to a human merge.
+- **Spec gate:** `SPEC GATE: PASS` (inline spec review + human promotion, 2026-10-18).
 
 ---
 
