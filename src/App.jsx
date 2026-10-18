@@ -209,21 +209,26 @@ export function App() {
     };
   }, []);
 
-  const handleOpenCharacter = useCallback(() => {
+  // Closing the help overlay also lifts the pause it applied. Opening a docked
+  // panel (character / inventory) dismisses help the same way.
+  const dismissHelp = useCallback(() => {
     setIsHelpOpen(false);
-    setIsCharacterOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
   }, []);
+
+  const handleOpenCharacter = useCallback(() => {
+    dismissHelp();
+    setIsCharacterOpen(true);
+  }, [dismissHelp]);
 
   const handleCloseCharacter = useCallback(() => {
     setIsCharacterOpen(false);
   }, []);
 
   const handleOpenInventory = useCallback(() => {
-    setIsHelpOpen(false);
+    dismissHelp();
     setIsInventoryOpen(true);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-  }, []);
+  }, [dismissHelp]);
 
   const handleCloseInventory = useCallback(() => {
     setIsInventoryOpen(false);
@@ -259,7 +264,7 @@ export function App() {
       }
 
       if (isInventoryOpen) {
-        setIsInventoryOpen(false);
+        handleCloseInventory();
         return;
       }
 
@@ -316,11 +321,6 @@ export function App() {
     setIsCharacterOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
-  }, []);
-
-  const handleCloseHelp = useCallback(() => {
-    setIsHelpOpen(false);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
   }, []);
 
   const handleSendMessage = useCallback((text) => {
@@ -445,7 +445,7 @@ export function App() {
       {/* Help & Guide Modal */}
       <HelpModal
         isOpen={isHelpOpen}
-        onClose={handleCloseHelp}
+        onClose={dismissHelp}
         onReset={handleReset}
       />
 
