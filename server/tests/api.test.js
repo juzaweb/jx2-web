@@ -260,6 +260,28 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.success, false);
   });
 
+  test("Users: Check username availability returns status and reason", async () => {
+    // Taken username (hiepkhat99 was registered in previous test)
+    const takenRes = await fetch(`${baseUrl}/users/check-username?username=hiepkhat99`);
+    assert.equal(takenRes.status, 200);
+    const takenJson = await takenRes.json();
+    assert.equal(takenJson.success, true);
+    assert.equal(takenJson.data.available, false);
+
+    // Available username
+    const availRes = await fetch(`${baseUrl}/users/check-username?username=brand_new_hero_123`);
+    assert.equal(availRes.status, 200);
+    const availJson = await availRes.json();
+    assert.equal(availJson.success, true);
+    assert.equal(availJson.data.available, true);
+
+    // Invalid format username
+    const invalidRes = await fetch(`${baseUrl}/users/check-username?username=a!b`);
+    assert.equal(invalidRes.status, 200);
+    const invalidJson = await invalidRes.json();
+    assert.equal(invalidJson.data.available, false);
+  });
+
   test("Users: Register validates username and password requirements", async () => {
     // Short password
     const res1 = await fetch(`${baseUrl}/users/register`, {

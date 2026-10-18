@@ -124,5 +124,35 @@ describe("ApiClient", () => {
       })
     );
   });
+
+  it("login throws descriptive error when server returns non-JSON HTML error", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError("Unexpected token '<'");
+      }
+    });
+
+    await expect(client.login("user", "pass")).rejects.toThrow(
+      "Máy chủ phản hồi không đúng định dạng (HTTP 502)"
+    );
+  });
+
+  it("checkUsername queries endpoint and returns availability data", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { available: true, reason: "Tài khoản có thể sử dụng." }
+      })
+    });
+
+    const res = await client.checkUsername("hero_name");
+    expect(res.available).toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/check-username?username=hero_name"
+    );
+  });
 });
 

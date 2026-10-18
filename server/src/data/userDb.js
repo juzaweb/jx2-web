@@ -30,6 +30,10 @@ export class UserDatabase {
 
     this.db = new DatabaseSync(this.dbPath);
 
+    if (this.dbPath !== ":memory:") {
+      this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+    }
+
     // Create users table and index
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -57,6 +61,18 @@ export class UserDatabase {
     this.stmtUpdateLastLogin = this.db.prepare(
       "UPDATE users SET last_login = ? WHERE id = ?"
     );
+  }
+
+  /**
+   * Check if a username is already taken
+   * @param {string} username
+   * @returns {boolean}
+   */
+  hasUsername(username) {
+    if (!username || typeof username !== "string") return false;
+    const clean = username.trim().toLowerCase();
+    const existing = this.stmtFindByUsername.get(clean);
+    return !!existing;
   }
 
   /**

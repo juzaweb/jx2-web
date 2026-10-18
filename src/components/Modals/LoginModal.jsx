@@ -29,27 +29,48 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
   const [isServerListOpen, setIsServerListOpen] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [canGuestLogin, setCanGuestLogin] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [usernameFeedback, setUsernameFeedback] = useState(null);
 
-  const handleGuestLogin = () => {
-    const cleanUser = username.trim() || "HiepKhach";
-    const session = {
-      user: {
-        id: `guest_${Date.now()}`,
-        username: cleanUser.toLowerCase(),
-        displayName: displayName.trim() || cleanUser
-      },
-      token: "offline-guest-token",
-      server: selectedServer.name,
-      loggedInAt: Date.now()
+  useEffect(() => {
+    if (mode !== "register") {
+      setUsernameFeedback(null);
+      return;
+    }
+
+    const clean = username.trim();
+    if (!clean) {
+      setUsernameFeedback(null);
+      return;
+    }
+
+    if (clean.length < 3) {
+      setUsernameFeedback({ available: false, reason: "Tài khoản cần tối thiểu 3 ký tự." });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(clean)) {
+      setUsernameFeedback({ available: false, reason: "Chỉ gồm chữ cái, số hoặc dấu _" });
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient.checkUsername(clean);
+        if (isMounted) {
+          setUsernameFeedback(res);
+        }
+      } catch {
+        // Silently skip real-time check when offline or server unreachable
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
     };
-    localStorage.setItem("jx2_user_session", JSON.stringify(session));
-    setSuccessMsg("Đang vào giang hồ ở chế độ Cục Bộ...");
-    setTimeout(() => {
-      onLoginSuccess(session);
-    }, 400);
-  };
+  }, [username, mode]);
 
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
@@ -118,6 +139,11 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       return;
     }
 
+    if (mode === "register" && usernameFeedback && !usernameFeedback.available) {
+      setError(usernameFeedback.reason || "Tài khoản này đã tồn tại trong giang hồ.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -173,8 +199,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         err.message?.includes("fetch failed");
 
       if (isNetworkError) {
-        setError("Chưa kết nối được máy chủ Backend API. Hãy kiểm tra server hoặc chọn vào chế độ Khách bên dưới!");
-        setCanGuestLogin(true);
+        setError("Không thể kết nối đến máy chủ Backend API. Vui lòng kiểm tra dịch vụ Backend đang chạy!");
       } else {
         setError(err.message || "Không thể kết nối đến máy chủ. Vui lòng thử lại!");
       }
@@ -188,6 +213,10 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
     setDisplayName("");
     setError("");
     setSuccessMsg("");
+    if (mode === "register") {
+      setMode("login");
+      return;
+    }
     if (!rememberAccount) {
       setUsername("");
     }
@@ -293,26 +322,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         {error && (
           <div className="jx2-alert-banner error">
             <div>{error}</div>
-            {canGuestLogin && (
-              <button
-                type="button"
-                onClick={handleGuestLogin}
-                style={{
-                  marginTop: "6px",
-                  background: "rgba(234, 179, 8, 0.2)",
-                  border: "1px dashed #facc15",
-                  color: "#fef08a",
-                  padding: "4px 8px",
-                  fontSize: "11px",
-                  borderRadius: "2px",
-                  cursor: "pointer",
-                  width: "100%",
-                  fontWeight: 600
-                }}
-              >
-                ⚡ Vào game chế độ Khách (Offline)
-              </button>
-            )}
           </div>
         )}
         {successMsg && <div className="jx2-alert-banner success">{successMsg}</div>}
@@ -341,6 +350,23 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               maxLength={30}
               required
             />
+            {mode === "register" && usernameFeedback && (
+              <div
+                style={{
+                  fontSize: "11px",
+                  marginTop: "3px",
+                  color: usernameFeedback.available ? "#4ade80" : "#f87171",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  fontWeight: 500,
+                  textShadow: "0 1px 2px rgba(0,0,0,0.8)"
+                }}
+              >
+                <span>{usernameFeedback.available ? "✓" : "⚠"}</span>
+                <span>{usernameFeedback.reason}</span>
+              </div>
+            )}
           </div>
 
           {/* Password */}
@@ -487,14 +513,14 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
             </div>
           )}
 
-          {/* Action Buttons: Đồng ý & Trở lại */}
+          {/* Action Buttons: Đăng nhập/Đăng ký & Trở lại */}
           <div className="jx2-dialog-actions">
             <button
               type="submit"
               className="jx2-btn-action"
-              disabled={loading}
+              disabled={loading || (mode === "register" && usernameFeedback?.available === false)}
             >
-              {loading ? "Chờ..." : "Đồng ý"}
+              {loading ? "Chờ..." : (mode === "register" ? "Đăng ký" : "Đăng nhập")}
             </button>
             <button
               type="button"

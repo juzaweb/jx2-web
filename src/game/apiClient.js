@@ -3,9 +3,17 @@
  * Connects frontend game client to the Node.js backend API service.
  */
 
-const DEFAULT_API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
-  "http://localhost:5000/api";
+const getApiBase = () => {
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE;
+  }
+  if (typeof window !== "undefined") {
+    return "/api";
+  }
+  return "http://localhost:5000/api";
+};
+
+const DEFAULT_API_BASE = getApiBase();
 
 export class ApiClient {
   constructor(baseUrl = DEFAULT_API_BASE) {
@@ -129,6 +137,34 @@ export class ApiClient {
   }
 
   /**
+   * Helper to safely parse JSON response
+   * @private
+   */
+  async _parseJson(res) {
+    try {
+      return await res.json();
+    } catch {
+      throw new Error(`Máy chủ phản hồi không đúng định dạng (HTTP ${res.status})`);
+    }
+  }
+
+  /**
+   * Check if a username is available for registration
+   * @param {string} username
+   * @returns {Promise<{ available: boolean, reason: string }>}
+   */
+  async checkUsername(username) {
+    const res = await fetch(
+      `${this.baseUrl}/users/check-username?username=${encodeURIComponent(username)}`
+    );
+    const json = await this._parseJson(res);
+    if (!res.ok) {
+      throw new Error(json?.error || `Kiểm tra tài khoản thất bại (HTTP ${res.status})`);
+    }
+    return json.data;
+  }
+
+  /**
    * Register a new user
    * @param {string} username
    * @param {string} password
@@ -141,9 +177,9 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, displayName }),
     });
-    const json = await res.json();
+    const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(json.error || `Registration failed with HTTP ${res.status}`);
+      throw new Error(json?.error || `Đăng ký thất bại với mã HTTP ${res.status}`);
     }
     return json.data;
   }
@@ -160,9 +196,9 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    const json = await res.json();
+    const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(json.error || `Login failed with HTTP ${res.status}`);
+      throw new Error(json?.error || `Đăng nhập thất bại với mã HTTP ${res.status}`);
     }
     return json.data;
   }

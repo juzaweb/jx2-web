@@ -40,6 +40,10 @@ export function App() {
       const saved = localStorage.getItem("jx2_user_session");
       if (!saved) return null;
       const parsed = JSON.parse(saved);
+      if (parsed?.token === "offline-guest-token" || String(parsed?.user?.id || "").startsWith("guest_")) {
+        localStorage.removeItem("jx2_user_session");
+        return null;
+      }
       if (parsed?.user?.id) {
         StorageManager.setUserId(parsed.user.id);
         return parsed.user;

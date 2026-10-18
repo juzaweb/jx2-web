@@ -129,3 +129,39 @@ export const getProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Check if a username is available for registration
+ */
+export const checkUsernameAvailability = async (req, res, next) => {
+  try {
+    const username = (req.query.username || "").trim();
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        error: "Thiếu tham số tên tài khoản."
+      });
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          available: false,
+          reason: "Tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới."
+        }
+      });
+    }
+
+    const taken = userDb.hasUsername(username);
+    return res.status(200).json({
+      success: true,
+      data: {
+        available: !taken,
+        reason: taken ? "Tài khoản này đã có người đăng ký." : "Tài khoản có thể sử dụng."
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
