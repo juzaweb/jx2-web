@@ -54,7 +54,7 @@ const backend = spawn(
   }
 );
 
-pipeOutput(backend, "[API 5000]", "\x1b[36m");
+pipeOutput(backend, `[API ${backendPort}]`, "\x1b[36m");
 
 // 2. Launch Frontend (Vite)
 const viteBin = path.join(rootDir, "node_modules", "vite", "bin", "vite.js");
@@ -65,13 +65,15 @@ const frontend = spawn(
     cwd: rootDir,
     env: {
       ...process.env,
+      PORT: String(backendPort),
+      VITE_PORT: String(frontendPort),
       VITE_API_BASE: apiBase,
     },
     stdio: ["ignore", "pipe", "pipe"],
   }
 );
 
-pipeOutput(frontend, "[GAME 3000]", "\x1b[33m");
+pipeOutput(frontend, `[GAME ${frontendPort}]`, "\x1b[33m");
 
 // Graceful cleanup on exit
 const cleanup = () => {
