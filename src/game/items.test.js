@@ -10,7 +10,9 @@ import {
   getQuantities,
   addQuantity,
   DROP_TABLE,
-  rollDrop
+  rollDrop,
+  rollKillReward,
+  KILL_REWARD
 } from "./items.js";
 
 describe("item catalog", () => {
@@ -185,6 +187,35 @@ describe("rollDrop", () => {
       expect(catalogIds.has(drop.id)).toBe(true);
       expect(Number.isInteger(drop.qty)).toBe(true);
       expect(drop.qty).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+describe("rollKillReward", () => {
+  it("is deterministic and lands on the documented minimums for rng 0", () => {
+    const reward = rollKillReward(() => 0);
+
+    expect(reward).toEqual(rollKillReward(() => 0));
+    expect(reward.exp).toBe(KILL_REWARD.exp);
+    expect(reward.coins).toBe(KILL_REWARD.coinsMin);
+    expect(reward.drop.id).toBe(DROP_TABLE[0].id);
+  });
+
+  it("caps the bạc roll at the documented maximum", () => {
+    expect(rollKillReward(() => 0.999999).coins).toBe(KILL_REWARD.coinsMax);
+    expect(rollKillReward(() => 1).coins).toBe(KILL_REWARD.coinsMax);
+    expect(rollKillReward(89).coins).toBe(KILL_REWARD.coinsMax);
+  });
+
+  it("always returns a catalog drop with a positive integer quantity", () => {
+    for (let i = 0; i <= 20; i++) {
+      const reward = rollKillReward(i / 20);
+      const entry = DROP_TABLE.find((item) => item.id === reward.drop.id);
+
+      expect(entry).toBeDefined();
+      expect(reward.drop.qty).toBe(entry.qty);
+      expect(reward.coins).toBeGreaterThanOrEqual(KILL_REWARD.coinsMin);
+      expect(reward.coins).toBeLessThanOrEqual(KILL_REWARD.coinsMax);
     }
   });
 });

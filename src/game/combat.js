@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
-import { addQuantity, rollDrop, DROP_TABLE } from "./items.js";
+import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
+import { parseEnemyReward } from "./rewardSync.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -134,6 +135,8 @@ export class CombatSystem {
     this.attackReady = true;
     this.skillReady = true;
     this.drops = [];
+    /** Player id this client joined with, used to match server kill attribution. */
+    this.localPlayerId = null;
   }
 
   performAttack() {
@@ -291,18 +294,73 @@ export class CombatSystem {
   handleWolfKill(wolf) {
     wolf.die();
 
-    const coinsGained = Phaser.Math.Between(3, 9);
-    this.player.stats.kills++;
-    this.player.stats.coins += coinsGained;
-    this.player.stats.exp += 35;
+    // Enemy health is server-owned, so the server also rolls the reward and
+    // broadcasts `enemy_reward`; applyServerReward() pays out from that message.
+    if (this.usesServerRewards()) {
+      this.ui.addLog("Đánh bại Sói Xám!");
+      return;
+    }
 
-    this.ui.addLog(`Đánh bại Sói Xám! +35 EXP, nhận được ${coinsGained} bạc.`);
-    this.showFloatText(wolf.x, wolf.y - 25, "+35 EXP", "#f3d17f");
-
-    this.spawnDrop(
-      wolf.x + Phaser.Math.Between(-20, 20),
-      wolf.y + Phaser.Math.Between(-10, 10)
+    this.grantKillReward(
+      rollKillReward(Math.random),
+      { x: wolf.x, y: wolf.y - 25 },
+      {
+        x: wolf.x + Phaser.Math.Between(-20, 20),
+        y: wolf.y + Phaser.Math.Between(-10, 10)
+      }
     );
+
+    // Schedule enemy revive (the server drives respawn while connected)
+    this.scene.time.delayedCall(10000, () => {
+      wolf.revive();
+    });
+  }
+
+  /**
+   * Apply the authoritative reward the server rolled for a defeated enemy.
+   * Every client renders the shared drop; only the attributed killer is paid.
+   * @param {Object} payload - `enemy_reward` payload
+   */
+  applyServerReward(payload) {
+    const reward = parseEnemyReward(payload);
+    if (!reward) return;
+
+    const x = reward.x ?? this.player.x;
+    const y = reward.y ?? this.player.y;
+
+    if (reward.drop) {
+      this.spawnDrop(x, y, reward.drop);
+    }
+
+    if (!this.isLocalKiller(reward.attackerId)) return;
+
+    this.grantKillReward(
+      { exp: reward.exp, coins: reward.coins },
+      { x, y: y - 25 },
+      null
+    );
+  }
+
+  /**
+   * Pay a kill reward to the local player: EXP, bạc, kill count, loot and the
+   * quest/save side effects.
+   * @param {{exp:number, coins:number}} reward
+   * @param {{x:number, y:number}} feedbackPosition - where the +EXP float text appears
+   * @param {?{x:number, y:number}} [dropPosition] - where a local loot drop lands, if any
+   */
+  grantKillReward(reward, feedbackPosition, dropPosition = null) {
+    this.player.stats.kills++;
+    this.player.stats.coins += reward.coins;
+    this.player.stats.exp += reward.exp;
+
+    this.ui.addLog(
+      `Đánh bại Sói Xám! +${reward.exp} EXP, nhận được ${reward.coins} bạc.`
+    );
+    this.showFloatText(feedbackPosition.x, feedbackPosition.y, `+${reward.exp} EXP`, "#f3d17f");
+
+    if (dropPosition) {
+      this.spawnDrop(dropPosition.x, dropPosition.y);
+    }
 
     this.checkLevelUp();
     this.ui.updateHud(this.player.stats);
@@ -314,11 +372,30 @@ export class CombatSystem {
     this.scene.time.delayedCall(650, () => {
       this.ui.updateQuest(this.player.stats, () => this.handleQuestReward());
     });
+  }
 
-    // Schedule enemy revive
-    this.scene.time.delayedCall(10000, () => {
-      wolf.revive();
-    });
+  /**
+   * True while a multiplayer connection owns enemy state; the reward then comes
+   * from the server instead of a local roll.
+   * @returns {boolean}
+   */
+  usesServerRewards() {
+    return this.scene?.networkClient?.isConnected === true;
+  }
+
+  /**
+   * @param {string|null} playerId
+   */
+  setLocalPlayerId(playerId) {
+    this.localPlayerId = playerId;
+  }
+
+  /**
+   * @param {string|null} attackerId
+   * @returns {boolean} whether the server attributed the kill to this client
+   */
+  isLocalKiller(attackerId) {
+    return Boolean(this.localPlayerId) && attackerId === this.localPlayerId;
   }
 
   handleQuestReward() {
@@ -416,18 +493,26 @@ export class CombatSystem {
     }
   }
 
-  spawnDrop(x, y) {
-    const loot = rollDrop();
-    const dropEntry = DROP_TABLE.find((entry) => entry.id === loot.id);
+  /**
+   * Spawn a collectable drop. Without an explicit entry the loot is rolled
+   * locally (offline play); while connected the server supplies the entry so
+   * every client renders the same item.
+   * @param {number} x
+   * @param {number} y
+   * @param {?{id:string, qty:number}} [loot]
+   */
+  spawnDrop(x, y, loot = null) {
+    const rolled = loot || rollDrop();
+    const dropEntry = DROP_TABLE.find((entry) => entry.id === rolled.id);
 
     const drop = {
       x,
       y,
       phase: Math.random() * 6,
       active: true,
-      itemId: loot.id,
-      qty: loot.qty,
-      name: dropEntry ? dropEntry.name : loot.id
+      itemId: rolled.id,
+      qty: rolled.qty ?? dropEntry?.qty ?? 1,
+      name: dropEntry ? dropEntry.name : rolled.id
     };
 
     drop.visual = this.scene.add.container(x, y).setDepth(y + 5);

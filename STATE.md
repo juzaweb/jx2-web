@@ -1,6 +1,6 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — feature pipeline cycle (L2, item F1 — server-synced enemy state)
+Last run: 2026-10-18 — feature pipeline cycle (L2, item F2 — server-authoritative kill rewards)
 
 ## Project Snapshot
 
@@ -19,6 +19,7 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item F1 — server-synced e
 - [ ] Next loop item after C2: pick highest-priority `todo` in `BACKLOG.md` (A1, A2, B4 at P1; E3 is P1 but needs Playwright → `package.json` humanMergeRequired).
 - [ ] Enable branch protection requirements so CI must pass before merge on `develop`.
 - [ ] F1 (server-synced enemy state) is rebased onto `develop` on this branch, waiting on a PR/merge.
+- [ ] F2 (server-authoritative kill rewards) implemented on `loop/f2-server-rewards`; PR open against `develop`, awaiting CI + merge.
 
 ## Watch List
 
@@ -39,9 +40,9 @@ Last run: 2026-10-18 — feature pipeline cycle (L2, item F1 — server-synced e
   AI for movement and report positions (`enemy_move`, 500 ms throttle → server relays
   only ≥40 px drift → clients snap only beyond 90 px). Damage is still applied
   optimistically on the hitter's client for feedback, then overwritten by the
-  authoritative `enemy_hit` broadcast, so kill rewards/drops stay with the player who
-  landed the killing blow. Respawn timeouts are `setTimeout`s on the manager and are
-  cleared in `close()`.
+  authoritative `enemy_hit` broadcast. Kill rewards used to stay with the player who
+  landed the killing blow; F2 moved them to the server (`enemy_reward`). Respawn
+  timeouts are `setTimeout`s on the manager and are cleared in `close()`.
 - **F1 not yet merged:** edits are in the working tree on the current branch
   (the multiplayer base is uncommitted), so no worktree/branch/PR was created this run.
 

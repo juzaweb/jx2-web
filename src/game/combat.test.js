@@ -13,7 +13,8 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { computeDamage } from "./combat.js";
+import { CombatSystem, computeDamage } from "./combat.js";
+import { DROP_TABLE } from "./items.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 
@@ -239,5 +240,116 @@ describe("computeDamage", () => {
       // 12 - 6 = 6
       expect(wolfAttackingPlayer.damage).toBe(6);
     });
+  });
+});
+
+describe("CombatSystem kill rewards", () => {
+  const makePlayer = () => ({
+    x: 100,
+    y: 200,
+    stats: {
+      kills: 0,
+      coins: 10,
+      exp: 900,
+      hp: 50,
+      maxHp: 50,
+      mp: 20,
+      maxMp: 20,
+      level: 1,
+      nextExp: 1000
+    }
+  });
+
+  const makeCombat = ({ isConnected = false, playerId = null } = {}) => {
+    const player = makePlayer();
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn() };
+    const scene = {
+      networkClient: { isConnected },
+      time: { delayedCall: vi.fn() },
+      add: {}
+    };
+    const onStateChange = vi.fn();
+    const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui, onStateChange);
+
+    combat.setLocalPlayerId(playerId);
+    vi.spyOn(combat, "spawnDrop").mockImplementation(() => {});
+    vi.spyOn(combat, "showFloatText").mockImplementation(() => {});
+
+    return { combat, player, ui, onStateChange };
+  };
+
+  const serverReward = (overrides = {}) => ({
+    enemyId: 1,
+    attackerId: "usr_hero",
+    exp: 35,
+    coins: 7,
+    x: 1110,
+    y: 590,
+    drop: { id: DROP_TABLE[0].id, qty: DROP_TABLE[0].qty },
+    ...overrides
+  });
+
+  it("pays a server reward to the client the kill was attributed to", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerReward(serverReward());
+
+    expect(player.stats.kills).toBe(1);
+    expect(player.stats.exp).toBe(935);
+    expect(player.stats.coins).toBe(17);
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the shared drop for bystanders without paying them", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_khac" });
+
+    combat.applyServerReward(serverReward());
+
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("ignores a reward payload it cannot trust", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerReward({ attackerId: "usr_hero", coins: 5 });
+    combat.applyServerReward(null);
+    combat.applyServerReward(serverReward({ coins: Number.NaN }));
+
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(combat.spawnDrop).not.toHaveBeenCalled();
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("rolls the reward locally while offline", () => {
+    const { combat, player } = makeCombat({ isConnected: false });
+    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
+
+    combat.handleWolfKill(wolf);
+
+    expect(wolf.die).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(1);
+    expect(player.stats.exp).toBe(935);
+    expect(player.stats.coins).toBeGreaterThanOrEqual(13);
+    expect(player.stats.coins).toBeLessThanOrEqual(19);
+    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the payout to the server while connected", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
+
+    combat.handleWolfKill(wolf);
+
+    expect(wolf.die).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
+    expect(combat.spawnDrop).not.toHaveBeenCalled();
   });
 });

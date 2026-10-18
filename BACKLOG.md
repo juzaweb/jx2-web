@@ -183,6 +183,20 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Maps to:** Social / MMO `[stretch]` — shared real-time world state (enemy HP/position).
 - **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
 
+### F2 — Server-authoritative kill rewards (EXP / bạc / drops) · `in-progress` · P2
+- **Why:** F1 put enemy HP, death and respawn on the server, but the reward is still minted by whichever client locally crosses HP ≤ 0: `CombatSystem.damageEnemy` → `handleWolfKill` rolled `Phaser.Math.Between(3, 9)` bạc, added a flat +35 EXP, incremented the kill counter, fired `spawnDrop` (a `rollDrop` from `DROP_TABLE`) and persisted the stats through `onStateChange`. That was the only client-authoritative step left in the combat loop — the server's `enemy_hit` broadcast already carried `attackerId`, yet nothing a client received could contradict a doctored payout. Acceptable for the co-op demo, but it has to close before any economy feature that treats bạc/EXP as scarce (B3 shop, C7 rèn đúc, C8 cường hoá).
+- **Acceptance:**
+  - The server rolls the kill reward when it marks an enemy dead from its own HP pool, attributes the kill to the `attackerId` of the `enemy_hit` that finished it, and broadcasts an `enemy_reward` event.
+  - Clients no longer add EXP/bạc/drops on their own when an enemy reaches 0 HP; `handleWolfKill` keeps only presentation (death, log line) and pays out from the server event.
+  - A reward is granted exactly once per kill: a duplicate, late, or post-death `enemy_hit` for the same enemy — including the existing "already dead on the server: resync" path — produces no second reward.
+  - The reward roll reuses the shared catalog (`items.js` `DROP_TABLE` / `rollKillReward`) so client and server agree on EXP, bạc and loot; the client validates the payload (finite non-negative amounts, catalog-backed drop id) and rejects anything else.
+  - A client that did not land the killing blow still renders the shared drop without granting itself EXP/bạc.
+  - Unit tests cover the server reward roll + attribution under a fixed rng (`server/tests/rewards.test.js`), the broadcast and the no-double-reward rule (`server/tests/websocket.test.js`), the payload validation (`src/game/rewardSync.test.js`) and client-side application (`src/game/combat.test.js`).
+- **Touches:** `server/src/rewards.js`, `server/src/websocket/gameSocket.js`, `src/game/items.js`, `src/game/rewardSync.js`, `src/game/combat.js`, `src/game/game.js`, tests.
+- **Depends on:** F1 (server-owned enemy HP/death).
+- **Maps to:** Social / MMO `[stretch]` — authoritative shared world state; unblocks the economy items (B3, C7, C8).
+- **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
+
 ---
 
 ## Definition of Done (every item)

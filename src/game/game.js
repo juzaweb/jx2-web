@@ -154,6 +154,11 @@ export class JiangHuScene extends Phaser.Scene {
       this.enemyManager.applyEnemyState(payload);
     });
 
+    // Kill rewards (EXP, bạc, drops) are rolled by the server on the killing blow
+    this.networkClient.on("enemy_reward", (payload) => {
+      this.combat.applyServerReward(payload);
+    });
+
     this.networkClient.on("connected", () => {
       this.sendNetworkJoin();
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
@@ -490,6 +495,7 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     this.remotePlayerManager.setLocalPlayerId(playerId);
+    this.combat.setLocalPlayerId(playerId);
     this.networkClient.join({
       id: playerId,
       username,
