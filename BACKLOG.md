@@ -201,8 +201,22 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 - **Touches:** `server/src/rewards.js`, `server/src/websocket/gameSocket.js`, `src/game/items.js`, `src/game/rewardSync.js`, `src/game/combat.js`, `src/game/game.js`, tests.
 - **Depends on:** F1 (server-owned enemy HP/death).
 - **Maps to:** Social / MMO `[stretch]` — authoritative shared world state; unblocks the economy items (B3, C7, C8).
-- **Evidence:** Branch `loop/f2-server-rewards` → PR #15 against `develop`; `npm run build` ✅ · `npm test` ✅ 92/92 (8 files; +18) · `npm run server:test` ✅ 29/29 (+4). Verifier (code-review, 2026-10-18) found the shared drop was collectable by bystanders, which duplicated loot per client → fixed by marking the drop `collectable` only for the attributed killer (+3 tests). Diff 13 files (> `gate.yaml:maxFiles` 10) → escalated to a human merge.
+- **Evidence:** Branch `loop/f2-server-rewards` → PR #15 against `develop`; `npm run build` ✅ · `npm test` ✅ 94/94 (8 files; +20) · `npm run server:test` ✅ 29/29 (+4). Verifier (code-review, 2026-10-18) found the shared drop was collectable by bystanders, which duplicated loot per client → fixed by marking the drop `collectable` only for the attributed killer (+3 tests); a follow-up five-axis `code-review-and-quality` pass then removed the optional-drop branch from `grantKillReward` and bounded the drop list (+2 tests). Diff 13 files (> `gate.yaml:maxFiles` 10) → escalated to a human merge.
 - **Spec gate:** `SPEC GATE: PASS` (inline spec review, 2026-10-18).
+
+### F3 — Server-authoritative enemy movement · `proposed` · P2
+- **Why:** F1 gave the server authority over enemy HP, death and respawn, but **movement** still runs on each client: every client drives the local AI (chase the local player within 210 px, otherwise walk home at 22 px/s — `src/game/enemy.js`), reports all alive positions every 500 ms (`src/game/game.js`), the server records them last-writer-wins and relays only ≥40 px drift (`server/src/websocket/gameSocket.js`), and a receiver snaps only beyond 90 px (`src/game/enemySync.js`). An aggroed wolf is therefore pulled toward each client's *own* player: two players watching the same wolf see it up to ~90 px apart, permanently, with a visible jump each time a threshold is crossed. Only idle wolves converge, because both clients walk them to the same `home`. Movement is the last part of the enemy state that is per-client.
+- **Acceptance:**
+  - The server runs the enemy AI on a fixed tick (order of 10 Hz) with the same tuning as today (aggro range 210 px, chase speed 43 px/s, stop distance 52 px, idle return 22 px/s), targeting the nearest player each tick; the server's enemy position is the single source of truth.
+  - Clients stop sending `enemy_move`, and `Wolf.update` no longer steers a live enemy locally — the rendered position comes from the server snapshot only.
+  - Clients smooth/interpolate between ticks so movement stays fluid at 60 fps (no teleport inside the interpolation bound) and a larger correction is blended or clamped instead of snapped.
+  - Tick rate and interpolation bound are named constants with the bandwidth/smoothness trade-off documented; the service stays within a low single-digit KB/s per client for the current 8-enemy world.
+  - Two players on opposite sides of the same wolf see it move identically, and the F1/F2 rules are preserved: HP, death, respawn timing and the kill-reward attribution still behave as specified.
+  - Unit tests cover the pure server AI step (nearest-player targeting, idle return, dead enemies ignored) and the client reconciliation/interpolation rule; WebSocket tests assert the roster carries positions and that a client-sent `enemy_move` is ignored.
+- **Touches:** `server/src/websocket/gameSocket.js`, new server AI module + test, `src/game/enemy.js`, `src/game/enemySync.js`, `src/game/game.js`, `src/game/networkClient.js`, tests.
+- **Depends on:** F1 (server enemy roster) and F2 (kill attribution must keep pointing at the killer).
+- **Maps to:** Social / MMO `[stretch]` — authoritative shared world state.
+- **Spec gate:** pending — new item awaiting `spec-review`; promote to `todo` only after a human approves the scope.
 
 ---
 
