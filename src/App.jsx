@@ -16,6 +16,7 @@ import {
   applyQuantities,
   setQuantities as rememberQuantities
 } from "./game/items.js";
+import { defaultEquipment } from "./game/equipment.js";
 import { StorageManager } from "./game/storage.js";
 import { apiClient } from "./game/apiClient.js";
 import {
@@ -118,6 +119,9 @@ export function App() {
     loadCharacterInventory(readSession()?.activeCharacter?.id)
   );
 
+  // Worn equipment (slot -> item id), scoped per character like the bag.
+  const [equipment, setEquipment] = useState(() => StorageManager.loadEquipment());
+
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
   const currentUserRef = useRef(currentUser);
@@ -191,6 +195,10 @@ export function App() {
       if (next) setInventory(next);
     });
 
+    const unsubEquipment = bridge.on(EVENTS.EQUIPMENT_UPDATED, (next) => {
+      if (next?.equipment) setEquipment(next.equipment);
+    });
+
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
       const user = currentUserRef.current;
@@ -211,6 +219,7 @@ export function App() {
       unsubAudio();
       unsubPk();
       unsubInventory();
+      unsubEquipment();
       unsubStarted();
     };
   }, []);
@@ -304,6 +313,14 @@ export function App() {
     bridge.emit(EVENTS.ACTION_USE_POTION, slot);
   }, []);
 
+  const handleEquipItem = useCallback((itemId) => {
+    bridge.emit(EVENTS.ACTION_EQUIP_ITEM, itemId);
+  }, []);
+
+  const handleUnequipSlot = useCallback((slot) => {
+    bridge.emit(EVENTS.ACTION_UNEQUIP_SLOT, slot);
+  }, []);
+
   const handleMove = useCallback((direction) => {
     bridge.emit(EVENTS.ACTION_MOVE, direction);
   }, []);
@@ -350,6 +367,7 @@ export function App() {
     setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
+    setEquipment(defaultEquipment());
     setIsLoginOpen(false);
   }, []);
 
@@ -365,6 +383,7 @@ export function App() {
     // scene enters the world, so the server fallback can never leak another
     // character's items.
     setInventory(loadCharacterInventory(character.id));
+    setEquipment(StorageManager.loadEquipment());
 
     bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);
@@ -383,6 +402,7 @@ export function App() {
       setServerName("");
       StorageManager.setUserId(null);
       StorageManager.setCharacterId(null);
+      setEquipment(defaultEquipment());
       setIsLoginOpen(true);
       bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
@@ -466,6 +486,9 @@ export function App() {
         isOpen={isInventoryOpen}
         onClose={handleCloseInventory}
         onUseItem={handleUseItem}
+        onEquipItem={handleEquipItem}
+        onUnequipSlot={handleUnequipSlot}
+        equipment={equipment}
         coins={stats.coins}
         quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}

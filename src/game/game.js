@@ -6,7 +6,8 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantities, getQuantity, consumeQuantity, setQuantities, QUICK_ITEMS } from "./items.js";
+import { getQuantities, getQuantity, consumeQuantity, addQuantity, setQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
 import { readSession } from "./session.js";
@@ -49,6 +50,16 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.fillRect(0, 0, 4, 4);
       textureGraphics.generateTexture("entity-dot", 4, 4);
       textureGraphics.destroy();
+    }
+
+    // White block tinted per slot by the equipment placeholder layers. Real
+    // layered art (textures named `equip-<slot>-<itemId>`) overrides it.
+    if (!this.textures.exists("equip-placeholder")) {
+      const equipGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+      equipGraphics.fillStyle(0xffffff, 1);
+      equipGraphics.fillRoundedRect(0, 0, 16, 16, 4);
+      equipGraphics.generateTexture("equip-placeholder", 16, 16);
+      equipGraphics.destroy();
     }
 
     // Configure world and camera bounds. Physics/collisions stay in the flat
@@ -386,6 +397,8 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
       }),
+      bridge.on(EVENTS.ACTION_EQUIP_ITEM, (itemId) => this.equipItem(itemId)),
+      bridge.on(EVENTS.ACTION_UNEQUIP_SLOT, (slot) => this.unequipSlot(slot)),
       bridge.on(EVENTS.ACTION_MOVE, (direction) => {
         if (!this.isPaused) this.player.setTouchDirection(direction);
       }),
@@ -553,6 +566,63 @@ export class JiangHuScene extends Phaser.Scene {
     this.saveGame(false);
   }
 
+  /**
+   * Push the worn items to the React HUD.
+   */
+  emitEquipment() {
+    bridge.emit(EVENTS.EQUIPMENT_UPDATED, {
+      equipment: { ...this.player.equipment }
+    });
+  }
+
+  /**
+   * Wear an inventory item in its slot. One unit is consumed from the bag and
+   * any item already in that slot is returned to it, so nothing is ever lost.
+   * @param {string} itemId
+   */
+  equipItem(itemId) {
+    if (!this.player || !this.started) return;
+
+    const { ok, slot, error } = planEquip(this.player.equipment, itemId);
+    if (!ok) {
+      this.uiBridge.addLog(error || "Không thể trang bị vật phẩm này.", "guide");
+      return;
+    }
+    if (getQuantity(itemId) <= 0) {
+      this.uiBridge.addLog("Hành trang không còn vật phẩm này.", "guide");
+      return;
+    }
+
+    const previous = equippedIn(this.player.equipment, slot);
+    const consumed = consumeQuantity(itemId, 1);
+    if (!consumed.ok) return;
+    if (previous) addQuantity(previous, 1);
+
+    this.player.applyEquipment({ ...this.player.equipment, [slot]: itemId });
+    const item = getItemById(itemId);
+    this.uiBridge.addLog(`Đã trang bị ${item?.name || itemId}.`, "system");
+    this.emitEquipment();
+    this.onInventoryChanged();
+  }
+
+  /**
+   * Take off whatever is worn in `slot` and return it to the bag.
+   * @param {string} slot
+   */
+  unequipSlot(slot) {
+    if (!this.player || !this.started) return;
+
+    const itemId = equippedIn(this.player.equipment, slot);
+    if (!itemId) return;
+
+    addQuantity(itemId, 1);
+    this.player.applyEquipment({ ...this.player.equipment, [slot]: null });
+    const item = getItemById(itemId);
+    this.uiBridge.addLog(`Đã tháo ${item?.name || itemId}.`, "system");
+    this.emitEquipment();
+    this.onInventoryChanged();
+  }
+
   setPaused(paused) {
     this.isPaused = !!paused;
     bridge.emit(EVENTS.GAME_PAUSED, this.isPaused);
@@ -580,6 +650,7 @@ export class JiangHuScene extends Phaser.Scene {
     });
     // The bag is character-scoped, so it is persisted under the active character.
     StorageManager.saveInventory(getQuantities());
+    StorageManager.saveEquipment(this.player.equipment);
 
     // Mirror the bag to the character's server inventory. Deduped by signature, so
     // a save that did not touch items (e.g. a kill) sends no request.
@@ -599,6 +670,7 @@ export class JiangHuScene extends Phaser.Scene {
   resetGame() {
     StorageManager.clear();
     StorageManager.clearInventory();
+    StorageManager.clearEquipment();
     window.location.reload();
   }
 
@@ -802,6 +874,10 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     bridge.emit(EVENTS.GAME_STARTED);
+
+    // Wear the character's saved gear. Persisted per character like the bag.
+    this.player.applyEquipment(StorageManager.loadEquipment());
+    this.emitEquipment();
 
     if (this.savedData) {
       this.uiBridge.addLog(

@@ -35,8 +35,8 @@ describe("item catalog", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("fills a 5x6 inventory grid (30 slots)", () => {
-    expect(INVENTORY_ITEMS).toHaveLength(30);
+  it("fills at least a 5x6 inventory grid (30 slots)", () => {
+    expect(INVENTORY_ITEMS.length).toBeGreaterThanOrEqual(30);
   });
 
   it("gives every inventory slot the required display fields", () => {
@@ -74,10 +74,10 @@ describe("inventory quantities", () => {
     });
   });
 
-  it("does not assign quantities to quantity-less equipment", () => {
+  it("does not assign quantities to quantity-less items", () => {
     const quantities = defaultQuantities();
-    const weapon = INVENTORY_ITEMS.find((item) => item && item.id === "hac-ung-kiem");
-    expect(quantities[weapon.id]).toBeUndefined();
+    const plain = INVENTORY_ITEMS.find((item) => item && item.id === "ho-lo-tuu");
+    expect(quantities[plain.id]).toBeUndefined();
   });
 
   it("applies persisted quantities over the catalog", () => {
@@ -89,7 +89,7 @@ describe("inventory quantities", () => {
     expect(quickItems.find((item) => item.id === "kim-sang-duoc").qty).toBe(7);
     expect(inventoryItems.find((item) => item.id === "tui-bac").qty).toBe(0);
     // Items with no saved or default quantity stay untouched.
-    expect(inventoryItems.find((item) => item.id === "hac-ung-kiem").qty).toBeUndefined();
+    expect(inventoryItems.find((item) => item.id === "ho-lo-tuu").qty).toBeUndefined();
   });
 
   it("keeps the shared in-memory store merged over defaults", () => {

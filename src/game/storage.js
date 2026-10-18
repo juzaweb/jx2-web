@@ -1,7 +1,9 @@
 import { sanitizeQuantities } from "./items.js";
+import { sanitizeEquipment, defaultEquipment } from "./equipment.js";
 
 const STORAGE_KEY = "giang_ho_game_save_v1";
 const INVENTORY_KEY = "giang_ho_inventory_v1";
+const EQUIPMENT_KEY = "giang_ho_equipment_v1";
 
 /**
  * Coerce an arbitrary value into a safe id -> non-negative integer map, or `{}`
@@ -48,6 +50,16 @@ export class StorageManager {
   static getInventoryKey() {
     if (this.activeCharacterId) return `${INVENTORY_KEY}_${this.activeCharacterId}`;
     return this.activeUserId ? `${INVENTORY_KEY}_${this.activeUserId}` : INVENTORY_KEY;
+  }
+
+  /**
+   * Get the active equipment storage key, scoped the same way as the bag so
+   * gear never leaks between characters.
+   * @returns {string}
+   */
+  static getEquipmentKey() {
+    if (this.activeCharacterId) return `${EQUIPMENT_KEY}_${this.activeCharacterId}`;
+    return this.activeUserId ? `${EQUIPMENT_KEY}_${this.activeUserId}` : EQUIPMENT_KEY;
   }
 
   /**
@@ -129,6 +141,36 @@ export class StorageManager {
   }
 
   /**
+   * Load the active character's persisted equipment, merged over empty defaults
+   * so every slot is always present.
+   * @returns {Record<string, string|null>}
+   */
+  static loadEquipment() {
+    try {
+      const raw = localStorage.getItem(this.getEquipmentKey());
+      return raw ? sanitizeEquipment(JSON.parse(raw)) : defaultEquipment();
+    } catch (error) {
+      console.warn("StorageManager: Failed to parse saved equipment:", error);
+      return defaultEquipment();
+    }
+  }
+
+  /**
+   * Persist the active character's equipment.
+   * @param {Record<string, string|null>} equipment
+   * @returns {boolean} Success status
+   */
+  static saveEquipment(equipment) {
+    try {
+      localStorage.setItem(this.getEquipmentKey(), JSON.stringify(sanitizeEquipment(equipment)));
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to save equipment:", error);
+      return false;
+    }
+  }
+
+  /**
    * Remove saved account progress from localStorage
    * @returns {boolean}
    */
@@ -152,6 +194,20 @@ export class StorageManager {
       return true;
     } catch (error) {
       console.warn("StorageManager: Failed to clear inventory:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove the active character's saved equipment (used by the reset flow).
+   * @returns {boolean}
+   */
+  static clearEquipment() {
+    try {
+      localStorage.removeItem(this.getEquipmentKey());
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to clear equipment:", error);
       return false;
     }
   }

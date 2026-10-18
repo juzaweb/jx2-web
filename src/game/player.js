@@ -1,6 +1,36 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
+import { EQUIPMENT_SLOTS, defaultEquipment, equippedIn } from "./equipment.js";
+
+/**
+ * Per-slot placeholder geometry, in body-local coordinates (same space as the
+ * hero sprite, which is centred on the body container). Used until real layered
+ * art exists for a slot.
+ */
+const EQUIPMENT_LAYOUT = {
+  color: {
+    boots: 0x8a6a3a,
+    armor: 0x7fb0d8,
+    helmet: 0xf0c85a,
+    accessory: 0xc06ad9,
+    weapon: 0xd7e3e8
+  },
+  front: {
+    boots: { x: 0, y: 20, w: 30, h: 12 },
+    armor: { x: 0, y: -2, w: 34, h: 34 },
+    helmet: { x: 0, y: -25, w: 26, h: 14 },
+    accessory: { x: -10, y: -6, w: 12, h: 12 },
+    weapon: { x: 14, y: 6, w: 10, h: 48, angle: 12 }
+  },
+  side: {
+    boots: { x: 4, y: 20, w: 30, h: 12 },
+    armor: { x: 2, y: -2, w: 30, h: 34 },
+    helmet: { x: 2, y: -25, w: 24, h: 14 },
+    accessory: { x: -4, y: -6, w: 12, h: 12 },
+    weapon: { x: 18, y: 6, w: 10, h: 48, angle: 20 }
+  }
+};
 
 export class Player {
   /**
@@ -33,6 +63,9 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
+    /** Worn items, slot -> item id. Visual layers live in this.equipLayers. */
+    this.equipment = defaultEquipment();
+    this.equipLayers = null;
     // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
     this.pkFlag = false;
     this.targetX = null;
@@ -122,6 +155,7 @@ export class Player {
       this.heroImage.setOrigin(0.5, 0.5);
 
       this.body.add([this.heroImage]);
+      this.createEquipmentLayers();
       container.add([this.shadow, this.body]);
       return;
     }
@@ -266,7 +300,93 @@ export class Player {
       bunTop
     ]);
 
+    this.createEquipmentLayers();
     container.add([this.shadow, this.body]);
+  }
+
+  /**
+   * Build one placeholder sprite per equipment slot, stacked over the body in
+   * layer order. These are the "empty" layers real layered art will eventually
+   * replace: an equipped slot just swaps the layer's texture (see
+   * {@link Player.applyEquipment}). They start hidden.
+   */
+  createEquipmentLayers() {
+    if (this.equipLayers) return;
+    this.equipLayers = {};
+
+    const defaultTexture = this.scene.textures.exists("equip-placeholder")
+      ? "equip-placeholder"
+      : "entity-dot";
+
+    EQUIPMENT_SLOTS.forEach(({ key }) => {
+      const layer = this.scene.add.sprite(0, 0, defaultTexture);
+      layer.setVisible(false);
+      this.body.add(layer);
+      this.equipLayers[key] = layer;
+    });
+
+    this.layoutEquipment();
+  }
+
+  /**
+   * Position/size every equipment layer for the current stance. Called on
+   * creation, on stance change, and after each equip.
+   */
+  layoutEquipment() {
+    if (!this.equipLayers) return;
+    const layout = this.currentStance === "side" ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front;
+
+    EQUIPMENT_SLOTS.forEach(({ key }) => {
+      const layer = this.equipLayers[key];
+      const box = layout[key];
+      if (!layer || !box) return;
+      layer.setPosition(box.x, box.y);
+      layer.setAngle(box.angle || 0);
+      // Real layered art keeps its own native size; only the placeholders are
+      // stretched to the slot box.
+      const key_ = layer.texture?.key;
+      if (key_ === "equip-placeholder" || key_ === "entity-dot") {
+        layer.setDisplaySize(box.w, box.h);
+      }
+    });
+  }
+
+  /**
+   * Show the worn items and, for any slot without real art yet, fall back to a
+   * tinted placeholder block. Real art is picked up automatically when a
+   * texture named `equip-<slot>-<itemId>` exists.
+   * @param {Record<string, string|null>} [equipment]
+   */
+  applyEquipment(equipment = this.equipment) {
+    this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
+    if (!this.equipLayers) return;
+    this.layoutEquipment();
+
+    EQUIPMENT_SLOTS.forEach(({ key }) => {
+      const layer = this.equipLayers[key];
+      if (!layer) return;
+
+      const itemId = equippedIn(this.equipment, key);
+      if (!itemId) {
+        layer.setVisible(false);
+        return;
+      }
+
+      const artKey = `equip-${key}-${itemId}`;
+      if (this.scene.textures.exists(artKey)) {
+        layer.setTexture(artKey);
+        layer.setDisplaySize(layer.width, layer.height);
+        layer.clearTint();
+      } else {
+        layer.setTexture(
+          this.scene.textures.exists("equip-placeholder") ? "equip-placeholder" : "entity-dot"
+        );
+        const box = (this.currentStance === "side" ? EQUIPMENT_LAYOUT.side : EQUIPMENT_LAYOUT.front)[key];
+        if (box) layer.setDisplaySize(box.w, box.h);
+        layer.setTint(EQUIPMENT_LAYOUT.color[key]);
+      }
+      layer.setVisible(true);
+    });
   }
 
   setStance(stance) {
@@ -289,6 +409,8 @@ export class Player {
         this.heroImage.setOrigin(0.5, 0.5);
       }
     }
+
+    this.layoutEquipment();
   }
 
   createKeyboard() {

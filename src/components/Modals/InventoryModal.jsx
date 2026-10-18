@@ -3,8 +3,15 @@ import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
   INVENTORY_CAPACITY,
-  INVENTORY_TREASURY
+  INVENTORY_TREASURY,
+  getItemById
 } from "../../game/items.js";
+import {
+  EQUIPMENT_SLOTS,
+  BONUS_LABELS,
+  bonusRows,
+  deriveEquipmentBonuses
+} from "../../game/equipment.js";
 import "./inventory.css";
 
 const GRID_COLUMNS = 5;
@@ -17,6 +24,9 @@ export function InventoryModal({
   isOpen,
   onClose,
   onUseItem,
+  onEquipItem,
+  onUnequipSlot,
+  equipment = {},
   coins = 0,
   quickItems = QUICK_ITEMS,
   inventoryItems = INVENTORY_ITEMS
@@ -56,9 +66,35 @@ export function InventoryModal({
   };
 
   const handleSlotClick = (item) => {
-    if (!item || item.useSlot == null) return;
-    onUseItem?.(item.useSlot);
+    if (!item) return;
+    if (item.slot) {
+      onEquipItem?.(item.id);
+      return;
+    }
+    if (item.useSlot != null) {
+      onUseItem?.(item.useSlot);
+    }
   };
+
+  const handleUnequip = (slotKey) => {
+    onUnequipSlot?.(slotKey);
+  };
+
+  const equippedItems = EQUIPMENT_SLOTS.map((slot) => ({
+    ...slot,
+    item: equipment?.[slot.key] ? getItemById(equipment[slot.key]) : null
+  }));
+
+  /** Item ids currently worn, so the grid can mark them instead of re-equipping. */
+  const equippedIds = new Set(
+    EQUIPMENT_SLOTS.map((slot) => equipment?.[slot.key]).filter(Boolean)
+  );
+
+  const bonusSummary = Object.entries(deriveEquipmentBonuses(equipment))
+    .filter(([, amount]) => amount !== 0)
+    .map(([stat, amount]) => ({ stat, label: BONUS_LABELS[stat] || stat, amount }));
+
+  const hoveredBonusRows = hovered ? bonusRows(hovered) : [];
 
   return (
     <div id="inventory-modal" className="inventory-dock">
@@ -120,6 +156,38 @@ export function InventoryModal({
           </span>
         </div>
 
+        {/* Equipment slots: click a filled slot to take the item off */}
+        <div className="inv-equiprow">
+          {equippedItems.map(({ key, label, item }) => (
+            <button
+              type="button"
+              key={key}
+              className={`inv-slot equip${item ? " filled" : ""}`}
+              title={item ? `${label}: ${item.name} (nhấp để tháo)` : label}
+              onMouseEnter={(event) =>
+                item ? handleSlotEnter(item, event) : setHovered(null)
+              }
+              onClick={() => item && handleUnequip(key)}
+            >
+              {item ? (
+                <span className={`inv-icon ${item.icon}`} />
+              ) : (
+                <span className="inv-equip-label">{label}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {bonusSummary.length > 0 && (
+          <div className="inv-equip-bonus">
+            {bonusSummary.map((row) => (
+              <span key={row.stat} className="inv-equip-bonus-item">
+                {row.label} <b>+{row.amount}</b>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div
           className="inv-grid"
           style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
@@ -135,21 +203,27 @@ export function InventoryModal({
               );
             }
 
-            const usable = item.useSlot != null;
+            const equippable = Boolean(item.slot);
+            const equipped = equippable && equippedIds.has(item.id);
+            const usable = equippable || item.useSlot != null;
             return (
               <button
                 type="button"
                 key={item.id}
-                className={`inv-slot${usable ? " usable" : ""}`}
+                className={`inv-slot${usable ? " usable" : ""}${equipped ? " equipped" : ""}`}
                 title={item.name}
                 onMouseEnter={(event) => handleSlotEnter(item, event)}
-                onClick={() => handleSlotClick(item)}
+                onClick={() => !equipped && handleSlotClick(item)}
               >
                 <span className={`inv-icon ${item.icon}`} />
                 {typeof item.qty === "number" && (
                   <span className="inv-qty">x{item.qty}</span>
                 )}
-                {usable && <span className="inv-use-tag">Dùng</span>}
+                {usable && (
+                  <span className="inv-use-tag">
+                    {equippable ? (equipped ? "Đang mặc" : "Mặc") : "Dùng"}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -207,6 +281,21 @@ export function InventoryModal({
             <div className="inv-tooltip-qty">Số lượng: {hovered.qty}</div>
           )}
           <div className="inv-tooltip-desc">{hovered.desc}</div>
+          {hoveredBonusRows.length > 0 && (
+            <div className="inv-tooltip-bonus">
+              {hoveredBonusRows.map((row) => (
+                <div key={row.stat}>
+                  {row.label} +{row.amount}
+                </div>
+              ))}
+            </div>
+          )}
+          {hovered.slot && (
+            <div className="inv-tooltip-use">
+              Nhấp để mặc vào ô{" "}
+              {EQUIPMENT_SLOTS.find((slot) => slot.key === hovered.slot)?.label || hovered.slot}
+            </div>
+          )}
           {hovered.useSlot != null && (
             <div className="inv-tooltip-use">Nhấp để sử dụng</div>
           )}

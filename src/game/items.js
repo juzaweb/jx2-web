@@ -60,21 +60,22 @@ export const INVENTORY_TREASURY = {
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 
 /**
- * 5 columns x 6 rows grid. An entry of `null` renders an empty slot.
- * @type {Array<null | {id:string, name:string, icon:string, qty?:number, desc:string, useSlot?:number}>}
+ * 5-column grid (scrolls when it overflows). An entry of `null` renders an empty
+ * slot. Items tagged with `slot` are equipment and can be worn (see equipment.js).
+ * @type {Array<null | {id:string, name:string, icon:string, qty?:number, slot?:string, bonuses?:Record<string,number>, desc:string, useSlot?:number}>}
  */
 export const INVENTORY_ITEMS = [
   { id: "ho-lo-tuu", name: "Hồ Lô Tửu", icon: "icon-gourd", desc: "Bầu rượu của hành khách, hương thơm nồng đượm." },
   { id: "lenh-bai", name: "Lệnh Bài Môn Phái", icon: "icon-token", desc: "Tín vật Võ Đang, chứng minh thân phận đệ tử." },
-  { id: "thiet-trao", name: "Thiết Trảo", icon: "icon-claw", desc: "Binh khí lợi hại, sử dụng trong cận chiến." },
-  { id: "hac-ung-kiem", name: "Hắc Ưng Kiếm", icon: "icon-jian", desc: "Thanh kiếm huyền thiết, sắc bén vô song." },
+  { id: "thiet-trao", name: "Thiết Trảo", icon: "icon-claw", qty: 1, slot: "weapon", bonuses: { attack: 6 }, desc: "Binh khí lợi hại, sử dụng trong cận chiến." },
+  { id: "hac-ung-kiem", name: "Hắc Ưng Kiếm", icon: "icon-jian", qty: 1, slot: "weapon", bonuses: { attack: 10, critRate: 0.02 }, desc: "Thanh kiếm huyền thiết, sắc bén vô song." },
   kimSangDuoc,
 
   { id: "bi-kip-vo-cong", name: "Bí Kíp Võ Công", icon: "icon-book", qty: 1, desc: "Sách cổ ghi chép tâm pháp luyện công." },
   { id: "thien-ha-mat-tich", name: "Thiên Hà Mật Tịch", icon: "icon-book-red", desc: "Mật tịch thượng thừa của phái Thiên Hà." },
-  { id: "cam-y-bao", name: "Cẩm Y Bào", icon: "icon-armor", desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự." },
-  { id: "thanh-long-dao", name: "Thanh Long Đao", icon: "icon-blade", desc: "Đại đao khắc hình thanh long, uy lực trầm hùng." },
-  { id: "ngoc-bo-dao", name: "Ngọc Bồi Dương Chi", icon: "icon-ring", desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ." },
+  { id: "cam-y-bao", name: "Cẩm Y Bào", icon: "icon-armor", qty: 1, slot: "armor", bonuses: { defense: 8, maxHp: 40 }, desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự." },
+  { id: "thanh-long-dao", name: "Thanh Long Đao", icon: "icon-blade", qty: 1, slot: "weapon", bonuses: { attack: 14 }, desc: "Đại đao khắc hình thanh long, uy lực trầm hùng." },
+  { id: "ngoc-bo-dao", name: "Ngọc Bồi Dương Chi", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { maxMp: 30 }, desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ." },
 
   daiHoanDan,
   nuNhiHong,
@@ -85,21 +86,38 @@ export const INVENTORY_ITEMS = [
   { id: "duoc-vuong-lo", name: "Dược Vương Lộ", icon: "icon-vase", qty: 113, desc: "Linh dịch chữa lành, chiết từ ngàn loại thảo dược." },
   { id: "than-bi-hop", name: "Thần Bí Hộp", icon: "icon-chest", qty: 99, desc: "Bảo hộp chưa mở, bên trong ẩn chứa kỳ vật." },
   { id: "yeu-dan", name: "Yêu Đan", icon: "icon-pills", qty: 473, desc: "Nội đan của yêu thú, tinh túy linh khí." },
-  { id: "huyet-chien-giap", name: "Huyết Chiến Giáp", icon: "icon-armor", desc: "Chiến giáp nhuốm huyết, phòng ngự cực cao." },
+  { id: "huyet-chien-giap", name: "Huyết Chiến Giáp", icon: "icon-armor", qty: 1, slot: "armor", bonuses: { defense: 14, maxHp: 80 }, desc: "Chiến giáp nhuốm huyết, phòng ngự cực cao." },
   { id: "bach-nien-linh-chi", name: "Bách Niên Linh Chi", icon: "icon-herb", qty: 574, desc: "Linh chi trăm năm, đại bổ nguyên khí." },
 
   { id: "tu-kim-ho-lo", name: "Tử Kim Hồ Lô", icon: "icon-gourd", qty: 45, desc: "Hồ lô tử kim, tích linh đan hồi phục." },
   { id: "ngoc-tinh-binh", name: "Ngọc Tịnh Bình", icon: "icon-vase", qty: 485, desc: "Bình ngọc tịnh khí, thanh lọc tâm thần." },
-  { id: "phuong-vu-bao", name: "Phượng Vũ Bào", icon: "icon-crown", desc: "Bào phục thêu lông phượng, tôn quý phi thường." },
-  { id: "phach-dao", name: "Phách Đao", icon: "icon-blade", desc: "Đao nhẹ, tốc độ xuất thủ cực nhanh." },
-  { id: "tu-tinh-nhan", name: "Tứ Tinh Nhẫn", icon: "icon-ring", desc: "Nhẫn khảm bốn viên linh thạch." },
+  { id: "phuong-vu-bao", name: "Phượng Vũ Bào", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 6, maxHp: 25 }, desc: "Bào phục thêu lông phượng, tôn quý phi thường." },
+  { id: "phach-dao", name: "Phách Đao", icon: "icon-blade", qty: 1, slot: "weapon", bonuses: { attack: 16, critRate: 0.03 }, desc: "Đao nhẹ, tốc độ xuất thủ cực nhanh." },
+  { id: "tu-tinh-nhan", name: "Tứ Tinh Nhẫn", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { attack: 4, critRate: 0.02 }, desc: "Nhẫn khảm bốn viên linh thạch." },
 
   { id: "linh-duong", name: "Thịt Rừng", icon: "icon-meat", qty: 3, desc: "Thịt thú tươi, dùng để nấu nướng hồi phục." },
   { id: "tang-kinh-do", name: "Tàng Kinh Đồ", icon: "icon-scroll", qty: 1, desc: "Bản đồ địa đạo bí mật dẫn tới tàng kinh các." },
-  { id: "ngoc-nhan", name: "Ngọc Nhẫn", icon: "icon-ring", desc: "Nhẫn ngọc đơn sơ nhưng ẩn chứa linh khí." },
+  { id: "ngoc-nhan", name: "Ngọc Nhẫn", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { maxHp: 15 }, desc: "Nhẫn ngọc đơn sơ nhưng ẩn chứa linh khí." },
   { id: "hoang-kim-huyen-thiet", name: "Huyền Thiết Kim", icon: "icon-gem", qty: 67, desc: "Kim loại huyền thiết, chế tạo binh khí thượng hạng." },
-  { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." }
+  { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." },
+
+  { id: "tu-kim-quan", name: "Tử Kim Quan", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 9, accuracy: 30 }, desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác." },
+  { id: "van-ly-hai", name: "Vân Lý Hài", icon: "icon-boots", qty: 1, slot: "boots", bonuses: { defense: 4, maxHp: 20 }, desc: "Hài thêu mây, bước đi nhẹ nhàng như mây bay." }
 ];
+
+/**
+ * Look up a catalog item by id across both the quick-slot and grid catalogs.
+ * @param {string} id
+ * @returns {object|null}
+ */
+export function getItemById(id) {
+  if (typeof id !== "string" || id.length === 0) return null;
+  return (
+    QUICK_ITEMS.find((item) => item.id === id) ||
+    INVENTORY_ITEMS.find((item) => item && item.id === id) ||
+    null
+  );
+}
 
 /**
  * Build the default id -> quantity map from the static catalog.
