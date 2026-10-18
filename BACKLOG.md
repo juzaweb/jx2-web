@@ -61,6 +61,12 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 - **Touches:** `src/game/items.js`, `src/components/Modals/InventoryModal.jsx`, `src/components/HUD/HotbarDock.jsx`, `src/styles/item-icons.css`, `src/game/items.test.js`.
 - **Maps to:** Items & Equipment `[stretch]` — "Item rarity tiers (thường / lam / kim / huyền)".
 
+### C6 — Sect initiation & stat affinities · `todo` · P2
+- **Why:** The player is permanently an unaffiliated "Lãng Khách" with fixed base stats; JX2 character identity centers on choosing a môn phái (Thiếu Lâm, Võ Đang, Nga My) with distinct stat affinities and titles.
+- **Acceptance:** A pure catalog defines ≥3 sects (`thieu-lam`, `vo-dang`, `nga-my`) with Vietnamese names, descriptions, and stat affinity modifiers (e.g. Thiếu Lâm +HP/DEF, Võ Đang +MP/ATK, Nga My +HP/MP regen); player can select or switch sect via `Lệnh Bài Môn Phái` or dialogue; chosen sect persists in `storage.js`; HUD and player overhead name display the sect title (e.g. "Võ Đang Đệ Tử"); unit tests verify stat modifier calculation, storage round-trip, and invalid sect ID rejection.
+- **Touches:** `src/game/player.js`, `src/game/storage.js`, `src/components/HUD/PlayerVitals.jsx`, new `src/game/sect.js`, new `src/game/sect.test.js`.
+- **Maps to:** Factions & Classes `[core]` — "Sect affects starting stats and one signature skill".
+
 ---
 
 ## EPIC A — Combat & Skills
@@ -82,6 +88,12 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 - **Acceptance:** A pure `computeDamage(attacker, defender, rng)` returns `{ damage, crit }`, applying attack-minus-defense mitigation, a minimum-damage floor of 1, and a crit multiplier; `performAttack`/`performSkill` use it and the combat log marks critical hits; unit tests cover the floor, the crit path, and a deterministic rng.
 - **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/game/enemy.js`, new `src/game/combat.test.js`.
 - **Maps to:** Combat `[core]` — "Critical hits, damage formula with attack/defense".
+
+### A5 — Combat status effects & buff slot · `todo` · P2
+- **Why:** Combat currently only performs instant HP subtractions; there are no ongoing effects like damage-over-time (Trúng độc) or stat buffs (Hộ thể khí), leaving the existing `#buff-slot` in PlayerVitals static and unfunctional.
+- **Acceptance:** A pure status effect engine `updateBuffs(buffs, deltaMs)` handles duration decay, interval-based ticks, and stat modifiers; supports at least one buff ("Hộ Thể Khí" reducing damage taken) and one debuff ("Trúng Độc" dealing periodic damage); active buffs display in the PlayerVitals buff slot with name, icon, and remaining timer; combat log announces effect application and expiration; unit tests cover duration decay, tick triggers, modifier application, and clean expiration removal.
+- **Touches:** `src/game/combat.js`, `src/game/player.js`, `src/components/HUD/PlayerVitals.jsx`, new `src/game/buffs.js`, new `src/game/buffs.test.js`.
+- **Maps to:** Skills `[stretch]` — "Buffs / debuffs with duration and stacking rules".
 
 ---
 
@@ -111,6 +123,12 @@ Status legend: `todo` · `in-progress` · `blocked` · `done`.
 
 ### D2 — Mobile controls polish · `todo` · P3
 ### D3 — Settings persistence (audio/graphics) · `todo` · P3
+
+### D4 — Interactive chat channels · `todo` · P3
+- **Why:** The chat input bar contains a non-functional static button (`[ Cận ] ▼`) and hardcodes every message to the "near" channel; JX2 players rely on switching channels (Thế giới, Môn phái, Tổ đội, Cận) to communicate.
+- **Acceptance:** Clicking `#chat-channel-btn` toggles a selector enabling the player to choose active channel (`near`, `world`, `sect`, `team`); outgoing messages carry the selected channel `type` and render with corresponding Vietnamese bracket tag (`[Cận]`, `[Thế giới]`, `[Môn phái]`, `[Tổ đội]`) and distinct color style; ChatPanel tab filtering scopes or shows messages accordingly; unit tests verify channel switching, message formatting with the channel prefix/type, and filter matching.
+- **Touches:** `src/components/HUD/ChatPanel.jsx`, `src/App.jsx`, `src/index.css`, new `src/components/HUD/ChatPanel.test.jsx`.
+- **Maps to:** Social / MMO `[stretch]` — "Chat channels: thế giới / môn phái / tổ đội".
 
 ---
 

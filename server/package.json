@@ -1,0 +1,16 @@
+{
+  "name": "jx2-backend",
+  "version": "1.0.0",
+  "description": "Backend API service for Giang Ho (jx2-web) - Character saves, inventory, and leaderboard",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
