@@ -27,6 +27,8 @@ small number of high-value features and write them as backlog items. Follow
 - `BACKLOG.md` — existing items (do NOT duplicate anything already
   `todo`/`in-progress`/`done`).
 - `docs/jx2-feature-library.md` — the trusted, human-curated JX2 feature menu.
+- `docs/example-images/` — human-curated real-game screenshots (trusted visual
+  reference); read its `README.md` and open the images for layout/atmosphere.
 - The `src/` tree — what exists and what is feasible now.
 
 ## Rules
@@ -34,6 +36,8 @@ small number of high-value features and write them as backlog items. Follow
 - Never edit source code. Proposals only, appended to `BACKLOG.md`.
 - Write new items with status **`proposed`**, never `todo` — only a human promotes
   `proposed` → `todo` to approve work.
+- Use `docs/example-images/` for **layout/atmosphere inspiration only** — never copy
+  the artwork or assets into the repo.
 - At most 3 new items per run, each with: stable ID + epic prefix, Why,
   objectively testable Acceptance, Touches, and the JX2 system it maps to.
 - Never invent features with no acceptance criteria.
