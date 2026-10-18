@@ -175,14 +175,6 @@ export class NetworkClient {
   }
 
   /**
-   * Report enemy positions so other players see the same monsters
-   * @param {Array<Object>} enemies
-   */
-  sendEnemyMove(enemies) {
-    this.send("enemy_move", { enemies });
-  }
-
-  /**
    * Send chat message
    * @param {Object} chatData
    */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { POSITION_SNAP_THRESHOLD, reconcileEnemyState, sanitizeHp } from "./enemySync.js";
+import { POSITION_SNAP_THRESHOLD, interpolateEnemyPosition, reconcileEnemyState, sanitizeHp } from "./enemySync.js";
 
 const localWolf = { x: 840, y: 600, hp: 45, maxHp: 45, isDead: false };
 
@@ -63,5 +63,61 @@ describe("reconcileEnemyState", () => {
   it("never snaps without a usable server position", () => {
     expect(reconcileEnemyState(localWolf, { hp: 10 }).snap).toBe(false);
     expect(reconcileEnemyState(localWolf, { x: Number.NaN, y: 600 }).snap).toBe(false);
+  });
+});
+
+describe("interpolateEnemyPosition", () => {
+  const current = { x: 840, y: 600 };
+  const target = { x: 880, y: 600 };
+
+  it("blends toward the authoritative position without overshooting", () => {
+    const next = interpolateEnemyPosition(current, target, 100);
+
+    expect(next.x).toBeGreaterThan(current.x);
+    expect(next.x).toBeLessThan(target.x);
+    expect(next.y).toBe(600);
+  });
+
+  it("covers the same distance in the same time whatever the frame rate", () => {
+    const sixtyFps = interpolateEnemyPosition(current, target, 1000 / 60);
+    const thirtyFps = interpolateEnemyPosition(current, target, 1000 / 30);
+
+    // Blending is exponential, so one 30 fps step equals two 60 fps steps
+    const twoSteps = interpolateEnemyPosition(
+      interpolateEnemyPosition(current, target, 1000 / 60),
+      target,
+      1000 / 60
+    );
+
+    expect(twoSteps.x).toBeCloseTo(thirtyFps.x, 6);
+    expect(sixtyFps.x).toBeLessThan(thirtyFps.x);
+  });
+
+  it("moves further with a longer frame delta", () => {
+    expect(interpolateEnemyPosition(current, target, 16).x).toBeLessThan(
+      interpolateEnemyPosition(current, target, 64).x
+    );
+  });
+
+  it("settles exactly on the target within the epsilon", () => {
+    expect(interpolateEnemyPosition({ x: 879.5, y: 600 }, target, 16)).toEqual(target);
+    expect(interpolateEnemyPosition({ x: 800, y: 600 }, { x: 800, y: 600 }, 16)).toEqual({ x: 800, y: 600 });
+  });
+
+  it("holds still for a zero or unusable delta", () => {
+    expect(interpolateEnemyPosition(current, target, 0)).toEqual(current);
+    expect(interpolateEnemyPosition(current, target, Number.NaN)).toEqual(current);
+    expect(interpolateEnemyPosition(current, target, -16)).toEqual(current);
+  });
+
+  it("settles onto a distant target it is not allowed to snap to in one frame", () => {
+    let position = { x: 840, y: 600 };
+    const far = { x: 840 + POSITION_SNAP_THRESHOLD - 1, y: 600 };
+
+    for (let frame = 0; frame < 120; frame++) {
+      position = interpolateEnemyPosition(position, far, 16);
+    }
+
+    expect(position).toEqual(far);
   });
 });

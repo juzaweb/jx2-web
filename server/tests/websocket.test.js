@@ -4,6 +4,7 @@ import http from "node:http";
 import { WebSocket } from "ws";
 import { createApp } from "../src/app.js";
 import { initGameSocket, ENEMY_MAX_HP } from "../src/websocket/gameSocket.js";
+import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { DROP_TABLE } from "../../src/game/items.js";
 
 const createTestClient = async (url) => {
@@ -78,7 +79,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await new Promise((resolve) => {
       server.listen(0, "127.0.0.1", () => {
         port = server.address().port;
-        gameSocket = initGameSocket(server, { path: "/ws", enemyRespawnMs: 800 });
+        gameSocket = initGameSocket(server, { path: "/ws", enemyRespawnMs: 800, enemyTickMs: 50 });
         resolve();
       });
     });
@@ -287,11 +288,24 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({ type: "enemy_hit", payload: { id: 0, damage: -50 } });
     client1.send({ type: "enemy_move", payload: {} });
 
-    // Position reports relay only meaningful drift to the other players
-    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 1, x: 950, y: 670 }] } });
-    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 2, x: 1400, y: 700 }] } });
-    const moved = await client2.waitFor((m) => m.type === "enemy_moved");
-    assert.deepEqual(moved.payload.enemies, [{ id: 2, x: 1400, y: 700 }]);
+    // Damage cannot move a wolf: wolf 6 sits at its home (1050, 820), out of every
+    // player's range, and a hit carrying a bogus position must not relocate it
+    client1.send({ type: "enemy_hit", payload: { id: 6, damage: 1, x: 10, y: 10 } });
+    const hitWolf6 = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 6);
+    assert.equal(hitWolf6.payload.x, 1050, "The server keeps its own enemy position");
+    assert.equal(hitWolf6.payload.y, 820);
+
+    // Movement is server-owned: a client's own position report changes nothing.
+    // Wolf 5 sits at its home (760, 800) with nobody in range, so it must stay there.
+    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 5, x: 900, y: 640 }] } });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(
+      client1.messages.filter(
+        (m) => m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 5)
+      ).length,
+      0,
+      "A client-reported enemy position is ignored"
+    );
 
     // Sockets that never joined cannot touch the shared enemy state
     const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
@@ -310,6 +324,45 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await spectator.close();
     await client2.close();
     await client1.close();
+  });
+
+  await t.test("Enemy movement is server-owned and shared by every player", async () => {
+    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    // Wolf 1 spawns at (950, 670): client2 stands next to it, client1 is far away
+    client1.send({ type: "player_join", payload: { id: "usr_move1", username: "Move1", x: 1400, y: 670 } });
+    await client1.waitFor((m) => m.type === "init_world");
+    client2.send({ type: "player_join", payload: { id: "usr_move2", username: "Move2", x: 1050, y: 670 } });
+    await client2.waitFor((m) => m.type === "init_world");
+    await client1.waitFor((m) => m.type === "player_joined");
+
+    const nearPlayer = { x: 1050, y: 670 };
+    const stopDistance = ENEMY_TUNING.stopDistance;
+    const wolfOne = (m) =>
+      m.type === "enemy_moved" ? m.payload.enemies.find((enemy) => enemy.id === 1) : null;
+    const settled = (m) => {
+      const wolf = wolfOne(m);
+      return Boolean(wolf) && Math.hypot(wolf.x - nearPlayer.x, wolf.y - nearPlayer.y) <= stopDistance + 1;
+    };
+
+    // Both players watch the wolf walk to the *nearer* player, not to their own
+    const seenByFarPlayer = await client1.waitFor(settled, 4000);
+    const seenByNearPlayer = await client2.waitFor(settled, 4000);
+    assert.ok(wolfOne(seenByFarPlayer).x < 1000, "The far player sees it hold short of the nearer player");
+    assert.ok(wolfOne(seenByNearPlayer).x < 1000);
+
+    // At rest the AI produces no delta, so the tick stops broadcasting that wolf
+    const before = client1.messages.length;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(
+      client1.messages.slice(before).filter((m) => wolfOne(m)).length,
+      0,
+      "A settled wolf stops generating movement traffic"
+    );
+
+    await client1.close();
+    await client2.close();
   });
 
   await t.test("Teardown test server", async () => {

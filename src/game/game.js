@@ -575,18 +575,6 @@ export class JiangHuScene extends Phaser.Scene {
           });
         }
       }
-
-      // Report enemy positions to the server (throttled) so players share one world state
-      if (!this.lastEnemySyncTime || time - this.lastEnemySyncTime > 500) {
-        this.lastEnemySyncTime = time;
-        const enemies = this.enemyManager
-          .getAlive()
-          .map((wolf) => ({ id: wolf.id, x: Math.round(wolf.x), y: Math.round(wolf.y) }));
-
-        if (enemies.length) {
-          this.networkClient.sendEnemyMove(enemies);
-        }
-      }
     }
 
     // Update enemies and check attacks against player
