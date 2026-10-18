@@ -1,7 +1,21 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — direct request: peers can see each other's health (remote overhead bars + HP relay)
-(Prior run: direct requests — overhead health bar on the player, respawn position desync; before that an HMR/canvas remount left an orphaned `NetworkClient` reconnecting forever.)
+Last run: 2026-10-18 — direct request (fix): other players did not appear on the minimap
+(Prior run: direct request (fix) — minimap stayed blank because its one-shot registration was lost.)
+
+## Remote players missing from the minimap (2026-10-18, direct request)
+
+- Report: teammates/other players were not shown as blips on the minimap.
+- Cause: `uiBridgeAdapter.drawMinimap` guarded the remote-player loop with `if (!rp.sprite || !rp.sprite.active)`. A `RemotePlayer` renders through a `container` (no physics `sprite`), so `rp.sprite` was always `undefined` and every remote player was skipped.
+- Fix: guard on `rp.container?.active` (a destroyed player has already nulled its container). The old test passed only because it fed the loop a fake `sprite` — switched the test to the real `container` shape and added a negative case for a destroyed player.
+- Verify: `npm run build` ✅ · `npm test` ✅ **149 passed / 149** (15 files).
+
+## Blank minimap fix (2026-10-18, direct request)
+
+- Report: the HUD minimap rendered empty.
+- Cause: `MinimapPanel` emits `ACTION_REGISTER_MINIMAP` once in a mount `useEffect`. Phaser's `Game.boot()` waits on `TextureEvents.READY` before `start()`, so `JiangHuScene.create()` — where `UIBridgeAdapter` subscribes — runs on the first RAF frame, *after* React's effects. The registration was emitted into the void, `minimapCtx` stayed `null`, and `drawMinimap` returned early every frame.
+- Fix: two-way handshake over the existing bridge. `UIBridgeAdapter` now (after subscribing) emits a new `ACTION_REQUEST_MINIMAP`; `MinimapPanel` answers it by re-sending its canvas. This covers both mount orders: panel-first (adapter requests → panel resends) and adapter-first (panel's own mount emit is caught). Extracted `attachMinimap()` for the bind. No new global/singleton state.
+- Verify: `npm run build` ✅ · `npm test` ✅ **148 passed / 148** (15 files; +4: new `uiBridgeAdapter.test.js` covering re-request, late registration, drawing, and pre-bind no-op).
 
 ## Peer health bars + HP relay (2026-10-18, direct request)
 
