@@ -29,7 +29,7 @@
     },
     "spec-review": {
       "name": "spec-review",
-      "description": "Independent spec reviewer. APPROVE/REJECT proposed BACKLOG items before coding. Does not edit files.",
+      "description": "Quality gate on proposed BACKLOG items. APPROVE/REJECT per item to keep weak/duplicate items out; a human (proposed→todo) authorizes implementation. Does not edit files.",
       "mode": "subagent",
       "prompt": "Read AGENTS.md, BACKLOG.md, docs/jx2-feature-library.md, and skills/spec-review/SKILL.md. Review newly proposed items and respond APPROVE/REJECT per item plus SPEC GATE: PASS/FAIL. Do not edit files.",
       "permission": {

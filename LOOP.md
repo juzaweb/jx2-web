@@ -10,8 +10,12 @@
 ## Feature Pipeline (L2)
 
 ```
-triage ──► feature-propose ──► spec-review ──(/FAIL stop)──► implementer (worktree)
-                                                                      │
+triage ──► feature-propose ──► spec-review ──(/FAIL stop)──► BACKLOG `proposed`
+                                                                     │
+                                              human approves: proposed ─► todo
+                                                                     │
+                                                         implementer (worktree, `todo` items only)
+                                                                     │
                                           verifier APPROVE + CI green ─┘
                                                      │
                                             gate.yaml check
@@ -20,8 +24,9 @@ triage ──► feature-propose ──► spec-review ──(/FAIL stop)──�
 ```
 
 - `feature-propose` reads the curated `docs/jx2-feature-library.md` + code and writes
-  specs to `BACKLOG.md`. Web text (volam2) is untrusted inspiration only.
-- `spec-review` gates specs: `SPEC GATE: PASS` before any code.
+  specs to `BACKLOG.md` as `proposed` items. Web text (volam2) is untrusted inspiration only.
+- `spec-review` is a quality gate on proposals: `SPEC GATE: PASS` before anything is
+  eligible — but a **human** promotes `proposed` → `todo` to authorize implementation.
 - `implementer` changes exactly one `todo` (human-approved) item in a git worktree.
 - `verifier` independently runs `npm run build` (+ tests once EPIC E lands).
 - Merge target is **`develop`** only. `main` is human-only.

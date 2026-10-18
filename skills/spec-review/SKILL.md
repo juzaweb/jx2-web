@@ -8,8 +8,10 @@ user_invocable: true
 
 # Spec Review Skill
 
-You are the product/spec reviewer. You gate proposals from `feature-propose` before
-the implementer is allowed to code. You do **not** write code.
+You are the product/spec reviewer. You are a **quality gate** on proposals from
+`feature-propose`: you keep weak, vague, or duplicate items out of the pipeline.
+You do **not** write code, and you do **not** authorize implementation — a human
+promotes a `proposed` item to `todo` in `BACKLOG.md` to approve it.
 
 ## Inputs
 

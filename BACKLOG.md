@@ -8,6 +8,7 @@ Status legend: `proposed` · `todo` · `in-progress` · `blocked` · `done`.
 > **Human approval gate:** `feature-propose` writes new items as `proposed`.
 > A human promotes an item to `todo` to approve it for implementation. The loop
 > implements only `todo` items; if none exist it stops after proposing.
+>
 > Loop rules: one item per run, small PRs, verify with `npm run build`
 > (plus the item's own tests once a harness exists). Update this file + `STATE.md`
 > after each run. Do not start an epic's next item before the current one is `done`.
