@@ -56,11 +56,14 @@ cadence and every safety precondition before a cycle starts.
 
 Recommended cadence:
 
-- **Feature pipeline (L2):** hourly inside the day window (`08:00–22:00`, up to
-  14 cycles/day). Each cycle is small (one item, one PR merged into `develop`).
-- **Night (`22:00–08:00`):** `loop-triage` in report-only (L1) only — no code.
+- **Feature pipeline (L2):** every 1–2h. Default day window `08:00–22:00`
+  (2h → 7 cycles/day); widen the window to run at night (2h over 24h → 12
+  cycles/day). Each cycle is small (one item, one PR merged into `develop`).
+- **Night gap (`22:00–08:00`):** with the default window, only `loop-triage`
+  in report-only (L1) runs — no code. Removing the window lets the loop merge
+  unattended overnight; treat `develop` as integration and review it daily.
 - **Warm-up:** start at 2h intervals for 2–3 days, watch for conflicts,
-  duplicate/low-value items, and rising test time, then move to hourly.
+  duplicate/low-value items, and rising test time, then tighten if desired.
 - Never faster than 1 run/hour; offset the minute so runs never overlap.
 
 Guardrails the script applies (all must hold or it skips):

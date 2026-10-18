@@ -39,6 +39,24 @@ needed: `skills/loop-constraints/SKILL.md`, `skills/feature-propose/SKILL.md`,
 5. On `APPROVE` and green CI, open a PR into `develop` and merge only per
    `gate.yaml`; otherwise open a PR and stop for a human.
 
+## Conflict handling (auto-rebase, never auto-resolve)
+
+Before opening the PR, and again whenever the PR is not mergeable, act on the
+loop branch inside its worktree:
+
+1. Fetch latest: `git fetch origin`.
+2. Rebase the loop branch onto the target:
+   `git rebase origin/develop`.
+3. If the rebase is clean: re-run `npm run build && npm test`, then
+   `git push --force-with-lease`. Never plain `--force`.
+4. Re-check CI and merge only when `mergeStateStatus` is `CLEAN`.
+
+If the rebase hits a conflict:
+
+- `git rebase --abort` immediately.
+- **Never resolve conflicts automatically.**
+- Leave the PR open, stop for a human, and record the conflict in `STATE.md`.
+
 ## Hard rules
 
 - Respect `gate.yaml` denylist, `maxFiles`, `autoMergeTargets`, and
