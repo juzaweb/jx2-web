@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { GameCanvas } from "./components/GameCanvas.jsx";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
@@ -59,17 +59,13 @@ export function App() {
   const [logs, setLogs] = useState(INITIAL_LOGS);
 
   // Inventory stack quantities are persisted in the same save slot as stats.
-  // The lazy initializer also seeds the shared in-memory store so the Phaser
-  // scene persists the loaded values on its first save.
-  const [inventoryQuantities] = useState(() =>
-    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+  // Seeding the shared in-memory store here also lets the Phaser scene persist
+  // the loaded values on its first save. Resolved once at mount.
+  const [{ quickItems, inventoryItems }] = useState(() =>
+    applyQuantities(
+      rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+    )
   );
-
-  const { quickItems, inventoryItems } = useMemo(
-    () => applyQuantities(inventoryQuantities),
-    [inventoryQuantities]
-  );
-
 
   useEffect(() => {
     const unsubStats = bridge.on(EVENTS.STATS_UPDATED, (newStats) => {
@@ -120,7 +116,6 @@ export function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isInventoryOpen]);
-
 
   const handleAttack = useCallback(() => {
     bridge.emit(EVENTS.ACTION_ATTACK);
