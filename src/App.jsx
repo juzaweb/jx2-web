@@ -7,6 +7,7 @@ import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
+import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
@@ -87,6 +88,7 @@ export function App() {
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [stats, setStats] = useState({
     level: 1,
@@ -207,12 +209,62 @@ export function App() {
     };
   }, []);
 
+  // Closing the help overlay also lifts the pause it applied. Opening a docked
+  // panel (character / inventory) dismisses help the same way.
+  const dismissHelp = useCallback(() => {
+    setIsHelpOpen(false);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleOpenCharacter = useCallback(() => {
+    dismissHelp();
+    setIsCharacterOpen(true);
+  }, [dismissHelp]);
+
+  const handleCloseCharacter = useCallback(() => {
+    setIsCharacterOpen(false);
+  }, []);
+
+  const handleOpenInventory = useCallback(() => {
+    dismissHelp();
+    setIsInventoryOpen(true);
+  }, [dismissHelp]);
+
+  const handleCloseInventory = useCallback(() => {
+    setIsInventoryOpen(false);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === "F3") {
+        e.preventDefault();
+        if (isCharacterOpen) {
+          handleCloseCharacter();
+        } else {
+          handleOpenCharacter();
+        }
+        return;
+      }
+
+      if (e.key === "F4") {
+        e.preventDefault();
+        if (isInventoryOpen) {
+          handleCloseInventory();
+        } else {
+          handleOpenInventory();
+        }
+        return;
+      }
+
       if (e.key !== "Escape") return;
 
+      if (isCharacterOpen) {
+        handleCloseCharacter();
+        return;
+      }
+
       if (isInventoryOpen) {
-        setIsInventoryOpen(false);
+        handleCloseInventory();
         return;
       }
 
@@ -225,7 +277,14 @@ export function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isInventoryOpen]);
+  }, [
+    isCharacterOpen,
+    isInventoryOpen,
+    handleOpenCharacter,
+    handleCloseCharacter,
+    handleOpenInventory,
+    handleCloseInventory
+  ]);
 
   const handleAttack = useCallback(() => {
     bridge.emit(EVENTS.ACTION_ATTACK);
@@ -259,22 +318,9 @@ export function App() {
 
   const handleOpenHelp = useCallback(() => {
     setIsInventoryOpen(false);
+    setIsCharacterOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
-  }, []);
-
-  const handleCloseHelp = useCallback(() => {
-    setIsHelpOpen(false);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-  }, []);
-
-  const handleOpenInventory = useCallback(() => {
-    setIsHelpOpen(false);
-    setIsInventoryOpen(true);
-  }, []);
-
-  const handleCloseInventory = useCallback(() => {
-    setIsInventoryOpen(false);
   }, []);
 
   const handleSendMessage = useCallback((text) => {
@@ -364,6 +410,7 @@ export function App() {
           onSkill={handleSkill}
           onSave={handleSave}
           onInventory={handleOpenInventory}
+          onCharacter={handleOpenCharacter}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
           onLogout={handleLogout}
@@ -398,7 +445,7 @@ export function App() {
       {/* Help & Guide Modal */}
       <HelpModal
         isOpen={isHelpOpen}
-        onClose={handleCloseHelp}
+        onClose={dismissHelp}
         onReset={handleReset}
       />
 
@@ -410,6 +457,14 @@ export function App() {
         coins={stats.coins}
         quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}
+      />
+
+      {/* Character Sheet ("Nhân vật") */}
+      <CharacterModal
+        isOpen={isCharacterOpen}
+        onClose={handleCloseCharacter}
+        stats={stats}
+        playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
       />
     </main>
   );

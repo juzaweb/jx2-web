@@ -9,6 +9,7 @@ export function HotbarDock({
   onSkill,
   onSave,
   onInventory,
+  onCharacter,
   onOpenHelp,
   onToggleAudio,
   onLogout,
@@ -117,8 +118,17 @@ export function HotbarDock({
           </button>
           <button
             className="sys-btn"
+            id="char-btn"
+            title="Nhân Vật (F3)"
+            onClick={onCharacter}
+          >
+            <span className="sys-ico">🧍</span>
+            <span className="sys-lbl">Nhân Vật</span>
+          </button>
+          <button
+            className="sys-btn"
             id="inv-btn"
-            title="Hành Trang / Túi Đồ"
+            title="Hành Trang (F4)"
             onClick={onInventory}
           >
             <span className="sys-ico">🎒</span>
