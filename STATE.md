@@ -1,6 +1,20 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — docs follow-up on merged F2: F3 (server-authoritative enemy movement) filed as `proposed`, position-gap known limitation recorded
+Last run: 2026-10-18 — direct human request (L2, branch `feature/character-select`):
+character selection + creation screens, backend-persisted; display name removed from register.
+(Prior repo-wide loop run: docs follow-up on merged F2 — F3 filed as `proposed`, position-gap limitation recorded.)
+
+## Character Select & Create (2026-10-18, direct request)
+
+- Item: **Character select/creation flow** (branch `feature/character-select`, base `develop` `b67ea45`; rebased onto `develop` @ `3e880ab`, resolving conflicts with user display-name/session work #16).
+- Change:
+  - **Backend:** new `characters` SQLite table (`server/src/data/characterDb.js`, soft-delete + restore, max 3 active slots, Vietnamese-friendly name validation, `gender` nam/nu + `appearance` with a column migration for older DBs); `character.controller.js` + `character.routes.js` under `/api/users/:userId/characters` (list/create/delete/restore), mounted in `app.js`.
+  - **Frontend:** `CharacterSelectModal.jsx` + `character-select.css` (list slots, Tạo mới/Xoá/Khôi phục/Trở lại/Bắt đầu; the "Tạo mới" panel shows 4 portrait tiles + a `Tên` input + Đồng ý/Trở lại) shown after login/register and before entering the world; `apiClient` gains `listCharacters/createCharacter/deleteCharacter/restoreCharacter`; `App.jsx` gates the game behind character selection and persists `activeCharacter` in the session via the shared `session.js`; in-game name now comes from the chosen character (`game.js`, `PlayerVitals.jsx`).
+  - **Register:** "Tên hiển thị" field and its virtual-keyboard handling removed from `LoginModal.jsx`; backend still defaults `displayName` to the username.
+- Verify: `npm run build` ✅ · `npm test` ✅ **79 passed / 79** (7 files) · `npm --prefix server test` ✅ **34 passed / 34** (+8 API suite incl. gender + a legacy-schema migration test). Integration smoke test against a live server confirmed register → create (with `gender: "nu"`) → list → soft-delete → restore, and a 400 on an invalid gender.
+- Review (code-review-and-quality, 2026-10-18): exported a shared `isValidUserId` (dropped the duplicated regex in the controller); collapsed the modal's three post-mutation `listCharacters`+override blocks into one `reload()`; guarded `activeCharacter` against guest sessions; tightened `mapRow`'s `appearance`/`gender` coercion; added the migration regression test. During the rebase, dropped a duplicate `readSession`/`SESSION_KEY` helper in `App.jsx` in favour of the shared `session.js` module introduced by #16.
+- Diff: 14 files (> `gate.yaml:maxFiles` 10) → **human merge required**; `server/**` is outside `autoMergeAllowlist`.
+- Limitation: game save/progress is still keyed by `userId`, so multiple characters on one account share progress (follow-up if per-character saves are wanted).
 
 ## Project Snapshot
 

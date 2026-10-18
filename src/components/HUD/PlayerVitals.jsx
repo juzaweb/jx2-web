@@ -1,6 +1,6 @@
 import React from "react";
 
-export function PlayerVitals({ stats, currentUser, onLogout }) {
+export function PlayerVitals({ stats, playerName, onLogout }) {
   const hpPercent = Math.max(0, Math.min(100, (stats.hp / stats.maxHp) * 100));
   const mpPercent = Math.max(0, Math.min(100, (stats.mp / stats.maxMp) * 100));
   const staPercent = Math.max(0, Math.min(100, ((stats.sta || 100) / (stats.maxSta || 100)) * 100));
@@ -9,7 +9,7 @@ export function PlayerVitals({ stats, currentUser, onLogout }) {
 
   return (
     <section className="top-left-panel" id="player-hud">
-      {currentUser && (
+      {playerName && (
         <div
           className="player-meta-info"
           style={{
@@ -33,7 +33,7 @@ export function PlayerVitals({ stats, currentUser, onLogout }) {
               textShadow: "0 1px 2px #000"
             }}
           >
-            ⚔ {currentUser.displayName || currentUser.username}
+            ⚔ {playerName}
           </span>
           {onLogout && (
             <button

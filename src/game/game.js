@@ -52,10 +52,12 @@ export class JiangHuScene extends Phaser.Scene {
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
     let initialName = "Lãng Khách";
-    const sessionUser = readSession()?.user;
-    if (sessionUser?.displayName || sessionUser?.username) {
-      initialName = sessionUser.displayName || sessionUser.username;
-    }
+    const session = readSession();
+    initialName =
+      session?.activeCharacter?.name ||
+      session?.user?.displayName ||
+      session?.user?.username ||
+      initialName;
 
     this.player = new Player(this, 640, 620, initialName);
     this.enemyManager = new EnemyManager(this);
@@ -475,11 +477,14 @@ export class JiangHuScene extends Phaser.Scene {
     let username = this.player.name || "Lãng Khách";
     let displayName = username;
 
-    const sessionUser = readSession()?.user;
-    if (sessionUser?.id) {
-      playerId = `${sessionUser.id}_${tabId}`;
-      username = sessionUser.username || username;
-      displayName = sessionUser.displayName || username;
+    const session = readSession();
+    if (session?.user?.id) {
+      playerId = `${session.user.id}_${tabId}`;
+      username = session.user.username || username;
+      displayName =
+        session.activeCharacter?.name ||
+        session.user.displayName ||
+        username;
     }
 
     this.remotePlayerManager.setLocalPlayerId(playerId);

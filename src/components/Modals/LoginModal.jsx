@@ -22,7 +22,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [rememberAccount, setRememberAccount] = useState(true);
   const [showVK, setShowVK] = useState(false);
   const [activeInput, setActiveInput] = useState("username");
@@ -75,7 +74,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
-  const displayNameRef = useRef(null);
 
   useEffect(() => {
     // Load remembered account if present
@@ -98,8 +96,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       setUsername((prev) => prev + key);
     } else if (activeInput === "password") {
       setPassword((prev) => prev + key);
-    } else if (activeInput === "displayName") {
-      setDisplayName((prev) => prev + key);
     }
   };
 
@@ -108,15 +104,12 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       setUsername((prev) => prev.slice(0, -1));
     } else if (activeInput === "password") {
       setPassword((prev) => prev.slice(0, -1));
-    } else if (activeInput === "displayName") {
-      setDisplayName((prev) => prev.slice(0, -1));
     }
   };
 
   const handleVirtualClear = () => {
     if (activeInput === "username") setUsername("");
     else if (activeInput === "password") setPassword("");
-    else if (activeInput === "displayName") setDisplayName("");
   };
 
   const handleSubmit = async (e) => {
@@ -164,15 +157,14 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         };
         writeSession(session);
 
-        setSuccessMsg("Đăng nhập thành công! Đang chuyển vào thế giới Giang Hồ...");
+        setSuccessMsg("Đăng nhập thành công! Đang chuyển đến màn hình chọn nhân vật...");
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
       } else {
         const data = await apiClient.register(
           username.trim(),
-          password,
-          displayName.trim() || username.trim()
+          password
         );
 
         if (rememberAccount) {
@@ -187,7 +179,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         };
         writeSession(session);
 
-        setSuccessMsg("Đăng ký tài khoản thành công! Đang chuẩn bị hành trang...");
+        setSuccessMsg("Đăng ký tài khoản thành công! Đang chuyển đến màn hình tạo nhân vật...");
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -211,7 +203,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
   const handleReset = () => {
     setPassword("");
-    setDisplayName("");
     setError("");
     setSuccessMsg("");
     if (mode === "register") {
@@ -388,26 +379,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               required
             />
           </div>
-
-          {/* Display Name (Only in register mode) */}
-          {mode === "register" && (
-            <div className="jx2-form-group">
-              <label className="jx2-form-label" htmlFor="jx2-displayname">
-                Tên hiển thị:
-              </label>
-              <input
-                id="jx2-displayname"
-                ref={displayNameRef}
-                type="text"
-                className="jx2-form-input"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                onFocus={() => setActiveInput("displayName")}
-                placeholder="Tên nhân vật giang hồ"
-                maxLength={50}
-              />
-            </div>
-          )}
 
           {/* Checkboxes Row */}
           <div className="jx2-options-row">

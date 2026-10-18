@@ -6,6 +6,7 @@ import saveRoutes from "./routes/save.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 import inventoryRoutes from "./routes/inventory.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import characterRoutes from "./routes/character.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 
 export const createApp = () => {
@@ -41,6 +42,7 @@ export const createApp = () => {
   app.use("/api", leaderboardRoutes);
   app.use("/api", inventoryRoutes);
   app.use("/api", userRoutes);
+  app.use("/api", characterRoutes);
 
   // Fallbacks
   app.use(notFoundHandler);
