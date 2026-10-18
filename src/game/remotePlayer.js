@@ -26,7 +26,6 @@ export class RemotePlayer {
     this.vy = data.vy || 0;
     this.direction = data.direction === "left" ? "left" : "right";
     this.stance = data.stance === "side" ? "side" : "front";
-    this.level = data.level || 1;
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
 
@@ -54,19 +53,7 @@ export class RemotePlayer {
 
     this.container.add([this.shadow, this.body]);
 
-    // 4. Overhead title and name (authentic JX2 style)
-    this.titleText = this.scene.add
-      .text(this.x, this.y - 74, `[Hiệp Khách Cấp ${this.level}]`, {
-        fontFamily: "Arial, Tahoma, sans-serif",
-        fontSize: "10px",
-        color: "#ffd84d",
-        stroke: "#12181c",
-        strokeThickness: 2,
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5)
-      .setDepth(this.y + 101);
-
+    // 4. Overhead name (authentic JX2 style)
     this.nameText = this.scene.add
       .text(this.x, this.y - 60, this.displayName, {
         fontFamily: "Arial, Tahoma, sans-serif",
@@ -258,11 +245,6 @@ export class RemotePlayer {
       this.nameText.setDepth(this.y + 100);
     }
 
-    if (this.titleText) {
-      this.titleText.setPosition(this.x, this.y - 74 + (this.body?.y || 0) * 0.35);
-      this.titleText.setDepth(this.y + 101);
-    }
-
     this.updateHealthBar(this.x, this.y + (this.body?.y || 0) * 0.35);
   }
 
@@ -274,10 +256,6 @@ export class RemotePlayer {
     if (this.nameText) {
       this.nameText.destroy();
       this.nameText = null;
-    }
-    if (this.titleText) {
-      this.titleText.destroy();
-      this.titleText = null;
     }
     if (this.hpBack) {
       this.hpBack.destroy();
