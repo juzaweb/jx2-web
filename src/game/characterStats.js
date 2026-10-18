@@ -83,7 +83,6 @@ function deriveCombat(level) {
  * @param {object} [stats]
  * @returns {{
  *   level: number,
- *   name: string,
  *   vitals: Array<{ key: string, label: string, value: string }>,
  *   combat: Array<{ key: string, label: string, value: string }>,
  *   attributes: Array<{ key: string, label: string, base: number, bonus: number }>,
@@ -102,7 +101,6 @@ export function deriveCharacterSheet(stats = {}) {
 
   return {
     level,
-    name: typeof stats.name === "string" ? stats.name : "",
     vitals: [
       { key: "hp", label: "Sinh", value: `${hp}/${maxHp}` },
       { key: "mp", label: "Nội", value: `${mp}/${maxMp}` },
