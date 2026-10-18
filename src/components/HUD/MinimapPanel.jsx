@@ -51,7 +51,7 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
         </div>
 
         <div className="minimap-subinfo">
-          <span className="subzone-name">Trường An Cổ Đạo</span>
+          <span className="subzone-name">Biện Kinh</span>
           <span className="coords" id="coords-text" ref={coordsRef}>
             640 / 620
           </span>
@@ -69,14 +69,12 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
 
         {/* Pinned Quest Objective */}
         <div className="quest-tracker" id="quest-tracker">
-          <div className="quest-head">✦ NHIỆM VỤ TÂN THỦ</div>
+          <div className="quest-head">✦ KHÁM PHÁ BIỆN KINH</div>
           <div className="quest-body" id="quest-text">
-            {quest?.completed ? "Đã hoàn thành nhiệm vụ" : "Tiêu diệt 3 Sói Xám"}
+            {quest?.completed ? "Đã dạo quanh Biện Kinh" : "Thành thị phồn hoa"}
           </div>
           <div className="quest-progress" id="quest-progress">
-            {quest?.completed
-              ? "Hoàn thành! +50 EXP thưởng"
-              : `Tiến độ: ${quest?.progress || 0} / ${quest?.total || 3}`}
+            Khu an toàn • Không có quái
           </div>
         </div>
       </div>

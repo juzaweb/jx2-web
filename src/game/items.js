@@ -42,7 +42,7 @@ export const QUICK_ITEMS = [
     name: "Hồi Thành Phù",
     icon: "icon-scroll",
     qty: 10,
-    desc: "Phù chú không gian, đưa hành giả trở về cố hương Trường An."
+    desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
   }
 ];
 

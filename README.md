@@ -56,7 +56,7 @@ npm run test:watch
   - `1`: Kim Sáng Dược (+35 HP)
   - `2`: Đại Hoàn Đan (+25 MP)
   - `3`: Nữ Nhi Hồng (+50 HP & +30 MP)
-  - `4`: Hồi Thành Phù (Return to central Truong An)
+  - `4`: Hồi Thành Phù (Return to central Bien Kinh)
 - **Pause & Guide:** `Esc` or click the Guide button
 - **Mobile:** Touch directional pad and action buttons
 
