@@ -211,13 +211,22 @@ export function App() {
 
   const handleOpenCharacter = useCallback(() => {
     setIsHelpOpen(false);
-    setIsInventoryOpen(false);
     setIsCharacterOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
   }, []);
 
   const handleCloseCharacter = useCallback(() => {
     setIsCharacterOpen(false);
+  }, []);
+
+  const handleOpenInventory = useCallback(() => {
+    setIsHelpOpen(false);
+    setIsInventoryOpen(true);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleCloseInventory = useCallback(() => {
+    setIsInventoryOpen(false);
   }, []);
 
   useEffect(() => {
@@ -228,6 +237,16 @@ export function App() {
           handleCloseCharacter();
         } else {
           handleOpenCharacter();
+        }
+        return;
+      }
+
+      if (e.key === "F4") {
+        e.preventDefault();
+        if (isInventoryOpen) {
+          handleCloseInventory();
+        } else {
+          handleOpenInventory();
         }
         return;
       }
@@ -253,7 +272,14 @@ export function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isCharacterOpen, isInventoryOpen, handleOpenCharacter, handleCloseCharacter]);
+  }, [
+    isCharacterOpen,
+    isInventoryOpen,
+    handleOpenCharacter,
+    handleCloseCharacter,
+    handleOpenInventory,
+    handleCloseInventory
+  ]);
 
   const handleAttack = useCallback(() => {
     bridge.emit(EVENTS.ACTION_ATTACK);
@@ -295,16 +321,6 @@ export function App() {
   const handleCloseHelp = useCallback(() => {
     setIsHelpOpen(false);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-  }, []);
-
-  const handleOpenInventory = useCallback(() => {
-    setIsHelpOpen(false);
-    setIsCharacterOpen(false);
-    setIsInventoryOpen(true);
-  }, []);
-
-  const handleCloseInventory = useCallback(() => {
-    setIsInventoryOpen(false);
   }, []);
 
   const handleSendMessage = useCallback((text) => {

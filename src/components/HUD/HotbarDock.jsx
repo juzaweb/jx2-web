@@ -128,7 +128,7 @@ export function HotbarDock({
           <button
             className="sys-btn"
             id="inv-btn"
-            title="Hành Trang / Túi Đồ"
+            title="Hành Trang (F4)"
             onClick={onInventory}
           >
             <span className="sys-ico">🎒</span>
