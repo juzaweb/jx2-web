@@ -464,7 +464,7 @@ export class CombatSystem {
       this.player.stats.hp = this.player.stats.maxHp;
       this.player.stats.mp = Math.max(20, this.player.stats.mp);
       this.player.respawn();
-      this.ui.addLog("Bạn được đưa về điểm hồi sinh tại Trường An.");
+      this.ui.addLog("Bạn được đưa về điểm hồi sinh tại Biện Kinh.");
     }
 
     this.ui.updateHud(this.player.stats);

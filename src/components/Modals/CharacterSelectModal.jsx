@@ -163,7 +163,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       {/* Top status bar: account + server, mirroring the in-game header */}
       <div className="jx2-cs-topbar">
         <span className="jx2-cs-topbar-user">Tài khoản: {user?.username}</span>
-        <span className="jx2-cs-topbar-server">Máy chủ: {server || "Trường An"}</span>
+        <span className="jx2-cs-topbar-server">Máy chủ: {server || "Biện Kinh"}</span>
       </div>
 
       <div className="jx2-cs-box">
