@@ -159,6 +159,28 @@ describe("Wolf movement is server-owned", () => {
     expect(scene.sprite.x).toBe(840);
   });
 
+  it("does not slide back to its spawn when the server takes over", () => {
+    const { scene, wolf } = createWolf({ isConnected: false });
+    const target = player(940, 600);
+
+    for (let frame = 0; frame < 240; frame++) {
+      wolf.update(frame * 16, 16, target, () => {});
+    }
+    const offlineX = scene.sprite.x;
+    expect(offlineX).toBeGreaterThan(880);
+
+    // The socket comes up before the first roster snapshot arrives: the wolf must
+    // hold still rather than slide back to a position the server never claimed
+    scene.networkClient.isConnected = true;
+    wolf.update(4000, 16, target, () => {});
+    expect(scene.sprite.x).toBe(offlineX);
+
+    // The first authoritative position is what it follows from then on
+    wolf.applyServerState({ x: offlineX + 40, y: 600 });
+    wolf.update(4016, 16, target, () => {});
+    expect(scene.sprite.x).toBeGreaterThan(offlineX);
+  });
+
   it("keeps biting whoever is in range, throttled by the bite cooldown", () => {
     const { wolf } = createWolf();
     const bites = vi.fn();

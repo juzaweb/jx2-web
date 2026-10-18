@@ -63,8 +63,10 @@ const moveToward = (enemy, targetX, targetY, maxStep) => {
 };
 
 /**
- * Advance one living enemy by `deltaMs`: chase the nearest player in range, hold
+ * Advance one enemy by `deltaMs`: chase the nearest player in range, hold
  * position once inside the stop distance, otherwise walk back home.
+ * The caller owns the dead check (the server skips `isDead` enemies before
+ * stepping them).
  * @param {{x:number, y:number, homeX:number, homeY:number}} enemy
  * @param {Array<Object>} players
  * @param {number} deltaMs

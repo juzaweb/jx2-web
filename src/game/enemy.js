@@ -28,9 +28,10 @@ export class Wolf {
     };
     this.isDead = false;
     this.nextBite = 0;
-    // Where the server says this wolf is; the render follows it (see update())
-    this.targetX = x;
-    this.targetY = y;
+    // Where the server last reported this wolf (see applyServerState). Left null
+    // until then, so a wolf never slides toward a position nobody has claimed.
+    this.targetX = null;
+    this.targetY = null;
 
     this.createSprite(x, y);
     this.createVisuals(x, y);
@@ -234,8 +235,6 @@ export class Wolf {
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
     this.sprite.body.enable = true;
-    this.targetX = this.homeX;
-    this.targetY = this.homeY;
     this.wolfVisual.setVisible(true);
     this.wolfVisual.setAlpha(1);
     this.hpBack.setVisible(true);
