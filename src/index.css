@@ -241,6 +241,7 @@ body {
   top: 10px;
   right: 12px;
   z-index: 15;
+  transform-origin: top right;
 }
 
 .minimap-frame {
@@ -907,10 +908,16 @@ body {
 }
 
 /* Full-city map modal (M shortcut) */
-.city-map-box {
-  width: min(1500px, calc(100% - 24px));
-  max-height: 94vh;
+.city-map-overlay {
+  align-items: flex-start;
   overflow: auto;
+  padding: 16px 0;
+}
+.city-map-box {
+  display: flex;
+  flex-direction: column;
+  width: min(1500px, calc(100% - 24px));
+  max-height: 92vh;
   padding: 18px;
   text-align: left;
 }
@@ -921,8 +928,11 @@ body {
   margin-bottom: 10px;
 }
 .city-map-view {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   width: 100%;
   background: #1e3324;
   border: 2px solid #80735a;
@@ -932,9 +942,9 @@ body {
 .city-map-canvas {
   display: block;
   width: auto;
-  max-width: 100%;
-  max-height: 86vh;
   height: auto;
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1 / 1;
 }
 .city-map-legend {
@@ -983,6 +993,24 @@ body {
   }
 }
 
+@media (max-width: 1240px) {
+  .top-right-panel.is-zoomed {
+    transform: scale(0.85);
+  }
+}
+
+@media (max-width: 1040px) {
+  .top-right-panel.is-zoomed {
+    transform: scale(0.72);
+  }
+}
+
+@media (max-width: 880px) {
+  .top-right-panel.is-zoomed {
+    transform: scale(0.62);
+  }
+}
+
 @media (max-width: 720px) {
   .mobile-controls {
     display: block;
@@ -1021,6 +1049,19 @@ body {
 @media (max-width: 400px) {
   .top-right-panel.is-zoomed {
     transform: scale(0.32);
+  }
+}
+
+/* Short viewports: shrink the expanded minimap so it never spills off-screen. */
+@media (max-height: 980px) and (min-width: 1241px) {
+  .top-right-panel.is-zoomed {
+    transform: scale(0.82);
+  }
+}
+
+@media (max-height: 860px) and (min-width: 521px) {
+  .top-right-panel.is-zoomed {
+    transform: scale(0.55);
   }
 }
 
