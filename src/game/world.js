@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { NPC_DATA, getNpcName, localizeNpc } from "./npcData.js";
+import { MARBLE_BLOCK, paintMarbleSheet } from "./marbleTexture.js";
 import { LANGUAGE_CHANGED_EVENT } from "../i18n/translator.js";
 import {
   CITY_AVENUES,
@@ -94,8 +95,8 @@ export class WorldManager {
   }
 
   /**
-   * Biện Kinh floor: grass / forest terrain across the whole map, with the warm
-   * sandstone plaza paving only inside the city walls.
+   * Biện Kinh floor: grass / forest terrain across the whole map, with warm
+   * marble paving only inside the city walls.
    */
   drawPavedGround() {
     const g = this.scene.add.graphics();
@@ -132,15 +133,23 @@ export class WorldManager {
       }
     }
 
-    // 2. City plaza sandstone paving.
+    // 2. City plaza base (sits under the marble texture so mask edges never
+    // show the grass through).
     g.fillStyle(0xd9d3c7, 1);
     g.fillPoints([toIso(C.x0, C.y0), toIso(C.x1, C.y0), toIso(C.x1, C.y1), toIso(C.x0, C.y1)], true);
 
-    // 2b. Main paved avenues crossing the plaza (also shown on the minimap).
+    // 3. Seamless marble paving tiled over the whole city.
+    this.addMarblePaving();
+
+    // Everything below paints on top of the marble sprite, so it lives in a
+    // second graphics object created after the tile sprite.
+    const d = this.scene.add.graphics();
+
+    // 3a. Main paved avenues crossing the plaza (also shown on the minimap).
     const avenueH = CITY_AVENUES.horizontal;
     const avenueV = CITY_AVENUES.vertical;
-    g.fillStyle(0x695f4e, 1);
-    g.fillPoints(
+    d.fillStyle(0x695f4e, 1);
+    d.fillPoints(
       [
         toIso(C.x0, avenueH.y),
         toIso(C.x1, avenueH.y),
@@ -149,7 +158,7 @@ export class WorldManager {
       ],
       true
     );
-    g.fillPoints(
+    d.fillPoints(
       [
         toIso(avenueV.x, C.y0),
         toIso(avenueV.x + avenueV.width, C.y0),
@@ -159,7 +168,7 @@ export class WorldManager {
       true
     );
 
-    // 3. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner.
+    // 3b. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner.
     const porchPoly = [
       { x: 0, y: 0 },
       { x: 740 * POS, y: 0 },
@@ -167,11 +176,11 @@ export class WorldManager {
       { x: 120 * POS, y: 560 * POS },
       { x: 0, y: 560 * POS }
     ].map((p) => toIso(p.x, p.y));
-    g.fillStyle(0x756f64, 1);
-    g.fillPoints(porchPoly, true);
+    d.fillStyle(0x756f64, 1);
+    d.fillPoints(porchPoly, true);
 
     // Irregular cobblestone stones inside Dược Điếm porch area
-    g.lineStyle(1.5, 0x474239, 0.7);
+    d.lineStyle(1.5, 0x474239, 0.7);
     for (let py = 20 * POS; py < 540 * POS; py += 32 * POS) {
       for (let px = 20 * POS; px < 720 * POS; px += 36 * POS) {
         if (px < 740 * POS - ((py - 240 * POS) * (620 / 320))) {
@@ -185,30 +194,30 @@ export class WorldManager {
             toIso(px + w / 2, py + h / 2),
             toIso(px - w / 2, py + h / 2)
           ];
-          g.fillStyle(stoneColor, 0.85);
-          g.fillPoints(corners, true);
-          g.strokePoints(corners, true, true);
+          d.fillStyle(stoneColor, 0.85);
+          d.fillPoints(corners, true);
+          d.strokePoints(corners, true, true);
         }
       }
     }
 
-    // 4. Diagonal stone curb step separating the shop porch from the plaza.
+    // 3c. Diagonal stone curb step separating the shop porch from the plaza.
     const curb = [
       { x: 120 * POS, y: 560 * POS },
       { x: 740 * POS, y: 240 * POS },
       { x: 765 * POS, y: 252 * POS },
       { x: 145 * POS, y: 572 * POS }
     ].map((p) => toIso(p.x, p.y));
-    g.fillStyle(0x8a8477, 1);
-    g.fillPoints(curb, true);
+    d.fillStyle(0x8a8477, 1);
+    d.fillPoints(curb, true);
     const curbTopA = toIso(120 * POS, 560 * POS);
     const curbTopB = toIso(740 * POS, 240 * POS);
     const curbShadowA = toIso(145 * POS, 572 * POS);
     const curbShadowB = toIso(765 * POS, 252 * POS);
-    g.lineStyle(2, 0xbeb7a9, 0.9);
-    g.lineBetween(curbTopA.x, curbTopA.y, curbTopB.x, curbTopB.y);
-    g.lineStyle(2, 0x484339, 0.8);
-    g.lineBetween(curbShadowA.x, curbShadowA.y, curbShadowB.x, curbShadowB.y);
+    d.lineStyle(2, 0xbeb7a9, 0.9);
+    d.lineBetween(curbTopA.x, curbTopA.y, curbTopB.x, curbTopB.y);
+    d.lineStyle(2, 0x484339, 0.8);
+    d.lineBetween(curbShadowA.x, curbShadowA.y, curbShadowB.x, curbShadowB.y);
 
     const curbSteps = 24;
     for (let i = 0; i <= curbSteps; i++) {
@@ -219,45 +228,62 @@ export class WorldManager {
       const ky2 = 572 * POS + t * ((252 - 572) * POS);
       const a = toIso(kx1, ky1);
       const b = toIso(kx2, ky2);
-      g.lineStyle(1.5, 0x484339, 0.7);
-      g.lineBetween(a.x, a.y, b.x, b.y);
+      d.lineStyle(1.5, 0x484339, 0.7);
+      d.lineBetween(a.x, a.y, b.x, b.y);
+    }
+  }
+
+  /**
+   * Build (once) a seamless, power-of-two marble paving texture and tile it
+   * across the walled city. The texture repeats every `BLOCK` ground tiles, so
+   * the diamond lattice lines up perfectly with the isometric ground grid.
+   */
+  addMarblePaving() {
+    const TILE = FLOOR_TILE;
+    const BLOCK = MARBLE_BLOCK;
+    const PERIOD_W = BLOCK * TILE;
+    const PERIOD_H = PERIOD_W / 2;
+    const TEX_W = 2048;
+    const TEX_H = 1024;
+    const KEY = "city-marble-paving";
+
+    if (!this.scene.textures.exists(KEY)) {
+      const texture = this.scene.textures.createCanvas(KEY, TEX_W, TEX_H);
+      const ctx = texture.getContext();
+      ctx.scale(TEX_W / PERIOD_W, TEX_H / PERIOD_H);
+      paintMarbleSheet(ctx, TILE, BLOCK, PERIOD_W);
+      texture.refresh();
     }
 
-    // 5. Isometric diamond paving grid inside the city.
-    g.lineStyle(1.2, 0xb8b0a1, 0.7);
-    for (let gx = C.x0; gx <= C.x1; gx += FLOOR_TILE) {
-      const a = toIso(gx, C.y0);
-      const b = toIso(gx, C.y1);
-      g.lineBetween(a.x, a.y, b.x, b.y);
-    }
-    for (let gy = C.y0; gy <= C.y1; gy += FLOOR_TILE) {
-      const a = toIso(C.x0, gy);
-      const b = toIso(C.x1, gy);
-      g.lineBetween(a.x, a.y, b.x, b.y);
-    }
+    const C = CITY_BOUNDS;
+    const poly = [
+      toIso(C.x0, C.y0),
+      toIso(C.x1, C.y0),
+      toIso(C.x1, C.y1),
+      toIso(C.x0, C.y1)
+    ];
+    const xs = poly.map((p) => p.x);
+    const ys = poly.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
 
-    // 6. Stone slab lighting & natural variations.
-    for (let gy = C.y0; gy < C.y1; gy += FLOOR_TILE) {
-      for (let gx = C.x0; gx < C.x1; gx += FLOOR_TILE) {
-        // Skip slabs covered by the Dược Điếm foundation or the main avenues.
-        const onAvenue =
-          (gx < avenueV.x + avenueV.width && gx + FLOOR_TILE > avenueV.x) ||
-          (gy < avenueH.y + avenueH.height && gy + FLOOR_TILE > avenueH.y);
-        if (
-          onAvenue ||
-          (gx < 740 * POS && gy < 560 * POS && gx < 740 * POS - ((gy - 240 * POS) * (620 / 320)))
-        ) {
-          continue;
-        }
+    const paving = this.scene.add.tileSprite(
+      minX,
+      minY,
+      Math.max(...xs) - minX,
+      Math.max(...ys) - minY,
+      KEY
+    );
+    paving.setOrigin(0, 0);
+    paving.tileScaleX = PERIOD_W / TEX_W;
+    paving.tileScaleY = PERIOD_H / TEX_H;
 
-        const val = rng((gy / FLOOR_TILE) * 47 + (gx / FLOOR_TILE) * 93);
-        if (val > 0.55) {
-          const tint = val > 0.85 ? 0xeae5dc : val > 0.7 ? 0xd0c9bd : 0xe0dad0;
-          g.fillStyle(tint, 0.5);
-          g.fillPoints(diamond(gx, gy), true);
-        }
-      }
-    }
+    const mask = this.scene.make.graphics({ add: false });
+    mask.fillStyle(0xffffff, 1);
+    mask.fillPoints(poly, true);
+    paving.setMask(mask.createGeometryMask());
+
+    return paving;
   }
 
   /** Central open plaza with its stone altar/statue. */
