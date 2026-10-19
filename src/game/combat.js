@@ -3,7 +3,13 @@ import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
 import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
 import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
-import { playSkillCastVfx, playSkillImpactVfx } from "./skillVfx.js";
+import {
+  playSkillCastVfx,
+  playSkillImpactVfx,
+  playRangeIndicator,
+  playTargetMarker
+} from "./skillVfx.js";
+import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack } from "./pvp.js";
 import { computeDamage } from "./damage.js";
@@ -233,7 +239,6 @@ export class CombatSystem {
 
     this.player.playSkillMotion?.();
     playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
-    playSkillCastVfx(this.scene, this.player, skill);
 
     this.scene.networkClient?.sendAttack?.({
       skill: skill.id,
@@ -261,21 +266,19 @@ export class CombatSystem {
    */
   applySkill(skill, now) {
     if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
+      playSkillCastVfx(this.scene, this.player, skill);
       this.applySelfEffects(skill, now);
       this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} đã thi triển.`);
       return;
     }
 
-    const alive = this.enemyManager.getAlive();
-    const inRadius = (wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
-    const targets = skill.radius > 0
-      ? alive.filter((wolf) => inRadius(wolf) <= skill.radius)
-      : (() => {
-          const nearest = alive
-            .filter((wolf) => inRadius(wolf) <= skill.range)
-            .sort((a, b) => inRadius(a) - inRadius(b))[0];
-          return nearest ? [nearest] : [];
-        })();
+    const targets = this.resolveTargets(skill);
+    const primary = targets[0] || null;
+    this.aimAt(primary);
+    playSkillCastVfx(this.scene, this.player, skill, primary);
+    if (skill.radius > 0) {
+      playRangeIndicator(this.scene, this.player.x, this.player.y, skill.radius, skill.vfx?.color);
+    }
 
     if (!targets.length) {
       this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tung ra, nhưng không trúng kẻ địch.`);
@@ -287,6 +290,7 @@ export class CombatSystem {
     let anyCrit = false;
 
     for (const wolf of targets) {
+      playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
       const result = computeSkillDamage(skill, attacker, wolf, Math.random);
       if (result.damage > 0) {
         if (result.crit) anyCrit = true;
@@ -300,6 +304,42 @@ export class CombatSystem {
     this.ui.addLog(
       `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!${critText}`
     );
+  }
+
+  /**
+   * Enemies this cast can hit: everything inside the AoE radius, or the nearest
+   * enemy inside the single-target range. Extracted so aiming and hit resolution
+   * use exactly the same target set.
+   * @param {Object} skill
+   * @returns {Object[]}
+   */
+  resolveTargets(skill) {
+    const alive = this.enemyManager.getAlive();
+    const distanceTo = (wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
+
+    if (skill.radius > 0) {
+      return alive
+        .filter((wolf) => distanceTo(wolf) <= skill.radius)
+        .sort((a, b) => distanceTo(a) - distanceTo(b));
+    }
+
+    const nearest = alive
+      .filter((wolf) => distanceTo(wolf) <= skill.range)
+      .sort((a, b) => distanceTo(a) - distanceTo(b))[0];
+    return nearest ? [nearest] : [];
+  }
+
+  /**
+   * Turn the hero toward the primary target so the cast VFX and attack motion
+   * visibly point at whoever is about to be hit.
+   * @param {Object|null} target
+   */
+  aimAt(target) {
+    if (!target) return;
+    const from = toIso(this.player.x, this.player.y);
+    const to = toIso(target.x, target.y);
+    const direction = directionFromVelocity(to.x - from.x, to.y - from.y);
+    this.player.faceDirection?.(direction);
   }
 
   /**
