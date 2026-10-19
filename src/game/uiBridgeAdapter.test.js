@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bridge, EVENTS } from "./bridge.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
+import { WORLD_TILE } from "./worldConfig.js";
 
 const makeCtx = () => ({
   fillRect: vi.fn(),
@@ -106,7 +107,7 @@ describe("UIBridgeAdapter minimap registration", () => {
     ).not.toThrow();
   });
 
-  it("centers the local radar on the player and spans one tenth of the city", () => {
+  it("centers the local radar on the player and spans a fixed number of tiles", () => {
     const ctx = makeCtx();
     const canvas = makeCanvas(ctx);
     const adapter = new UIBridgeAdapter();
@@ -114,8 +115,8 @@ describe("UIBridgeAdapter minimap registration", () => {
 
     const city = { x0: 0, y0: 0, x1: 2200, y1: 1250 };
     const player = { x: 1100, y: 625 };
-    const aspect = canvas.width / canvas.height;
-    const spanX = Math.sqrt((((city.x1 - city.x0) * (city.y1 - city.y0)) / 10) * aspect);
+    // Default radar width is 20 ground tiles.
+    const spanX = 20 * WORLD_TILE;
     // A blip on the east edge of the radar view.
     const edge = { x: player.x + spanX / 2, y: player.y, active: true, isDead: false };
 

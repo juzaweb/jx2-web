@@ -6,8 +6,13 @@ import {
   CITY_HOUSES,
   CITY_PAGODAS,
   CITY_PLAZA,
-  CITY_TREES
+  CITY_TREES,
+  WORLD_TILE
 } from "./worldConfig.js";
+
+/** Local radar view width, in ground tiles (enlarged view shows more tiles). */
+const MINIMAP_TILES = 20;
+const MINIMAP_ZOOM_TILES = 50;
 
 export class UIBridgeAdapter {
   constructor() {
@@ -44,7 +49,7 @@ export class UIBridgeAdapter {
     this.minimapCanvas = canvas || null;
     this.minimapCtx = canvas ? canvas.getContext("2d") : null;
     this.coordsElement = registration?.coordsEl || null;
-    // Zoomed radar shows the whole city instead of the local one-tenth slice.
+    // Enlarged radar (Tab) also shows twice the local view distance.
     this.minimapZoomed = !!registration?.zoomed;
   }
 
@@ -114,10 +119,10 @@ export class UIBridgeAdapter {
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
 
-    // The minimap is a local radar: it follows the player and only covers about
-    // one tenth of the walled city's area, so Biện Kinh feels as large as the
-    // classic VLTK2 maps. Without city bounds (tests/other regions) it shows the
-    // whole world instead.
+    // The minimap is a local radar: it follows the player and shows a fixed
+    // number of ground tiles around them, so Biện Kinh feels as large as the
+    // classic VLTK2 maps. Without city bounds (tests/other regions) it shows
+    // the whole world instead.
     const city = worldConfig.cityBounds || {
       x0: 0,
       y0: 0,
@@ -125,26 +130,12 @@ export class UIBridgeAdapter {
       y1: worldConfig.height
     };
     let view;
-    if (worldConfig.cityBounds && this.minimapZoomed) {
-      // Expanded radar (Tab): the whole city, anchored to its centre and shaped
-      // to the canvas so it stays undistorted.
-      const spanY = (city.y1 - city.y0) * 1.08;
-      const spanX = spanY * (w / h);
-      const centerX = (city.x0 + city.x1) / 2;
-      const centerY = (city.y0 + city.y1) / 2;
-      view = {
-        x0: centerX - spanX / 2,
-        y0: centerY - spanY / 2,
-        x1: centerX + spanX / 2,
-        y1: centerY + spanY / 2
-      };
-    } else if (worldConfig.cityBounds) {
-      // Local radar (default): one tenth of the city's area around the player,
-      // shaped to the canvas so the local view stays undistorted.
-      const aspect = w / h;
-      const area = ((city.x1 - city.x0) * (city.y1 - city.y0)) / 10;
-      const spanX = Math.sqrt(area * aspect);
-      const spanY = spanX / aspect;
+    if (worldConfig.cityBounds) {
+      // Measured in ground tiles (not a share of the city) and shaped to the
+      // canvas so the view stays undistorted. The enlarged minimap (Tab) simply
+      // shows more tiles.
+      const spanX = (this.minimapZoomed ? MINIMAP_ZOOM_TILES : MINIMAP_TILES) * WORLD_TILE;
+      const spanY = spanX * (h / w);
       view = {
         x0: player.x - spanX / 2,
         y0: player.y - spanY / 2,

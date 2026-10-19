@@ -20,6 +20,8 @@ export const WORLD_SPREAD = 2;
 export const WORLD_POSITION_SCALE = WORLD_SCALE * WORLD_SPREAD;
 /** Movement speed multiplier on top of the position scale (game feel knob). */
 export const WORLD_SPEED_SCALE = 0.6;
+/** World size of one ground tile (the paving grid cell). */
+export const WORLD_TILE = 76 * WORLD_SCALE;
 
 export const WORLD_CONFIG = {
   width: 32000,

@@ -12,7 +12,8 @@ import {
   CITY_TREES,
   WORLD_CONFIG,
   WORLD_POSITION_SCALE,
-  WORLD_SCALE
+  WORLD_SCALE,
+  WORLD_TILE
 } from "./worldConfig.js";
 
 /** Scale for legacy design-unit constants still written inline in this file. */
@@ -22,7 +23,7 @@ const POS = WORLD_POSITION_SCALE;
 export { CITY_BOUNDS, WORLD_CONFIG };
 
 /** Ground tile size (world units) that renders as one 76x38 iso diamond. */
-const FLOOR_TILE = 76 * S;
+const FLOOR_TILE = WORLD_TILE;
 
 /** Building footprints indexed by id, used when constructing the scene. */
 const BUILDING = Object.fromEntries(CITY_BUILDINGS.map((building) => [building.id, building]));
