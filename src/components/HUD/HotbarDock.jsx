@@ -62,22 +62,36 @@ export function HotbarDock({
   const leftCooldown = cooldownLeft(leftSkill?.id);
   const rightCooldown = cooldownLeft(selectedSkill?.id);
 
+  // The bottom bar always shows eight numbered slots; 1-4 hold consumables and
+  // the rest stay as empty placeholders.
+  const quickSlots = Array.from({ length: 8 }, (_, index) => {
+    const useSlot = index + 1;
+    const raw = items.find((entry) => entry.useSlot === useSlot);
+    return { useSlot, item: raw ? localizeItem(raw, t) : null };
+  });
+
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {items.map((rawItem) => {
-            const item = localizeItem(rawItem, t);
+          {quickSlots.map(({ useSlot, item }) => {
+            if (!item) {
+              return (
+                <div className="slot-item empty" id={`slot-${useSlot}`} key={`slot-${useSlot}`}>
+                  <span className="slot-key">{useSlot}</span>
+                </div>
+              );
+            }
             return (
               <div
                 className="slot-item"
-                id={`slot-${item.useSlot}`}
+                id={`slot-${useSlot}`}
                 key={item.id}
-                title={t("hotbar.slotTitle", { key: item.useSlot, name: item.name })}
-                onClick={() => onUseItem(item.useSlot)}
+                title={t("hotbar.slotTitle", { key: useSlot, name: item.name })}
+                onClick={() => onUseItem(useSlot)}
               >
-                <span className="slot-key">{item.useSlot}</span>
+                <span className="slot-key">{useSlot}</span>
                 <div className={`item-icon ${item.icon}`} />
                 <span className="slot-qty" id={`qty-${item.id}`}>
                   {item.qty}
@@ -85,7 +99,6 @@ export function HotbarDock({
               </div>
             );
           })}
-
         </div>
 
         {/* Middle: the left/right mouse skills and the sect skill bar */}
