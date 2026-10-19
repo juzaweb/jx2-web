@@ -66,7 +66,18 @@ export default {
     questHead: "✦ KHÁM PHÁ BIỆN KINH",
     questDone: "Đã dạo quanh Biện Kinh",
     questTodo: "Thành thị phồn hoa",
-    questSafe: "Khu an toàn • Không có quái"
+    questSafe: "Khu an toàn • Không có quái",
+    zoomTitle: "Tab: Phóng to minimap gấp đôi",
+    mapTitle: "M: Xem bản đồ toàn thành"
+  },
+  cityMap: {
+    eyebrow: "TOÀN CẢNH THÀNH TRÌ",
+    title: "Bản Đồ Biện Kinh",
+    hint: "Nhấn M hoặc Esc để đóng",
+    player: "Nhân vật",
+    enemy: "Yêu thú",
+    remote: "Hiệp khách",
+    pavilion: "Vạn Sự Thông"
   },
   chat: {
     tabs: {
@@ -114,6 +125,7 @@ export default {
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
+    map: "Bản đồ: Nhấn Tab để phóng to minimap gấp đôi, nhấn M để mở bản đồ toàn thành Biện Kinh.",
     pause: "Tạm dừng: Nhấn Esc hoặc mở bảng Hướng Dẫn để tạm dừng game.",
     resume: "ĐÃ THÔNG SUỐT",
     reset: "LÀM LẠI TỪ ĐẦU (RESET TIẾN TRÌNH)"

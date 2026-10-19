@@ -29,6 +29,7 @@ export function HelpModal({ isOpen, onClose, onReset }) {
           </p>
           <p>{t("help.loot")}</p>
           <p>{t("help.save")}</p>
+          <p>{t("help.map")}</p>
           <p>{t("help.pause")}</p>
         </div>
         <button id="resume-btn" className="wuxia-btn-primary" onClick={onClose}>

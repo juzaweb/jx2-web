@@ -2,19 +2,20 @@ import * as Phaser from "phaser";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { NPC_DATA, getNpcName, localizeNpc } from "./npcData.js";
 import { LANGUAGE_CHANGED_EVENT } from "../i18n/translator.js";
+import {
+  CITY_AVENUES,
+  CITY_BOUNDS,
+  CITY_BUILDINGS,
+  WORLD_CONFIG
+} from "./worldConfig.js";
+
+export { CITY_BOUNDS, WORLD_CONFIG };
 
 /** Ground tile size (world units) that renders as one 76x38 iso diamond. */
 const FLOOR_TILE = 76;
 
-export const WORLD_CONFIG = {
-  width: 4400,
-  height: 2500
-};
-
-/** Ground rectangle enclosed by the Biện Kinh city walls. */
-export const CITY_BOUNDS = { x0: 90, y0: 60, x1: 2110, y1: 1190 };
-
-
+/** Building footprints indexed by id, used when constructing the scene. */
+const BUILDING = Object.fromEntries(CITY_BUILDINGS.map((building) => [building.id, building]));
 
 export class WorldManager {
   /**
@@ -100,6 +101,29 @@ export class WorldManager {
     g.fillStyle(0xd9d3c7, 1);
     g.fillPoints([toIso(C.x0, C.y0), toIso(C.x1, C.y0), toIso(C.x1, C.y1), toIso(C.x0, C.y1)], true);
 
+    // 2b. Main paved avenues crossing the plaza (also shown on the minimap).
+    const avenueH = CITY_AVENUES.horizontal;
+    const avenueV = CITY_AVENUES.vertical;
+    g.fillStyle(0x695f4e, 1);
+    g.fillPoints(
+      [
+        toIso(C.x0, avenueH.y),
+        toIso(C.x1, avenueH.y),
+        toIso(C.x1, avenueH.y + avenueH.height),
+        toIso(C.x0, avenueH.y + avenueH.height)
+      ],
+      true
+    );
+    g.fillPoints(
+      [
+        toIso(avenueV.x, C.y0),
+        toIso(avenueV.x + avenueV.width, C.y0),
+        toIso(avenueV.x + avenueV.width, C.y1),
+        toIso(avenueV.x, C.y1)
+      ],
+      true
+    );
+
     // 3. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner.
     const porchPoly = [
       { x: 0, y: 0 },
@@ -180,8 +204,14 @@ export class WorldManager {
     // 6. Stone slab lighting & natural variations.
     for (let gy = C.y0; gy < C.y1; gy += FLOOR_TILE) {
       for (let gx = C.x0; gx < C.x1; gx += FLOOR_TILE) {
-        // Skip slabs covered by Dược Điếm cobblestone foundation
-        if (gx < 740 && gy < 560 && gx < 740 - ((gy - 240) * (620 / 320))) {
+        // Skip slabs covered by the Dược Điếm foundation or the main avenues.
+        const onAvenue =
+          (gx < avenueV.x + avenueV.width && gx + FLOOR_TILE > avenueV.x) ||
+          (gy < avenueH.y + avenueH.height && gy + FLOOR_TILE > avenueH.y);
+        if (
+          onAvenue ||
+          (gx < 740 && gy < 560 && gx < 740 - ((gy - 240) * (620 / 320)))
+        ) {
           continue;
         }
 
@@ -414,10 +444,7 @@ export class WorldManager {
    */
   drawApothecaryShop() {
     this.drawIsoBuilding({
-      x: 140,
-      y: 30,
-      w: 380,
-      d: 210,
+      ...BUILDING.apothecary,
       height: 150,
       wallLeft: 0x6b4a2e,
       wallRight: 0x523823,
@@ -600,10 +627,7 @@ export class WorldManager {
    */
   drawBankShop() {
     this.drawIsoBuilding({
-      x: 1460,
-      y: 200,
-      w: 380,
-      d: 250,
+      ...BUILDING.bank,
       height: 180,
       wallLeft: 0x8a3b34,
       wallRight: 0x6b2e2b,
@@ -625,10 +649,7 @@ export class WorldManager {
    */
   drawTavernShop() {
     this.drawIsoBuilding({
-      x: 70,
-      y: 900,
-      w: 340,
-      d: 230,
+      ...BUILDING.tavern,
       height: 200,
       wallLeft: 0x6b432b,
       wallRight: 0x50321f,
@@ -673,10 +694,7 @@ export class WorldManager {
    */
   drawMartialAcademy() {
     this.drawIsoBuilding({
-      x: 1580,
-      y: 720,
-      w: 360,
-      d: 240,
+      ...BUILDING.academy,
       height: 165,
       wallLeft: 0x6b5540,
       wallRight: 0x4d3829,
@@ -720,10 +738,7 @@ export class WorldManager {
    */
   drawCentralPavilion() {
     this.drawIsoBuilding({
-      x: 1080,
-      y: 360,
-      w: 170,
-      d: 140,
+      ...BUILDING.pavilion,
       height: 175,
       wallLeft: 0x3b2416,
       wallRight: 0x2c1b10,
@@ -747,10 +762,7 @@ export class WorldManager {
    */
   drawDragonBalustrades() {
     this.drawIsoBuilding({
-      x: 1060,
-      y: 860,
-      w: 170,
-      d: 120,
+      ...BUILDING.dragon,
       height: 34,
       wallLeft: 0x8a8477,
       wallRight: 0x747066,

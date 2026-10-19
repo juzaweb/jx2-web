@@ -1,11 +1,17 @@
 import { bridge, EVENTS } from "./bridge.js";
 import { applyQuantities, getQuantities } from "./items.js";
+import { CITY_AVENUES, CITY_BUILDINGS } from "./worldConfig.js";
+
+/** The local radar shows one tenth of the city's area. */
+const MINIMAP_SPAN_RATIO = 1 / Math.sqrt(10);
 
 export class UIBridgeAdapter {
   constructor() {
     this.questRewarded = false;
     this.minimapCanvas = null;
     this.minimapCtx = null;
+    this.cityMapCanvas = null;
+    this.cityMapCtx = null;
     this.coordsElement = null;
 
     // Listen for canvas attachment from React Minimap component
@@ -13,10 +19,16 @@ export class UIBridgeAdapter {
       this.attachMinimap(registration);
     });
 
-    // React effects run before Phaser's first frame, so the MinimapPanel may have
-    // already fired its one-shot registration before this adapter existed and the
-    // event was dropped. Ask any mounted panel to (re)send its canvas.
+    // The full-city map modal mounts independently of the scene.
+    this.unsubCityMap = bridge.on(EVENTS.ACTION_REGISTER_CITY_MAP, (registration) => {
+      this.attachCityMap(registration);
+    });
+
+    // React effects run before Phaser's first frame, so the panels may have
+    // already fired their one-shot registration before this adapter existed and
+    // the event was dropped. Ask any mounted panel to (re)send its canvas.
     bridge.emit(EVENTS.ACTION_REQUEST_MINIMAP);
+    bridge.emit(EVENTS.ACTION_REQUEST_CITY_MAP);
   }
 
   /**
@@ -28,6 +40,16 @@ export class UIBridgeAdapter {
     this.minimapCanvas = canvas || null;
     this.minimapCtx = canvas ? canvas.getContext("2d") : null;
     this.coordsElement = registration?.coordsEl || null;
+  }
+
+  /**
+   * Bind the full-city map modal canvas.
+   * @param {{canvas?: HTMLCanvasElement}|null} registration
+   */
+  attachCityMap(registration) {
+    const canvas = registration?.canvas;
+    this.cityMapCanvas = canvas || null;
+    this.cityMapCtx = canvas ? canvas.getContext("2d") : null;
   }
 
   setQuestRewarded(rewarded) {
@@ -83,92 +105,162 @@ export class UIBridgeAdapter {
   drawMinimap(player, enemies, worldConfig, remotePlayers = []) {
     if (!this.minimapCtx || !player || !worldConfig) return;
 
-    const ctx = this.minimapCtx;
-    const w = this.minimapCanvas.width;
-    const h = this.minimapCanvas.height;
+    // The minimap is a local radar: it follows the player and only covers about
+    // one tenth of the walled city's area, so Biện Kinh feels as large as the
+    // classic VLTK2 maps. Without city bounds (tests/other regions) it shows the
+    // whole world instead.
+    const city = worldConfig.cityBounds || {
+      x0: 0,
+      y0: 0,
+      x1: worldConfig.width,
+      y1: worldConfig.height
+    };
+    let view;
+    if (worldConfig.cityBounds) {
+      // Equal spans on each axis would be area/10; keeping the city aspect here
+      // preserves the proportions of the region on screen.
+      const spanX = (city.x1 - city.x0) * MINIMAP_SPAN_RATIO;
+      const spanY = (city.y1 - city.y0) * MINIMAP_SPAN_RATIO;
+      view = {
+        x0: player.x - spanX / 2,
+        y0: player.y - spanY / 2,
+        x1: player.x + spanX / 2,
+        y1: player.y + spanY / 2
+      };
+    } else {
+      view = { x0: 0, y0: 0, x1: worldConfig.width, y1: worldConfig.height };
+    }
 
-    const scaleX = w / worldConfig.width;
-    const scaleY = h / worldConfig.height;
+    this.drawMap(this.minimapCtx, this.minimapCanvas, {
+      view,
+      city,
+      player,
+      enemies,
+      remotePlayers
+    });
 
-    // 1. Countryside outskirts
+    // Direct DOM text update for 60fps performance without triggering React re-renders
+    if (this.coordsElement) {
+      this.coordsElement.textContent = `${Math.floor(player.x)} / ${Math.floor(player.y)}`;
+    }
+  }
+
+  /**
+   * Draw the entire walled city (the M shortcut map) into the modal canvas.
+   * @param {object} player
+   * @param {Array<object>} [enemies]
+   * @param {{cityBounds?: object}} worldConfig
+   * @param {Array<object>} [remotePlayers]
+   */
+  drawCityMap(player, enemies, worldConfig, remotePlayers = []) {
+    if (!this.cityMapCtx || !player || !worldConfig?.cityBounds) return;
+
+    const city = worldConfig.cityBounds;
+    const padX = (city.x1 - city.x0) * 0.02;
+    const padY = (city.y1 - city.y0) * 0.02;
+    const view = {
+      x0: city.x0 - padX,
+      y0: city.y0 - padY,
+      x1: city.x1 + padX,
+      y1: city.y1 + padY
+    };
+
+    this.drawMap(this.cityMapCtx, this.cityMapCanvas, {
+      view,
+      city,
+      player,
+      enemies,
+      remotePlayers
+    });
+  }
+
+  /**
+   * Render one map view (terrain, walls, buildings, blips) into a canvas.
+   * Shared by the local radar and the full-city modal.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {HTMLCanvasElement} canvas
+   * @param {{view: object, city: object, player: object, enemies: Array<object>, remotePlayers: Array<object>}} frame
+   */
+  drawMap(ctx, canvas, { view, city, player, enemies, remotePlayers }) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const scaleX = w / (view.x1 - view.x0);
+    const scaleY = h / (view.y1 - view.y0);
+    const mapX = (gx) => (gx - view.x0) * scaleX;
+    const mapY = (gy) => (gy - view.y0) * scaleY;
+    // Marker sizes track the canvas resolution so the full-city modal stays legible.
+    const mark = Math.max(1, w / 220);
+
+    const cityX = mapX(city.x0);
+    const cityY = mapY(city.y0);
+    const cityW = (city.x1 - city.x0) * scaleX;
+    const cityH = (city.y1 - city.y0) * scaleY;
+
+    // 1. Forest ring around the ramparts
     ctx.fillStyle = "#1e3324";
     ctx.fillRect(0, 0, w, h);
 
-    // 2. Moat water surrounding the city
-    ctx.fillStyle = "#275560";
-    ctx.fillRect(220 * scaleX, 130 * scaleY, 50 * scaleX, 990 * scaleY); // West
-    ctx.fillRect(220 * scaleX, 1110 * scaleY, 1750 * scaleX, 50 * scaleY); // South
-    ctx.fillRect(1940 * scaleX, 130 * scaleY, 50 * scaleX, 990 * scaleY); // East
-
-    // 3. Inner city stone ground
+    // 2. Inner city stone ground
     ctx.fillStyle = "#4a4237";
-    ctx.fillRect(280 * scaleX, 150 * scaleY, 1660 * scaleX, 950 * scaleY);
+    ctx.fillRect(cityX, cityY, cityW, cityH);
 
-    // 4. Imperial Palace royal courtyard
-    ctx.fillStyle = "#692e24";
-    ctx.fillRect(1440 * scaleX, 160 * scaleY, 480 * scaleX, 360 * scaleY);
+    // 3. Paving grid (subtle texture, mirrors the 76-unit floor tiles)
+    ctx.strokeStyle = "rgba(184, 176, 161, 0.22)";
+    ctx.lineWidth = Math.max(0.5, 0.5 * mark);
+    ctx.beginPath();
+    for (let gx = city.x0; gx <= city.x1; gx += 152) {
+      ctx.moveTo(mapX(gx), cityY);
+      ctx.lineTo(mapX(gx), cityY + cityH);
+    }
+    for (let gy = city.y0; gy <= city.y1; gy += 152) {
+      ctx.moveTo(cityX, mapY(gy));
+      ctx.lineTo(cityX + cityW, mapY(gy));
+    }
+    ctx.stroke();
+
+    // 4. Paved avenues
+    const avenueH = CITY_AVENUES.horizontal;
+    const avenueV = CITY_AVENUES.vertical;
+    ctx.fillStyle = "rgba(105, 95, 78, 0.85)";
+    ctx.fillRect(mapX(city.x0), mapY(avenueH.y), cityW, avenueH.height * scaleY);
+    ctx.fillRect(mapX(avenueV.x), mapY(city.y0), avenueV.width * scaleX, cityH);
 
     // 5. City walls outline
     ctx.strokeStyle = "#80735a";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = Math.max(1.5, 0.7 * mark);
     ctx.beginPath();
-    ctx.moveTo(280 * scaleX, 150 * scaleY);
-    ctx.lineTo(1940 * scaleX, 150 * scaleY);
-    ctx.lineTo(1940 * scaleX, 1100 * scaleY);
-    ctx.lineTo(280 * scaleX, 1100 * scaleY);
+    ctx.moveTo(cityX, cityY);
+    ctx.lineTo(cityX + cityW, cityY);
+    ctx.lineTo(cityX + cityW, cityY + cityH);
+    ctx.lineTo(cityX, cityY + cityH);
     ctx.closePath();
     ctx.stroke();
 
-    // 6. Paved avenues
-    ctx.fillStyle = "#695f4e";
-    // West-East Main Avenue
-    ctx.fillRect(280 * scaleX, 575 * scaleY, 1660 * scaleX, 90 * scaleY);
-    // South-North Avenue
-    ctx.fillRect(955 * scaleX, 620 * scaleY, 90 * scaleX, 480 * scaleY);
-    ctx.fillRect(1040 * scaleX, 260 * scaleY, 90 * scaleX, 360 * scaleY);
-
-    // 7. Central Plaza
-    ctx.fillStyle = "#7a705e";
-    ctx.beginPath();
-    ctx.arc(1100 * scaleX, 620 * scaleY, 80 * scaleX, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 8. Key building footprints
+    // 6. Building footprints (shared with the Phaser scene)
     ctx.fillStyle = "#33261c";
-    // Dược Điếm (Top-left plaza)
-    ctx.fillRect(250 * scaleX, 220 * scaleY, 380 * scaleX, 260 * scaleY);
-    // Tiền Trang (North-East)
-    ctx.fillRect(1520 * scaleX, 260 * scaleY, 260 * scaleX, 140 * scaleY);
-    // Tiểu Viễn Lâu (South-West)
-    ctx.fillRect(160 * scaleX, 940 * scaleY, 220 * scaleX, 160 * scaleY);
-    // Võ Quán (South-East)
-    ctx.fillRect(1600 * scaleX, 780 * scaleY, 260 * scaleX, 160 * scaleY);
-    // Imperial Palace
-    ctx.fillStyle = "#b45309";
-    ctx.fillRect(1580 * scaleX, 180 * scaleY, 310 * scaleX, 150 * scaleY); // Hoàng Cung
+    CITY_BUILDINGS.forEach(({ x, y, w: bw, d: bh }) => {
+      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
+    });
 
-    // 9. Vạn Sự Thông Pavilion (Green point)
+    // 7. Vạn Sự Thông Pavilion (green point)
     ctx.fillStyle = "#22c55e";
     ctx.beginPath();
-    ctx.arc(1160 * scaleX, 440 * scaleY, 3.5, 0, Math.PI * 2);
+    ctx.arc(mapX(1160), mapY(440), 3.5 * mark, 0, Math.PI * 2);
     ctx.fill();
 
-    // 10. Bridges
-    ctx.fillStyle = "#877f72";
-    ctx.fillRect(205 * scaleX, 575 * scaleY, 75 * scaleX, 90 * scaleY);
-    ctx.fillRect(955 * scaleX, 1105 * scaleY, 90 * scaleX, 55 * scaleY);
-    ctx.fillRect(1940 * scaleX, 755 * scaleY, 70 * scaleX, 90 * scaleY);
+    // 8. Central plaza around the spawn point
+    ctx.fillStyle = "rgba(122, 112, 94, 0.8)";
+    ctx.beginPath();
+    ctx.arc(mapX(1100), mapY(620), 80 * scaleX, 0, Math.PI * 2);
+    ctx.fill();
 
     // Enemies (Red radar blips)
     if (enemies && enemies.length) {
       enemies.forEach((wolf) => {
         if (!wolf.active || wolf.isDead) return;
-        const ex = wolf.x * scaleX;
-        const ey = wolf.y * scaleY;
-
         ctx.fillStyle = "#ff4d4f";
         ctx.beginPath();
-        ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+        ctx.arc(mapX(wolf.x), mapY(wolf.y), 2.5 * mark, 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -179,49 +271,47 @@ export class UIBridgeAdapter {
         // A RemotePlayer renders through `container` (it has no physics `sprite`);
         // a destroyed one has already nulled it.
         if (!rp.container || !rp.container.active) return;
-        const rx = rp.x * scaleX;
-        const ry = rp.y * scaleY;
+        const rx = mapX(rp.x);
+        const ry = mapY(rp.y);
 
         ctx.fillStyle = "rgba(0, 210, 211, 0.25)";
         ctx.beginPath();
-        ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+        ctx.arc(rx, ry, 6 * mark, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = "#00d2d3";
         ctx.beginPath();
-        ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+        ctx.arc(rx, ry, 3 * mark, 0, Math.PI * 2);
         ctx.fill();
       });
     }
 
     // Player position (Golden yellow glowing beacon)
-    const px = player.x * scaleX;
-    const py = player.y * scaleY;
+    const px = mapX(player.x);
+    const py = mapY(player.y);
 
     // Player sight radius
     ctx.fillStyle = "rgba(255, 215, 0, 0.18)";
     ctx.beginPath();
-    ctx.arc(px, py, 10, 0, Math.PI * 2);
+    ctx.arc(px, py, 10 * mark, 0, Math.PI * 2);
     ctx.fill();
 
     // Player center dot
     ctx.fillStyle = "#ffdd59";
     ctx.beginPath();
-    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+    ctx.arc(px, py, 3.5 * mark, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = Math.max(1, 0.5 * mark);
     ctx.stroke();
-
-    // Direct DOM text update for 60fps performance without triggering React re-renders
-    if (this.coordsElement) {
-      this.coordsElement.textContent = `${Math.floor(player.x)} / ${Math.floor(player.y)}`;
-    }
   }
 
   destroy() {
     if (this.unsubMinimap) {
       this.unsubMinimap();
+    }
+    if (this.unsubCityMap) {
+      this.unsubCityMap();
     }
   }
 }

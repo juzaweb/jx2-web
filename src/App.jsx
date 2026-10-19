@@ -8,6 +8,7 @@ import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
+import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
@@ -49,6 +50,12 @@ const INITIAL_LOGS = [
 const isGuestSession = (session) =>
   session?.token === "offline-guest-token" ||
   String(session?.user?.id || "").startsWith("guest_");
+
+/** True while the user is typing in a chat/modal field, where shortcuts must not fire. */
+const isTypingTarget = (target) => {
+  const tag = target?.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable === true;
+};
 
 /**
  * Point the persisted bag and the shared in-memory store at one character, and
@@ -92,6 +99,8 @@ export function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
+  const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
+  const [isCityMapOpen, setIsCityMapOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
   const [stats, setStats] = useState({
@@ -253,6 +262,43 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (isTypingTarget(e.target)) return;
+      if (e.repeat) return;
+
+      const key = e.key.toLowerCase();
+      const hasOpenModal =
+        isHelpOpen ||
+        isInventoryOpen ||
+        isCharacterOpen ||
+        isCityMapOpen ||
+        isLoginOpen ||
+        (!activeCharacter && !!currentUser);
+
+      // Tab doubles the minimap. Leave Tab alone while a modal is open so it
+      // keeps its normal focus-navigation behavior.
+      if (key === "tab") {
+        if (hasOpenModal) return;
+        e.preventDefault();
+        setIsMinimapZoomed((prev) => !prev);
+        return;
+      }
+
+      // M shows the whole Biện Kinh city map.
+      if (key === "m") {
+        if (isLoginOpen || (!activeCharacter && currentUser)) return;
+        e.preventDefault();
+        if (isCityMapOpen) {
+          setIsCityMapOpen(false);
+        } else {
+          setIsCityMapOpen(true);
+          setIsHelpOpen(false);
+          setIsInventoryOpen(false);
+          setIsCharacterOpen(false);
+          bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        }
+        return;
+      }
+
       if (e.key === "F3") {
         e.preventDefault();
         if (isCharacterOpen) {
@@ -274,6 +320,11 @@ export function App() {
       }
 
       if (e.key !== "Escape") return;
+
+      if (isCityMapOpen) {
+        setIsCityMapOpen(false);
+        return;
+      }
 
       if (isCharacterOpen) {
         handleCloseCharacter();
@@ -297,6 +348,11 @@ export function App() {
   }, [
     isCharacterOpen,
     isInventoryOpen,
+    isHelpOpen,
+    isCityMapOpen,
+    isLoginOpen,
+    activeCharacter,
+    currentUser,
     handleOpenCharacter,
     handleCloseCharacter,
     handleOpenInventory,
@@ -433,6 +489,7 @@ export function App() {
           onToggleAudio={handleToggleAudio}
           onOpenHelp={handleOpenHelp}
           quest={quest}
+          zoomed={isMinimapZoomed}
         />
 
         <ChatPanel logs={logs} onSendMessage={handleSendMessage} />
@@ -485,6 +542,12 @@ export function App() {
         isOpen={isHelpOpen}
         onClose={dismissHelp}
         onReset={handleReset}
+      />
+
+      {/* Full-city map (M shortcut) */}
+      <CityMapModal
+        isOpen={isCityMapOpen}
+        onClose={() => setIsCityMapOpen(false)}
       />
 
       {/* Character Inventory ("Hành trang") */}

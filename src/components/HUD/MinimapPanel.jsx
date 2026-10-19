@@ -3,7 +3,7 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest }) {
+export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
@@ -26,10 +26,10 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
   }, []);
 
   return (
-    <section className="top-right-panel" id="minimap-panel">
-      <div className="minimap-frame metal-card">
+    <section className={`top-right-panel${zoomed ? " is-zoomed" : ""}`} id="minimap-panel">
+      <div className={`minimap-frame metal-card${zoomed ? " is-zoomed" : ""}`}>
         <div className="minimap-header">
-          <div className="region-title">
+          <div className="region-title" title={t("minimap.mapTitle")}>
             <span className="realm-channel">{t("minimap.region")}</span>
           </div>
           <div className="minimap-actions">
@@ -52,12 +52,12 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
           </span>
         </div>
 
-        <div className="minimap-view">
+        <div className="minimap-view" title={t("minimap.zoomTitle")}>
           <canvas
             id="minimap-canvas"
             ref={canvasRef}
-            width={168}
-            height={116}
+            width={zoomed ? 440 : 220}
+            height={zoomed ? 300 : 150}
           ></canvas>
           <div className="minimap-radar-sweep"></div>
         </div>

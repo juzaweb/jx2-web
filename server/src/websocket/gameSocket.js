@@ -3,6 +3,7 @@ import { rollEnemyReward } from "../rewards.js";
 import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
+import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
 
 /**
  * Clean sanitization for player strings
@@ -48,9 +49,9 @@ const sanitizeEquipment = (val) => {
   return out;
 };
 
-/** World bounds shared with the client scene (see src/game/world.js). */
-const WORLD_WIDTH = 2200;
-const WORLD_HEIGHT = 1250;
+/** World bounds shared with the client (see src/game/worldConfig.js). */
+const WORLD_WIDTH = WORLD_CONFIG.width;
+const WORLD_HEIGHT = WORLD_CONFIG.height;
 
 /** Enemy tuning mirroring the client's Wolf entity. */
 export const ENEMY_MAX_HP = 45;
@@ -280,8 +281,8 @@ export class GameSocketManager {
       id: playerId,
       username,
       displayName,
-      x: clampNum(payload.x, 0, 2200, 640),
-      y: clampNum(payload.y, 0, 1250, 620),
+      x: clampNum(payload.x, 0, WORLD_WIDTH, 640),
+      y: clampNum(payload.y, 0, WORLD_HEIGHT, 620),
       vx: clampNum(payload.vx, -500, 500, 0),
       vy: clampNum(payload.vy, -500, 500, 0),
       direction: payload.direction === "left" ? "left" : "right",
@@ -363,8 +364,8 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    player.x = clampNum(payload.x, 0, 2200, player.x);
-    player.y = clampNum(payload.y, 0, 1250, player.y);
+    player.x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
+    player.y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
     player.vx = clampNum(payload.vx, -500, 500, 0);
     player.vy = clampNum(payload.vy, -500, 500, 0);
     if (payload.direction) {
@@ -468,8 +469,8 @@ export class GameSocketManager {
     if (!player) return;
 
     const skill = payload.skill === "kiem_khi" ? "kiem_khi" : "normal";
-    const x = clampNum(payload.x, 0, 2200, player.x);
-    const y = clampNum(payload.y, 0, 1250, player.y);
+    const x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
+    const y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
     const facingRight = payload.facingRight !== false;
 
     this.broadcast(ws, {

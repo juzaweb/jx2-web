@@ -453,6 +453,12 @@ export class JiangHuScene extends Phaser.Scene {
       WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
+    this.uiBridge.drawCityMap(
+      this.player,
+      this.enemyManager.getAll(),
+      WORLD_CONFIG,
+      this.remotePlayerManager?.getAll() || []
+    );
 
     // Auto-start game immediately without start modal
     this.startGame();
@@ -955,6 +961,12 @@ export class JiangHuScene extends Phaser.Scene {
     // Update UI HUD & Minimap Radar
     this.uiBridge.updateHud(this.player.stats);
     this.uiBridge.drawMinimap(
+      this.player,
+      this.enemyManager.getAll(),
+      WORLD_CONFIG,
+      this.remotePlayerManager?.getAll() || []
+    );
+    this.uiBridge.drawCityMap(
       this.player,
       this.enemyManager.getAll(),
       WORLD_CONFIG,

@@ -66,7 +66,18 @@ export default {
     questHead: "✦ EXPLORE BIANJING",
     questDone: "You have toured Bianjing",
     questTodo: "A bustling city",
-    questSafe: "Safe zone • No monsters"
+    questSafe: "Safe zone • No monsters",
+    zoomTitle: "Tab: Double the minimap size",
+    mapTitle: "M: Open the full city map"
+  },
+  cityMap: {
+    eyebrow: "CITY OVERVIEW",
+    title: "Bianjing Map",
+    hint: "Press M or Esc to close",
+    player: "You",
+    enemy: "Monsters",
+    remote: "Players",
+    pavilion: "Pavilion"
   },
   chat: {
     tabs: {
@@ -114,6 +125,7 @@ export default {
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
+    map: "Map: Press Tab to double the minimap, press M to open the full Bianjing city map.",
     pause: "Pause: Press Esc or open the Guide to pause the game.",
     resume: "I UNDERSTAND",
     reset: "START OVER (RESET PROGRESS)"

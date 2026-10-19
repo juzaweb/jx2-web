@@ -66,7 +66,18 @@ export default {
     questHead: "✦ 探索汴京",
     questDone: "已游历汴京",
     questTodo: "繁华都城",
-    questSafe: "安全区 • 无怪物"
+    questSafe: "安全区 • 无怪物",
+    zoomTitle: "Tab：小地图放大一倍",
+    mapTitle: "M：查看全城地图"
+  },
+  cityMap: {
+    eyebrow: "城池全貌",
+    title: "汴京地图",
+    hint: "按 M 或 Esc 关闭",
+    player: "角色",
+    enemy: "妖兽",
+    remote: "侠客",
+    pavilion: "万事通"
   },
   chat: {
     tabs: {
@@ -114,6 +125,7 @@ export default {
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与银两：击败灰狼可获得经验、银两，并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
+    map: "地图：按 Tab 将小地图放大一倍，按 M 打开汴京全城地图。",
     pause: "暂停：按 Esc 或打开秘笈面板可暂停游戏。",
     resume: "我已了解",
     reset: "从头开始（重置进度）"

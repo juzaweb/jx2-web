@@ -244,8 +244,17 @@ body {
 }
 
 .minimap-frame {
-  width: 176px;
+  width: 228px;
   padding: 4px;
+}
+
+.minimap-frame.is-zoomed {
+  width: 456px;
+}
+
+.minimap-frame.is-zoomed .minimap-view {
+  width: 440px;
+  height: 300px;
 }
 
 .minimap-header {
@@ -305,8 +314,8 @@ body {
 }
 
 .minimap-view {
-  width: 168px;
-  height: 116px;
+  width: 220px;
+  height: 150px;
   background: #19271c;
   border: 1.5px inset #4a3c26;
   position: relative;
@@ -897,6 +906,57 @@ body {
   line-height: 1;
 }
 
+/* Full-city map modal (M shortcut) */
+.city-map-box {
+  width: min(900px, calc(100% - 32px));
+  padding: 22px;
+  text-align: left;
+}
+.city-map-box h2 {
+  font-family: 'Cinzel', serif;
+  color: #f7e8c6;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.city-map-view {
+  width: 100%;
+  background: #1e3324;
+  border: 2px solid #80735a;
+  outline: 1px solid #231b13;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.75);
+}
+.city-map-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.city-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #d8c7a1;
+}
+.city-map-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.city-map-dot.player { background: #ffdd59; }
+.city-map-dot.enemy { background: #ff4d4f; }
+.city-map-dot.remote { background: #00d2d3; }
+.city-map-dot.pavilion { background: #22c55e; }
+.city-map-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #8f9a91;
+  text-align: right;
+}
+
 
 /* ====================================================
    Responsive Adjustments
@@ -926,6 +986,9 @@ body {
   .top-right-panel {
     transform: scale(0.85);
     transform-origin: top right;
+  }
+  .top-right-panel.is-zoomed {
+    transform: scale(0.6);
   }
   .top-left-panel {
     transform: scale(0.85);
