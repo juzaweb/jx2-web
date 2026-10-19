@@ -112,16 +112,16 @@ export default {
     character: "Nhân Vật",
     inventory: "Hành Trang",
     help: "Cẩm Nang",
-    pkTitle: "Bật/tắt cờ PK (Phím P)",
+    pkTitle: "Bật/tắt cờ PK",
     pkOn: "PK",
     pkOff: "Hòa Bình"
   },
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",
     title: "Hướng Dẫn Tân Thủ",
-    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng phím W, A, S, D / phím mũi tên.",
-    combat: "Chiến đấu: Nhấn Space để xuất chiêu, hoặc nhấp chuột trái trực tiếp vào quái vật để tấn công.",
-    skill: "Tuyệt kỹ Kiếm Khí: Nhấn phím Q hoặc Phím 8, phát kình khí diện rộng (tiêu hao 15 MP).",
+    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng cần gạt ảo trên mobile.",
+    combat: "Chiến đấu: Dùng nút Tấn công trên thanh dưới (hoặc nút tấn công trên mobile).",
+    skill: "Chiêu thức: Nhấn phím tắt đã gán để đưa chiêu vào tay phải, rồi nhấp chuột phải để thi triển. Đổi phím trong nút Đổi phím trên thanh chiêu.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
@@ -204,6 +204,49 @@ export default {
     notice: {
       created: 'Đã tạo nhân vật "{name}".',
       deleted: 'Đã xoá nhân vật "{name}".'
+    }
+  },
+  skills: {
+    rightHandTitle: "Chiêu tay phải (chuột phải để dùng)",
+    rightClickCast: "Chuột phải",
+    keybind: {
+      short: "Đổi phím",
+      eyebrow: "Thiết lập",
+      title: "Phím tắt chiêu thức",
+      hint: "Bấm vào ô phím rồi nhấn phím muốn gán. Phím chỉ gán chiêu vào tay phải; chuột phải để thi triển.",
+      press: "Nhấn phím...",
+      error: {
+        reserved: "Phím này đã bị giao diện sử dụng.",
+        duplicate: "Phím đã gán cho chiêu khác.",
+        empty: "Phím không hợp lệ.",
+        "invalid-slot": "Ô chiêu không hợp lệ."
+      }
+    },
+    thieuLam: {
+      laHanQuyen: {
+        name: "La Hán Quyền",
+        desc: "Quyền pháp nhập môn, công kích cận chiến nhanh."
+      },
+      caDiepThoai: {
+        name: "Ca Diệp Thoái",
+        desc: "Cước pháp cơ bản, đá trúng khiến đối phương chậm chạp."
+      },
+      viDaQuyen: {
+        name: "Vi Đà Quyền",
+        desc: "Quyền pháp trung cấp, uy lực kết liễu mạnh."
+      },
+      daiTuDiChuong: {
+        name: "Đại Tu Di Chưởng",
+        desc: "Chưởng pháp diện rộng, đánh choáng kẻ địch quanh thân."
+      },
+      hueNhanChu: {
+        name: "Huệ Nhãn Chú",
+        desc: "Tâm pháp độc môn, tăng chí mạng và công kích trong thời gian ngắn."
+      },
+      nhuLaiThanThuong: {
+        name: "Như Lai Thần Thưởng",
+        desc: "Tuyệt kỹ trấn phái, sát thương diện rộng và choáng dài lâu."
+      }
     }
   },
   character: {

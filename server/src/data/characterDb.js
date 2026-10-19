@@ -327,6 +327,17 @@ export class CharacterDatabase {
   }
 
   /**
+   * Fetch a character owned by a user.
+   * @param {string} userId
+   * @param {string} characterId
+   * @returns {Object|null} Sanitized character or null
+   */
+  findById(userId, characterId) {
+    if (!isValidUserId(userId) || typeof characterId !== "string" || !characterId) return null;
+    return mapRow(this.stmtFindById.get(characterId, userId));
+  }
+
+  /**
    * Count characters owned by a user.
    * @param {string} userId
    * @returns {number}

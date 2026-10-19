@@ -28,6 +28,10 @@ export class Wolf {
     this.stats = { ...WOLF_COMBAT };
     this.isDead = false;
     this.nextBite = 0;
+    // Skill control state: a stunned wolf holds still, a slowed one moves slower.
+    this.stunUntil = 0;
+    this.slowUntil = 0;
+    this.slowPct = 0;
     // Where the server last reported this wolf (see applyServerState). Left null
     // until then, so a wolf never slides toward a position nobody has claimed.
     this.targetX = null;
@@ -83,12 +87,18 @@ export class Wolf {
   update(time, delta, player, onBite) {
     if (!this.sprite.active || this.isDead) return;
 
+    // A stunned wolf holds position; a slowed one advances its clock slower.
+    const stunned = time < this.stunUntil;
+    const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
+
     // Online the server steps the AI and this render follows its lead; offline the
     // client steps the same shared AI with the local player as the only target
-    if (this.usesServerMovement()) {
-      this.followServerPosition(delta);
+    if (stunned) {
+      this.sprite.setVelocity(0, 0);
+    } else if (this.usesServerMovement()) {
+      this.followServerPosition(delta * slowFactor);
     } else {
-      this.stepLocally(delta, player);
+      this.stepLocally(delta * slowFactor, player);
     }
 
     const x = this.sprite.x;

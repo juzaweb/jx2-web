@@ -14,7 +14,8 @@ import {
   progressPayload,
   vitalsForLevel
 } from "../../../src/game/progression.js";
-import { skillMpCost } from "../../../src/game/skills.js";
+import { skillById, skillMpCost, skillCooldown } from "../../../src/game/skills.js";
+import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 
 /**
  * Clean sanitization for player strings
@@ -80,6 +81,12 @@ export const PLAYER_IFRAME_MS = 700;
  * attack cadence, so it never throttles legitimate play.
  */
 export const ACTION_COOLDOWN_MS = 300;
+
+/** How long after a cast its follow-up hit(s) stay authorized (an AoE may hit many). */
+export const CAST_HIT_WINDOW_MS = 2000;
+
+/** Maximum follow-up hit messages accepted from one cast (AoE headroom). */
+export const MAX_HITS_PER_CAST = 8;
 
 /** Drop broadcasts to a socket once it has this much unflushed data (backpressure). */
 const MAX_BUFFERED_BYTES = 1_000_000;
@@ -369,6 +376,9 @@ export class GameSocketManager {
     // The server is the economy's source of truth: a fresh character starts at
     // level 1; an existing one resumes from its persisted ledger, never from a
     // client-reported level.
+    // The requested sect is server-owned: it comes from the stored character, so
+    // a client cannot claim another sect's kit.
+    const character = characterId ? characterDb.findById(userId, characterId) : null;
     const saved = characterId ? store.getProgress(characterId) : null;
     const progress = characterId
       ? saved
@@ -420,13 +430,20 @@ export class GameSocketManager {
       // driven by the server (skill cost, potion, level-up refill).
       maxMp: vitals ? vitals.maxMp : 60,
       mp: 0,
-      // Reported purely so the server can roll wolf bites against it.
+      // Reported purely so the server can roll wolf bites and skill damage against it.
       defense: clampNum(payload.defense, 0, 9999, 6),
+      attack: clampNum(payload.attack, 0, 99999, 24),
+      critRate: clampNum(payload.critRate, 0, 1, 0.12),
+      sect: character?.sect || "thieu-lam",
       pkFlag: payload.pkFlag === true,
       invulnerableUntil: 0,
       nextBiteAt: 0,
       nextAttackAt: 0,
-      nextHitAt: 0
+      nextHitAt: 0,
+      /** skill id -> timestamp the next cast is allowed. */
+      skillReadyAt: Object.create(null),
+      /** { skillId, at } of the most recent accepted cast, used to authorize its hit. */
+      lastCast: null
     };
 
     playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
@@ -561,6 +578,8 @@ export class GameSocketManager {
     if (!player) return;
 
     player.defense = clampNum(payload.defense, 0, 9999, player.defense);
+    player.attack = clampNum(payload.attack, 0, 99999, player.attack);
+    player.critRate = clampNum(payload.critRate, 0, 1, player.critRate);
   }
 
   /**
@@ -624,8 +643,19 @@ export class GameSocketManager {
     if (now < player.nextAttackAt) return;
     player.nextAttackAt = now + ACTION_COOLDOWN_MS;
 
-    const skill = payload.skill === "kiem_khi" ? "kiem_khi" : "normal";
-    const cost = skillMpCost(skill);
+    // Only skills belonging to the player's server-owned sect can be cast; an
+    // unknown or foreign id degrades to a plain attack.
+    const requested = skillById(payload.skill);
+    const skill = requested && requested.sect === player.sect ? requested : null;
+    const skillId = skill ? skill.id : "normal";
+
+    if (skill) {
+      const readyAt = player.skillReadyAt[skillId] || 0;
+      if (now < readyAt) return;
+      player.skillReadyAt[skillId] = now + skillCooldown(skillId);
+    }
+
+    const cost = skillMpCost(skillId);
     if (cost > 0) {
       if (player.mp < cost) {
         // Refuse the cast and resync the caster so its HUD matches the server.
@@ -636,6 +666,10 @@ export class GameSocketManager {
       this.broadcastMp(player);
     }
 
+    // A successful cast authorizes the skill's follow-up hit. `enemy_hit` refuses
+    // a skill the player did not just cast, so damage cannot be minted freely.
+    if (skill) player.lastCast = { skillId, at: now, hits: 0 };
+
     const x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
     const y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
     const facingRight = payload.facingRight !== false;
@@ -644,7 +678,7 @@ export class GameSocketManager {
       type: "player_attacked",
       payload: {
         id: player.id,
-        skill,
+        skill: skillId,
         x,
         y,
         facingRight
@@ -842,8 +876,34 @@ export class GameSocketManager {
     const enemy = this.enemies.get(payload.id);
     if (!enemy) return;
 
-    if (typeof payload.damage !== "number" || !Number.isFinite(payload.damage) || payload.damage <= 0) return;
-    const damage = Math.round(Math.min(payload.damage, 200));
+    let damage;
+    const skill = skillById(payload.skill);
+    if (skill && skill.sect === player.sect) {
+      // Only a hit that follows a validated cast is accepted; otherwise a client
+      // could mint damage without paying MP or cooldown.
+      const now = Date.now();
+      const cast = player.lastCast;
+      if (!cast || cast.skillId !== skill.id || now - cast.at > CAST_HIT_WINDOW_MS) return;
+      // Cap follow-up hits per cast (an AoE may legitimately hit a handful).
+      if (cast.hits >= MAX_HITS_PER_CAST) return;
+      cast.hits += 1;
+
+      // Skill hits are authoritative: the server recomputes the damage from the
+      // catalog and the player's own attack stat instead of trusting the client.
+      const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+      if (distance > skill.range + skill.radius + 40) return;
+      damage = computeSkillDamage(
+        skill,
+        { attack: player.attack, critRate: player.critRate, critDamage: 1.5 },
+        { defense: WOLF_COMBAT.defense },
+        Math.random
+      ).damage;
+    } else {
+      if (typeof payload.damage !== "number" || !Number.isFinite(payload.damage) || payload.damage <= 0) return;
+      damage = Math.round(Math.min(payload.damage, 200));
+    }
+
+    if (damage <= 0) return;
 
     // Already dead on the server: resync the hitter instead of applying damage twice
     if (enemy.isDead) {

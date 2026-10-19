@@ -112,16 +112,16 @@ export default {
     character: "Character",
     inventory: "Inventory",
     help: "Guide",
-    pkTitle: "Toggle PK flag (Key P)",
+    pkTitle: "Toggle PK flag",
     pkOn: "PK",
     pkOff: "Peace"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",
     title: "Beginner's Guide",
-    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use W, A, S, D / the arrow keys.",
-    combat: "Combat: Press Space to strike, or left-click a monster directly to attack it.",
-    skill: "Sword Aura ultimate: Press Q or key 8 to unleash an area blast of inner force (costs 15 MP).",
+    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use the mobile joystick.",
+    combat: "Combat: Use the Attack button on the bottom bar (or the attack button on mobile).",
+    skill: "Skills: Press a bound key to assign a skill to the right hand, then right-click to cast it. Rebind keys from the Keys button on the skill bar.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
@@ -204,6 +204,31 @@ export default {
     notice: {
       created: 'Created character "{name}".',
       deleted: 'Deleted character "{name}".'
+    }
+  },
+  skills: {
+    rightHandTitle: "Right-hand skill (right-click to use)",
+    rightClickCast: "Right click",
+    keybind: {
+      short: "Keys",
+      eyebrow: "Settings",
+      title: "Skill hotkeys",
+      hint: "Click a key box, then press the key to bind. A key only assigns its skill to the right hand; right-click casts it.",
+      press: "Press a key...",
+      error: {
+        reserved: "That key is reserved by the UI.",
+        duplicate: "That key is already bound to another skill.",
+        empty: "Invalid key.",
+        "invalid-slot": "Invalid skill slot."
+      }
+    },
+    thieuLam: {
+      laHanQuyen: { name: "Arhat Fist", desc: "Entry fist art with fast melee strikes." },
+      caDiepThoai: { name: "Kasyapa Kick", desc: "Basic leg art that slows the target." },
+      viDaQuyen: { name: "Veda Fist", desc: "Mid-tier fist art with strong finishing power." },
+      daiTuDiChuong: { name: "Great Sumeru Palm", desc: "Wide palm strike that stuns nearby foes." },
+      hueNhanChu: { name: "Wisdom Eye", desc: "Secret mantra boosting crit and attack briefly." },
+      nhuLaiThanThuong: { name: "Tathagata Palm", desc: "Signature ultimate: wide damage and a long stun." }
     }
   },
   character: {

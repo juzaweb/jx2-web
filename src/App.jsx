@@ -11,8 +11,11 @@ import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
+import { SkillKeybindModal } from "./components/Modals/SkillKeybindModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
+import { loadSkillBinds, saveSkillBinds } from "./game/keybinds.js";
+import { skillsForSect } from "./game/skills.js";
 import {
   defaultQuantities,
   applyQuantities,
@@ -104,6 +107,11 @@ export function App() {
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
+  const [selectedSkillSlot, setSelectedSkillSlot] = useState(0);
+  const [skillBinds, setSkillBinds] = useState(() =>
+    loadSkillBinds(readSession()?.activeCharacter?.id)
+  );
+  const [isSkillKeybindOpen, setIsSkillKeybindOpen] = useState(false);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -140,6 +148,15 @@ export function App() {
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  // Switching characters loads that hero's skill layout and sect kit.
+  useEffect(() => {
+    setSkillBinds(loadSkillBinds(activeCharacter?.id));
+    setSelectedSkillSlot(0);
+    if (activeCharacter?.sect) {
+      bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
+    }
+  }, [activeCharacter?.id, activeCharacter?.sect]);
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
   // rename in the users table reaches the HUD, the game scene and the network join.
@@ -224,6 +241,10 @@ export function App() {
       }
     });
 
+    const unsubSkillSelected = bridge.on(EVENTS.SKILL_SELECTED, (slot) => {
+      if (typeof slot === "number") setSelectedSkillSlot(slot);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -233,6 +254,7 @@ export function App() {
       unsubInventory();
       unsubEquipment();
       unsubStarted();
+      unsubSkillSelected();
     };
   }, []);
 
@@ -367,6 +389,30 @@ export function App() {
   const handleSkill = useCallback(() => {
     bridge.emit(EVENTS.ACTION_SKILL);
   }, []);
+
+  const handleSelectSkill = useCallback((slot) => {
+    bridge.emit(EVENTS.ACTION_SELECT_SKILL, slot);
+  }, []);
+
+  const handleOpenSkillKeys = useCallback(() => {
+    dismissHelp();
+    setIsSkillKeybindOpen(true);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+  }, [dismissHelp]);
+
+  const handleCloseSkillKeys = useCallback(() => {
+    setIsSkillKeybindOpen(false);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleSaveSkillBinds = useCallback(
+    (binds) => {
+      const saved = saveSkillBinds(activeCharacter?.id, binds);
+      setSkillBinds(saved);
+      bridge.emit(EVENTS.SKILL_BINDS_CHANGED, saved);
+    },
+    [activeCharacter?.id]
+  );
 
   const handleUseItem = useCallback((slot) => {
     bridge.emit(EVENTS.ACTION_USE_POTION, slot);
@@ -506,7 +552,8 @@ export function App() {
           onUseItem={handleUseItem}
           onAttack={handleAttack}
           onSkill={handleSkill}
-          onSave={handleSave}
+          onSelectSkill={handleSelectSkill}
+          onOpenSkillKeys={handleOpenSkillKeys}
           onInventory={handleOpenInventory}
           onCharacter={handleOpenCharacter}
           onOpenHelp={handleOpenHelp}
@@ -514,6 +561,9 @@ export function App() {
           onLogout={handleLogout}
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
+          skills={skillsForSect(activeCharacter?.sect)}
+          skillBinds={skillBinds}
+          selectedSkillSlot={selectedSkillSlot}
         />
 
         <MobileControls
@@ -577,6 +627,15 @@ export function App() {
         equipment={equipment}
         onUnequipSlot={handleUnequipSlot}
         onEquipItem={handleEquipItem}
+      />
+
+      {/* Skill hotkey rebinding */}
+      <SkillKeybindModal
+        isOpen={isSkillKeybindOpen}
+        skills={skillsForSect(activeCharacter?.sect)}
+        binds={skillBinds}
+        onSave={handleSaveSkillBinds}
+        onClose={handleCloseSkillKeys}
       />
     </main>
   );

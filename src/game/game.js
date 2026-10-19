@@ -18,6 +18,8 @@ import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import { normalizeGender } from "./gender.js";
+import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
+import { normalizeSect } from "./skills.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
@@ -85,6 +87,7 @@ export class JiangHuScene extends Phaser.Scene {
       initialName,
       initialGender
     );
+    this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
     this.enemyManager = new EnemyManager(this);
     this.enemyManager.create([]);
 
@@ -361,16 +364,34 @@ export class JiangHuScene extends Phaser.Scene {
       const tag = typeof document !== "undefined" && document.activeElement?.tagName;
       return tag === "INPUT" || tag === "TEXTAREA";
     };
+    this.isTyping = isTyping;
 
-    // Keyboard Hotkeys
-    this.input.keyboard.on("keydown-SPACE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performAttack();
+    // Skill selection keys are player-configurable (see keybinds.js). Movement is
+    // click/joystick only, and normal attack / PK live on UI buttons, so no other
+    // action steals a key the player may want to bind.
+    this.skillBinds = loadSkillBinds(readSession()?.activeCharacter?.id);
+    this.bindSkillKeys();
+
+    // Right mouse button releases the skill assigned to the right hand.
+    // A DOM listener reliably reports the secondary button (Phaser's pointerdown
+    // can be flaky for right-click across browsers).
+    this.rightMouseHandler = (event) => {
+      if (event.button !== 2) return;
+      if (event.target !== this.game.canvas) return;
+      if (!this.started || this.isPaused) return;
+      this.combat.castSelectedSkill();
+    };
+    this.contextMenuHandler = (event) => {
+      if (this.started) event.preventDefault();
+    };
+    window.addEventListener("mousedown", this.rightMouseHandler);
+    window.addEventListener("contextmenu", this.contextMenuHandler);
+    this.events.once("shutdown", () => {
+      window.removeEventListener("mousedown", this.rightMouseHandler);
+      window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
-    this.input.keyboard.on("keydown-Q", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
-    });
-
+    // Consumable hotkeys stay fixed on 1-4.
     this.input.keyboard.on("keydown-ONE", () => {
       if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
     });
@@ -387,14 +408,6 @@ export class JiangHuScene extends Phaser.Scene {
       if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
     });
 
-    this.input.keyboard.on("keydown-EIGHT", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
-    });
-
-    this.input.keyboard.on("keydown-P", () => {
-      if (!isTyping() && this.started) this.togglePk();
-    });
-
     // Listen to React UI Actions via Game Bridge
     this.unsubscribers.push(
       bridge.on(EVENTS.ACTION_START, () => this.startGame()),
@@ -402,7 +415,17 @@ export class JiangHuScene extends Phaser.Scene {
         if (this.started && !this.isPaused) this.combat.performAttack();
       }),
       bridge.on(EVENTS.ACTION_SKILL, () => {
-        if (this.started && !this.isPaused) this.combat.performSkill();
+        if (this.started && !this.isPaused) this.combat.castSelectedSkill();
+      }),
+      bridge.on(EVENTS.ACTION_SELECT_SKILL, (slot) => {
+        if (this.started && !this.isPaused) this.combat.selectSkill(slot);
+      }),
+      bridge.on(EVENTS.SKILL_BINDS_CHANGED, (binds) => {
+        if (Array.isArray(binds)) this.skillBinds = binds;
+        this.updateSkillKeyMap();
+      }),
+      bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
+        this.player?.setSect(normalizeSect(sect));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
@@ -869,6 +892,7 @@ export class JiangHuScene extends Phaser.Scene {
         username;
     }
 
+    const effective = this.combat?.getEffectiveStats?.() || this.player.stats;
     this.remotePlayerManager.setLocalPlayerId(playerId);
     this.combat.setLocalPlayerId(playerId);
     this.networkClient.join({
@@ -886,9 +910,39 @@ export class JiangHuScene extends Phaser.Scene {
       gender: normalizeGender(this.player.gender),
       hp: this.player.stats?.hp || 100,
       mp: this.player.stats?.mp || 0,
-      defense: this.player.stats?.defense ?? 6,
+      defense: effective.defense ?? 6,
+      attack: effective.attack ?? 24,
+      critRate: effective.critRate ?? 0.12,
       pkFlag: this.player.pkFlag === true
     });
+  }
+
+  /**
+   * Rebuild the key -> slot lookup from the current player bindings.
+   */
+  updateSkillKeyMap() {
+    this.skillKeyMap = keyToSlot(this.skillBinds);
+  }
+
+  /**
+   * Bind the configurable skill-selection keys. Only one raw keydown listener is
+   * registered; rebinding just swaps the lookup map.
+   */
+  bindSkillKeys() {
+    this.updateSkillKeyMap();
+    if (this.skillKeyHandler) return;
+    this.skillKeyHandler = (event) => {
+      if (!this.started || this.isPaused) return;
+      if (this.isTyping?.()) return;
+      if (event.repeat) return;
+      const key = normalizeKey(event);
+      if (!key) return;
+      const slot = this.skillKeyMap?.get(key);
+      if (slot === undefined) return;
+      event.preventDefault();
+      this.combat.selectSkill(slot);
+    };
+    this.input.keyboard.on("keydown", this.skillKeyHandler);
   }
 
   startGame() {
@@ -987,12 +1041,19 @@ export class JiangHuScene extends Phaser.Scene {
           });
         }
 
-        // Report the one stat the client still owns: defense (used to roll wolf
-        // bites). Level, HP ceiling and current HP are server-owned.
-        const { defense } = this.player.stats;
-        if (defense !== this.lastReportedDefense) {
+        // Report the stats the client owns: defense (rolls wolf bites), attack and
+        // crit (the server uses them to validate skill damage). Level/HP/MP stay
+        // server-owned.
+        const { defense, attack, critRate } = this.combat?.getEffectiveStats?.() || this.player.stats;
+        if (
+          defense !== this.lastReportedDefense ||
+          attack !== this.lastReportedAttack ||
+          critRate !== this.lastReportedCrit
+        ) {
           this.lastReportedDefense = defense;
-          this.networkClient.sendStats({ defense });
+          this.lastReportedAttack = attack;
+          this.lastReportedCrit = critRate;
+          this.networkClient.sendStats({ defense, attack, critRate });
         }
       }
     }

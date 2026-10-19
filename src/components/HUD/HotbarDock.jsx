@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { QUICK_ITEMS } from "../../game/items.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
+import { bridge, EVENTS } from "../../game/bridge.js";
 
 export function HotbarDock({
   coins = 0,
@@ -9,7 +10,8 @@ export function HotbarDock({
   onUseItem,
   onAttack,
   onSkill,
-  onSave,
+  onSelectSkill,
+  onOpenSkillKeys,
   onInventory,
   onCharacter,
   onOpenHelp,
@@ -17,9 +19,45 @@ export function HotbarDock({
   onLogout,
   onTogglePk,
   pkEnabled = false,
+  skills = [],
+  skillBinds = [],
+  selectedSkillSlot = 0,
   items = QUICK_ITEMS
 }) {
   const { t } = useI18n();
+  const [cooldownEnds, setCooldownEnds] = useState({});
+  const [clock, setClock] = useState(0);
+
+  useEffect(() => {
+    const off = bridge.on(EVENTS.SKILL_CAST, ({ slot, cooldown }) => {
+      if (typeof slot !== "number") return;
+      setCooldownEnds((prev) => ({ ...prev, [slot]: Date.now() + (cooldown || 0) }));
+    });
+    return off;
+  }, []);
+
+  useEffect(() => {
+    const active = Object.values(cooldownEnds).some((end) => end > Date.now());
+    if (!active) return undefined;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      setCooldownEnds((prev) => {
+        const next = {};
+        let changed = false;
+        for (const [slot, end] of Object.entries(prev)) {
+          if (end > now) next[slot] = end;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 200);
+    return () => clearInterval(id);
+  }, [cooldownEnds]);
+
+  const cooldownLeft = (slot) => Math.max(0, (cooldownEnds[slot] || 0) - clock);
+  const selectedSkill = skills.find((skill) => skill.slot === selectedSkillSlot) || skills[0] || null;
+
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
@@ -44,30 +82,9 @@ export function HotbarDock({
             );
           })}
 
-          {/* Slot 5 to 7: Martial shortcuts */}
-          <div className="slot-item empty">
-            <span className="slot-key">5</span>
-          </div>
-          <div className="slot-item empty">
-            <span className="slot-key">6</span>
-          </div>
-          <div className="slot-item empty">
-            <span className="slot-key">7</span>
-          </div>
-
-          {/* Slot 8 / Q: Kiếm Khí Skill */}
-          <div
-            className="slot-item skill-slot"
-            id="slot-8"
-            title={t("hotbar.skillSlotTitle")}
-            onClick={onSkill}
-          >
-            <span className="slot-key">8/Q</span>
-            <div className="item-icon icon-sword-aura"></div>
-          </div>
         </div>
 
-        {/* Middle: Active Martial Arts Cooldown & Skills Display */}
+        {/* Middle: normal attack, right-hand skill, and the sect skill bar */}
         <div className="martial-center">
           <div
             className="martial-skill-box l-click"
@@ -78,15 +95,49 @@ export function HotbarDock({
             <div className="skill-art art-sword"></div>
             <span className="click-badge">{t("hotbar.leftClick")}</span>
           </div>
+
           <div
-            className="martial-skill-box r-click"
-            id="skill-q-box"
-            title={t("hotbar.skillTitle")}
+            className="right-hand-slot"
+            id="right-hand-slot"
+            title={t("skills.rightHandTitle")}
             onClick={onSkill}
           >
-            <div className="skill-art art-aura"></div>
-            <span className="click-badge">{t("hotbar.rightClickQ")}</span>
+            <span className="right-hand-glyph">{selectedSkill?.glyph || "?"}</span>
+            <span className="click-badge">{t("skills.rightClickCast")}</span>
           </div>
+
+          <div className="skill-bar" id="skill-bar">
+            {skills.map((skill) => {
+              const remaining = cooldownLeft(skill.slot);
+              return (
+                <button
+                  key={skill.id}
+                  type="button"
+                  className={`skill-slot ${skill.slot === selectedSkillSlot ? "selected" : ""} ${
+                    remaining > 0 ? "cooling" : ""
+                  }`}
+                  title={`${t(skill.nameKey, undefined, skill.id)} · ${skill.mp} MP`}
+                  onClick={() => onSelectSkill?.(skill.slot)}
+                >
+                  <span className="skill-slot-glyph">{skill.glyph}</span>
+                  <span className="skill-slot-key">{(skillBinds[skill.slot] || "?").toUpperCase()}</span>
+                  {remaining > 0 && (
+                    <span className="skill-slot-cd">{Math.ceil(remaining / 1000)}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            className="skill-bind-btn"
+            title={t("skills.keybind.title")}
+            onClick={onOpenSkillKeys}
+          >
+            {t("skills.keybind.short")}
+          </button>
+
           <div className="martial-text-label">
             <div className="martial-name">{t("hotbar.martialName")}</div>
             <div className="martial-sub">{t("hotbar.martialSub")}</div>

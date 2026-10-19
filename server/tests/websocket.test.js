@@ -209,7 +209,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({
       type: "player_attack",
       payload: {
-        skill: "kiem_khi",
+        skill: "la_han_quyen",
         x: 5300,
         y: 5100,
         facingRight: true
@@ -218,7 +218,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     const attackBroadcast = await client2.waitFor((m) => m.type === "player_attacked");
     assert.equal(attackBroadcast.payload.id, "usr_hero1");
-    assert.equal(attackBroadcast.payload.skill, "kiem_khi");
+    assert.equal(attackBroadcast.payload.skill, "la_han_quyen");
 
     // Test chat broadcast: Client 2 chats -> Both receive player_chat
     client2.send({
@@ -375,25 +375,70 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client.send({ type: "player_join", payload: { id: "usr_mp1", token: "test-token", characterId: "char_mp_1", username: "Mp1", x: 640, y: 620 } });
     await client.waitFor((m) => m.type === "init_world");
 
-    // Each cast spends 15 MP from the server-owned pool (level 1 -> maxMp 60).
-    // Casts are spaced past the anti-spam cooldown so each one is accepted.
-    for (const expected of [45, 30, 15, 0]) {
-      client.send({ type: "player_attack", payload: { skill: "kiem_khi", x: 640, y: 620, facingRight: true } });
-      const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === expected);
+    // Each cast spends that skill's MP from the server-owned pool (level 1 -> maxMp 60).
+    // Distinct skills are used so their individual cooldowns never block the next cast.
+    const casts = [
+      { skill: "la_han_quyen", mp: 55 },
+      { skill: "ca_diep_thoai", mp: 48 },
+      { skill: "vi_da_quyen", mp: 36 },
+      { skill: "dai_tu_di_chuong", mp: 18 },
+      { skill: "hue_nhan_chu", mp: 3 }
+    ];
+    for (const step of casts) {
+      client.send({ type: "player_attack", payload: { skill: step.skill, x: 640, y: 620, facingRight: true } });
+      const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === step.mp);
       assert.equal(mp.payload.maxMp, 60);
       await new Promise((resolve) => setTimeout(resolve, 320));
     }
 
-    // At 0 MP an unaffordable cast is refused: MP never goes negative
-    client.send({ type: "player_attack", payload: { skill: "kiem_khi", x: 640, y: 620, facingRight: true } });
+    // An unaffordable ultimate is refused: MP never goes negative
+    client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_thuong", x: 640, y: 620, facingRight: true } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     const lastMp = client.messages.filter((m) => m.type === "player_mp").at(-1);
-    assert.equal(lastMp.payload.mp, 0, "The refused cast spends nothing");
+    assert.equal(lastMp.payload.mp, 3, "The refused cast spends nothing");
 
     // A restore is clamped to the ceiling
     client.send({ type: "player_restore_mp", payload: { amount: 9999 } });
     const refilled = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 60);
     assert.equal(refilled.payload.maxMp, 60);
+
+    await client.close();
+  });
+
+  await t.test("Skill hits are damage-authoritative (client damage is ignored)", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: {
+        id: "usr_skilldmg",
+        token: "test-token",
+        characterId: "char_eco_1",
+        username: "SkillDmg",
+        x: 8400,
+        y: 6000,
+        attack: 40,
+        critRate: 0
+      }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    // A hit without a preceding cast is ignored: damage cannot be minted freely.
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(
+      client.messages.filter((m) => m.type === "enemy_hit" && m.payload.damage > 0).length,
+      0,
+      "an uncast skill hit is dropped"
+    );
+
+    // After a real cast the server recomputes the damage from the catalog.
+    client.send({ type: "player_attack", payload: { skill: "la_han_quyen", x: 8400, y: 6000, facingRight: true } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    const hit = await client.waitFor(
+      (m) => m.type === "enemy_hit" && m.payload.id === 0 && m.payload.damage > 0
+    );
+    assert.ok(hit.payload.damage < 9999, "the server ignored the client-reported damage");
+    assert.ok(hit.payload.damage <= 120, "damage stays within the skill's plausible range");
 
     await client.close();
   });

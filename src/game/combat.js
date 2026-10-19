@@ -1,10 +1,14 @@
 import * as Phaser from "phaser";
 import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillMpCost } from "./skills.js";
+import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
+import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
+import { playSkillCastVfx, playSkillImpactVfx } from "./skillVfx.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack } from "./pvp.js";
 import { computeDamage } from "./damage.js";
+import { bridge, EVENTS } from "./bridge.js";
+import { translate } from "../i18n/translator.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -72,10 +76,26 @@ export class CombatSystem {
     this.onStateChange = onStateChange;
 
     this.attackReady = true;
-    this.skillReady = true;
     this.drops = [];
+    /** Skill assigned to the right-hand slot (slot index into the sect kit). */
+    this.selectedSkillSlot = 0;
+    /** id -> timestamp (ms) the skill becomes castable again. */
+    this.skillCooldowns = new Map();
+    /** Active timed buffs: { stat, amount, until }. */
+    this.buffs = [];
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
+  }
+
+  /**
+   * The player's stats with active timed buffs applied. The server is told these
+   * numbers so its authoritative skill damage matches the client's prediction.
+   * @returns {Object}
+   */
+  getEffectiveStats() {
+    const now = this.scene?.time?.now ?? 0;
+    this.buffs = this.buffs.filter((buff) => buff.until > now);
+    return applyBuffsToStats(this.player.stats, this.buffs, now);
   }
 
   performAttack() {
@@ -150,67 +170,179 @@ export class CombatSystem {
     }
   }
 
+  /**
+   * The skill currently assigned to the right hand.
+   * @returns {Object|undefined}
+   */
+  getSelectedSkill() {
+    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.selectedSkillSlot);
+  }
+
+  /**
+   * Assign a skill slot to the right hand. Keys only select; the cast itself is
+   * the right mouse button.
+   * @param {number} slot
+   * @returns {boolean} whether the slot was assigned
+   */
+  selectSkill(slot) {
+    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
+    if (!skill) {
+      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
+      return false;
+    }
+    if (!skillUnlocked(skill, this.player.stats.level)) {
+      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      return false;
+    }
+    this.selectedSkillSlot = slot;
+    bridge.emit(EVENTS.SKILL_SELECTED, slot);
+    this.ui.addLog(`Tay phải: ${translate(skill.nameKey, undefined, skill.id)} (chuột phải để dùng).`);
+    return true;
+  }
+
+  /**
+   * Cast whatever skill is assigned to the right hand.
+   */
+  castSelectedSkill() {
+    this.performSkill();
+  }
+
   performSkill() {
-    if (!this.skillReady) return;
-    const cost = skillMpCost("kiem_khi");
-    if (this.player.stats.mp < cost) {
-      this.ui.addLog("Nội lực không đủ để thi triển Kiếm Khí.");
+    const skill = this.getSelectedSkill();
+    if (!skill) {
+      this.ui.addLog("Chưa gán chiêu thức vào tay phải.");
       return;
     }
+    const now = this.scene.time?.now ?? 0;
+    const readyAt = this.skillCooldowns.get(skill.id) || 0;
+    if (now < readyAt) {
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} còn ${Math.ceil((readyAt - now) / 1000)}s hồi.`);
+      return;
+    }
+    if (!skillUnlocked(skill, this.player.stats.level)) {
+      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      return;
+    }
+    const cost = skillMpCost(skill.id);
+    if (this.player.stats.mp < cost) {
+      this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
+      return;
+    }
+    this.skillCooldowns.set(skill.id, now + skill.cooldown);
+    if (cost > 0) this.player.stats.mp -= cost;
 
-    this.skillReady = false;
-    this.scene.time.delayedCall(1800, () => {
-      this.skillReady = true;
-    });
-
-    // Trigger martial focus & release animation
     this.player.playSkillMotion?.();
+    playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
+    playSkillCastVfx(this.scene, this.player, skill);
 
-    // Predict the cost locally; the server spends it authoritatively and streams
-    // the resulting MP back (a refused cast resyncs this number).
-    this.player.stats.mp -= cost;
-    playTone(420, 0.18, "triangle", 0.035);
-
-    // Broadcast skill to other players via network
     this.scene.networkClient?.sendAttack?.({
-      skill: "kiem_khi",
+      skill: skill.id,
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
       facingRight: this.player.visual.scaleX >= 0
     });
 
-    const ringBase = toIso(this.player.x, this.player.y);
-    const ring = this.scene.add
-      .circle(ringBase.x, ringBase.y, 24, 0x80d7e9, 0.2)
-      .setStrokeStyle(4, 0xb8e9f0, 0.9)
-      .setDepth(isoDepth(this.player.x, this.player.y) + 5);
-
-    this.scene.tweens.add({
-      targets: ring,
-      scale: 4,
-      alpha: 0,
-      duration: 380,
-      onComplete: () => ring.destroy()
+    bridge.emit(EVENTS.SKILL_CAST, {
+      slot: skill.slot,
+      skillId: skill.id,
+      cooldown: skill.cooldown,
+      readyAt: this.skillCooldowns.get(skill.id)
     });
 
+    this.applySkill(skill, now);
+    this.ui.updateHud(this.player.stats);
+  }
+
+  /**
+   * Resolve a cast against the world: self buffs/heals, or damage and control on
+   * the nearest enemy / an area around the hero.
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySkill(skill, now) {
+    if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
+      this.applySelfEffects(skill, now);
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} đã thi triển.`);
+      return;
+    }
+
+    const alive = this.enemyManager.getAlive();
+    const inRadius = (wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
+    const targets = skill.radius > 0
+      ? alive.filter((wolf) => inRadius(wolf) <= skill.radius)
+      : (() => {
+          const nearest = alive
+            .filter((wolf) => inRadius(wolf) <= skill.range)
+            .sort((a, b) => inRadius(a) - inRadius(b))[0];
+          return nearest ? [nearest] : [];
+        })();
+
+    if (!targets.length) {
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tung ra, nhưng không trúng kẻ địch.`);
+      return;
+    }
+
+    const attacker = applyBuffsToStats(this.player.stats, this.buffs, now);
     let hits = 0;
     let anyCrit = false;
-    this.enemyManager.getAlive().forEach((wolf) => {
-      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < 145) {
-        const result = computeDamage(this.player, wolf, Math.random, { skillMult: 1.4 });
+
+    for (const wolf of targets) {
+      const result = computeSkillDamage(skill, attacker, wolf, Math.random);
+      if (result.damage > 0) {
         if (result.crit) anyCrit = true;
-        this.damageEnemy(wolf, result.damage, result.crit);
+        this.damageEnemy(wolf, result.damage, result.crit, { skill: skill.id });
         hits++;
       }
-    });
-
-    if (hits > 0) {
-      const critText = anyCrit ? " (Chí mạng!)" : "";
-      this.ui.addLog(`Kiếm Khí quét trúng ${hits} mục tiêu!${critText}`);
-    } else {
-      this.ui.addLog("Kiếm Khí tung ra, nhưng không trúng kẻ địch.");
+      this.applySkillEffectsToEnemy(wolf, skill, now);
     }
-    this.ui.updateHud(this.player.stats);
+
+    const critText = anyCrit ? " (Chí mạng!)" : "";
+    this.ui.addLog(
+      `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!${critText}`
+    );
+  }
+
+  /**
+   * Apply a skill's timed effects to the caster (buff, heal).
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySelfEffects(skill, now) {
+    for (const effect of skill.effects || []) {
+      if (effect.kind === "buff") {
+        this.buffs.push({
+          stat: effect.stat,
+          amount: effect.amount,
+          until: now + effect.duration
+        });
+      } else if (effect.kind === "heal") {
+        const amount = Math.round((effect.amount || 0) + (this.player.stats.maxHp * (effect.pctMaxHp || 0)));
+        if (amount > 0) {
+          if (this.scene.networkClient?.isConnected) {
+            this.scene.networkClient.sendHeal({ amount });
+          } else {
+            this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a skill's timed effects to a struck enemy (slow, stun).
+   * @param {Object} wolf
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySkillEffectsToEnemy(wolf, skill, now) {
+    for (const effect of skill.effects || []) {
+      if (effect.kind === "slow") {
+        wolf.slowPct = effect.pct;
+        wolf.slowUntil = now + effect.duration;
+      } else if (effect.kind === "stun") {
+        wolf.stunUntil = now + effect.duration;
+      }
+    }
   }
 
   /**
@@ -300,7 +432,7 @@ export class CombatSystem {
     );
   }
 
-  damageEnemy(wolf, damage, isCrit = false) {
+  damageEnemy(wolf, damage, isCrit = false, meta = {}) {
     if (wolf.isDead) return;
 
     wolf.takeHit(damage);
@@ -309,10 +441,15 @@ export class CombatSystem {
     this.showFloatText(wolf.x, wolf.y - 30, floatText, floatColor);
     playTone(isCrit ? 180 : 120, 0.06, "square", isCrit ? 0.025 : 0.012);
 
-    // The server owns the wolf's health and position, so a hit reports damage only
+    const skill = meta.skill ? skillById(meta.skill) : null;
+    if (skill) playSkillImpactVfx(this.scene, wolf.x, wolf.y, skill);
+
+    // The server owns the wolf's health: a skill hit names the skill so the server
+    // can recompute the damage itself; a plain attack still reports its estimate.
     this.scene.networkClient?.sendEnemyHit?.({
       id: wolf.id,
-      damage
+      damage,
+      ...(meta.skill ? { skill: meta.skill } : {})
     });
 
     if (wolf.hp <= 0) {
