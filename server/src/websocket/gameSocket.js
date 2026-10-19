@@ -288,6 +288,8 @@ export class GameSocketManager {
       direction: payload.direction === "left" ? "left" : "right",
       stance: payload.stance === "side" ? "side" : "front",
       equipment: sanitizeEquipment(payload.equipment),
+      // Character gender drives the peer's rig silhouette ("male" | "female").
+      gender: payload.gender === "female" ? "female" : "male",
       level: clampNum(payload.level, 1, 150, 1),
       // Server-authoritative health. The join snapshot seeds it; every later
       // change is driven by the server (bite, PvP hit, heal), never by a raw
@@ -348,6 +350,7 @@ export class GameSocketManager {
       direction: player.direction,
       stance: player.stance,
       equipment: player.equipment,
+      gender: player.gender,
       level: player.level,
       hp: player.hp,
       maxHp: player.maxHp,

@@ -56,13 +56,13 @@ describe("Character API Test Suite", () => {
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Tiêu Phong", gender: "nu", appearance: 2 })
+      body: JSON.stringify({ name: "Tiêu Phong", gender: "female", appearance: 2 })
     });
     assert.equal(res.status, 201);
     const json = await res.json();
     assert.equal(json.success, true);
     assert.equal(json.data.character.name, "Tiêu Phong");
-    assert.equal(json.data.character.gender, "nu");
+    assert.equal(json.data.character.gender, "female");
     assert.equal(json.data.character.appearance, 2);
     assert.equal(json.data.character.level, 1);
     assert.equal(json.data.character.userId, userId);
@@ -70,17 +70,17 @@ describe("Character API Test Suite", () => {
 
     const list = await fetch(`${baseUrl}/users/${userId}/characters`).then((r) => r.json());
     assert.equal(list.data.characters.length, 1);
-    assert.equal(list.data.characters[0].gender, "nu");
+    assert.equal(list.data.characters[0].gender, "female");
   });
 
-  test("POST defaults gender to 'nam' when omitted (400 on invalid)", async () => {
+  test("POST defaults gender to 'male' when omitted (400 on invalid)", async () => {
     const userId = nextUser();
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Vô Danh" })
     }).then((r) => r.json());
-    assert.equal(created.data.character.gender, "nam");
+    assert.equal(created.data.character.gender, "male");
 
     const bad = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
@@ -216,11 +216,11 @@ describe("CharacterDatabase schema migration", () => {
 
     const [row] = db.listByUser("u1");
     assert.equal(row.name, "Cũ");
-    assert.equal(row.gender, "nam");
+    assert.equal(row.gender, "male");
     assert.equal(row.appearance, 0);
 
-    const created = db.create("u1", "Mới", "nu", 3);
-    assert.equal(created.gender, "nu");
+    const created = db.create("u1", "Mới", "female", 3);
+    assert.equal(created.gender, "female");
     assert.equal(created.appearance, 3);
 
     db.close();

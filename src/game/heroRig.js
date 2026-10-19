@@ -15,6 +15,7 @@
  */
 
 import { HERO_DIRECTIONS } from "./heroDirections.js";
+import { normalizeGender } from "./gender.js";
 
 /** Equipment slot colours (opaque ids; the rig only fills the worn slots). */
 const EQUIP_COLORS = {
@@ -59,6 +60,21 @@ const C = {
   shoe: 0x241a33
 };
 
+/** Female palette: a rose gown with a light lining and a gold sash. */
+const F = {
+  robe: 0xd75a8f,
+  robeDark: 0xa93b68,
+  robeEdge: 0x78244a,
+  lining: 0xf7d3e3,
+  sash: 0xe8c25a,
+  sashEdge: 0xa8852f,
+  skin: 0xf8cfa9,
+  skinEdge: 0xd59c70,
+  hair: 0x1a1210,
+  hairHi: 0x37251d,
+  shoe: 0x6a2f4a
+};
+
 /* ------------------------------------------------------------------ *
  * Primitives
  * ------------------------------------------------------------------ */
@@ -99,18 +115,28 @@ export function poseFor(direction) {
   return { side, back, depth: Math.abs(side) };
 }
 
+/** Shoulder width per gender: [head-on, side-on] half-widths. */
+const SHOULDER = {
+  male: { front: 9, side: 5 },
+  female: { front: 7.4, side: 4.6 }
+};
+
 /** Shoulder half-width for the current pose (shrinks as the body turns side-on). */
-const shoulderHalf = (pose) => lerp(9, 5, pose.depth);
+const shoulderHalf = (pose, gender = "male") => {
+  const s = SHOULDER[normalizeGender(gender)];
+  return lerp(s.front, s.side, pose.depth);
+};
 
 /**
  * Joint anchors the limbs pivot around when walking, in rig space. Shared by the
  * body builder and the view's animator so the swing stays attached to the body.
  * @param {ReturnType<typeof poseFor>} pose
+ * @param {"male"|"female"} [gender]
  * @returns {{legL:{x:number,y:number}, legR:{x:number,y:number}, armL:{x:number,y:number}, armR:{x:number,y:number}}}
  */
-export function limbPivots(pose) {
+export function limbPivots(pose, gender = "male") {
   const { side, depth } = pose;
-  const sh = shoulderHalf(pose);
+  const sh = shoulderHalf(pose, gender);
   const spread = lerp(4.2, 1.4, depth);
   const bump = side === 0 ? 0 : 1.2;
   const sg = Math.sign(side);
@@ -268,9 +294,167 @@ function head(parts, pose) {
   return { x, rx };
 }
 
-function sword(parts, pose) {
-  const sh = shoulderHalf(pose);
-  const hx = sh + 2.5; // right hand
+/* ------------------------------------------------------------------ *
+ * Female body (long gown, flowing hair, slimmer silhouette)
+ * ------------------------------------------------------------------ */
+
+/** Slim stockinged legs + slippers, mostly hidden under the gown hem. */
+function legsFemale(parts, pose) {
+  const { side } = pose;
+  const pivots = limbPivots(pose, "female");
+  const order = side === 0 ? [-1, 1] : [Math.sign(side), -Math.sign(side)];
+
+  for (const s of order) {
+    const g = s < 0 ? "legL" : "legR";
+    const hipX = (s < 0 ? pivots.legL : pivots.legR).x;
+    const kneeX = hipX + side * 0.8;
+    const ankleX = hipX + side * 0.4;
+    // Silken leg under the gown
+    parts.push(taper(hipX, -39, 5.4, kneeX, -20, 4.2, F.robeDark, { stroke: F.robeEdge, lineWidth: 0.6, group: g }));
+    parts.push(taper(kneeX, -20, 4.6, ankleX, -5, 3.8, F.skin, { stroke: F.skinEdge, lineWidth: 0.5, group: g }));
+    // Embroidered slipper
+    parts.push(ell(ankleX + side * 1.2, -3, 7.4, 3.4, F.shoe, { group: g }));
+  }
+}
+
+/** Long back panel of the gown, flaring from the shoulders to a hem near the feet. */
+function robeFemale(parts, pose) {
+  const { back, side, depth } = pose;
+  const x = side * 0.8;
+  const w = shoulderHalf(pose, "female");
+  const hipW = lerp(7.6, 5, depth);
+  const flare = lerp(6.5, 11, back);
+
+  parts.push(poly(
+    [[x - w, -58], [x + w, -58], [x + hipW + flare, -9], [x - hipW - flare, -9]],
+    F.robeDark, { stroke: F.robeEdge, lineWidth: 1 }
+  ));
+  // Lighter inner lining down the middle
+  parts.push(poly(
+    [[x - w * 0.45, -56], [x + w * 0.45, -56], [x + 4, -13], [x - 4, -13]],
+    F.robe, { alpha: 0.4 }
+  ));
+  // Embroidered hem band
+  parts.push(poly(
+    [[x - hipW - flare + 1, -13], [x + hipW + flare - 1, -13], [x + hipW + flare, -9], [x - hipW - flare, -9]],
+    F.lining, { alpha: 0.35 }
+  ));
+}
+
+/** Slim arms with a flowing bell sleeve; keeps the arm groups for the walk cycle. */
+function armsFemale(parts, pose) {
+  const { side } = pose;
+  const pivots = limbPivots(pose, "female");
+  const order = side === 0 ? [-1, 1] : [Math.sign(side), -Math.sign(side)];
+
+  for (const s of order) {
+    const g = s < 0 ? "armL" : "armR";
+    const shoulderX = (s < 0 ? pivots.armL : pivots.armR).x;
+    const elbowX = shoulderX + side * 0.4;
+    const wristX = shoulderX + side * 0.8;
+    // Shoulder cap
+    parts.push(circ(shoulderX, -57, 3, F.robe, { stroke: F.robeEdge, lineWidth: 0.8 }));
+    // Upper arm
+    parts.push(taper(shoulderX, -56, 4.8, elbowX, -47, 3.8, F.robe, { stroke: F.robeEdge, lineWidth: 0.6, group: g }));
+    // Wide bell sleeve
+    parts.push(taper(elbowX, -47, 5.6, wristX, -39, 7.4, F.robe, { stroke: F.robeEdge, lineWidth: 0.7, group: g }));
+    parts.push(taper(elbowX, -47, 3, wristX, -39, 4.4, F.lining, { alpha: 0.5, group: g }));
+    // Hand
+    parts.push(circ(wristX, -36, 1.9, F.skin, { stroke: F.skinEdge, lineWidth: 0.5, group: g }));
+  }
+}
+
+/** Cinched-waist bodice, gold sash and a hint of a bust. */
+function torsoFemale(parts, pose) {
+  const { back, side, depth } = pose;
+  const x = side * 0.8;
+  const sh = shoulderHalf(pose, "female");
+  const waist = lerp(4.6, 3.4, depth);
+  const hip = lerp(7.6, 5, depth);
+
+  // Sloped-shoulder bodice, cinched waist, flared hips
+  parts.push(poly(
+    [[x - sh, -60], [x + sh, -60], [x + sh - 0.4, -54], [x + waist, -44],
+      [x + hip, -38], [x - hip, -38], [x - waist, -44], [x - sh + 0.4, -54]],
+    F.robe, { stroke: F.robeEdge, lineWidth: 1 }
+  ));
+
+  // Gold sash at the waist
+  parts.push(rect(x, -43.5, waist * 2 + 1.2, 3, F.sash));
+  parts.push(line(x - waist, -42, x + waist, -42, F.sashEdge, { lineWidth: 0.6 }));
+
+  if (back < 0.75) {
+    // Crossed collar
+    parts.push(poly([[x - sh + 1, -60], [x + sh - 1, -60], [x, -51]], F.lining));
+    parts.push(poly([[x - sh + 1, -60], [x, -60], [x, -51]], F.robeDark, { alpha: 0.5 }));
+    // Bust hint
+    parts.push(ell(x - 3.2, -53, 4.6, 4, F.robe, { stroke: F.robeEdge, lineWidth: 0.5 }));
+    parts.push(ell(x + 3.2, -53, 4.6, 4, F.robe, { stroke: F.robeEdge, lineWidth: 0.5 }));
+    // Sash knot and hanging ribbons
+    parts.push(ell(x, -43.5, 3.4, 3, F.sash, { stroke: F.sashEdge, lineWidth: 0.5 }));
+    parts.push(taper(x - 0.6, -42, 1.6, x - 3, -35, 1.2, F.sash));
+    parts.push(taper(x + 0.6, -42, 1.6, x + 3, -35, 1.2, F.sash));
+  }
+
+  return { x, sh, aw: hip * 1.9 };
+}
+
+/** Smaller face, long flowing hair and a jade hairpin. */
+function headFemale(parts, pose) {
+  const { back, side, depth } = pose;
+  const x = side * 1.6;
+  const rx = lerp(5.4, 4.7, depth);
+  const faceVisible = back < 0.6;
+
+  // Neck
+  parts.push(rect(x, -62, 4.4, 6, F.skinEdge));
+
+  // Hair mass behind the head, flowing down the back
+  parts.push(ell(x, -73, rx * 2 + 3, 15, F.hair));
+  parts.push(poly(
+    [[x - rx - 1, -76], [x + rx + 1, -76], [x + rx + 2, -52], [x - rx - 2, -52]],
+    F.hair
+  ));
+
+  if (faceVisible) {
+    // Face + jaw
+    parts.push(poly(
+      [[x - rx, -75], [x + rx, -75], [x + rx - 1.2, -67.5], [x, -64.5], [x - rx + 1.2, -67.5]],
+      F.skin, { stroke: F.skinEdge, lineWidth: 0.5 }
+    ));
+    parts.push(ell(x, -74, rx * 2 - 0.4, 12, F.skin));
+
+    const eo = side * 1.8;
+    parts.push(ell(x - 2 + eo, -73.5, 2.2, 2.6, C.eye));
+    parts.push(ell(x + 2 + eo, -73.5, 2.2, 2.6, C.eye));
+    // Lashes
+    parts.push(line(x - 3.6 + eo, -76.4, x - 0.9 + eo, -76.1, F.hair, { lineWidth: 0.7 }));
+    parts.push(line(x + 0.9 + eo, -76.1, x + 3.6 + eo, -76.4, F.hair, { lineWidth: 0.7 }));
+    // Lips
+    parts.push(line(x - 1 + eo, -69.3, x + 1 + eo, -69.3, 0xc23b56, { lineWidth: 0.7 }));
+    if (depth > 0.4) parts.push(line(x + eo, -72.5, x + eo + side * 1.2, -71.4, F.skinEdge, { lineWidth: 0.6 }));
+  }
+
+  // Hair cap over the crown
+  parts.push(poly(
+    [[x - rx - 1, -73], [x - rx - 1, -78], [x, -82.5], [x + rx + 1, -78], [x + rx + 1, -73],
+      [x + rx - 1.4, -77.5], [x, -80.5], [x - rx + 1.4, -77.5]],
+    F.hair
+  ));
+  // Long sidelocks framing the face
+  parts.push(taper(x - rx + 0.3, -78, 2.2, x - rx - 0.6, -58, 1.6, F.hair));
+  parts.push(taper(x + rx - 0.3, -78, 2.2, x + rx + 0.6, -58, 1.6, F.hair));
+  // Crown highlight
+  parts.push(ell(x, -80, rx * 1.3, 4, F.hairHi, { alpha: 0.6 }));
+  // Jade hairpin with a dangling bead
+  parts.push(rect(x + rx - 1, -84, 4.6, 1.6, C.jade, { stroke: C.jadeEdge, lineWidth: 0.5 }));
+  parts.push(circ(x + rx + 1, -85, 1.1, C.jade));
+
+  return { x, rx };
+}
+
+function sword(parts, pose, gender = "male") {
+  const hx = limbPivots(pose, gender).armR.x + 1.5; // right hand
   const g = "armR"; // the sword rides the right arm
   parts.push(circ(hx, -37.5, 1.6, C.gold, { group: g }));
   parts.push(rect(hx, -35.5, 6.5, 2.2, C.gold, { stroke: C.goldEdge, lineWidth: 0.5, group: g }));
@@ -282,8 +466,8 @@ function sword(parts, pose) {
  * Equipment layers
  * ------------------------------------------------------------------ */
 
-function equipHelmet(parts, pose, headAnchor) {
-  const { x, rx } = headAnchor;
+function equipHelmet(parts, pose, ctx) {
+  const { x, rx } = ctx.head;
   parts.push(poly(
     [[x - rx - 1.2, -77], [x - rx - 1.2, -82], [x - rx + 2, -86], [x, -89.5],
       [x + rx - 2, -86], [x + rx + 1.2, -82], [x + rx + 1.2, -77]],
@@ -293,8 +477,8 @@ function equipHelmet(parts, pose, headAnchor) {
   parts.push(poly([[x - 1.6, -89.5], [x + 1.6, -89.5], [x, -94]], C.gold, { stroke: C.goldEdge, lineWidth: 0.6 }));
 }
 
-function equipArmor(parts, pose, t) {
-  const { x, sh, aw } = t;
+function equipArmor(parts, pose, ctx) {
+  const { x, sh, aw } = ctx.torso;
   // Chest plate + shoulder pads
   parts.push(poly(
     [[x - sh + 0.5, -59], [x - sh - 2.5, -53], [x - sh + 0.5, -47], [x - aw / 2 + 1, -41],
@@ -304,9 +488,9 @@ function equipArmor(parts, pose, t) {
   parts.push(ell(x, -51, 6, 5, C.gold, { alpha: 0.9 }));
 }
 
-function equipBoots(parts, pose) {
+function equipBoots(parts, pose, ctx) {
   const { side } = pose;
-  const pivots = limbPivots(pose);
+  const pivots = limbPivots(pose, ctx.gender);
   for (const s of [-1, 1]) {
     const g = s < 0 ? "legL" : "legR";
     const hipX = (s < 0 ? pivots.legL : pivots.legR).x;
@@ -316,13 +500,13 @@ function equipBoots(parts, pose) {
   }
 }
 
-function equipAccessory(parts, pose) {
-  const hx = -(shoulderHalf(pose) + 1.5);
+function equipAccessory(parts, pose, ctx) {
+  const hx = limbPivots(pose, ctx.gender).armL.x - 0.5;
   parts.push(circ(hx, -37.5, 2, EQUIP_COLORS.accessory, { stroke: C.jadeEdge, lineWidth: 0.7, group: "armL" }));
 }
 
-function equipWeapon(parts, pose) {
-  const hx = shoulderHalf(pose) + 2.5;
+function equipWeapon(parts, pose, ctx) {
+  const hx = limbPivots(pose, ctx.gender).armR.x + 1.5;
   parts.push(line(hx + 2, -33.5, hx + 5, -7, EQUIP_COLORS.weapon, { lineWidth: 2, stroke: C.steelEdge, group: "armR" }));
 }
 
@@ -340,24 +524,36 @@ const EQUIP_DRAW = {
 
 /**
  * Build the ordered draw list for the hero (back to front).
- * @param {{direction?:number, equipment?:Record<string, string|null|boolean>}} [opts]
+ * @param {{direction?:number, equipment?:Record<string, string|null|boolean>, gender?:"male"|"female"}} [opts]
  * @returns {Array<Object>} primitives
  */
 export function buildHero(opts = {}) {
+  const gender = normalizeGender(opts.gender);
   const pose = poseFor(opts.direction ?? 0);
   const equipment = opts.equipment || {};
   const out = [];
 
-  coat(out, pose);
-  legs(out, pose);
-  arms(out, pose);
-  const t = torso(out, pose);
-  const headAnchor = head(out, pose);
-  sword(out, pose);
+  let torsoAnchor;
+  let headAnchor;
+  if (gender === "female") {
+    legsFemale(out, pose);
+    robeFemale(out, pose);
+    armsFemale(out, pose);
+    torsoAnchor = torsoFemale(out, pose);
+    headAnchor = headFemale(out, pose);
+  } else {
+    coat(out, pose);
+    legs(out, pose);
+    arms(out, pose);
+    torsoAnchor = torso(out, pose);
+    headAnchor = head(out, pose);
+  }
+  sword(out, pose, gender);
 
+  const ctx = { torso: torsoAnchor, head: headAnchor, gender };
   for (const slot of EQUIP_SLOT_ORDER) {
     if (!equipment[slot]) continue;
-    EQUIP_DRAW[slot]?.(out, pose, slot === "helmet" ? headAnchor : t);
+    EQUIP_DRAW[slot]?.(out, pose, ctx);
   }
 
   return out;

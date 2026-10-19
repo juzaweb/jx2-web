@@ -1,4 +1,5 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
+import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
@@ -33,6 +34,7 @@ export class HeroRigView {
     this.scene = scene;
     this.container = scene.add.container(0, footOffsetY);
     this.key = null;
+    this.gender = "male";
     this.pose = poseFor(0);
     /** group name -> [{ obj, baseX, baseY }] */
     this.groups = {};
@@ -43,16 +45,19 @@ export class HeroRigView {
    * change. Equipment is the slot -> item map used by the game (falsy = empty).
    * @param {number} direction
    * @param {Record<string, string|null|undefined>} [equipment]
+   * @param {"male"|"female"} [gender]
    */
-  set(direction, equipment = {}) {
-    const key = `${direction}|${slotSignature(equipment)}`;
+  set(direction, equipment = {}, gender = "male") {
+    const g = normalizeGender(gender);
+    const key = `${g}|${direction}|${slotSignature(equipment)}`;
     if (key === this.key) return;
     this.key = key;
+    this.gender = g;
     this.pose = poseFor(direction);
 
     this.container.removeAll(true);
     this.groups = {};
-    for (const primitive of buildHero({ direction, equipment })) {
+    for (const primitive of buildHero({ direction, equipment, gender: g })) {
       const child = createPrimitive(this.scene, primitive);
       if (!child) continue;
       this.container.add(child);
@@ -75,7 +80,7 @@ export class HeroRigView {
   animate(phase) {
     const swing = Math.sin(phase);
     const { depth } = this.pose;
-    const pivots = limbPivots(this.pose);
+    const pivots = limbPivots(this.pose, this.gender);
 
     const legAngle = swing * LEG_ANGLE * depth;
     const armAngle = swing * ARM_ANGLE * Math.max(depth, ARM_DEPTH_FLOOR);

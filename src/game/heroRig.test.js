@@ -42,4 +42,21 @@ describe("buildHero", () => {
     const base = buildHero({ direction: 0 }).length;
     expect(buildHero({ direction: 0, equipment: { helmet: null, armor: undefined } }).length).toBe(base);
   });
+
+  it("draws a distinct non-empty female rig for every direction", () => {
+    for (let d = 0; d < HERO_DIRECTIONS; d++) {
+      const female = buildHero({ direction: d, gender: "female" });
+      expect(female.length).toBeGreaterThan(10);
+      expect(female.some((p) => p.group === "legR")).toBe(true);
+      expect(female.some((p) => p.group === "armR")).toBe(true);
+      // The female body is not simply a recolour of the male one.
+      expect(female).not.toEqual(buildHero({ direction: d, gender: "male" }));
+    }
+  });
+
+  it("falls back to the male rig for unknown genders", () => {
+    const male = buildHero({ direction: 1, gender: "male" });
+    expect(buildHero({ direction: 1, gender: "other" })).toEqual(male);
+    expect(buildHero({ direction: 1 })).toEqual(male);
+  });
 });
