@@ -16,6 +16,7 @@ vi.mock("phaser", () => ({
 }));
 
 import { NetworkClient } from "./networkClient.js";
+import { WORLD_SCALE, WORLD_SPREAD } from "./worldConfig.js";
 import { JiangHuScene } from "./game.js";
 import { setQuantities, getQuantity } from "./items.js";
 
@@ -175,7 +176,7 @@ describe("JiangHuScene.useItem quantity", () => {
 
     JiangHuScene.prototype.useItem.call(scene, 4);
 
-    expect(setPosition).toHaveBeenCalledWith(640, 620);
+    expect(setPosition).toHaveBeenCalledWith(640 * WORLD_SCALE * WORLD_SPREAD, 620 * WORLD_SCALE * WORLD_SPREAD);
     expect(getQuantity("hoi-thanh-phu")).toBe(0);
   });
 });

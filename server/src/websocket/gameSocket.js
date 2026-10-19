@@ -63,18 +63,18 @@ export const ENEMY_TICK_MS = 100;
 export const PLAYER_IFRAME_MS = 700;
 
 /** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
-export const PLAYER_SPAWN = { x: 640, y: 620 };
+export const PLAYER_SPAWN = { x: 6400, y: 6200 };
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
-  [840, 600],
-  [950, 670],
-  [1110, 590],
-  [1260, 650],
-  [1380, 590],
-  [760, 800],
-  [1050, 820],
-  [1320, 790]
+  [8400, 6000],
+  [9500, 6700],
+  [11100, 5900],
+  [12600, 6500],
+  [13800, 5900],
+  [7600, 8000],
+  [10500, 8200],
+  [13200, 7900]
 ];
 
 /**

@@ -8,13 +8,15 @@
  * Phaser/transport so the rules can be unit tested.
  */
 
+import { WORLD_POSITION_SCALE as POS, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+
 /** Aggro/chase/home tuning shared by the server tick. */
 export const ENEMY_TUNING = {
-  aggroRange: 210,
-  chaseSpeed: 43,
-  stopDistance: 52,
-  idleSpeed: 22,
-  homeEpsilon: 10
+  aggroRange: 210 * WORLD_SCALE,
+  chaseSpeed: 43 * POS * WORLD_SPEED_SCALE,
+  stopDistance: 52 * WORLD_SCALE,
+  idleSpeed: 22 * POS * WORLD_SPEED_SCALE,
+  homeEpsilon: 10 * WORLD_SCALE
 };
 
 /**
@@ -30,7 +32,7 @@ export const WOLF_COMBAT = {
 
 /** How close a wolf must be to bite, and how often it may (both client & server). */
 export const BITE_TUNING = {
-  range: 55,
+  range: 55 * WORLD_SCALE,
   cooldownMs: 1400
 };
 

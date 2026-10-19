@@ -11,6 +11,7 @@ vi.mock("phaser", () => ({
 
 import { Wolf } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
+import { ENEMY_TUNING } from "./enemyAi.js";
 
 /** Minimal Phaser scene stub: the wolf only needs sprites, containers and a clock. */
 const createScene = ({ isConnected = false } = {}) => {
@@ -106,18 +107,18 @@ describe("Wolf movement is server-owned", () => {
 
   it("chases the player itself when no server owns the roster", () => {
     const { scene, wolf } = createWolf({ isConnected: false });
-    const target = player(940, 600);
+    const target = player(840 + ENEMY_TUNING.stopDistance + 120, 600);
     const bites = vi.fn();
 
     for (let frame = 0; frame < 240; frame++) {
       wolf.update(frame * 16, 16, target, bites);
     }
 
-    // 43 px/s closes the 48 px gap and then holds at the stop distance
+    // 43 px/s closes the gap and then holds at the stop distance
     const distance = Math.hypot(scene.sprite.x - target.x, scene.sprite.y - target.y);
     expect(scene.sprite.x).toBeGreaterThan(840);
-    expect(distance).toBeLessThanOrEqual(53);
-    expect(distance).toBeGreaterThanOrEqual(51);
+    expect(distance).toBeLessThanOrEqual(ENEMY_TUNING.stopDistance + 1);
+    expect(distance).toBeGreaterThanOrEqual(ENEMY_TUNING.stopDistance - 1);
     expect(bites).toHaveBeenCalled();
   });
 
@@ -161,13 +162,13 @@ describe("Wolf movement is server-owned", () => {
 
   it("does not slide back to its spawn when the server takes over", () => {
     const { scene, wolf } = createWolf({ isConnected: false });
-    const target = player(940, 600);
+    const target = player(840 + ENEMY_TUNING.stopDistance + 120, 600);
 
     for (let frame = 0; frame < 240; frame++) {
       wolf.update(frame * 16, 16, target, () => {});
     }
     const offlineX = scene.sprite.x;
-    expect(offlineX).toBeGreaterThan(880);
+    expect(offlineX).toBeGreaterThan(900);
 
     // The socket comes up before the first roster snapshot arrives: the wolf must
     // hold still rather than slide back to a position the server never claimed

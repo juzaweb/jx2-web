@@ -114,7 +114,8 @@ describe("UIBridgeAdapter minimap registration", () => {
 
     const city = { x0: 0, y0: 0, x1: 2200, y1: 1250 };
     const player = { x: 1100, y: 625 };
-    const spanX = (city.x1 - city.x0) / Math.sqrt(10);
+    const aspect = canvas.width / canvas.height;
+    const spanX = Math.sqrt((((city.x1 - city.x0) * (city.y1 - city.y0)) / 10) * aspect);
     // A blip on the east edge of the radar view.
     const edge = { x: player.x + spanX / 2, y: player.y, active: true, isDead: false };
 

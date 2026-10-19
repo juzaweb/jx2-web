@@ -6,14 +6,14 @@ const wolf = () => ({ id: 0, x: 840, y: 600, homeX: 840, homeY: 600 });
 
 test("Enemy AI suite", async (t) => {
   await t.test("chases the nearest player inside the aggro range", () => {
-    const near = { id: "near", x: 900, y: 600 };
-    const far = { id: "far", x: 1000, y: 600 };
+    const near = { id: "near", x: 840 + ENEMY_TUNING.stopDistance + 60, y: 600 };
+    const far = { id: "far", x: near.x + 80, y: 600 };
 
     assert.equal(nearestPlayerInRange(wolf(), [far, near]).id, "near");
 
     const next = stepEnemy(wolf(), [near], 100);
     // 43 px/s over 100 ms, straight toward the player (positions stay unrounded here)
-    assert.ok(Math.abs(next.x - 844.3) < 1e-9);
+    assert.ok(Math.abs(next.x - (840 + ENEMY_TUNING.chaseSpeed * 0.1)) < 1e-9);
     assert.equal(next.y, 600);
   });
 
@@ -45,11 +45,15 @@ test("Enemy AI suite", async (t) => {
     const away = { ...wolf(), x: 940, y: 600 };
 
     // 22 px/s: one second of idle walking, straight toward home
-    assert.deepEqual(stepEnemy(away, [], 1000), { x: 918, y: 600 });
-    assert.ok(Math.abs(stepEnemy({ ...away, x: 870 }, [], 300).x - 863.4) < 1e-9);
+    assert.deepEqual(stepEnemy(away, [], 1000), { x: 840, y: 600 });
+    const nearHomeX = 840 + ENEMY_TUNING.homeEpsilon + ENEMY_TUNING.idleSpeed * 0.3 + 20;
+    assert.ok(
+      Math.abs(stepEnemy({ ...away, x: nearHomeX }, [], 300).x - (nearHomeX - ENEMY_TUNING.idleSpeed * 0.3)) < 1e-9
+    );
 
     // Inside the home epsilon it stops moving, so an idle map broadcasts nothing
-    assert.deepEqual(stepEnemy({ ...away, x: 848 }, [], 1000), { x: 848, y: 600 });
+    const restingX = 840 + ENEMY_TUNING.homeEpsilon;
+    assert.deepEqual(stepEnemy({ ...away, x: restingX }, [], 1000), { x: restingX, y: 600 });
   });
 
   await t.test("a wolf is drawn to the same player on every client", () => {

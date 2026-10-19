@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { WorldManager, WORLD_CONFIG } from "./world.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
 import { Player } from "./player.js";
 import { EnemyManager } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
@@ -75,7 +76,7 @@ export class JiangHuScene extends Phaser.Scene {
       session?.user?.username ||
       initialName;
 
-    this.player = new Player(this, 640, 620, initialName);
+    this.player = new Player(this, 640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE, initialName);
     this.enemyManager = new EnemyManager(this);
     this.enemyManager.create([]);
 
@@ -544,7 +545,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (slot === 4) {
       // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
-      this.player.setPosition(640, 620);
+      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
@@ -674,13 +675,13 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   updateCameraZoom() {
-    // Reference resolution: 800 x 600 (classic JX2 viewport)
-    // In original JX2, character height is ~82px in a 600px tall frame (82/600 ~= 13.67%).
-    // Setting zoom proportional to frame height maintains the exact 13.67% character-to-frame ratio across all screens.
+    // The Biện Kinh map is now a large square city, so the camera keeps a wider
+    // view than the original 1:1 ratio: the player sees a generous slice of the
+    // city (matching the world map) instead of a cramped corner.
     const h = this.scale.height || 600;
     const w = this.scale.width || 800;
-    const targetZoom = Math.min(h / 600, w / 480);
-    const zoom = Phaser.Math.Clamp(targetZoom, 0.65, 4.0);
+    const targetZoom = Math.min(h / (700 * WORLD_SCALE), w / (600 * WORLD_SCALE));
+    const zoom = Phaser.Math.Clamp(targetZoom, 0.15, 3.0);
     this.cameras.main.setZoom(zoom);
   }
 
@@ -885,7 +886,7 @@ export class JiangHuScene extends Phaser.Scene {
       );
     } else {
       this.uiBridge.addLog("Bạn đã đặt chân đến Biện Kinh. Chúc hiệp khách hành tẩu bình an.", "system");
-      this.player.setPosition(640, 620);
+      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
     }
 
     this.saveGame(false);

@@ -38,7 +38,7 @@ export function CityMapModal({ isOpen, onClose }) {
         <h2>{t("cityMap.title")}</h2>
 
         <div className="city-map-view">
-          <canvas ref={canvasRef} width={800} height={460} className="city-map-canvas" />
+          <canvas ref={canvasRef} width={1000} height={1000} className="city-map-canvas" />
         </div>
 
         <div className="city-map-legend">

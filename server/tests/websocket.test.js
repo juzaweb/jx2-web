@@ -97,8 +97,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
         id: "usr_alice",
         username: "alice",
         displayName: "Hiệp Nữ Alice",
-        x: 640,
-        y: 620,
+        x: 6400,
+        y: 6200,
         level: 5
       }
     });
@@ -122,8 +122,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
         id: "usr_hero1",
         username: "Hero1",
         displayName: "Độc Cô Cầu Bại",
-        x: 500,
-        y: 500
+        x: 5000,
+        y: 5000
       }
     });
     const init1 = await client1.waitFor((m) => m.type === "init_world");
@@ -136,8 +136,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
         id: "usr_hero2",
         username: "Hero2",
         displayName: "Lệnh Hồ Xung",
-        x: 550,
-        y: 520
+        x: 5500,
+        y: 5200
       }
     });
 
@@ -154,8 +154,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({
       type: "player_move",
       payload: {
-        x: 530,
-        y: 510,
+        x: 5300,
+        y: 5100,
         vx: 120,
         vy: 0,
         direction: "right",
@@ -165,8 +165,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     const moveBroadcast = await client2.waitFor((m) => m.type === "player_moved");
     assert.equal(moveBroadcast.payload.id, "usr_hero1");
-    assert.equal(moveBroadcast.payload.x, 530);
-    assert.equal(moveBroadcast.payload.y, 510);
+    assert.equal(moveBroadcast.payload.x, 5300);
+    assert.equal(moveBroadcast.payload.y, 5100);
     assert.equal(moveBroadcast.payload.stance, "side");
 
     // Test attack broadcast: Client 1 attacks -> Client 2 receives player_attacked
@@ -174,8 +174,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
       type: "player_attack",
       payload: {
         skill: "kiem_khi",
-        x: 530,
-        y: 510,
+        x: 5300,
+        y: 5100,
         facingRight: true
       }
     });
@@ -217,8 +217,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
       payload: {
         id: "usr_eq1",
         username: "Eq1",
-        x: 400,
-        y: 400,
+        x: 4000,
+        y: 4000,
         // Unknown slots and non-string ids must be dropped.
         equipment: { armor: "cam-y-bao", helmet: "phuong-vu-bao", bogus: "x", boots: 5 }
       }
@@ -226,7 +226,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.waitFor((m) => m.type === "init_world");
 
     // Client 2's init snapshot must carry client 1's worn slots, sanitized.
-    client2.send({ type: "player_join", payload: { id: "usr_eq2", username: "Eq2", x: 410, y: 410 } });
+    client2.send({ type: "player_join", payload: { id: "usr_eq2", username: "Eq2", x: 4100, y: 4100 } });
     const init2 = await client2.waitFor((m) => m.type === "init_world");
     const snap = init2.payload.players.find((p) => p.id === "usr_eq1");
     assert.equal(snap.equipment.armor, "cam-y-bao");
@@ -253,9 +253,9 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    client1.send({ type: "player_join", payload: { id: "usr_hp1", username: "Hp1", x: 640, y: 620, hp: 100, maxHp: 100 } });
+    client1.send({ type: "player_join", payload: { id: "usr_hp1", username: "Hp1", x: 6400, y: 6200, hp: 100, maxHp: 100 } });
     await client1.waitFor((m) => m.type === "init_world");
-    client2.send({ type: "player_join", payload: { id: "usr_hp2", username: "Hp2", x: 660, y: 620, hp: 80, maxHp: 120 } });
+    client2.send({ type: "player_join", payload: { id: "usr_hp2", username: "Hp2", x: 6600, y: 6200, hp: 80, maxHp: 120 } });
     await client2.waitFor((m) => m.type === "init_world");
     await client1.waitFor((m) => m.type === "player_joined");
 
@@ -306,7 +306,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Stand on wolf 0's home; it settles within bite range immediately
     client.send({
       type: "player_join",
-      payload: { id: "usr_bite", username: "Bite", x: 840, y: 600, hp: 100, maxHp: 100, defense: 6 }
+      payload: { id: "usr_bite", username: "Bite", x: 8400, y: 6000, hp: 100, maxHp: 100, defense: 6 }
     });
     await client.waitFor((m) => m.type === "init_world");
 
@@ -334,18 +334,18 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    client1.send({ type: "player_join", payload: { id: "usr_wolf1", username: "Wolf1", x: 840, y: 600 } });
+    client1.send({ type: "player_join", payload: { id: "usr_wolf1", username: "Wolf1", x: 8400, y: 6000 } });
     const init1 = await client1.waitFor((m) => m.type === "init_world");
     assert.equal(init1.payload.enemies.length, 8, "World init ships the full enemy roster");
     assert.equal(init1.payload.enemies[0].hp, ENEMY_MAX_HP);
     assert.equal(init1.payload.enemies[0].isDead, false);
 
-    client2.send({ type: "player_join", payload: { id: "usr_wolf2", username: "Wolf2", x: 900, y: 640 } });
+    client2.send({ type: "player_join", payload: { id: "usr_wolf2", username: "Wolf2", x: 9000, y: 6400 } });
     await client2.waitFor((m) => m.type === "init_world");
     await client1.waitFor((m) => m.type === "player_joined");
 
     // Hero1 hits wolf 0 for 20 -> both players must see 25 HP
-    client1.send({ type: "enemy_hit", payload: { id: 0, damage: 20, x: 840, y: 600 } });
+    client1.send({ type: "enemy_hit", payload: { id: 0, damage: 20, x: 8400, y: 6000 } });
     const hit1 = await client1.waitFor((m) => m.type === "enemy_hit");
     const hit2 = await client2.waitFor((m) => m.type === "enemy_hit");
     assert.equal(hit1.payload.hp, 25);
@@ -401,14 +401,14 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     // Damage cannot move a wolf: wolf 6 sits at its home (1050, 820), out of every
     // player's range, and a hit carrying a bogus position must not relocate it
-    client1.send({ type: "enemy_hit", payload: { id: 6, damage: 1, x: 10, y: 10 } });
+    client1.send({ type: "enemy_hit", payload: { id: 6, damage: 1, x: 100, y: 100 } });
     const hitWolf6 = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 6);
-    assert.equal(hitWolf6.payload.x, 1050, "The server keeps its own enemy position");
-    assert.equal(hitWolf6.payload.y, 820);
+    assert.equal(hitWolf6.payload.x, 10500, "The server keeps its own enemy position");
+    assert.equal(hitWolf6.payload.y, 8200);
 
     // Movement is server-owned: a client's own position report changes nothing.
     // Wolf 5 sits at its home (760, 800) with nobody in range, so it must stay there.
-    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 5, x: 900, y: 640 }] } });
+    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 5, x: 9000, y: 6400 }] } });
     await new Promise((resolve) => setTimeout(resolve, 200));
     assert.equal(
       client1.messages.filter(
@@ -421,13 +421,13 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Sockets that never joined cannot touch the shared enemy state
     const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     spectator.send({ type: "enemy_hit", payload: { id: 3, damage: 40 } });
-    spectator.send({ type: "enemy_move", payload: { enemies: [{ id: 3, x: 10, y: 10 }] } });
-    spectator.send({ type: "player_join", payload: { id: "usr_wolf3", username: "Wolf3", x: 100, y: 100 } });
+    spectator.send({ type: "enemy_move", payload: { enemies: [{ id: 3, x: 100, y: 100 }] } });
+    spectator.send({ type: "player_join", payload: { id: "usr_wolf3", username: "Wolf3", x: 1000, y: 1000 } });
 
     const spectatorInit = await spectator.waitFor((m) => m.type === "init_world");
     const wolfThree = spectatorInit.payload.enemies.find((e) => e.id === 3);
     assert.equal(wolfThree.hp, ENEMY_MAX_HP, "Un-joined sockets cannot damage enemies");
-    assert.equal(wolfThree.x, 1260, "Un-joined sockets cannot move enemies");
+    assert.equal(wolfThree.x, 12600, "Un-joined sockets cannot move enemies");
 
     spectator.send({ type: "ping" });
     assert.equal((await spectator.waitFor((m) => m.type === "pong")).type, "pong", "Server stays healthy");
@@ -442,13 +442,13 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
     // Wolf 1 spawns at (950, 670): client2 stands next to it, client1 is far away
-    client1.send({ type: "player_join", payload: { id: "usr_move1", username: "Move1", x: 1400, y: 670 } });
+    client1.send({ type: "player_join", payload: { id: "usr_move1", username: "Move1", x: 14000, y: 6700 } });
     await client1.waitFor((m) => m.type === "init_world");
-    client2.send({ type: "player_join", payload: { id: "usr_move2", username: "Move2", x: 1050, y: 670 } });
+    client2.send({ type: "player_join", payload: { id: "usr_move2", username: "Move2", x: 10500, y: 6700 } });
     await client2.waitFor((m) => m.type === "init_world");
     await client1.waitFor((m) => m.type === "player_joined");
 
-    const nearPlayer = { x: 1050, y: 670 };
+    const nearPlayer = { x: 10500, y: 6700 };
     const stopDistance = ENEMY_TUNING.stopDistance;
     const wolfOne = (m) =>
       m.type === "enemy_moved" ? m.payload.enemies.find((enemy) => enemy.id === 1) : null;
@@ -460,8 +460,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Both players watch the wolf walk to the *nearer* player, not to their own
     const seenByFarPlayer = await client1.waitFor(settled, 4000);
     const seenByNearPlayer = await client2.waitFor(settled, 4000);
-    assert.ok(wolfOne(seenByFarPlayer).x < 1000, "The far player sees it hold short of the nearer player");
-    assert.ok(wolfOne(seenByNearPlayer).x < 1000);
+    assert.ok(wolfOne(seenByFarPlayer).x < nearPlayer.x, "The far player sees it hold short of the nearer player");
+    assert.ok(wolfOne(seenByNearPlayer).x < nearPlayer.x);
 
     // At rest the AI produces no delta, so the tick stops broadcasting that wolf
     const before = client1.messages.length;
@@ -483,14 +483,14 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Client 1 joins with the PK flag on
     client1.send({
       type: "player_join",
-      payload: { id: "usr_pk1", username: "Pk1", displayName: "Kiếm Khách", x: 500, y: 500, hp: 100, maxHp: 100, pkFlag: true }
+      payload: { id: "usr_pk1", username: "Pk1", displayName: "Kiếm Khách", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
     });
     await client1.waitFor((m) => m.type === "init_world");
 
     // Client 2 joins flagged too, close to client 1
     client2.send({
       type: "player_join",
-      payload: { id: "usr_pk2", username: "Pk2", displayName: "Đao Khách", x: 540, y: 520, hp: 100, maxHp: 100, pkFlag: true }
+      payload: { id: "usr_pk2", username: "Pk2", displayName: "Đao Khách", x: 5400, y: 5200, hp: 100, maxHp: 100, pkFlag: true }
     });
     const init2 = await client2.waitFor((m) => m.type === "init_world");
     assert.equal(init2.payload.players[0].pkFlag, true, "The PK flag travels in the world snapshot");
@@ -519,7 +519,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const peaceful = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     peaceful.send({
       type: "player_join",
-      payload: { id: "usr_peace", username: "Peace", x: 500, y: 520, hp: 100, maxHp: 100, pkFlag: false }
+      payload: { id: "usr_peace", username: "Peace", x: 5000, y: 5200, hp: 100, maxHp: 100, pkFlag: false }
     });
     await peaceful.waitFor((m) => m.type === "init_world");
     await client1.waitFor((m) => m.type === "player_joined" && m.payload.player.id === "usr_peace");
@@ -553,7 +553,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(defeat.payload.victimId, "usr_pk2");
     assert.equal(defeat.payload.attackerId, "usr_pk1");
     assert.equal(defeat.payload.attackerName, "Kiếm Khách");
-    assert.deepEqual(defeat.payload.respawn, { x: 640, y: 620 });
+    assert.deepEqual(defeat.payload.respawn, { x: 6400, y: 6200 });
 
     const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
     assert.equal(restored.payload.maxHp, 100);

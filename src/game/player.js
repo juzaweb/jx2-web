@@ -4,6 +4,10 @@ import { toIso, isoDepth } from "./isoProjection.js";
 import { defaultEquipment } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+
+const S = WORLD_SCALE;
+const POS = WORLD_POSITION_SCALE;
 
 export class Player {
   /**
@@ -12,7 +16,7 @@ export class Player {
    * @param {number} y
    * @param {string} [name]
    */
-  constructor(scene, x = 640, y = 620, name = "Lãng Khách") {
+  constructor(scene, x = 640 * POS, y = 620 * POS, name = "Lãng Khách") {
     this.scene = scene;
     this.spawnX = x;
     this.spawnY = y;
@@ -57,11 +61,11 @@ export class Player {
 
   createPhysicsSprite(x, y) {
     this.sprite = this.scene.physics.add.sprite(x, y, "entity-dot");
-    this.sprite.setSize(24, 20);
+    this.sprite.setSize(24 * S, 20 * S);
     this.sprite.setCollideWorldBounds(true);
     this.sprite.setDepth(y);
-    this.sprite.body.setDrag(700, 700);
-    this.sprite.body.setMaxVelocity(220, 220);
+    this.sprite.body.setDrag(700 * POS * WORLD_SPEED_SCALE, 700 * POS * WORLD_SPEED_SCALE);
+    this.sprite.body.setMaxVelocity(220 * POS * WORLD_SPEED_SCALE, 220 * POS * WORLD_SPEED_SCALE);
     this.sprite.setVisible(false);
   }
 
@@ -69,9 +73,10 @@ export class Player {
     const iso = toIso(x, y);
     this.visual = this.scene.add.container(iso.x, iso.y);
     this.visual.setDepth(isoDepth(x, y));
+    this.visual.setScale(S);
     this.drawHero(this.visual);
 
-    this.nameText = this.scene.add.text(iso.x, iso.y - 60, this.name, {
+    this.nameText = this.scene.add.text(iso.x, iso.y - 60 * S, this.name, {
       fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "12px",
       color: "#5cfc5c",
@@ -80,8 +85,10 @@ export class Player {
       fontStyle: "bold"
     }).setOrigin(0.5).setDepth(isoDepth(x, y) + 100);
 
+    this.nameText.setScale(S);
+
     // Health bar sits between the name and the character's head
-    const healthBar = createHealthBar(this.scene, iso.x, iso.y);
+    const healthBar = createHealthBar(this.scene, iso.x, iso.y, S);
     this.hpBack = healthBar.back;
     this.hpFill = healthBar.fill;
     this.updateHealthBar(iso.x, iso.y, isoDepth(x, y));
@@ -100,7 +107,8 @@ export class Player {
       y,
       depthBase,
       this.stats.hp,
-      this.stats.maxHp
+      this.stats.maxHp,
+      S
     );
   }
 
@@ -189,7 +197,7 @@ export class Player {
     const depth = isoDepth(this.sprite.x, this.sprite.y);
     this.visual.setPosition(iso.x, iso.y);
     this.visual.setDepth(depth);
-    this.nameText.setPosition(iso.x, iso.y - 60 + this.body.y * 0.35);
+    this.nameText.setPosition(iso.x, iso.y - 60 * S + this.body.y * 0.35);
     this.nameText.setDepth(depth + 100);
     this.updateHealthBar(iso.x, iso.y + this.body.y * 0.35, depth);
   }
@@ -274,7 +282,7 @@ export class Player {
 
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
-        vector.normalize().scale(175);
+        vector.normalize().scale(175 * POS * WORLD_SPEED_SCALE);
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
@@ -291,8 +299,8 @@ export class Player {
       }
 
       const angle = Phaser.Math.Angle.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
-      const vx = Math.cos(angle) * 175;
-      const vy = Math.sin(angle) * 175;
+      const vx = Math.cos(angle) * 175 * POS * WORLD_SPEED_SCALE;
+      const vy = Math.sin(angle) * 175 * POS * WORLD_SPEED_SCALE;
 
       this.sprite.setVelocity(vx, vy);
       return;
@@ -356,7 +364,7 @@ export class Player {
     const depth = isoDepth(x, y);
     this.visual.setPosition(iso.x, iso.y);
     this.visual.setDepth(depth);
-    this.nameText.setPosition(iso.x, iso.y - 60);
+    this.nameText.setPosition(iso.x, iso.y - 60 * S);
     this.nameText.setDepth(depth + 100);
     this.updateHealthBar(iso.x, iso.y, depth);
   }

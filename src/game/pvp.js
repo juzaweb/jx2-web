@@ -7,8 +7,10 @@
  * server (to enforce) import this module so the rules never drift apart.
  */
 
+import { WORLD_SCALE } from "./worldConfig.js";
+
 /** Max distance (world px) at which one flagged player can strike another. */
-export const PVP_ATTACK_RANGE = 110;
+export const PVP_ATTACK_RANGE = 110 * WORLD_SCALE;
 
 /** Hard ceiling on a single reported hit, mirroring the server's enemy clamp. */
 export const PVP_MAX_DAMAGE = 200;

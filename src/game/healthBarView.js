@@ -17,9 +17,6 @@ const BAR_DEPTH_FILL = 102;
 const BAR_PADDING_X = 2;
 const BAR_PADDING_Y = 1;
 
-const FILL_WIDTH = HEALTH_BAR_WIDTH - BAR_PADDING_X * 2;
-const FILL_HEIGHT = HEALTH_BAR_HEIGHT - BAR_PADDING_Y * 2;
-
 /**
  * Build the two rectangles that make up an overhead health bar. Only calls
  * methods on the scene it is handed, so the module stays free of any direct
@@ -27,20 +24,23 @@ const FILL_HEIGHT = HEALTH_BAR_HEIGHT - BAR_PADDING_Y * 2;
  * @param {Phaser.Scene} scene
  * @param {number} x
  * @param {number} y - character anchor Y; the bar is drawn above it
+ * @param {number} [scale=1] - world scale so the bar matches a scaled character
  * @returns {{back: object, fill: object}}
  */
-export function createHealthBar(scene, x, y) {
-  const barY = y - BAR_TOP_OFFSET;
+export function createHealthBar(scene, x, y, scale = 1) {
+  const barY = y - BAR_TOP_OFFSET * scale;
+  const width = HEALTH_BAR_WIDTH * scale;
+  const height = HEALTH_BAR_HEIGHT * scale;
   const back = scene.add
-    .rectangle(x, barY, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, BAR_BACK_COLOR)
+    .rectangle(x, barY, width, height, BAR_BACK_COLOR)
     .setStrokeStyle(1, BAR_STROKE_COLOR)
     .setDepth(y + BAR_DEPTH_BACK);
   const fill = scene.add
     .rectangle(
-      x - HEALTH_BAR_WIDTH / 2 + BAR_PADDING_X,
+      x - width / 2 + BAR_PADDING_X * scale,
       barY,
-      FILL_WIDTH,
-      FILL_HEIGHT,
+      (HEALTH_BAR_WIDTH - BAR_PADDING_X * 2) * scale,
+      (HEALTH_BAR_HEIGHT - BAR_PADDING_Y * 2) * scale,
       HEALTH_COLOR_HEALTHY
     )
     .setOrigin(0, 0.5)
@@ -58,18 +58,20 @@ export function createHealthBar(scene, x, y) {
  *   not flicker behind the name when the character bobs
  * @param {number} hp
  * @param {number} maxHp
+ * @param {number} [scale=1] - world scale so the bar matches a scaled character
  */
-export function layoutHealthBar(bar, x, overheadY, depthBase, hp, maxHp) {
+export function layoutHealthBar(bar, x, overheadY, depthBase, hp, maxHp, scale = 1) {
   if (!bar?.back || !bar?.fill) return;
 
-  const barY = overheadY - BAR_TOP_OFFSET;
+  const barY = overheadY - BAR_TOP_OFFSET * scale;
+  const width = HEALTH_BAR_WIDTH * scale;
   const { ratio, color } = healthBarStyle(hp, maxHp);
 
   bar.back.setPosition(x, barY);
   bar.back.setDepth(depthBase + BAR_DEPTH_BACK);
 
-  bar.fill.width = FILL_WIDTH * ratio;
-  bar.fill.setPosition(x - HEALTH_BAR_WIDTH / 2 + BAR_PADDING_X, barY);
+  bar.fill.width = (HEALTH_BAR_WIDTH - BAR_PADDING_X * 2) * scale * ratio;
+  bar.fill.setPosition(x - width / 2 + BAR_PADDING_X * scale, barY);
   bar.fill.setDepth(depthBase + BAR_DEPTH_FILL);
   bar.fill.setFillStyle(color);
 }

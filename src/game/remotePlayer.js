@@ -3,6 +3,10 @@ import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
+
+const S = WORLD_SCALE;
+const POS = WORLD_POSITION_SCALE;
 
 /** Distance (px) a packet may move a peer before it is treated as a teleport. */
 const TELEPORT_SNAP_THRESHOLD = 200;
@@ -21,8 +25,8 @@ export class RemotePlayer {
     this.id = data.id;
     this.username = data.username || "Lãng Khách";
     this.displayName = data.displayName || this.username;
-    this.x = typeof data.x === "number" ? data.x : 640;
-    this.y = typeof data.y === "number" ? data.y : 620;
+    this.x = typeof data.x === "number" ? data.x : 640 * POS;
+    this.y = typeof data.y === "number" ? data.y : 620 * POS;
     this.targetX = this.x;
     this.targetY = this.y;
     this.vx = data.vx || 0;
@@ -43,6 +47,7 @@ export class RemotePlayer {
     const iso = toIso(this.x, this.y);
     this.container = this.scene.add.container(iso.x, iso.y);
     this.container.setDepth(isoDepth(this.x, this.y));
+    this.container.setScale(S);
 
     // 1. Soft ground shadow under feet
     this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
@@ -59,7 +64,7 @@ export class RemotePlayer {
 
     // 4. Overhead name (authentic JX2 style)
     this.nameText = this.scene.add
-      .text(iso.x, iso.y - 60, this.displayName, {
+      .text(iso.x, iso.y - 60 * S, this.displayName, {
         fontFamily: "Arial, Tahoma, sans-serif",
         fontSize: "12px",
         color: this.pkFlag ? "#ff5555" : "#5cfc5c",
@@ -70,7 +75,9 @@ export class RemotePlayer {
       .setOrigin(0.5)
       .setDepth(isoDepth(this.x, this.y) + 100);
 
-    const healthBar = createHealthBar(this.scene, iso.x, iso.y);
+    this.nameText.setScale(S);
+
+    const healthBar = createHealthBar(this.scene, iso.x, iso.y, S);
     this.hpBack = healthBar.back;
     this.hpFill = healthBar.fill;
     this.updateHealthBar(iso.x, iso.y);
@@ -101,7 +108,7 @@ export class RemotePlayer {
    * @param {number} y
    */
   updateHealthBar(x, y) {
-    layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, isoDepth(this.x, this.y), this.hp, this.maxHp);
+    layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, isoDepth(this.x, this.y), this.hp, this.maxHp, S);
   }
 
   /**
@@ -235,7 +242,7 @@ export class RemotePlayer {
     this.container.setDepth(depth);
 
     if (this.nameText) {
-      this.nameText.setPosition(iso.x, iso.y - 60 + (this.body?.y || 0) * 0.35);
+      this.nameText.setPosition(iso.x, iso.y - 60 * S + (this.body?.y || 0) * 0.35);
       this.nameText.setDepth(depth + 100);
     }
 

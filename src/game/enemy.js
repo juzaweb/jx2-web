@@ -2,6 +2,10 @@ import * as Phaser from "phaser";
 import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "./enemyAi.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
 import { toIso, isoDepth } from "./isoProjection.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+
+const S = WORLD_SCALE;
+const POS = WORLD_POSITION_SCALE;
 
 export class Wolf {
   /**
@@ -35,10 +39,10 @@ export class Wolf {
 
   createSprite(x, y) {
     this.sprite = this.scene.physics.add.sprite(x, y, "entity-dot");
-    this.sprite.setSize(30, 22);
+    this.sprite.setSize(30 * S, 22 * S);
     this.sprite.body.setCollideWorldBounds(true);
     this.sprite.body.setDrag(250, 250);
-    this.sprite.body.setMaxVelocity(90, 90);
+    this.sprite.body.setMaxVelocity(90 * POS * WORLD_SPEED_SCALE, 90 * POS * WORLD_SPEED_SCALE);
     this.sprite.setDepth(y);
     this.sprite.setVisible(false);
   }
@@ -47,17 +51,19 @@ export class Wolf {
     const iso = toIso(x, y);
     const depth = isoDepth(x, y);
     this.wolfVisual = this.scene.add.container(iso.x, iso.y).setDepth(depth);
+    this.wolfVisual.setScale(S);
     this.drawWolf(this.wolfVisual);
 
-    this.hpBack = this.scene.add.rectangle(iso.x, iso.y - 20, 38, 4, 0x1b1714).setDepth(depth + 1);
-    this.hpFill = this.scene.add.rectangle(iso.x, iso.y - 20, 36, 2, 0xc94a3f).setDepth(depth + 2);
-    this.nameText = this.scene.add.text(iso.x, iso.y - 29, "Sói Xám", {
+    this.hpBack = this.scene.add.rectangle(iso.x, iso.y - 20 * S, 38 * S, 4 * S, 0x1b1714).setDepth(depth + 1);
+    this.hpFill = this.scene.add.rectangle(iso.x, iso.y - 20 * S, 36 * S, 2 * S, 0xc94a3f).setDepth(depth + 2);
+    this.nameText = this.scene.add.text(iso.x, iso.y - 29 * S, "Sói Xám", {
       fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "10px",
       color: "#e5d6bb",
       stroke: "#1c201a",
       strokeThickness: 2
     }).setOrigin(0.5).setDepth(depth + 3);
+    this.nameText.setScale(S);
   }
 
   drawWolf(container) {
@@ -93,12 +99,12 @@ export class Wolf {
     this.wolfVisual.setPosition(iso.x, iso.y);
     this.wolfVisual.setDepth(depth);
 
-    this.hpBack.setPosition(iso.x, iso.y - 20);
+    this.hpBack.setPosition(iso.x, iso.y - 20 * S);
     this.hpBack.setDepth(depth + 1);
-    this.hpFill.setPosition(iso.x - 19 + (this.hp / this.maxHp) * 19, iso.y - 20);
+    this.hpFill.setPosition(iso.x - 19 * S + (this.hp / this.maxHp) * 19 * S, iso.y - 20 * S);
     this.hpFill.setDepth(depth + 2);
-    this.hpFill.width = Math.max(0.5, 36 * (this.hp / this.maxHp));
-    this.nameText.setPosition(iso.x, iso.y - 29);
+    this.hpFill.width = Math.max(0.5, 36 * S * (this.hp / this.maxHp));
+    this.nameText.setPosition(iso.x, iso.y - 29 * S);
     this.nameText.setDepth(depth + 3);
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
@@ -162,7 +168,7 @@ export class Wolf {
 
     this.placeAt(next.x, next.y);
     if (Math.abs(next.x - previousX) > 1) {
-      this.wolfVisual.setScale(next.x < previousX ? -1 : 1, 1);
+      this.wolfVisual.setScale((next.x < previousX ? -1 : 1) * S, S);
     }
   }
 

@@ -11,19 +11,21 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
   useEffect(() => {
     // Register on mount, and again whenever the game asks (the Phaser scene may
     // have been created after this panel mounted, so its initial registration was
-    // emitted before anyone was listening).
+    // emitted before anyone was listening). Re-register on zoom so the radar can
+    // switch between the local view and the whole-city view.
     const registerMinimap = () => {
       if (canvasRef.current) {
         bridge.emit(EVENTS.ACTION_REGISTER_MINIMAP, {
           canvas: canvasRef.current,
-          coordsEl: coordsRef.current
+          coordsEl: coordsRef.current,
+          zoomed
         });
       }
     };
 
     registerMinimap();
     return bridge.on(EVENTS.ACTION_REQUEST_MINIMAP, registerMinimap);
-  }, []);
+  }, [zoomed]);
 
   return (
     <section className={`top-right-panel${zoomed ? " is-zoomed" : ""}`} id="minimap-panel">
@@ -48,7 +50,7 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
         <div className="minimap-subinfo">
           <span className="subzone-name">{t("minimap.subzone")}</span>
           <span className="coords" id="coords-text" ref={coordsRef}>
-            640 / 620
+            6400 / 6200
           </span>
         </div>
 
@@ -56,8 +58,8 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           <canvas
             id="minimap-canvas"
             ref={canvasRef}
-            width={zoomed ? 440 : 220}
-            height={zoomed ? 300 : 150}
+            width={zoomed ? 1100 : 220}
+            height={zoomed ? 750 : 150}
           ></canvas>
           <div className="minimap-radar-sweep"></div>
         </div>

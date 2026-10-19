@@ -6,13 +6,23 @@ import {
   CITY_AVENUES,
   CITY_BOUNDS,
   CITY_BUILDINGS,
-  WORLD_CONFIG
+  CITY_HOUSES,
+  CITY_PAGODAS,
+  CITY_PLAZA,
+  CITY_TREES,
+  WORLD_CONFIG,
+  WORLD_POSITION_SCALE,
+  WORLD_SCALE
 } from "./worldConfig.js";
+
+/** Scale for legacy design-unit constants still written inline in this file. */
+const S = WORLD_SCALE;
+const POS = WORLD_POSITION_SCALE;
 
 export { CITY_BOUNDS, WORLD_CONFIG };
 
 /** Ground tile size (world units) that renders as one 76x38 iso diamond. */
-const FLOOR_TILE = 76;
+const FLOOR_TILE = 76 * S;
 
 /** Building footprints indexed by id, used when constructing the scene. */
 const BUILDING = Object.fromEntries(CITY_BUILDINGS.map((building) => [building.id, building]));
@@ -32,6 +42,7 @@ export class WorldManager {
   create() {
     this.obstacles = this.scene.physics.add.staticGroup();
     this.drawPavedGround();
+    this.drawCityPlaza();
     this.drawCityWalls();
     this.drawApothecaryShop();
     this.drawBankShop();
@@ -39,6 +50,9 @@ export class WorldManager {
     this.drawMartialAcademy();
     this.drawCentralPavilion();
     this.drawDragonBalustrades();
+    this.drawCityHouses();
+    this.drawPagodas();
+    this.drawTrees();
     this.drawNPCs();
     this.drawWorldBorder();
   }
@@ -48,10 +62,30 @@ export class WorldManager {
    * projecting to iso and depth-sorting it.
    */
   placeProp(obj, gx, gy) {
-    const p = toIso(gx, gy);
+    // Props are authored in design units; convert them to the scaled world.
+    const wx = gx * POS;
+    const wy = gy * POS;
+    const p = toIso(wx, wy);
     obj.setPosition(p.x, p.y);
-    obj.setDepth(isoDepth(gx, gy));
+    obj.setDepth(isoDepth(wx, wy));
+    if (typeof obj.setScale === "function") obj.setScale(S);
     return obj;
+  }
+
+  /**
+   * Add a static collider authored in design units (scaled to world units).
+   * @param {number} cx
+   * @param {number} cy
+   * @param {number} w
+   * @param {number} d
+   */
+  addBody(cx, cy, w, d) {
+    if (!this.obstacles) return null;
+    const col = this.obstacles.create(cx * POS, cy * POS, "entity-dot");
+    col.setSize(w * S, d * S);
+    col.setVisible(false);
+    col.refreshBody();
+    return col;
   }
 
   isInsideCity(gx, gy) {
@@ -127,23 +161,23 @@ export class WorldManager {
     // 3. Cobblestone / Flagstone foundation for Dược Điếm in the top-left corner.
     const porchPoly = [
       { x: 0, y: 0 },
-      { x: 740, y: 0 },
-      { x: 740, y: 240 },
-      { x: 120, y: 560 },
-      { x: 0, y: 560 }
+      { x: 740 * POS, y: 0 },
+      { x: 740 * POS, y: 240 * POS },
+      { x: 120 * POS, y: 560 * POS },
+      { x: 0, y: 560 * POS }
     ].map((p) => toIso(p.x, p.y));
     g.fillStyle(0x756f64, 1);
     g.fillPoints(porchPoly, true);
 
     // Irregular cobblestone stones inside Dược Điếm porch area
     g.lineStyle(1.5, 0x474239, 0.7);
-    for (let py = 20; py < 540; py += 32) {
-      for (let px = 20; px < 720; px += 36) {
-        if (px < 740 - ((py - 240) * (620 / 320))) {
+    for (let py = 20 * POS; py < 540 * POS; py += 32 * POS) {
+      for (let px = 20 * POS; px < 720 * POS; px += 36 * POS) {
+        if (px < 740 * POS - ((py - 240 * POS) * (620 / 320))) {
           const val = rng(px * 17 + py * 43);
           const stoneColor = val > 0.6 ? 0x8a8477 : val > 0.3 ? 0x6e685c : 0x7e786b;
-          const w = 26 + val * 8;
-          const h = 18 + val * 6;
+          const w = (26 + val * 8) * S;
+          const h = (18 + val * 6) * S;
           const corners = [
             toIso(px - w / 2, py - h / 2),
             toIso(px + w / 2, py - h / 2),
@@ -159,17 +193,17 @@ export class WorldManager {
 
     // 4. Diagonal stone curb step separating the shop porch from the plaza.
     const curb = [
-      { x: 120, y: 560 },
-      { x: 740, y: 240 },
-      { x: 765, y: 252 },
-      { x: 145, y: 572 }
+      { x: 120 * POS, y: 560 * POS },
+      { x: 740 * POS, y: 240 * POS },
+      { x: 765 * POS, y: 252 * POS },
+      { x: 145 * POS, y: 572 * POS }
     ].map((p) => toIso(p.x, p.y));
     g.fillStyle(0x8a8477, 1);
     g.fillPoints(curb, true);
-    const curbTopA = toIso(120, 560);
-    const curbTopB = toIso(740, 240);
-    const curbShadowA = toIso(145, 572);
-    const curbShadowB = toIso(765, 252);
+    const curbTopA = toIso(120 * POS, 560 * POS);
+    const curbTopB = toIso(740 * POS, 240 * POS);
+    const curbShadowA = toIso(145 * POS, 572 * POS);
+    const curbShadowB = toIso(765 * POS, 252 * POS);
     g.lineStyle(2, 0xbeb7a9, 0.9);
     g.lineBetween(curbTopA.x, curbTopA.y, curbTopB.x, curbTopB.y);
     g.lineStyle(2, 0x484339, 0.8);
@@ -178,10 +212,10 @@ export class WorldManager {
     const curbSteps = 24;
     for (let i = 0; i <= curbSteps; i++) {
       const t = i / curbSteps;
-      const kx1 = 120 + t * (740 - 120);
-      const ky1 = 560 + t * (240 - 560);
-      const kx2 = 145 + t * (765 - 145);
-      const ky2 = 572 + t * (252 - 572);
+      const kx1 = 120 * POS + t * ((740 - 120) * POS);
+      const ky1 = 560 * POS + t * ((240 - 560) * POS);
+      const kx2 = 145 * POS + t * ((765 - 145) * POS);
+      const ky2 = 572 * POS + t * ((252 - 572) * POS);
       const a = toIso(kx1, ky1);
       const b = toIso(kx2, ky2);
       g.lineStyle(1.5, 0x484339, 0.7);
@@ -210,7 +244,7 @@ export class WorldManager {
           (gy < avenueH.y + avenueH.height && gy + FLOOR_TILE > avenueH.y);
         if (
           onAvenue ||
-          (gx < 740 && gy < 560 && gx < 740 - ((gy - 240) * (620 / 320)))
+          (gx < 740 * POS && gy < 560 * POS && gx < 740 * POS - ((gy - 240 * POS) * (620 / 320)))
         ) {
           continue;
         }
@@ -223,6 +257,118 @@ export class WorldManager {
         }
       }
     }
+  }
+
+  /** Central open plaza with its stone altar/statue. */
+  drawCityPlaza() {
+    const { x, y, w, h } = CITY_PLAZA;
+    const corners = [toIso(x, y), toIso(x + w, y), toIso(x + w, y + h), toIso(x, y + h)];
+    const inset = 70 * S;
+    const inner = [
+      toIso(x + inset, y + inset),
+      toIso(x + w - inset, y + inset),
+      toIso(x + w - inset, y + h - inset),
+      toIso(x + inset, y + h - inset)
+    ];
+
+    const g = this.scene.add.graphics();
+    g.fillStyle(0xe6dfd0, 1);
+    g.fillPoints(corners, true);
+    g.lineStyle(3, 0x9c8f7a, 0.9);
+    g.strokePoints(corners, true, true);
+    g.lineStyle(1.5, 0xb3a894, 0.9);
+    g.strokePoints(inner, true, true);
+
+    const center = toIso(x + w / 2, y + h / 2);
+    const statue = this.scene.add.container(center.x, center.y).setDepth(isoDepth(x + w / 2, y + h / 2));
+    statue.setScale(S);
+    statue.add(this.scene.add.ellipse(0, 6, 54, 18, 0x151b14, 0.35));
+    statue.add(this.scene.add.rectangle(0, -2, 40, 14, 0x9c9382).setStrokeStyle(2, 0x575249));
+    statue.add(this.scene.add.rectangle(0, -20, 22, 26, 0xb0a795).setStrokeStyle(2, 0x575249));
+    statue.add(this.scene.add.triangle(0, -44, -10, 18, 0, -12, 10, 18, 0xd4af37));
+
+    if (this.obstacles) {
+      const col = this.obstacles.create(x + w / 2, y + h / 2, "entity-dot");
+      col.setSize(44 * S, 30 * S);
+      col.setVisible(false);
+      col.refreshBody();
+    }
+  }
+
+  /** Multi-tier towers matching the two pagodas on the reference map. */
+  drawPagodas() {
+    CITY_PAGODAS.forEach((pagoda) => {
+      this.drawPagoda(pagoda);
+
+      if (this.obstacles) {
+        const radius = pagoda.size * 0.32;
+        const col = this.obstacles.create(pagoda.cx, pagoda.cy, "entity-dot");
+        col.setSize(radius * 2, radius * 2);
+        col.setVisible(false);
+        col.refreshBody();
+      }
+    });
+  }
+
+  drawPagoda({ cx, cy, size, tiers }) {
+    const g = this.scene.add.graphics();
+    const base = toIso(cx, cy);
+    const half = size / 2;
+    const prism = this.isoCorners(cx - half, cy - half, size, size, 24 * S);
+    this.drawPrismWalls(g, prism, 0x8a3b34, 0x6e2a23);
+    g.fillStyle(0x9c4a3e, 1);
+    g.fillPoints([prism.tA, prism.tB, prism.tC, prism.tD], true);
+
+    let lift = 24 * S;
+    for (let i = 0; i < tiers; i++) {
+      const tierHalf = half * Math.pow(0.78, i);
+      const tierHalfH = tierHalf / 2;
+
+      g.fillStyle(i % 2 ? 0x6e2a23 : 0x7d332a, 1);
+      g.fillPoints(
+        [
+          { x: base.x - tierHalf * 0.72, y: base.y - lift - tierHalfH * 0.1 },
+          { x: base.x + tierHalf * 0.72, y: base.y - lift - tierHalfH * 0.1 },
+          { x: base.x + tierHalf * 0.72, y: base.y - lift + tierHalfH * 0.75 },
+          { x: base.x - tierHalf * 0.72, y: base.y - lift + tierHalfH * 0.75 }
+        ],
+        true
+      );
+
+      const roof = [
+        { x: base.x, y: base.y - lift - tierHalfH },
+        { x: base.x + tierHalf, y: base.y - lift },
+        { x: base.x, y: base.y - lift + tierHalfH },
+        { x: base.x - tierHalf, y: base.y - lift }
+      ];
+      g.fillStyle(i % 2 ? 0x28414c : 0x31545c, 1);
+      g.fillPoints(roof, true);
+      g.lineStyle(2, 0xd4af37, 0.85);
+      g.strokePoints(roof, true, true);
+      lift += 34 * S;
+    }
+
+    g.lineStyle(3, 0xd4af37, 1);
+    g.lineBetween(base.x, base.y - lift, base.x, base.y - lift - 28 * S);
+    g.fillStyle(0xffdd59, 1);
+    g.fillCircle(base.x, base.y - lift - 28 * S, 4 * S);
+
+    const container = this.scene.add.container(0, 0, [g]);
+    container.setDepth(isoDepth(cx + half, cy + half));
+    return container;
+  }
+
+  drawTrees() {
+    CITY_TREES.forEach(([x, y, scale]) => {
+      const iso = toIso(x, y);
+      const tree = this.scene.add.container(iso.x, iso.y).setDepth(isoDepth(x, y));
+      tree.setScale(S);
+      tree.add(this.scene.add.ellipse(0, 4, 26 * scale, 10 * scale, 0x101a12, 0.35));
+      tree.add(this.scene.add.rectangle(0, -4 * scale, 4 * scale, 18 * scale, 0x4a3420));
+      tree.add(this.scene.add.circle(0, -16 * scale, 14 * scale, 0x2f5d3a));
+      tree.add(this.scene.add.circle(-8 * scale, -10 * scale, 10 * scale, 0x3c7347));
+      tree.add(this.scene.add.circle(8 * scale, -8 * scale, 9 * scale, 0x4f8a56));
+    });
   }
 
   /**
@@ -261,7 +407,7 @@ export class WorldManager {
     g.fillStyle(color, 1);
     for (const [p, q] of edges) {
       const len = Math.hypot(q.x - p.x, q.y - p.y);
-      const count = Math.max(2, Math.round(len / 34));
+      const count = Math.max(2, Math.round(len / (34 * S)));
       for (let i = 0; i < count; i++) {
         const a = this.lerpPoint(p, q, i / count);
         const b = this.lerpPoint(p, q, (i + 0.6) / count);
@@ -321,14 +467,14 @@ export class WorldManager {
       const sB = this.lerpPoint(c.bC, c.bB, 0.8);
       const plaque = this.scene.add.graphics();
       plaque.fillStyle(0x18140f, 1);
-      plaque.fillPoints([sA, sB, c.lift(sB, sy + 22), c.lift(sA, sy + 22)], true);
+      plaque.fillPoints([sA, sB, c.lift(sB, sy + 22 * S), c.lift(sA, sy + 22 * S)], true);
       plaque.lineStyle(2, 0xd4af37, 1);
-      plaque.strokePoints([sA, sB, c.lift(sB, sy + 22), c.lift(sA, sy + 22)], true, true);
-      const mid = c.lift(this.lerpPoint(sA, sB, 0.5), sy + 11);
+      plaque.strokePoints([sA, sB, c.lift(sB, sy + 22 * S), c.lift(sA, sy + 22 * S)], true, true);
+      const mid = c.lift(this.lerpPoint(sA, sB, 0.5), sy + 11 * S);
       const text = this.scene.add
         .text(mid.x, mid.y, label, {
           fontFamily: "Arial, Tahoma, sans-serif",
-          fontSize: "12px",
+          fontSize: `${12 * S}px`,
           color: labelColor,
           fontStyle: "bold"
         })
@@ -391,10 +537,10 @@ export class WorldManager {
    */
   drawCityWalls() {
     const { x0, y0, x1, y1 } = CITY_BOUNDS;
-    const t = 40;
-    const height = 86;
-    const merlon = 20;
-    const SEG = 150;
+    const t = 40 * S;
+    const height = 86 * S;
+    const merlon = 20 * S;
+    const SEG = 150 * S;
 
     const top = 0x9a8f78;
     const left = 0x8a7f69;
@@ -416,13 +562,13 @@ export class WorldManager {
 
     const mx = (x0 + x1) / 2;
     const my = (y0 + y1) / 2;
-    const gw = 180;
-    const gh = 150;
-    const gate = { w: gw, d: t + 32, height: gh, top: gateTop, left: gateLeft, right: gateRight };
-    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y0 - 16 });
-    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y1 - t - 16 });
-    this.drawIsoGate({ ...gate, x: x0 - 16, y: my - gw / 2, w: t + 32, d: gw });
-    this.drawIsoGate({ ...gate, x: x1 - t - 16, y: my - gw / 2, w: t + 32, d: gw });
+    const gw = 180 * S;
+    const gh = 150 * S;
+    const gate = { w: gw, d: t + 32 * POS, height: gh, top: gateTop, left: gateLeft, right: gateRight };
+    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y0 - 16 * POS });
+    this.drawIsoGate({ ...gate, x: mx - gw / 2, y: y1 - t - 16 * POS });
+    this.drawIsoGate({ ...gate, x: x0 - 16 * POS, y: my - gw / 2, w: t + 32 * POS, d: gw });
+    this.drawIsoGate({ ...gate, x: x1 - t - 16 * POS, y: my - gw / 2, w: t + 32 * POS, d: gw });
 
     if (this.obstacles) {
       const body = (cx, cy, bw, bh) => {
@@ -445,7 +591,7 @@ export class WorldManager {
   drawApothecaryShop() {
     this.drawIsoBuilding({
       ...BUILDING.apothecary,
-      height: 150,
+      height: 150 * S,
       wallLeft: 0x6b4a2e,
       wallRight: 0x523823,
       roof: 0x33302c,
@@ -468,10 +614,7 @@ export class WorldManager {
 
     // Static physics collider over the shop footprint (ground coordinates)
     if (this.obstacles) {
-      const col = this.obstacles.create(330, 135, "entity-dot");
-      col.setSize(380, 210);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(330, 135, 380, 210);
     }
   }
 
@@ -628,7 +771,7 @@ export class WorldManager {
   drawBankShop() {
     this.drawIsoBuilding({
       ...BUILDING.bank,
-      height: 180,
+      height: 180 * S,
       wallLeft: 0x8a3b34,
       wallRight: 0x6b2e2b,
       roof: 0x262e38,
@@ -637,10 +780,7 @@ export class WorldManager {
     });
 
     if (this.obstacles) {
-      const col = this.obstacles.create(1650, 300, "entity-dot");
-      col.setSize(360, 150);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(1650, 300, 360, 150);
     }
   }
 
@@ -650,7 +790,7 @@ export class WorldManager {
   drawTavernShop() {
     this.drawIsoBuilding({
       ...BUILDING.tavern,
-      height: 200,
+      height: 200 * S,
       wallLeft: 0x6b432b,
       wallRight: 0x50321f,
       roof: 0x242d38,
@@ -682,10 +822,7 @@ export class WorldManager {
     );
 
     if (this.obstacles) {
-      const col = this.obstacles.create(240, 1010, "entity-dot");
-      col.setSize(320, 130);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(240, 1010, 320, 130);
     }
   }
 
@@ -695,7 +832,7 @@ export class WorldManager {
   drawMartialAcademy() {
     this.drawIsoBuilding({
       ...BUILDING.academy,
-      height: 165,
+      height: 165 * S,
       wallLeft: 0x6b5540,
       wallRight: 0x4d3829,
       roof: 0x2d3748,
@@ -708,10 +845,7 @@ export class WorldManager {
     this.placeProp(this.createHeavyWeaponRack(0, 0), 1870, 1005);
 
     if (this.obstacles) {
-      const col = this.obstacles.create(1760, 820, "entity-dot");
-      col.setSize(340, 140);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(1760, 820, 340, 140);
     }
   }
 
@@ -739,7 +873,7 @@ export class WorldManager {
   drawCentralPavilion() {
     this.drawIsoBuilding({
       ...BUILDING.pavilion,
-      height: 175,
+      height: 175 * S,
       wallLeft: 0x3b2416,
       wallRight: 0x2c1b10,
       roof: 0x1e2e38,
@@ -749,10 +883,7 @@ export class WorldManager {
     });
 
     if (this.obstacles) {
-      const col = this.obstacles.create(1165, 460, "entity-dot");
-      col.setSize(150, 80);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(1165, 460, 150, 80);
     }
   }
 
@@ -763,7 +894,7 @@ export class WorldManager {
   drawDragonBalustrades() {
     this.drawIsoBuilding({
       ...BUILDING.dragon,
-      height: 34,
+      height: 34 * S,
       wallLeft: 0x8a8477,
       wallRight: 0x747066,
       roof: 0x948e82,
@@ -802,11 +933,42 @@ export class WorldManager {
     this.placeProp(dragon, 1130, 960);
 
     if (this.obstacles) {
-      const col = this.obstacles.create(1140, 895, "entity-dot");
-      col.setSize(150, 70);
-      col.setVisible(false);
-      col.refreshBody();
+      this.addBody(1140, 895, 150, 70);
     }
+  }
+
+  /**
+   * Residential courtyard houses filling the expanded city, arranged in rows
+   * like the classic Biện Kinh map. Layout comes from the shared config so the
+   * minimap and the scene can never disagree.
+   */
+  drawCityHouses() {
+    const styles = [
+      { wallLeft: 0x9a8c72, wallRight: 0x776a55, roof: 0x2f4f57, roofEdge: 0x4f7a80 },
+      { wallLeft: 0x8f836c, wallRight: 0x6f6450, roof: 0x35575a, roofEdge: 0x5b8a8f },
+      { wallLeft: 0x958666, wallRight: 0x73664c, roof: 0x3b5a52, roofEdge: 0x5d8f7f },
+      { wallLeft: 0x8a7f6b, wallRight: 0x69604f, roof: 0x344a5c, roofEdge: 0x59758f }
+    ];
+
+    CITY_HOUSES.forEach((house, index) => {
+      this.drawIsoBuilding({
+        ...house,
+        ...styles[index % styles.length],
+        height: (72 + (index % 3) * 6) * S,
+        label: null
+      });
+
+      if (this.obstacles) {
+        const col = this.obstacles.create(
+          house.x + house.w / 2,
+          house.y + house.d / 2,
+          "entity-dot"
+        );
+        col.setSize(house.w - 24 * S, house.d - 24 * S);
+        col.setVisible(false);
+        col.refreshBody();
+      }
+    });
   }
 
   /**
@@ -1150,11 +1312,12 @@ export class WorldManager {
     c.add([shadow, bodyContainer, nameLabel]);
     c.setData("nameLabel", nameLabel);
     c.setDepth(isoDepth(x, y));
+    c.setScale(S);
 
     // Obstacle collider so players can't walk inside NPCs
     if (this.obstacles) {
-      const col = this.obstacles.create(x, y + 8, "entity-dot");
-      col.setSize(28, 18);
+      const col = this.obstacles.create(x, y + 8 * S, "entity-dot");
+      col.setSize(28 * S, 18 * S);
       col.setVisible(false);
       col.refreshBody();
     }

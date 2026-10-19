@@ -1,9 +1,13 @@
 import { bridge, EVENTS } from "./bridge.js";
 import { applyQuantities, getQuantities } from "./items.js";
-import { CITY_AVENUES, CITY_BUILDINGS } from "./worldConfig.js";
-
-/** The local radar shows one tenth of the city's area. */
-const MINIMAP_SPAN_RATIO = 1 / Math.sqrt(10);
+import {
+  CITY_AVENUES,
+  CITY_BUILDINGS,
+  CITY_HOUSES,
+  CITY_PAGODAS,
+  CITY_PLAZA,
+  CITY_TREES
+} from "./worldConfig.js";
 
 export class UIBridgeAdapter {
   constructor() {
@@ -40,6 +44,8 @@ export class UIBridgeAdapter {
     this.minimapCanvas = canvas || null;
     this.minimapCtx = canvas ? canvas.getContext("2d") : null;
     this.coordsElement = registration?.coordsEl || null;
+    // Zoomed radar shows the whole city instead of the local one-tenth slice.
+    this.minimapZoomed = !!registration?.zoomed;
   }
 
   /**
@@ -105,6 +111,9 @@ export class UIBridgeAdapter {
   drawMinimap(player, enemies, worldConfig, remotePlayers = []) {
     if (!this.minimapCtx || !player || !worldConfig) return;
 
+    const w = this.minimapCanvas.width;
+    const h = this.minimapCanvas.height;
+
     // The minimap is a local radar: it follows the player and only covers about
     // one tenth of the walled city's area, so Biện Kinh feels as large as the
     // classic VLTK2 maps. Without city bounds (tests/other regions) it shows the
@@ -116,11 +125,26 @@ export class UIBridgeAdapter {
       y1: worldConfig.height
     };
     let view;
-    if (worldConfig.cityBounds) {
-      // Equal spans on each axis would be area/10; keeping the city aspect here
-      // preserves the proportions of the region on screen.
-      const spanX = (city.x1 - city.x0) * MINIMAP_SPAN_RATIO;
-      const spanY = (city.y1 - city.y0) * MINIMAP_SPAN_RATIO;
+    if (worldConfig.cityBounds && this.minimapZoomed) {
+      // Expanded radar (Tab): the whole city, anchored to its centre and shaped
+      // to the canvas so it stays undistorted.
+      const spanY = (city.y1 - city.y0) * 1.08;
+      const spanX = spanY * (w / h);
+      const centerX = (city.x0 + city.x1) / 2;
+      const centerY = (city.y0 + city.y1) / 2;
+      view = {
+        x0: centerX - spanX / 2,
+        y0: centerY - spanY / 2,
+        x1: centerX + spanX / 2,
+        y1: centerY + spanY / 2
+      };
+    } else if (worldConfig.cityBounds) {
+      // Local radar (default): one tenth of the city's area around the player,
+      // shaped to the canvas so the local view stays undistorted.
+      const aspect = w / h;
+      const area = ((city.x1 - city.x0) * (city.y1 - city.y0)) / 10;
+      const spanX = Math.sqrt(area * aspect);
+      const spanY = spanX / aspect;
       view = {
         x0: player.x - spanX / 2,
         y0: player.y - spanY / 2,
@@ -225,7 +249,11 @@ export class UIBridgeAdapter {
     ctx.fillRect(mapX(city.x0), mapY(avenueH.y), cityW, avenueH.height * scaleY);
     ctx.fillRect(mapX(avenueV.x), mapY(city.y0), avenueV.width * scaleX, cityH);
 
-    // 5. City walls outline
+    // 5. Central plaza
+    ctx.fillStyle = "#e6dfd0";
+    ctx.fillRect(mapX(CITY_PLAZA.x), mapY(CITY_PLAZA.y), CITY_PLAZA.w * scaleX, CITY_PLAZA.h * scaleY);
+
+    // 6. City walls outline
     ctx.strokeStyle = "#80735a";
     ctx.lineWidth = Math.max(1.5, 0.7 * mark);
     ctx.beginPath();
@@ -236,23 +264,48 @@ export class UIBridgeAdapter {
     ctx.closePath();
     ctx.stroke();
 
-    // 6. Building footprints (shared with the Phaser scene)
+    // 7. Residential blocks (blue-tiled roofs)
+    ctx.fillStyle = "#3a5157";
+    CITY_HOUSES.forEach(({ x, y, w: bw, d: bh }) => {
+      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
+    });
+
+    // 8. Landmark buildings (shared with the Phaser scene)
     ctx.fillStyle = "#33261c";
     CITY_BUILDINGS.forEach(({ x, y, w: bw, d: bh }) => {
       ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
     });
 
-    // 7. Vạn Sự Thông Pavilion (green point)
-    ctx.fillStyle = "#22c55e";
-    ctx.beginPath();
-    ctx.arc(mapX(1160), mapY(440), 3.5 * mark, 0, Math.PI * 2);
-    ctx.fill();
+    // 9. Pagodas
+    ctx.fillStyle = "#ffdd59";
+    CITY_PAGODAS.forEach(({ cx, cy }) => {
+      ctx.beginPath();
+      ctx.arc(mapX(cx), mapY(cy), 3.5 * mark, 0, Math.PI * 2);
+      ctx.fill();
+    });
 
-    // 8. Central plaza around the spawn point
-    ctx.fillStyle = "rgba(122, 112, 94, 0.8)";
-    ctx.beginPath();
-    ctx.arc(mapX(1100), mapY(620), 80 * scaleX, 0, Math.PI * 2);
-    ctx.fill();
+    // 10. Trees
+    ctx.fillStyle = "#3c7347";
+    CITY_TREES.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(mapX(x), mapY(y), 1.6 * mark, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // 11. Vạn Sự Thông Pavilion (green point)
+    const pavilion = CITY_BUILDINGS.find((building) => building.id === "pavilion");
+    if (pavilion) {
+      ctx.fillStyle = "#22c55e";
+      ctx.beginPath();
+      ctx.arc(
+        mapX(pavilion.x + pavilion.w / 2),
+        mapY(pavilion.y + pavilion.d / 2),
+        3.5 * mark,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
 
     // Enemies (Red radar blips)
     if (enemies && enemies.length) {
