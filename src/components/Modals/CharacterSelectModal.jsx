@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { apiClient } from "../../game/apiClient.js";
 import "../../styles/character-select.css";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
@@ -10,31 +12,45 @@ const NAME_MAX = 16;
  * the character's appearance so the chosen face can be restored.
  */
 const PORTRAITS = [
-  { index: 0, gender: "nam", label: "Nam", glyph: "♂" },
-  { index: 1, gender: "nu", label: "Nữ", glyph: "♀" }
+  { index: 0, gender: "nam", labelKey: "characterSelect.genderMale", glyph: "♂" },
+  { index: 1, gender: "nu", labelKey: "characterSelect.genderFemale", glyph: "♀" }
 ];
 
-const GENDER_LABEL = { nam: "Nam", nu: "Nữ" };
+const GENDER_LABEL = {
+  nam: "characterSelect.genderMale",
+  nu: "characterSelect.genderFemale"
+};
+
+const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", zh: "zh-CN" };
 
 /**
- * Format an epoch millisecond timestamp into a short Vietnamese date-time.
+ * Format an epoch millisecond timestamp into a short localized date-time.
  * @param {number} ts
+ * @param {string} language
  * @returns {string}
  */
-const formatDateTime = (ts) => {
+const formatDateTime = (ts, language = "vi") => {
   if (!ts || typeof ts !== "number") return "";
   try {
     const d = new Date(ts);
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const parts = new Intl.DateTimeFormat(DATE_LOCALES[language] || DATE_LOCALES.vi, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).formatToParts(d);
+    const pick = (type) => parts.find((part) => part.type === type)?.value || "";
+    return `${pick("day")}/${pick("month")}/${pick("year")} ${pick("hour")}:${pick("minute")}`;
   } catch {
     return "";
   }
 };
 
 export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }) {
-  if (!isOpen) return null;
-
+  const { t, language } = useI18n();
+  const tRef = useRef(t);
   const [characters, setCharacters] = useState([]);
   const [maxSlots, setMaxSlots] = useState(3);
   const [selectedId, setSelectedId] = useState("");
@@ -45,6 +61,10 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const applyData = useCallback((data) => {
     const list = Array.isArray(data?.characters) ? data.characters : [];
@@ -67,7 +87,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
     setError("");
     reload()
       .catch((err) => {
-        if (isMounted) setError(err.message || "Không tải được danh sách nhân vật.");
+        if (isMounted) setError(err.message || tRef.current("characterSelect.errors.load"));
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -102,7 +122,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
     const cleanName = nameInput.trim().replace(/\s+/g, " ");
     if (cleanName.length < NAME_MIN || cleanName.length > NAME_MAX) {
-      setError(`Tên nhân vật phải gồm ${NAME_MIN}-${NAME_MAX} ký tự.`);
+      setError(t("characterSelect.errors.nameLength", { min: NAME_MIN, max: NAME_MAX }));
       return;
     }
 
@@ -119,9 +139,9 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       if (createdId) setSelectedId(createdId);
       setMode("select");
       setNameInput("");
-      setNotice(`Đã tạo nhân vật "${data?.character?.name || cleanName}".`);
+      setNotice(t("characterSelect.notice.created", { name: data?.character?.name || cleanName }));
     } catch (err) {
-      setError(err.message || "Không thể tạo nhân vật. Vui lòng thử lại!");
+      setError(err.message || t("characterSelect.errors.create"));
     } finally {
       setBusy(false);
     }
@@ -129,10 +149,10 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   const handleDelete = async () => {
     if (!selected) {
-      setError("Vui lòng chọn một nhân vật để xoá.");
+      setError(t("characterSelect.errors.selectToDelete"));
       return;
     }
-    if (!window.confirm(`Bạn có chắc muốn xoá vĩnh viễn nhân vật "${selected.name}" không?`)) return;
+    if (!window.confirm(t("characterSelect.errors.confirmDelete", { name: selected.name }))) return;
 
     setBusy(true);
     setError("");
@@ -140,9 +160,9 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
     try {
       await apiClient.deleteCharacter(user.id, selected.id);
       await reload();
-      setNotice(`Đã xoá nhân vật "${selected.name}".`);
+      setNotice(t("characterSelect.notice.deleted", { name: selected.name }));
     } catch (err) {
-      setError(err.message || "Không thể xoá nhân vật.");
+      setError(err.message || t("characterSelect.errors.delete"));
     } finally {
       setBusy(false);
     }
@@ -150,7 +170,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   const handleStart = () => {
     if (!selected) {
-      setError("Vui lòng chọn hoặc tạo một nhân vật trước khi bắt đầu.");
+      setError(t("characterSelect.errors.selectToStart"));
       return;
     }
     onStart(selected);
@@ -158,16 +178,20 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   const slots = Array.from({ length: maxSlots }, (_, i) => characters[i] || null);
 
+  if (!isOpen) return null;
+
   return (
     <div className="jx2-login-overlay" id="jx2-character-overlay">
+      <LanguageSwitcher variant="character" />
+
       {/* Top status bar: account + server, mirroring the in-game header */}
       <div className="jx2-cs-topbar">
-        <span className="jx2-cs-topbar-user">Tài khoản: {user?.username}</span>
-        <span className="jx2-cs-topbar-server">Máy chủ: {server || "Biện Kinh"}</span>
+        <span className="jx2-cs-topbar-user">{t("characterSelect.account")}: {user?.username}</span>
+        <span className="jx2-cs-topbar-server">{t("characterSelect.server")}: {server || "Biện Kinh"}</span>
       </div>
 
       <div className="jx2-cs-box">
-        <div className="jx2-cs-title">{mode === "create" ? "Tạo mới" : "Chọn nhân vật"}</div>
+        <div className="jx2-cs-title">{mode === "create" ? t("characterSelect.create") : t("characterSelect.select")}</div>
 
         {error && <div className="jx2-alert-banner error">{error}</div>}
         {notice && <div className="jx2-alert-banner success">{notice}</div>}
@@ -181,9 +205,9 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                   <span className="jx2-cs-portrait-glyph">{activePortrait.glyph}</span>
                 </div>
                 <div className="jx2-cs-stage-name">
-                  {nameInput.trim() || "Nhân vật mới"}
+                  {nameInput.trim() || t("characterSelect.newCharacter")}
                 </div>
-                <div className="jx2-cs-stage-meta">Giới tính: {GENDER_LABEL[activePortrait.gender]}</div>
+                <div className="jx2-cs-stage-meta">{t("characterSelect.gender")}: {t(GENDER_LABEL[activePortrait.gender])}</div>
               </>
             ) : (
               <>
@@ -197,12 +221,12 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                   )}
                 </div>
                 <div className="jx2-cs-stage-name">
-                  {selected ? selected.name : loading ? "Đang tải..." : "Chưa có nhân vật"}
+                  {selected ? selected.name : loading ? t("characterSelect.loading") : t("characterSelect.noCharacters")}
                 </div>
                 {selected && (
                   <div className="jx2-cs-stage-meta">
-                    {GENDER_LABEL[selected.gender] || "Nam"} · Cấp {selected.level} ·{" "}
-                    {formatDateTime(selected.createdAt)}
+                    {t(GENDER_LABEL[selected.gender] || GENDER_LABEL.nam)} ·{" "}
+                    {t("common.level")} {selected.level} · {formatDateTime(selected.createdAt, language)}
                   </div>
                 )}
               </>
@@ -213,7 +237,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
           <div className="jx2-cs-panel">
             {mode === "create" ? (
               <form className="jx2-cs-create" onSubmit={handleCreate}>
-                <div className="jx2-cs-panel-title">Tạo mới</div>
+                <div className="jx2-cs-panel-title">{t("characterSelect.create")}</div>
 
                 <div className="jx2-cs-portraits">
                   {PORTRAITS.map((p) => (
@@ -224,16 +248,16 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                         p.index === portraitIndex ? "selected" : ""
                       }`}
                       onClick={() => setPortraitIndex(p.index)}
-                      title={`Ngoại hình ${p.label} ${p.index + 1}`}
+                      title={t("characterSelect.appearance", { label: t(p.labelKey), index: p.index + 1 })}
                     >
                       <span className="jx2-cs-portrait-tile-glyph">{p.glyph}</span>
-                      <span className="jx2-cs-portrait-tile-label">{p.label}</span>
+                      <span className="jx2-cs-portrait-tile-label">{t(p.labelKey)}</span>
                     </button>
                   ))}
                 </div>
 
                 <label className="jx2-form-label" htmlFor="jx2-character-name">
-                  Tên:
+                  {t("characterSelect.nameLabel")}
                 </label>
                 <input
                   id="jx2-character-name"
@@ -241,17 +265,17 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                   className="jx2-form-input"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Nhập tên nhân vật"
+                  placeholder={t("characterSelect.namePlaceholder")}
                   maxLength={NAME_MAX}
                   autoFocus
                 />
                 <div className="jx2-cs-create-hint">
-                  {NAME_MIN}-{NAME_MAX} ký tự chữ, số, khoảng trắng, gạch ngang hoặc gạch dưới.
+                  {t("characterSelect.nameHint", { min: NAME_MIN, max: NAME_MAX })}
                 </div>
 
                 <div className="jx2-cs-create-actions">
                   <button type="submit" className="jx2-btn-action" disabled={busy}>
-                    {busy ? "Chờ..." : "Đồng ý"}
+                    {busy ? t("common.wait") : t("characterSelect.agree")}
                   </button>
                   <button
                     type="button"
@@ -259,13 +283,13 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                     onClick={handleCancelCreate}
                     disabled={busy}
                   >
-                    Trở lại
+                    {t("common.back")}
                   </button>
                 </div>
               </form>
             ) : (
               <>
-                <div className="jx2-cs-panel-title">Danh sách nhân vật</div>
+                <div className="jx2-cs-panel-title">{t("characterSelect.characterList")}</div>
                 <div className="jx2-cs-slots">
                   {slots.map((char, index) => (
                     <button
@@ -286,12 +310,13 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                         <>
                           <span className="jx2-cs-slot-name">{char.name}</span>
                           <span className="jx2-cs-slot-info">
-                            {GENDER_LABEL[char.gender] || "Nam"} · Cấp {char.level}
+                            {t(GENDER_LABEL[char.gender] || GENDER_LABEL.nam)} ·{" "}
+                            {t("common.level")} {char.level}
                           </span>
-                          <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt)}</span>
+                          <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>
                         </>
                       ) : (
-                        <span className="jx2-cs-slot-empty">(Trống)</span>
+                        <span className="jx2-cs-slot-empty">{t("characterSelect.emptySlot")}</span>
                       )}
                     </button>
                   ))}
@@ -304,7 +329,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                     onClick={handleOpenCreate}
                     disabled={busy || characters.length >= maxSlots}
                   >
-                    Tạo mới nhân vật
+                    {t("characterSelect.createCharacter")}
                   </button>
                   <button
                     type="button"
@@ -312,7 +337,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                     onClick={handleDelete}
                     disabled={busy || !selected}
                   >
-                    Xoá nhân vật
+                    {t("characterSelect.deleteCharacter")}
                   </button>
                   <button
                     type="button"
@@ -320,7 +345,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                     onClick={onLogout}
                     disabled={busy}
                   >
-                    Trở lại
+                    {t("common.back")}
                   </button>
                 </div>
               </>
@@ -335,7 +360,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
             onClick={handleStart}
             disabled={busy || !selected}
           >
-            Bắt đầu
+            {t("characterSelect.start")}
           </button>
         )}
       </div>

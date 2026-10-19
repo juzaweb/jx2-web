@@ -18,6 +18,7 @@ import {
 } from "./game/items.js";
 import { defaultEquipment } from "./game/equipment.js";
 import { StorageManager } from "./game/storage.js";
+import { useI18n } from "./i18n/I18nProvider.jsx";
 import { apiClient } from "./game/apiClient.js";
 import {
   readSession,
@@ -31,17 +32,17 @@ const INITIAL_LOGS = [
   {
     id: "init-1",
     type: "system",
-    text: "Chào mừng hiệp khách đến với Biện Kinh."
+    textKey: "app.log.welcome"
   },
   {
     id: "init-2",
     type: "near",
-    text: "Lãng Khách: Giang hồ hiểm ác, bảo trọng!"
+    textKey: "app.log.near"
   },
   {
     id: "init-3",
     type: "guide",
-    text: "Dùng WASD di chuyển, Phím 1/2 uống dược phẩm, Chuột/Space đánh, Q kiếm khí."
+    textKey: "app.log.guide"
   }
 ];
 
@@ -64,6 +65,7 @@ const loadCharacterInventory = (characterId) => {
 };
 
 export function App() {
+  const { t } = useI18n();
   const [currentUser, setCurrentUser] = useState(() => {
     const session = readSession();
     if (!session) return null;
@@ -330,10 +332,10 @@ export function App() {
   }, []);
 
   const handleReset = useCallback(() => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?")) {
+    if (window.confirm(t("app.confirmReset"))) {
       bridge.emit(EVENTS.ACTION_RESET);
     }
-  }, []);
+  }, [t]);
 
   const handleToggleAudio = useCallback(() => {
     bridge.emit(EVENTS.ACTION_TOGGLE_AUDIO);
@@ -352,14 +354,17 @@ export function App() {
 
   const handleSendMessage = useCallback((text) => {
     const sender =
-      activeCharacter?.name || currentUser?.displayName || currentUser?.username || "Lãng Khách";
+      activeCharacter?.name ||
+      currentUser?.displayName ||
+      currentUser?.username ||
+      t("app.defaultPlayerName");
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
       text: `${sender}: ${text}`,
       type: "near"
     });
     bridge.emit(EVENTS.ACTION_CHAT, { text, sender });
-  }, [activeCharacter, currentUser]);
+  }, [activeCharacter, currentUser, t]);
 
   const handleLoginSuccess = useCallback((session) => {
     setCurrentUser(session.user);
@@ -389,13 +394,14 @@ export function App() {
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `character-${Date.now()}`,
-      text: `Hiệp khách ${character.name} đã gia nhập ${serverName || "Giang Hồ"}!`,
+      textKey: "app.joinLog",
+      textParams: { name: character.name, server: serverName || t("app.serverFallback") },
       type: "system"
     });
-  }, [serverName]);
+  }, [serverName, t]);
 
   const handleLogout = useCallback(() => {
-    if (window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?")) {
+    if (window.confirm(t("app.confirmLogout"))) {
       clearSession();
       setCurrentUser(null);
       setActiveCharacter(null);
@@ -404,10 +410,10 @@ export function App() {
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
       setIsLoginOpen(true);
-      bridge.emit(EVENTS.SET_PLAYER_NAME, "Lãng Khách");
+      bridge.emit(EVENTS.SET_PLAYER_NAME, t("app.defaultPlayerName"));
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
     }
-  }, []);
+  }, [t]);
 
   return (
     <main id="game-shell">

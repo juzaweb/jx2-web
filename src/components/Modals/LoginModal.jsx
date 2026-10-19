@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { apiClient } from "../../game/apiClient.js";
 import { writeSession } from "../../game/session.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 import "../../styles/login.css";
 
 const SERVERS = [
-  { id: "s1", name: "Youtube: PYTA Gaming", tag: "Đề Cử", tagClass: "recommended" },
-  { id: "s2", name: "Biện Kinh", tag: "Mới", tagClass: "normal" },
-  { id: "s3", name: "Thành Đô", tag: "Đông", tagClass: "crowded" },
-  { id: "s4", name: "Tương Dương", tag: "Đông", tagClass: "crowded" },
-  { id: "s5", name: "Trường An", tag: "Bình Thường", tagClass: "normal" },
+  { id: "s1", name: "Youtube: PYTA Gaming", tagKey: "login.tags.recommended", tagClass: "recommended" },
+  { id: "s2", name: "Biện Kinh", tagKey: "login.tags.new", tagClass: "normal" },
+  { id: "s3", name: "Thành Đô", tagKey: "login.tags.crowded", tagClass: "crowded" },
+  { id: "s4", name: "Tương Dương", tagKey: "login.tags.crowded", tagClass: "crowded" },
+  { id: "s5", name: "Trường An", tagKey: "login.tags.normal", tagClass: "normal" },
 ];
 
 const VK_NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
@@ -17,8 +19,7 @@ const VK_ROW2 = ["a", "s", "d", "f", "g", "h", "j", "k", "l"];
 const VK_ROW3 = ["z", "x", "c", "v", "b", "n", "m", "_"];
 
 export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
-  if (!isOpen) return null;
-
+  const { t } = useI18n();
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +34,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
   const [usernameFeedback, setUsernameFeedback] = useState(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (mode !== "register") {
       setUsernameFeedback(null);
       return;
@@ -45,12 +47,12 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
     }
 
     if (clean.length < 3) {
-      setUsernameFeedback({ available: false, reason: "Tài khoản cần tối thiểu 3 ký tự." });
+      setUsernameFeedback({ available: false, reason: t("login.errors.usernameMin") });
       return;
     }
 
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(clean)) {
-      setUsernameFeedback({ available: false, reason: "Chỉ gồm chữ cái, số hoặc dấu _" });
+      setUsernameFeedback({ available: false, reason: t("login.errors.usernameChars") });
       return;
     }
 
@@ -70,12 +72,13 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [username, mode]);
+  }, [isOpen, username, mode, t]);
 
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     // Load remembered account if present
     const saved = localStorage.getItem("jx2_saved_username");
     if (saved) {
@@ -88,7 +91,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
     } else if (usernameRef.current) {
       usernameRef.current.focus();
     }
-  }, []);
+  }, [isOpen]);
 
   const handleVirtualKey = (key) => {
     setError("");
@@ -119,22 +122,22 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
     const cleanUser = username.trim();
     if (!cleanUser || !password) {
-      setError("Vui lòng điền đầy đủ tài khoản và mật khẩu.");
+      setError(t("login.errors.required"));
       return;
     }
 
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUser)) {
-      setError("Tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.");
+      setError(t("login.errors.usernamePattern"));
       return;
     }
 
     if (password.length < 6) {
-      setError("Mật khẩu phải có độ dài tối thiểu 6 ký tự.");
+      setError(t("login.errors.passwordLength"));
       return;
     }
 
     if (mode === "register" && usernameFeedback && !usernameFeedback.available) {
-      setError(usernameFeedback.reason || "Tài khoản này đã tồn tại trong giang hồ.");
+      setError(usernameFeedback.reason || t("login.errors.usernameTaken"));
       return;
     }
 
@@ -157,7 +160,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         };
         writeSession(session);
 
-        setSuccessMsg("Đăng nhập thành công! Đang chuyển đến màn hình chọn nhân vật...");
+        setSuccessMsg(t("login.success.login"));
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -179,7 +182,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         };
         writeSession(session);
 
-        setSuccessMsg("Đăng ký tài khoản thành công! Đang chuyển đến màn hình tạo nhân vật...");
+        setSuccessMsg(t("login.success.register"));
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -192,9 +195,9 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         err.message?.includes("fetch failed");
 
       if (isNetworkError) {
-        setError("Không thể kết nối đến máy chủ Backend API. Vui lòng kiểm tra dịch vụ Backend đang chạy!");
+        setError(t("login.errors.network"));
       } else {
-        setError(err.message || "Không thể kết nối đến máy chủ. Vui lòng thử lại!");
+        setError(err.message || t("login.errors.generic"));
       }
     } finally {
       setLoading(false);
@@ -217,8 +220,12 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="jx2-login-overlay" id="jx2-login-overlay">
+      <LanguageSwitcher variant="login" />
+
       {/* Top-Right Official Emblem */}
       <div className="jx2-login-logo">
         <div className="jx2-logo-title-wrap">
@@ -227,9 +234,9 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
             <path d="M26 38 L38 26" stroke="#fcd34d" strokeWidth="3" />
             <circle cx="10" cy="54" r="4" fill="#ef4444" />
           </svg>
-          <span className="jx2-logo-text">Võ Lâm Truyền Kỳ II</span>
+          <span className="jx2-logo-text">{t("login.brandTitle")}</span>
         </div>
-        <div className="jx2-logo-subtitle">HẢO KIỆT LÔI TRANH</div>
+        <div className="jx2-logo-subtitle">{t("login.brandSubtitle")}</div>
         <div className="jx2-logo-domain">volam2.zing.vn</div>
       </div>
 
@@ -243,7 +250,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
         {/* Header Plaque */}
         <div className="jx2-box-header">
-          <div className="jx2-box-title">Máy chủ đã đăng nhập</div>
+          <div className="jx2-box-title">{t("login.serverLoggedIn")}</div>
         </div>
 
         {/* Server Preview Card */}
@@ -261,7 +268,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
             className="jx2-btn-server-select"
             onClick={() => setIsServerListOpen(!isServerListOpen)}
           >
-            {isServerListOpen ? "Đóng danh sách" : "Chọn lại máy chủ"}
+            {isServerListOpen ? t("login.closeList") : t("login.chooseServer")}
           </button>
 
           {/* Server Switcher Dropdown */}
@@ -277,7 +284,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
                   }}
                 >
                   <span className="jx2-server-item-name">{srv.name}</span>
-                  <span className={`jx2-server-item-tag ${srv.tagClass}`}>{srv.tag}</span>
+                  <span className={`jx2-server-item-tag ${srv.tagClass}`}>{t(srv.tagKey)}</span>
                 </div>
               ))}
             </div>
@@ -295,7 +302,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               setSuccessMsg("");
             }}
           >
-            Đăng nhập
+            {t("login.loginTab")}
           </button>
           <button
             type="button"
@@ -306,7 +313,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               setSuccessMsg("");
             }}
           >
-            Đăng ký tài khoản
+            {t("login.registerTab")}
           </button>
         </div>
 
@@ -327,7 +334,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           {/* Username */}
           <div className="jx2-form-group">
             <label className="jx2-form-label" htmlFor="jx2-username">
-              Tài khoản:
+              {t("login.usernameLabel")}
             </label>
             <input
               id="jx2-username"
@@ -337,7 +344,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onFocus={() => setActiveInput("username")}
-              placeholder="Nhập tài khoản"
+              placeholder={t("login.usernamePlaceholder")}
               autoComplete="username"
               maxLength={30}
               required
@@ -364,7 +371,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           {/* Password */}
           <div className="jx2-form-group">
             <label className="jx2-form-label" htmlFor="jx2-password">
-              Mật khẩu:
+              {t("login.passwordLabel")}
             </label>
             <input
               id="jx2-password"
@@ -374,7 +381,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setActiveInput("password")}
-              placeholder="Nhập mật khẩu"
+              placeholder={t("login.passwordPlaceholder")}
               autoComplete="current-password"
               required
             />
@@ -389,7 +396,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
                 checked={rememberAccount}
                 onChange={(e) => setRememberAccount(e.target.checked)}
               />
-              <span>Nhớ</span>
+              <span>{t("login.remember")}</span>
             </label>
 
             <label className="jx2-checkbox-label">
@@ -399,7 +406,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
                 checked={showVK}
                 onChange={(e) => setShowVK(e.target.checked)}
               />
-              <span>Bàn phím ảo</span>
+              <span>{t("login.virtualKeyboard")}</span>
             </label>
           </div>
 
@@ -407,7 +414,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           {showVK && (
             <div className="jx2-vk-container">
               <div className="jx2-vk-header">
-                <span className="jx2-vk-title">Bàn Phím Ảo (Chống Keylogger)</span>
+                <span className="jx2-vk-title">{t("login.vkTitle")}</span>
                 <button type="button" className="jx2-vk-close" onClick={() => setShowVK(false)}>
                   ✕
                 </button>
@@ -472,14 +479,14 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
                   className="jx2-vk-key special"
                   onClick={handleVirtualBackspace}
                 >
-                  Xóa
+                  {t("login.deleteKey")}
                 </button>
                 <button
                   type="button"
                   className="jx2-vk-key special"
                   onClick={handleVirtualClear}
                 >
-                  Hết
+                  {t("login.clearKey")}
                 </button>
               </div>
             </div>
@@ -492,7 +499,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               className="jx2-btn-action"
               disabled={loading || (mode === "register" && usernameFeedback?.available === false)}
             >
-              {loading ? "Chờ..." : (mode === "register" ? "Đăng ký" : "Đăng nhập")}
+              {loading ? t("common.wait") : (mode === "register" ? t("login.registerButton") : t("login.loginButton"))}
             </button>
             <button
               type="button"
@@ -500,7 +507,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
               onClick={handleReset}
               disabled={loading}
             >
-              Trở lại
+              {t("common.back")}
             </button>
           </div>
         </form>

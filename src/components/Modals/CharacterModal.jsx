@@ -1,32 +1,33 @@
 import React, { useState } from "react";
 import { deriveCharacterSheet } from "../../game/characterStats.js";
 import "../../styles/character.css";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 /** Paper-doll slots. Presentation only — equipment is not simulated yet. */
 const EQUIPMENT_SLOTS = {
   columnLeft: [
-    { key: "helm", label: "Mũ" },
-    { key: "armor", label: "Áo giáp" },
-    { key: "belt", label: "Đai lưng" },
-    { key: "gloves", label: "Găng tay" },
-    { key: "bracers", label: "Hộ uyển" },
-    { key: "weapon", label: "Vũ khí" },
+    { key: "helm", labelKey: "character.slots.helm" },
+    { key: "armor", labelKey: "character.slots.armor" },
+    { key: "belt", labelKey: "character.slots.belt" },
+    { key: "gloves", labelKey: "character.slots.gloves" },
+    { key: "bracers", labelKey: "character.slots.bracers" },
+    { key: "weapon", labelKey: "character.slots.weapon" },
     // Sits directly above the corner "Phó mật tịch" slot.
-    { key: "secretManual", label: "Mật tịch", icon: "manual" }
+    { key: "secretManual", labelKey: "character.slots.secretManual", icon: "manual" }
   ],
   // Sits at the elbow where the vertical column meets the horizontal row.
-  corner: { key: "subManual", label: "Phó mật tịch", icon: "subManual" },
+  corner: { key: "subManual", labelKey: "character.slots.subManual", icon: "subManual" },
   row: [
-    { key: "cosHat", label: "Ngoại trang - Nón", icon: "cosHat" },
-    { key: "cosTop", label: "Ngoại trang - Áo", icon: "cosTop" },
-    { key: "cosPants", label: "Ngoại trang - Quần", icon: "cosPants" },
-    { key: "mount", label: "Ngựa", icon: "mount" }
+    { key: "cosHat", labelKey: "character.slots.cosHat", icon: "cosHat" },
+    { key: "cosTop", labelKey: "character.slots.cosTop", icon: "cosTop" },
+    { key: "cosPants", labelKey: "character.slots.cosPants", icon: "cosPants" },
+    { key: "mount", labelKey: "character.slots.mount", icon: "mount" }
   ]
 };
 
 const TABS = [
-  { key: "equip", label: "Trang bị", enabled: true },
-  { key: "news", label: "Tin tức", enabled: false }
+  { key: "equip", labelKey: "character.tabEquip", enabled: true },
+  { key: "news", labelKey: "character.tabNews", enabled: false }
 ];
 
 /** Faint silhouette drawn behind each empty equipment slot. */
@@ -96,6 +97,7 @@ const SLOT_ICONS = {
 };
 
 export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
+  const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
 
   if (!isOpen) return null;
@@ -103,7 +105,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
   const sheet = deriveCharacterSheet(stats);
 
   const renderSlot = (slot) => (
-    <div className="equip-slot" key={slot.key} title={`${slot.label} (chưa trang bị)`}>
+    <div className="equip-slot" key={slot.key} title={t("character.notEquipped", { label: t(slot.labelKey) })}>
       <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
         {SLOT_ICONS[slot.icon || slot.key]}
       </svg>
@@ -116,21 +118,21 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
         className="char-panel"
         role="dialog"
         aria-modal="false"
-        aria-label="Nhân vật"
+        aria-label={t("character.title")}
       >
         <div className="char-titlebar">
-          <span className="char-title">Nhân vật</span>
+          <span className="char-title">{t("character.title")}</span>
           <div className="char-titlebar-actions">
             <button
               className="char-icon-btn"
-              title="Trợ giúp"
+              title={t("character.helpTitle")}
               onClick={() => setShowHint((v) => !v)}
             >
               ?
             </button>
             <button
               className="char-icon-btn close"
-              title="Đóng (F3 / Esc)"
+              title={t("character.closeTitle")}
               onClick={onClose}
             >
               ×
@@ -140,8 +142,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
 
         {showHint && (
           <div className="char-hint">
-            Các chỉ số chiến đấu được suy ra từ đẳng cấp nhân vật. Hệ thống trang bị và
-            điểm tiềm năng sẽ được mở ở giai đoạn sau.
+            {t("character.hint")}
           </div>
         )}
 
@@ -154,9 +155,9 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
               aria-selected={tab.enabled}
               className={`char-tab${tab.enabled ? " active" : ""}`}
               disabled={!tab.enabled}
-              title={tab.enabled ? tab.label : `${tab.label} (chưa mở)`}
+              title={tab.enabled ? t(tab.labelKey) : t("character.locked", { label: t(tab.labelKey) })}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>
@@ -166,7 +167,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
             <div className="char-stats">
               {sheet.vitals.map((row) => (
                 <div className="stat-row vital" key={row.key}>
-                  <span className="stat-label">{row.label}</span>
+                  <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
               ))}
@@ -175,7 +176,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
             <div className="char-stats">
               {sheet.combat.map((row) => (
                 <div className="stat-row" key={row.key}>
-                  <span className="stat-label">{row.label}</span>
+                  <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
               ))}
@@ -184,7 +185,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
             <div className="char-stats">
               {sheet.attributes.map((row) => (
                 <div className="stat-row attr" key={row.key}>
-                  <span className="stat-label">{row.label}</span>
+                  <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">
                     {row.base}
                     <span className="attr-bonus">+{row.bonus}</span>
@@ -194,7 +195,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
             </div>
 
             <div className="char-potential">
-              <span className="stat-label">Tiềm năng</span>
+              <span className="stat-label">{t("character.potential")}</span>
               <span className="stat-value">{sheet.footer.potential}</span>
             </div>
           </div>
@@ -206,7 +207,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
               </div>
 
               <div className="char-model">
-                <img src="/hero_full.png" alt={playerName || "Nhân vật"} />
+                <img src="/hero_full.png" alt={playerName || t("character.playerAlt")} />
                 {playerName && <div className="char-model-name">{playerName}</div>}
               </div>
 
@@ -219,10 +220,10 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
 
         <div className="char-footer">
           <span>
-            Điểm: <b>{sheet.footer.points}</b>
+            {t("character.points")} <b>{sheet.footer.points}</b>
           </span>
           <span>
-            Tăng cấp: <b>{sheet.footer.nextLevelExp}</b>
+            {t("character.nextLevel")} <b>{sheet.footer.nextLevelExp}</b>
           </span>
         </div>
       </div>

@@ -1,5 +1,7 @@
 import React from "react";
 import { QUICK_ITEMS } from "../../game/items.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { localizeItem } from "../../i18n/localize.js";
 
 export function HotbarDock({
   coins = 0,
@@ -17,26 +19,30 @@ export function HotbarDock({
   pkEnabled = false,
   items = QUICK_ITEMS
 }) {
+  const { t } = useI18n();
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {items.map((item) => (
-            <div
-              className="slot-item"
-              id={`slot-${item.useSlot}`}
-              key={item.id}
-              title={`Phím [${item.useSlot}]: ${item.name}`}
-              onClick={() => onUseItem(item.useSlot)}
-            >
-              <span className="slot-key">{item.useSlot}</span>
-              <div className={`item-icon ${item.icon}`} />
-              <span className="slot-qty" id={`qty-${item.id}`}>
-                {item.qty}
-              </span>
-            </div>
-          ))}
+          {items.map((rawItem) => {
+            const item = localizeItem(rawItem, t);
+            return (
+              <div
+                className="slot-item"
+                id={`slot-${item.useSlot}`}
+                key={item.id}
+                title={t("hotbar.slotTitle", { key: item.useSlot, name: item.name })}
+                onClick={() => onUseItem(item.useSlot)}
+              >
+                <span className="slot-key">{item.useSlot}</span>
+                <div className={`item-icon ${item.icon}`} />
+                <span className="slot-qty" id={`qty-${item.id}`}>
+                  {item.qty}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Slot 5 to 7: Martial shortcuts */}
           <div className="slot-item empty">
@@ -53,7 +59,7 @@ export function HotbarDock({
           <div
             className="slot-item skill-slot"
             id="slot-8"
-            title="Phím [8] hoặc [Q]: Tuyệt kỹ Kiếm Khí"
+            title={t("hotbar.skillSlotTitle")}
             onClick={onSkill}
           >
             <span className="slot-key">8/Q</span>
@@ -66,33 +72,33 @@ export function HotbarDock({
           <div
             className="martial-skill-box l-click"
             id="skill-attack-box"
-            title="Chuột Trái / Space: Vô Cực Kiếm Pháp"
+            title={t("hotbar.attackTitle")}
             onClick={onAttack}
           >
             <div className="skill-art art-sword"></div>
-            <span className="click-badge">Chuột Trái</span>
+            <span className="click-badge">{t("hotbar.leftClick")}</span>
           </div>
           <div
             className="martial-skill-box r-click"
             id="skill-q-box"
-            title="Chuột Phải / Phím Q: Kiếm Khí Bát Hoang"
+            title={t("hotbar.skillTitle")}
             onClick={onSkill}
           >
             <div className="skill-art art-aura"></div>
-            <span className="click-badge">Chuột Phải [Q]</span>
+            <span className="click-badge">{t("hotbar.rightClickQ")}</span>
           </div>
           <div className="martial-text-label">
-            <div className="martial-name">Phần Cẩm Chữ Hạc</div>
-            <div className="martial-sub">Thiên Hà Mật Tịch</div>
+            <div className="martial-name">{t("hotbar.martialName")}</div>
+            <div className="martial-sub">{t("hotbar.martialSub")}</div>
           </div>
         </div>
 
         {/* Hero Portrait */}
-        <div className="hero-portrait" title="Lãng Khách Võ Đang">
+        <div className="hero-portrait" title={t("hotbar.portraitTitle")}>
           <div className="portrait-avatar">
             <img
               src="/hero_portrait.png"
-              alt="Lãng Khách"
+              alt={t("hotbar.portraitAlt")}
               style={{
                 width: "100%",
                 height: "100%",
@@ -103,7 +109,7 @@ export function HotbarDock({
             />
           </div>
           <div className="portrait-coins" id="coin-label">
-            BẠC: {coins}
+            {t("hotbar.coins")}: {coins}
           </div>
         </div>
 
@@ -112,38 +118,38 @@ export function HotbarDock({
           <button
             className="sys-btn"
             id="char-btn"
-            title="Nhân Vật (F3)"
+            title={`${t("hotbar.character")} (F3)`}
             onClick={onCharacter}
           >
             <span className="sys-ico">🧍</span>
-            <span className="sys-lbl">Nhân Vật</span>
+            <span className="sys-lbl">{t("hotbar.character")}</span>
           </button>
           <button
             className="sys-btn"
             id="inv-btn"
-            title="Hành Trang (F4)"
+            title={`${t("hotbar.inventory")} (F4)`}
             onClick={onInventory}
           >
             <span className="sys-ico">🎒</span>
-            <span className="sys-lbl">Hành Trang</span>
+            <span className="sys-lbl">{t("hotbar.inventory")}</span>
           </button>
           <button
             className="sys-btn"
             id="help-btn"
-            title="Cẩm Nang Hướng Dẫn"
+            title={t("hotbar.help")}
             onClick={onOpenHelp}
           >
             <span className="sys-ico">📜</span>
-            <span className="sys-lbl">Cẩm Nang</span>
+            <span className="sys-lbl">{t("hotbar.help")}</span>
           </button>
           <button
             className={`sys-btn pk-mode${pkEnabled ? " pk-active" : ""}`}
             id="pk-btn"
-            title="Bật/tắt cờ PK (Phím P)"
+            title={t("hotbar.pkTitle")}
             onClick={onTogglePk}
           >
             <span className="sys-ico">⚔️</span>
-            <span className="sys-lbl">{pkEnabled ? "PK" : "Hòa Bình"}</span>
+            <span className="sys-lbl">{pkEnabled ? t("hotbar.pkOn") : t("hotbar.pkOff")}</span>
           </button>
         </div>
       </div>

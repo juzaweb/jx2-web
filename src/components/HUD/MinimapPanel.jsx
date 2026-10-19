@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import { bridge, EVENTS } from "../../game/bridge.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
 export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest }) {
+  const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
 
@@ -27,13 +30,14 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
       <div className="minimap-frame metal-card">
         <div className="minimap-header">
           <div className="region-title">
-            <span className="realm-channel">Tàng Long (Máy chủ 1)</span>
+            <span className="realm-channel">{t("minimap.region")}</span>
           </div>
           <div className="minimap-actions">
+            <LanguageSwitcher variant="hud" />
             <button
               id="map-help-btn"
               className="mini-btn gold"
-              title="Cẩm nang tân thủ"
+              title={t("minimap.helpTitle")}
               onClick={onOpenHelp}
             >
               ?
@@ -42,7 +46,7 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
         </div>
 
         <div className="minimap-subinfo">
-          <span className="subzone-name">Biện Kinh</span>
+          <span className="subzone-name">{t("minimap.subzone")}</span>
           <span className="coords" id="coords-text" ref={coordsRef}>
             640 / 620
           </span>
@@ -60,12 +64,12 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest })
 
         {/* Pinned Quest Objective */}
         <div className="quest-tracker" id="quest-tracker">
-          <div className="quest-head">✦ KHÁM PHÁ BIỆN KINH</div>
+          <div className="quest-head">{t("minimap.questHead")}</div>
           <div className="quest-body" id="quest-text">
-            {quest?.completed ? "Đã dạo quanh Biện Kinh" : "Thành thị phồn hoa"}
+            {quest?.completed ? t("minimap.questDone") : t("minimap.questTodo")}
           </div>
           <div className="quest-progress" id="quest-progress">
-            Khu an toàn • Không có quái
+            {t("minimap.questSafe")}
           </div>
         </div>
       </div>

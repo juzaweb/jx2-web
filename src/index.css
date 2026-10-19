@@ -941,3 +941,90 @@ body {
     display: none;
   }
 }
+
+/* ====================================================
+   LANGUAGE SWITCHER
+==================================================== */
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(10, 20, 18, 0.8);
+  border: 1px solid rgba(110, 231, 183, 0.35);
+  border-radius: 3px;
+  color: #ffe9a8;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 60;
+}
+
+.language-switcher-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.language-switcher-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffe9a8;
+  font-family: "Be Vietnam Pro", "Cinzel", serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  padding: 0 1px;
+}
+
+.language-switcher-select option {
+  background: #13201e;
+  color: #ffe9a8;
+}
+
+.language-switcher:hover,
+.language-switcher:focus-within {
+  border-color: #d4af37;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.35);
+}
+
+.language-switcher--login {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 30;
+}
+
+.language-switcher--character {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 5;
+}
+
+.language-switcher--hud {
+  padding: 0 3px;
+  gap: 2px;
+  background: #252f36;
+  border-color: #5a4b35;
+}
+
+.language-switcher--hud .language-switcher-icon {
+  display: none;
+}
+
+.language-switcher--hud .language-switcher-select {
+  font-size: 9px;
+  color: #d8c7a1;
+  padding: 1px 0;
+}
+
+@media (max-width: 640px) {
+  .language-switcher--login {
+    top: 10px;
+    left: 10px;
+  }
+}

@@ -1,5 +1,7 @@
 import * as Phaser from "phaser";
 import { toIso, isoDepth } from "./isoProjection.js";
+import { NPC_DATA, getNpcName, localizeNpc } from "./npcData.js";
+import { LANGUAGE_CHANGED_EVENT } from "../i18n/translator.js";
 
 /** Ground tile size (world units) that renders as one 76x38 iso diamond. */
 const FLOOR_TILE = 76;
@@ -12,62 +14,7 @@ export const WORLD_CONFIG = {
 /** Ground rectangle enclosed by the Biện Kinh city walls. */
 export const CITY_BOUNDS = { x0: 90, y0: 60, x1: 2110, y1: 1190 };
 
-export const NPC_DATA = [
-  {
-    id: "duoc-diem",
-    name: "Chủ Dược Điếm",
-    x: 580,
-    y: 380,
-    type: "herbalist",
-    dialogue:
-      'Chủ Dược Điếm: "Hoan nghênh hiệp khách ghé Dược Điếm Biện Kinh! Bổn tiệm chuyên cung cấp Kim Sáng Dược, Đại Hoàn Đan thượng hạng trị thương hồi khí."'
-  },
-  {
-    id: "bach-tien-sinh",
-    name: "Bạch Tiên Sinh",
-    x: 780,
-    y: 780,
-    type: "scholar",
-    dialogue:
-      'Bạch Tiên Sinh: "Giang hồ hiểm ác, lòng người khó lường. Thiếu hiệp hành tẩu Biện Kinh nhớ giữ gìn bản tâm, chăm chỉ tu luyện võ công!"'
-  },
-  {
-    id: "thuong-nhan-bao-ruong",
-    name: "Thương Nhân Bảo Rương",
-    x: 990,
-    y: 800,
-    type: "merchant",
-    dialogue:
-      'Thương Nhân Bảo Rương: "Khắp nơi trong thiên hạ đều có bảo rương ẩn giấu kỳ trân dị bảo. Thiếu hiệp nếu có chìa khóa hoàng kim, hãy mang đến đây đổi lấy tuyệt thế thần binh!"'
-  },
-  {
-    id: "dai-su-hoat-dong",
-    name: "Đại Sứ Hoạt Động",
-    x: 1090,
-    y: 690,
-    type: "ambassador",
-    dialogue:
-      'Đại Sứ Hoạt Động: "Hoan nghênh chư vị anh hùng đến với Biện Kinh! Tham gia các hoạt động giang hồ mỗi ngày để nhận vinh dự và phần thưởng quý giá."'
-  },
-  {
-    id: "chan-tu-don",
-    name: "Chân Tử Đơn",
-    x: 1220,
-    y: 520,
-    type: "martial",
-    dialogue:
-      'Chân Tử Đơn: "Võ học vô biên! Luyện tập quyền cước hàng ngày chính là căn cơ để xưng bá võ lâm."'
-  },
-  {
-    id: "van-su-thong",
-    name: "Vạn Sự Thông",
-    x: 1160,
-    y: 480,
-    type: "sage",
-    dialogue:
-      'Vạn Sự Thông: "Thiên hạ sự tình, phong vân biến ảo, không điều gì mà lão phu không tường. Thiếu hiệp muốn dò hỏi tin tức chốn võ lâm chăng?"'
-  }
-];
+
 
 export class WorldManager {
   /**
@@ -855,8 +802,31 @@ export class WorldManager {
    * With green overhead names matching the JX2 screenshot
    */
   drawNPCs() {
+    this.npcLabels = new Map();
     this.npcs.forEach((npc) => {
-      this.createNPC(npc.x, npc.y, npc.name, npc.type);
+      const container = this.createNPC(npc.x, npc.y, getNpcName(npc), npc.type);
+      const label = container?.getData?.("nameLabel");
+      if (label) this.npcLabels.set(npc.id, label);
+    });
+
+    if (typeof window !== "undefined" && !this.npcLanguageHandler) {
+      const handler = () => this.refreshNpcLabels();
+      this.npcLanguageHandler = handler;
+      window.addEventListener(LANGUAGE_CHANGED_EVENT, handler);
+      this.scene.events.once("shutdown", () => {
+        window.removeEventListener(LANGUAGE_CHANGED_EVENT, handler);
+        if (this.npcLanguageHandler === handler) this.npcLanguageHandler = null;
+        this.npcLabels = null;
+      });
+    }
+  }
+
+  /** Re-render the overhead name tags after a language switch. */
+  refreshNpcLabels() {
+    if (!this.npcLabels) return;
+    this.npcs.forEach((npc) => {
+      const label = this.npcLabels.get(npc.id);
+      if (label?.setText) label.setText(getNpcName(npc));
     });
   }
 
@@ -1166,6 +1136,7 @@ export class WorldManager {
     }).setOrigin(0.5);
 
     c.add([shadow, bodyContainer, nameLabel]);
+    c.setData("nameLabel", nameLabel);
     c.setDepth(isoDepth(x, y));
 
     // Obstacle collider so players can't walk inside NPCs
@@ -1202,6 +1173,7 @@ export class WorldManager {
    * @returns {Array<object>}
    */
   getNPCs() {
-    return this.npcs ? [...this.npcs] : [];
+    if (!this.npcs) return [];
+    return this.npcs.map(localizeNpc);
   }
 }

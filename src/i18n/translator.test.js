@@ -1,0 +1,81 @@
+import { describe, expect, it } from "vitest";
+import en from "./locales/en.js";
+import vi from "./locales/vi.js";
+import zh from "./locales/zh.js";
+import { normalizeLanguage, translateFor } from "./translator.js";
+import { INVENTORY_ITEMS, QUICK_ITEMS } from "../game/items.js";
+
+const flattenKeys = (dictionary, prefix = "") =>
+  Object.entries(dictionary).flatMap(([key, value]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    return value && typeof value === "object" ? flattenKeys(value, path) : [path];
+  });
+
+describe("normalizeLanguage", () => {
+  it("accepts supported codes and regional variants", () => {
+    expect(normalizeLanguage("vi")).toBe("vi");
+    expect(normalizeLanguage("en-US")).toBe("en");
+    expect(normalizeLanguage("zh-CN")).toBe("zh");
+    expect(normalizeLanguage("ZH")).toBe("zh");
+  });
+
+  it("rejects unsupported or missing values", () => {
+    expect(normalizeLanguage("fr")).toBeNull();
+    expect(normalizeLanguage(undefined)).toBeNull();
+  });
+});
+
+describe("translateFor", () => {
+  it("translates per language", () => {
+    expect(translateFor("en", "common.back")).toBe("Back");
+    expect(translateFor("zh", "common.back")).toBe("返回");
+    expect(translateFor("vi", "common.back")).toBe("Trở lại");
+  });
+
+  it("interpolates named parameters", () => {
+    expect(
+      translateFor("en", "hotbar.slotTitle", { key: 1, name: "Golden Radiance Elixir" })
+    ).toBe("Key [1]: Golden Radiance Elixir");
+  });
+
+  it("falls back to Vietnamese, then the supplied fallback, then the key", () => {
+    expect(translateFor("en", "npc.duoc-diem.name")).toBe("Apothecary Owner");
+    expect(translateFor("en", "does.not.exist", undefined, "fallback")).toBe("fallback");
+    expect(translateFor("en", "does.not.exist")).toBe("does.not.exist");
+  });
+});
+
+describe("locale catalogs", () => {
+  const viKeys = flattenKeys(vi).sort();
+
+  it("keeps every language key-for-key aligned with Vietnamese", () => {
+    expect(flattenKeys(en).sort()).toEqual(viKeys);
+    expect(flattenKeys(zh).sort()).toEqual(viKeys);
+  });
+
+  it("defines a name and description for every item in the catalog", () => {
+    const itemIds = [...QUICK_ITEMS, ...INVENTORY_ITEMS]
+      .filter(Boolean)
+      .map((item) => item.id);
+
+    itemIds.forEach((id) => {
+      [vi, en, zh].forEach((dictionary) => {
+        expect(dictionary.item[id]?.name, `${id} name`).toBeTruthy();
+        expect(dictionary.item[id]?.desc, `${id} description`).toBeTruthy();
+      });
+    });
+  });
+
+  it("defines names and dialogue for every NPC", () => {
+    ["duoc-diem", "bach-tien-sinh", "thuong-nhan-bao-ruong", "dai-su-hoat-dong", "chan-tu-don", "van-su-thong"].forEach(
+      (id) => {
+        expect(vi.npc[id].name).toBeTruthy();
+        expect(vi.npc[id].dialogue).toBeTruthy();
+        expect(en.npc[id].name).toBeTruthy();
+        expect(en.npc[id].dialogue).toBeTruthy();
+        expect(zh.npc[id].name).toBeTruthy();
+        expect(zh.npc[id].dialogue).toBeTruthy();
+      }
+    );
+  });
+});

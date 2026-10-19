@@ -1,20 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
-const TAB_LABELS = {
-  all: "Tổng hợp",
-  system: "Hệ thống",
-  near: "Cận",
-  combat: "Chiến đấu"
-};
-
-const TYPE_NAMES = {
-  system: "Hệ thống",
-  near: "Cận",
-  combat: "Chiến đấu",
-  guide: "Cẩm nang"
-};
+const TABS = ["all", "system", "near", "combat"];
 
 export function ChatPanel({ logs, onSendMessage }) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
   const [inputText, setInputText] = useState("");
   const contentRef = useRef(null);
@@ -51,13 +41,13 @@ export function ChatPanel({ logs, onSendMessage }) {
     <section className="bottom-left-panel" id="chat-panel">
       <div className="chat-box metal-card">
         <div className="chat-tabs">
-          {["all", "system", "near", "combat"].map((tab) => (
+          {TABS.map((tab) => (
             <button
               key={tab}
               className={`chat-tab ${activeTab === tab ? "active" : ""}`}
               onClick={() => setActiveTab(tab)}
             >
-              {TAB_LABELS[tab]}
+              {t(`chat.tabs.${tab}`)}
             </button>
           ))}
         </div>
@@ -66,28 +56,28 @@ export function ChatPanel({ logs, onSendMessage }) {
           {filteredLogs.map((log) => (
             <p key={log.id} data-type={log.type}>
               <span className={`tag tag-${log.type}`}>
-                [{TYPE_NAMES[log.type] || "Giang hồ"}]
+                [{t(`chat.types.${log.type}`, undefined, t("chat.types.default"))}]
               </span>{" "}
-              {log.text}
+              {log.textKey ? t(log.textKey, log.textParams) : log.text}
             </p>
           ))}
         </div>
 
         <div className="chat-input-bar">
           <div className="channel-select" id="chat-channel-btn">
-            [ Cận ] ▼
+            {t("chat.channel")}
           </div>
           <input
             type="text"
             id="chat-input"
-            placeholder="Nhấn Enter để gửi lời vào giang hồ..."
+            placeholder={t("chat.placeholder")}
             maxLength={60}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
           />
           <button id="chat-send-btn" className="chat-send" onClick={handleSend}>
-            GỬI
+            {t("chat.send")}
           </button>
         </div>
       </div>
