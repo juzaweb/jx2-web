@@ -3,8 +3,7 @@ import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
   INVENTORY_CAPACITY,
-  INVENTORY_TREASURY,
-  getItemById
+  INVENTORY_TREASURY
 } from "../../game/items.js";
 import {
   EQUIPMENT_SLOTS,
@@ -15,6 +14,7 @@ import {
 import "./inventory.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
+import { setDragPayload, readDragPayload, hasDragPayload } from "./dragItem.js";
 
 const GRID_COLUMNS = 5;
 const TOOLTIP_OFFSET = 16;
@@ -79,16 +79,23 @@ export function InventoryModal({
     }
   };
 
-  const handleUnequip = (slotKey) => {
-    onUnequipSlot?.(slotKey);
+  // Dropping an item dragged off the character paper-doll returns it to the bag.
+  const handlePanelDragOver = (event) => {
+    if (hasDragPayload(event)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
   };
 
-  const equippedItems = EQUIPMENT_SLOTS.map((slot) => ({
-    ...slot,
-    item: equipment?.[slot.key] ? getItemById(equipment[slot.key]) : null
-  }));
+  const handlePanelDrop = (event) => {
+    const payload = readDragPayload(event);
+    if (payload?.kind === "equipment") {
+      event.preventDefault();
+      onUnequipSlot?.(payload.slot);
+    }
+  };
 
-  /** Item ids currently worn, so the grid can mark them instead of re-equipping. */
+  /** Worn item ids — hidden from the grid so the bag only shows carried items. */
   const equippedIds = new Set(
     EQUIPMENT_SLOTS.map((slot) => equipment?.[slot.key]).filter(Boolean)
   );
@@ -111,6 +118,8 @@ export function InventoryModal({
         aria-label={t("inventory.title")}
         onMouseMove={handlePanelMouseMove}
         onMouseLeave={() => setHovered(null)}
+        onDragOver={handlePanelDragOver}
+        onDrop={handlePanelDrop}
       >
         <div className="inv-titlebar">
           <span className="inv-title">{t("inventory.title")}</span>
@@ -164,36 +173,6 @@ export function InventoryModal({
           </span>
         </div>
 
-        {/* Equipment slots: click a filled slot to take the item off */}
-        <div className="inv-equiprow">
-          {equippedItems.map(({ key, label, item: rawItem }) => {
-            const labelText = t(`slots.${key}`, undefined, label);
-            const item = localizeItem(rawItem, t);
-            return (
-              <button
-                type="button"
-                key={key}
-                className={`inv-slot equip${item ? " filled" : ""}`}
-                title={
-                  item
-                    ? t("inventory.equipTitle", { label: labelText, name: item.name })
-                    : labelText
-                }
-                onMouseEnter={(event) =>
-                  item ? handleSlotEnter(item, event) : setHovered(null)
-                }
-                onClick={() => item && handleUnequip(key)}
-              >
-                {item ? (
-                  <span className={`inv-icon ${item.icon}`} />
-                ) : (
-                  <span className="inv-equip-label">{labelText}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
         {bonusSummary.length > 0 && (
           <div className="inv-equip-bonus">
             {bonusSummary.map((row) => (
@@ -209,7 +188,10 @@ export function InventoryModal({
           style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
         >
           {inventoryItems.map((rawItem, index) => {
-            if (!rawItem) {
+            const item = rawItem ? localizeItem(rawItem, t) : null;
+
+            // Worn items live on the character sheet, so the bag shows an empty cell.
+            if (!item || equippedIds.has(item.id)) {
               return (
                 <div
                   className="inv-slot empty"
@@ -219,18 +201,27 @@ export function InventoryModal({
               );
             }
 
-            const item = localizeItem(rawItem, t);
             const equippable = Boolean(item.slot);
-            const equipped = equippable && equippedIds.has(item.id);
             const usable = equippable || item.useSlot != null;
             return (
               <button
                 type="button"
                 key={item.id}
-                className={`inv-slot${usable ? " usable" : ""}${equipped ? " equipped" : ""}`}
+                className={`inv-slot${usable ? " usable" : ""}`}
                 title={item.name}
+                draggable={equippable}
+                onDragStart={
+                  equippable
+                    ? (event) =>
+                        setDragPayload(event, {
+                          kind: "inventory",
+                          itemId: item.id,
+                          slot: item.slot
+                        })
+                    : undefined
+                }
                 onMouseEnter={(event) => handleSlotEnter(item, event)}
-                onClick={() => !equipped && handleSlotClick(item)}
+                onClick={() => handleSlotClick(item)}
               >
                 <span className={`inv-icon ${item.icon}`} />
                 {typeof item.qty === "number" && (
@@ -238,7 +229,7 @@ export function InventoryModal({
                 )}
                 {usable && (
                   <span className="inv-use-tag">
-                    {equippable ? (equipped ? t("inventory.equipped") : t("inventory.equip")) : t("inventory.use")}
+                    {equippable ? t("inventory.equip") : t("inventory.use")}
                   </span>
                 )}
               </button>

@@ -1,17 +1,23 @@
 import React, { useState } from "react";
 import { deriveCharacterSheet } from "../../game/characterStats.js";
+import { getItemById } from "../../game/items.js";
 import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { localizeItem } from "../../i18n/localize.js";
+import { setDragPayload, readDragPayload, hasDragPayload } from "./dragItem.js";
 
-/** Paper-doll slots. Presentation only — equipment is not simulated yet. */
-const EQUIPMENT_SLOTS = {
+/**
+ * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
+ * slot and can be clicked to take it off; the rest are decorative placeholders.
+ */
+const DOLL_SLOTS = {
   columnLeft: [
-    { key: "helm", labelKey: "character.slots.helm" },
-    { key: "armor", labelKey: "character.slots.armor" },
+    { key: "helm", source: "helmet", labelKey: "slots.helmet" },
+    { key: "armor", source: "armor", labelKey: "slots.armor" },
     { key: "belt", labelKey: "character.slots.belt" },
-    { key: "gloves", labelKey: "character.slots.gloves" },
+    { key: "accessory", source: "accessory", labelKey: "slots.accessory", icon: "accessory" },
     { key: "bracers", labelKey: "character.slots.bracers" },
-    { key: "weapon", labelKey: "character.slots.weapon" },
+    { key: "weapon", source: "weapon", labelKey: "slots.weapon" },
     // Sits directly above the corner "Phó mật tịch" slot.
     { key: "secretManual", labelKey: "character.slots.secretManual", icon: "manual" }
   ],
@@ -50,13 +56,16 @@ const SLOT_ICONS = {
       <rect x="10" y="9" width="4" height="7" rx="1" />
     </>
   ),
-  gloves: (
-    <path d="M8 20v-8a2 2 0 0 1 4 0V9a2 2 0 0 1 4 0v3a2 2 0 0 1 4 0v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" />
-  ),
   bracers: (
     <>
       <rect x="7" y="6" width="10" height="12" rx="2" />
       <path d="M7 12h10" />
+    </>
+  ),
+  accessory: (
+    <>
+      <circle cx="12" cy="15" r="5" />
+      <path d="M9 7l2 3h2l2-3" />
     </>
   ),
   weapon: (
@@ -96,21 +105,81 @@ const SLOT_ICONS = {
   )
 };
 
-export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
+export function CharacterModal({
+  isOpen,
+  onClose,
+  stats,
+  playerName = "",
+  equipment = {},
+  onUnequipSlot,
+  onEquipItem
+}) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
+  const [dragOverKey, setDragOverKey] = useState(null);
 
   if (!isOpen) return null;
 
   const sheet = deriveCharacterSheet(stats);
 
-  const renderSlot = (slot) => (
-    <div className="equip-slot" key={slot.key} title={t("character.notEquipped", { label: t(slot.labelKey) })}>
-      <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
-        {SLOT_ICONS[slot.icon || slot.key]}
-      </svg>
-    </div>
-  );
+  // Dropping a bag item on a doll slot equips it when the slot matches.
+  const handleSlotDragOver = (event, slot) => {
+    if (hasDragPayload(event)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+  };
+
+  const handleSlotDrop = (event, slot) => {
+    setDragOverKey(null);
+    const payload = readDragPayload(event);
+    if (payload?.kind === "inventory" && payload.slot === slot.source) {
+      event.preventDefault();
+      onEquipItem?.(payload.itemId);
+    }
+  };
+
+  const renderSlot = (slot) => {
+    const wornId = slot.source ? equipment?.[slot.source] : null;
+    const item = wornId ? localizeItem(getItemById(wornId), t) : null;
+
+    if (item) {
+      return (
+        <button
+          type="button"
+          className={`equip-slot filled${dragOverKey === slot.key ? " drag-over" : ""}`}
+          key={slot.key}
+          title={t("character.unequipTitle", { name: item.name })}
+          draggable
+          onDragStart={(event) => setDragPayload(event, { kind: "equipment", slot: slot.source })}
+          onDragOver={(event) => handleSlotDragOver(event, slot)}
+          onDragEnter={() => setDragOverKey(slot.key)}
+          onDragLeave={() => setDragOverKey((key) => (key === slot.key ? null : key))}
+          onDrop={(event) => handleSlotDrop(event, slot)}
+          onClick={() => onUnequipSlot?.(slot.source)}
+        >
+          <span className={`inv-icon ${item.icon}`} />
+        </button>
+      );
+    }
+
+    const droppable = Boolean(slot.source);
+    return (
+      <div
+        className={`equip-slot${droppable ? " droppable" : ""}${dragOverKey === slot.key ? " drag-over" : ""}`}
+        key={slot.key}
+        title={t("character.notEquipped", { label: t(slot.labelKey) })}
+        onDragOver={droppable ? (event) => handleSlotDragOver(event, slot) : undefined}
+        onDragEnter={droppable ? () => setDragOverKey(slot.key) : undefined}
+        onDragLeave={droppable ? () => setDragOverKey((key) => (key === slot.key ? null : key)) : undefined}
+        onDrop={droppable ? (event) => handleSlotDrop(event, slot) : undefined}
+      >
+        <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
+          {SLOT_ICONS[slot.icon || slot.key]}
+        </svg>
+      </div>
+    );
+  };
 
   return (
     <div className="char-modal-overlay" id="character-modal">
@@ -203,7 +272,7 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
           <div className="char-main">
             <div className="char-equip">
               <div className="equip-col left">
-                {EQUIPMENT_SLOTS.columnLeft.map(renderSlot)}
+                {DOLL_SLOTS.columnLeft.map(renderSlot)}
               </div>
 
               <div className="char-model">
@@ -211,9 +280,9 @@ export function CharacterModal({ isOpen, onClose, stats, playerName = "" }) {
                 {playerName && <div className="char-model-name">{playerName}</div>}
               </div>
 
-              <div className="equip-corner">{renderSlot(EQUIPMENT_SLOTS.corner)}</div>
+              <div className="equip-corner">{renderSlot(DOLL_SLOTS.corner)}</div>
 
-              <div className="equip-row">{EQUIPMENT_SLOTS.row.map(renderSlot)}</div>
+              <div className="equip-row">{DOLL_SLOTS.row.map(renderSlot)}</div>
             </div>
           </div>
         </div>

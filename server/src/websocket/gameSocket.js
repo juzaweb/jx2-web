@@ -30,7 +30,7 @@ const clampNum = (val, min, max, fallback) => {
 };
 
 /** Equipment slots the client renders (see src/game/equipment.js). */
-const EQUIPMENT_SLOTS = ["boots", "armor", "helmet", "accessory", "weapon"];
+const EQUIPMENT_SLOTS = ["armor", "helmet", "accessory", "weapon"];
 
 /**
  * Reduce a client-reported equipment map to the known slots with short string

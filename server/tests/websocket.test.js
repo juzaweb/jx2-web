@@ -220,7 +220,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
         x: 4000,
         y: 4000,
         // Unknown slots and non-string ids must be dropped.
-        equipment: { armor: "cam-y-bao", helmet: "phuong-vu-bao", bogus: "x", boots: 5 }
+        equipment: { armor: "cam-y-bao", helmet: "phuong-vu-bao", bogus: "x", weapon: 5 }
       }
     });
     await client1.waitFor((m) => m.type === "init_world");
@@ -231,7 +231,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const snap = init2.payload.players.find((p) => p.id === "usr_eq1");
     assert.equal(snap.equipment.armor, "cam-y-bao");
     assert.equal(snap.equipment.helmet, "phuong-vu-bao");
-    assert.equal(snap.equipment.boots, null);
+    assert.equal(snap.equipment.weapon, null);
     assert.equal(snap.equipment.bogus, undefined);
 
     // A later change is relayed to peers only, with the same sanitizing.

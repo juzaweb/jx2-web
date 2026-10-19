@@ -209,11 +209,12 @@ export default {
     title: "Character",
     helpTitle: "Help",
     closeTitle: "Close (F3 / Esc)",
-    hint: "Combat stats are derived from the character level. Equipment and potential points will open in a later phase.",
+    hint: "Combat stats are derived from the character level. Drag equipment from the Inventory (F4) onto a slot to wear it, or click/drag a worn slot to take it off.",
     tabEquip: "Equipment",
     tabNews: "News",
     locked: "{label} (locked)",
     notEquipped: "{label} (not equipped)",
+    unequipTitle: "{name} (click to remove)",
     potential: "Potential",
     points: "Points:",
     nextLevel: "Next level:",
@@ -237,11 +238,9 @@ export default {
     title: "Inventory",
     helpTitle: "Bag help",
     closeTitle: "Close (Esc)",
-    hint: "Click potions or talismans to use them. Hover over an item to read its description. Defeat wild beasts to collect more loot.",
+    hint: "Click potions or talismans to use them. Drag equipment to the Character panel (F3) to wear it. Hover over an item to read its description.",
     equip: "Equip",
-    equipped: "Equipped",
     use: "Use",
-    equipTitle: "{label}: {name} (click to remove)",
     useTitle: "{name}",
     weight: "Weight",
     count: "{used}/{total}",
@@ -255,7 +254,6 @@ export default {
     useHint: "Click to use"
   },
   slots: {
-    boots: "Boots",
     armor: "Armor",
     helmet: "Helmet",
     accessory: "Accessory",
@@ -417,10 +415,6 @@ export default {
     "tu-kim-quan": {
       name: "Purple Gold Crown",
       desc: "A jade-studded crown that boosts defense and accuracy."
-    },
-    "van-ly-hai": {
-      name: "Cloud-Walk Boots",
-      desc: "Cloud-embroidered boots that make every step light as air."
     }
   }
 };

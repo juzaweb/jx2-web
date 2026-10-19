@@ -209,11 +209,12 @@ export default {
     title: "Nhân vật",
     helpTitle: "Trợ giúp",
     closeTitle: "Đóng (F3 / Esc)",
-    hint: "Các chỉ số chiến đấu được suy ra từ đẳng cấp nhân vật. Hệ thống trang bị và điểm tiềm năng sẽ được mở ở giai đoạn sau.",
+    hint: "Các chỉ số chiến đấu được suy ra từ đẳng cấp nhân vật. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
     tabEquip: "Trang bị",
     tabNews: "Tin tức",
     locked: "{label} (chưa mở)",
     notEquipped: "{label} (chưa trang bị)",
+    unequipTitle: "{name} (nhấp để tháo)",
     potential: "Tiềm năng",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
@@ -237,11 +238,9 @@ export default {
     title: "Hành trang",
     helpTitle: "Trợ giúp túi đồ",
     closeTitle: "Đóng (Esc)",
-    hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Di chuột lên vật phẩm để xem mô tả. Hạ gục dã thú để nhặt thêm chiến lợi phẩm.",
+    hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Kéo trang bị sang bảng Nhân vật (F3) để mặc. Di chuột lên vật phẩm để xem mô tả.",
     equip: "Mặc",
-    equipped: "Đang mặc",
     use: "Dùng",
-    equipTitle: "{label}: {name} (nhấp để tháo)",
     useTitle: "{name}",
     weight: "Sức nặng",
     count: "{used}/{total}",
@@ -255,7 +254,6 @@ export default {
     useHint: "Nhấp để sử dụng"
   },
   slots: {
-    boots: "Giày",
     armor: "Giáp",
     helmet: "Mũ",
     accessory: "Trang sức",
@@ -417,10 +415,6 @@ export default {
     "tu-kim-quan": {
       name: "Tử Kim Quan",
       desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác."
-    },
-    "van-ly-hai": {
-      name: "Vân Lý Hài",
-      desc: "Hài thêu mây, bước đi nhẹ nhàng như mây bay."
     }
   }
 };

@@ -4,7 +4,7 @@
  * Replaces the baked sprite sheet with a parametric vector character: the body
  * is composed from primitive shapes, and equipment is drawn as slot layers on
  * top of the anchors they belong to (helmet on the head, armor on the torso,
- * boots on the feet, weapon/accessory on the hand). Because everything is
+ * weapon/accessory on the hand). Because everything is
  * generated from one pose model, equipment follows the body in all 8 directions
  * for free — no per-direction art.
  *
@@ -22,12 +22,11 @@ const EQUIP_COLORS = {
   helmet: 0xc9a24a,
   armor: 0x2f5fd0,
   weapon: 0xdfe7ee,
-  boots: 0x577a4a,
   accessory: 0x36b993
 };
 
 /** Draw order: body-hugging layers first, helmet last (it sits highest). */
-const EQUIP_SLOT_ORDER = ["armor", "boots", "accessory", "weapon", "helmet"];
+const EQUIP_SLOT_ORDER = ["armor", "accessory", "weapon", "helmet"];
 
 const C = {
   tunic: 0x2f5fd0,
@@ -488,18 +487,6 @@ function equipArmor(parts, pose, ctx) {
   parts.push(ell(x, -51, 6, 5, C.gold, { alpha: 0.9 }));
 }
 
-function equipBoots(parts, pose, ctx) {
-  const { side } = pose;
-  const pivots = limbPivots(pose, ctx.gender);
-  for (const s of [-1, 1]) {
-    const g = s < 0 ? "legL" : "legR";
-    const hipX = (s < 0 ? pivots.legL : pivots.legR).x;
-    const kneeX = hipX + side * 0.8;
-    const ankleX = hipX + side * 0.4;
-    parts.push(taper(kneeX, -19, 6.6, ankleX, -4, 5.6, EQUIP_COLORS.boots, { stroke: 0x2d4030, lineWidth: 1, group: g }));
-  }
-}
-
 function equipAccessory(parts, pose, ctx) {
   const hx = limbPivots(pose, ctx.gender).armL.x - 0.5;
   parts.push(circ(hx, -37.5, 2, EQUIP_COLORS.accessory, { stroke: C.jadeEdge, lineWidth: 0.7, group: "armL" }));
@@ -513,7 +500,6 @@ function equipWeapon(parts, pose, ctx) {
 const EQUIP_DRAW = {
   helmet: equipHelmet,
   armor: equipArmor,
-  boots: equipBoots,
   accessory: equipAccessory,
   weapon: equipWeapon
 };

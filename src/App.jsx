@@ -574,6 +574,9 @@ export function App() {
         onClose={handleCloseCharacter}
         stats={stats}
         playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
+        equipment={equipment}
+        onUnequipSlot={handleUnequipSlot}
+        onEquipItem={handleEquipItem}
       />
     </main>
   );

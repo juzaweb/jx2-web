@@ -13,9 +13,9 @@ import {
 import { getItemById } from "./items.js";
 
 describe("equipment model", () => {
-  it("exposes five unique slots", () => {
-    expect(EQUIPMENT_SLOT_KEYS).toHaveLength(5);
-    expect(new Set(EQUIPMENT_SLOT_KEYS).size).toBe(5);
+  it("exposes four unique slots", () => {
+    expect(EQUIPMENT_SLOT_KEYS).toHaveLength(4);
+    expect(new Set(EQUIPMENT_SLOT_KEYS).size).toBe(4);
     EQUIPMENT_SLOTS.forEach((slot) => {
       expect(typeof slot.label).toBe("string");
       expect(slot.label.length).toBeGreaterThan(0);
@@ -41,7 +41,7 @@ describe("sanitizeEquipment", () => {
   });
 
   it("drops unknown slots, non-strings and non-object input", () => {
-    expect(sanitizeEquipment({ boots: 123 })).toEqual(defaultEquipment());
+    expect(sanitizeEquipment({ helmet: 123 })).toEqual(defaultEquipment());
     expect(sanitizeEquipment({ nope: "hac-ung-kiem" })).toEqual(defaultEquipment());
     expect(sanitizeEquipment(null)).toEqual(defaultEquipment());
     expect(sanitizeEquipment([])).toEqual(defaultEquipment());

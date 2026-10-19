@@ -101,8 +101,7 @@ export const INVENTORY_ITEMS = [
   { id: "hoang-kim-huyen-thiet", name: "Huyền Thiết Kim", icon: "icon-gem", qty: 67, desc: "Kim loại huyền thiết, chế tạo binh khí thượng hạng." },
   { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." },
 
-  { id: "tu-kim-quan", name: "Tử Kim Quan", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 9, accuracy: 30 }, desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác." },
-  { id: "van-ly-hai", name: "Vân Lý Hài", icon: "icon-boots", qty: 1, slot: "boots", bonuses: { defense: 4, maxHp: 20 }, desc: "Hài thêu mây, bước đi nhẹ nhàng như mây bay." }
+  { id: "tu-kim-quan", name: "Tử Kim Quan", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 9, accuracy: 30 }, desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác." }
 ];
 
 /**
