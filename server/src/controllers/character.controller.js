@@ -38,8 +38,8 @@ export const createCharacter = async (req, res, next) => {
       });
     }
 
-    const { name, gender, appearance } = req.body || {};
-    const character = characterDb.create(userId, name, gender, appearance);
+    const { name, sect } = req.body || {};
+    const character = characterDb.create(userId, name, sect);
 
     return res.status(201).json({
       success: true,
@@ -50,7 +50,11 @@ export const createCharacter = async (req, res, next) => {
       }
     });
   } catch (error) {
-    if (error.code === "INVALID_NAME" || error.code === "INVALID_USER" || error.code === "INVALID_GENDER") {
+    if (
+      error.code === "INVALID_NAME" ||
+      error.code === "INVALID_USER" ||
+      error.code === "INVALID_SECT"
+    ) {
       return res.status(400).json({ success: false, error: error.message });
     }
     if (error.code === "NAME_TAKEN" || error.code === "SLOT_LIMIT") {

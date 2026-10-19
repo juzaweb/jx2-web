@@ -203,15 +203,14 @@ export class ApiClient {
    * Create a new character for a user account
    * @param {string} userId
    * @param {string} name
-   * @param {"male"|"female"} [gender="male"]
-   * @param {number} [appearance=0]
+   * @param {"thieu-lam"|"nga-my"|"vo-dang"|"ngu-doc"} [sect="thieu-lam"]
    * @returns {Promise<Object>} The created character
    */
-  async createCharacter(userId, name, gender = "male", appearance = 0) {
+  async createCharacter(userId, name, sect = "thieu-lam") {
     const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, gender, appearance }),
+      body: JSON.stringify({ name, sect }),
     });
     const json = await this._parseJson(res);
     if (!res.ok) {

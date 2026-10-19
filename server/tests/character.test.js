@@ -55,36 +55,59 @@ describe("Character API Test Suite", () => {
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Tiêu Phong", gender: "female", appearance: 2 })
+      body: JSON.stringify({ name: "Tiêu Phong", sect: "nga-my" })
     });
     assert.equal(res.status, 201);
     const json = await res.json();
     assert.equal(json.success, true);
     assert.equal(json.data.character.name, "Tiêu Phong");
+    assert.equal(json.data.character.sect, "nga-my");
     assert.equal(json.data.character.gender, "female");
-    assert.equal(json.data.character.appearance, 2);
     assert.equal(json.data.character.level, 1);
     assert.equal(json.data.character.userId, userId);
     assert.ok(json.data.character.id);
 
     const list = await fetch(`${baseUrl}/users/${userId}/characters`).then((r) => r.json());
     assert.equal(list.data.characters.length, 1);
+    assert.equal(list.data.characters[0].sect, "nga-my");
     assert.equal(list.data.characters[0].gender, "female");
   });
 
-  test("POST defaults gender to 'male' when omitted (400 on invalid)", async () => {
+  test("POST defaults to Thiếu Lâm (male) when sect is omitted", async () => {
     const userId = nextUser();
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Vô Danh" })
     }).then((r) => r.json());
+    assert.equal(created.data.character.sect, "thieu-lam");
     assert.equal(created.data.character.gender, "male");
+  });
+
+  test("POST persists the chosen sect and derives its gender (400 on invalid)", async () => {
+    const userId = nextUser();
+    const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Độc Cô", sect: "ngu-doc" })
+    });
+    assert.equal(created.status, 201);
+    const json = await created.json();
+    assert.equal(json.data.character.sect, "ngu-doc");
+    assert.equal(json.data.character.gender, "male");
+
+    const female = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Nga My Nữ", sect: "nga-my" })
+    }).then((r) => r.json());
+    assert.equal(female.data.character.sect, "nga-my");
+    assert.equal(female.data.character.gender, "female");
 
     const bad = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Sai Giới Tính", gender: "other" })
+      body: JSON.stringify({ name: "Sai Môn Phái", sect: "bogus" })
     });
     assert.equal(bad.status, 400);
   });
@@ -216,11 +239,12 @@ describe("CharacterDatabase schema migration", () => {
     const [row] = db.listByUser("u1");
     assert.equal(row.name, "Cũ");
     assert.equal(row.gender, "male");
+    assert.equal(row.sect, "thieu-lam");
     assert.equal(row.appearance, 0);
 
-    const created = db.create("u1", "Mới", "female", 3);
+    const created = db.create("u1", "Mới", "nga-my");
+    assert.equal(created.sect, "nga-my");
     assert.equal(created.gender, "female");
-    assert.equal(created.appearance, 3);
 
     db.close();
     await fs.rm(dir, { recursive: true, force: true });
@@ -252,12 +276,16 @@ describe("CharacterDatabase schema migration", () => {
     legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at) VALUES ('c2', 'u2', 'Trùng', 1, 200)");
     // A soft-deleted row must be purged rather than left orphaned.
     legacy.exec("INSERT INTO characters (id, user_id, name, level, created_at, deleted_at) VALUES ('c3', 'u3', 'Đã Xoá', 1, 300, 400)");
+    // Legacy female rows belong to Nga My once the sect column is added.
+    legacy.exec("INSERT INTO characters (id, user_id, name, gender, level, created_at) VALUES ('c4', 'u4', 'Nữ Cũ', 'nu', 1, 400)");
     legacy.close();
 
     const { CharacterDatabase } = await import("../src/data/characterDb.js");
     const db = new CharacterDatabase(dbPath);
 
     assert.equal(db.listByUser("u3").length, 0, "soft-deleted row is purged");
+    assert.equal(db.listByUser("u4")[0].sect, "nga-my", "legacy female keeps her gender");
+    assert.equal(db.listByUser("u4")[0].gender, "female");
     assert.equal(db.listByUser("u1")[0].name, "Trùng", "oldest row keeps the name");
     assert.equal(db.listByUser("u2")[0].name, "Trùng-2", "newer duplicate is renamed");
 
