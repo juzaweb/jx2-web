@@ -16,6 +16,7 @@
 
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
+import { getItemById } from "./items.js";
 
 /** Equipment slot colours (opaque ids; the rig only fills the worn slots). */
 const EQUIP_COLORS = {
@@ -452,13 +453,20 @@ function headFemale(parts, pose) {
   return { x, rx };
 }
 
-function sword(parts, pose, gender = "male") {
-  const hx = limbPivots(pose, gender).armR.x + 1.5; // right hand
-  const g = "armR"; // the sword rides the right arm
-  parts.push(circ(hx, -37.5, 1.6, C.gold, { group: g }));
-  parts.push(rect(hx, -35.5, 6.5, 2.2, C.gold, { stroke: C.goldEdge, lineWidth: 0.5, group: g }));
-  parts.push(line(hx + 2, -33.5, hx + 4.5, -10, C.steel, { lineWidth: 2.4, group: g }));
-  parts.push(circ(hx + 4.5, -10, 1.1, 0xffffff, { group: g }));
+/**
+ * The rig shape family for a weapon item, derived from its catalog icon. The
+ * held weapon is rebuilt whenever the `weapon` slot changes, so the same item
+ * id shows the matching blade/claw in every direction. An unknown weapon id
+ * falls back to the sword shape rather than leaving the hand empty.
+ * @param {string|null|undefined} weaponId
+ * @returns {"jian"|"blade"|"claw"|null}
+ */
+export function weaponKindFor(weaponId) {
+  if (typeof weaponId !== "string" || !weaponId) return null;
+  const icon = getItemById(weaponId)?.icon;
+  if (icon === "icon-claw") return "claw";
+  if (icon === "icon-blade") return "blade";
+  return "jian";
 }
 
 /* ------------------------------------------------------------------ *
@@ -492,9 +500,39 @@ function equipAccessory(parts, pose, ctx) {
   parts.push(circ(hx, -37.5, 2, EQUIP_COLORS.accessory, { stroke: C.jadeEdge, lineWidth: 0.7, group: "armL" }));
 }
 
-function equipWeapon(parts, pose, ctx) {
-  const hx = limbPivots(pose, ctx.gender).armR.x + 1.5;
-  parts.push(line(hx + 2, -33.5, hx + 5, -7, EQUIP_COLORS.weapon, { lineWidth: 2, stroke: C.steelEdge, group: "armR" }));
+function equipWeapon(parts, pose, ctx, equipment) {
+  const kind = weaponKindFor(equipment.weapon);
+  if (!kind) return;
+  const hx = limbPivots(pose, ctx.gender).armR.x + 1.5; // right hand
+  const g = "armR"; // the weapon rides the right arm
+
+  if (kind === "claw") {
+    // Bladed fist: three short talons over the knuckles.
+    parts.push(circ(hx, -37.5, 2.6, EQUIP_COLORS.weapon, { stroke: C.steelEdge, lineWidth: 0.9, group: g }));
+    parts.push(line(hx + 1.2, -39.6, hx + 4.2, -45, C.steel, { lineWidth: 1.1, stroke: C.steelEdge, group: g }));
+    parts.push(line(hx + 2.6, -38.8, hx + 6.2, -43.4, C.steel, { lineWidth: 1.1, stroke: C.steelEdge, group: g }));
+    parts.push(line(hx + 3.8, -37.2, hx + 7.6, -40.6, C.steel, { lineWidth: 1.1, stroke: C.steelEdge, group: g }));
+    return;
+  }
+
+  // Shared hilt: pommel, grip and cross-guard.
+  parts.push(circ(hx, -37.5, 1.6, C.gold, { group: g }));
+  parts.push(rect(hx, -35.5, kind === "blade" ? 7 : 6.5, 2.2, C.gold, { stroke: C.goldEdge, lineWidth: 0.5, group: g }));
+
+  if (kind === "blade") {
+    // Broad single-edged dao, slightly curved toward the back.
+    parts.push(poly(
+      [[hx + 1.4, -33.6], [hx + 3.2, -24], [hx + 4.8, -13], [hx + 6, -5.5],
+        [hx + 4.2, -5.8], [hx + 3, -13], [hx + 1.7, -24]],
+      C.steel, { stroke: C.steelEdge, lineWidth: 0.9, group: g }
+    ));
+    parts.push(circ(hx + 5.2, -7, 1, 0xffffff, { group: g }));
+    return;
+  }
+
+  // Straight double-edged jian.
+  parts.push(line(hx + 2, -33.5, hx + 4.5, -10, C.steel, { lineWidth: 2.4, group: g }));
+  parts.push(circ(hx + 4.5, -10, 1.1, 0xffffff, { group: g }));
 }
 
 const EQUIP_DRAW = {
@@ -534,12 +572,10 @@ export function buildHero(opts = {}) {
     torsoAnchor = torso(out, pose);
     headAnchor = head(out, pose);
   }
-  sword(out, pose, gender);
-
   const ctx = { torso: torsoAnchor, head: headAnchor, gender };
   for (const slot of EQUIP_SLOT_ORDER) {
     if (!equipment[slot]) continue;
-    EQUIP_DRAW[slot]?.(out, pose, ctx);
+    EQUIP_DRAW[slot]?.(out, pose, ctx, equipment);
   }
 
   return out;

@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { WorldManager, WORLD_CONFIG } from "./world.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
-import { EnemyManager } from "./enemy.js";
+import { EnemyManager, DEFAULT_ENEMY_SPAWNS } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
@@ -21,6 +21,8 @@ import { PVP_ATTACK_RANGE } from "./pvp.js";
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 10;
 import { normalizeGender } from "./gender.js";
+import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
+import { normalizeSect } from "./skills.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
@@ -88,8 +90,9 @@ export class JiangHuScene extends Phaser.Scene {
       initialName,
       initialGender
     );
+    this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
     this.enemyManager = new EnemyManager(this);
-    this.enemyManager.create([]);
+    this.enemyManager.create(DEFAULT_ENEMY_SPAWNS);
 
     // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();
@@ -259,10 +262,10 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      if (pointer.rightButtonDown()) {
-        this.combat.performSkill();
-        return;
-      }
+      // Right-click casting is handled by the DOM mousedown listener so it can
+      // pass the clicked ground point for target selection; never treat it as a
+      // left-click move.
+      if (pointer.rightButtonDown()) return;
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       const worldX = ground.x;
@@ -274,6 +277,11 @@ export class JiangHuScene extends Phaser.Scene {
         .find((wolf) => Phaser.Math.Distance.Between(worldX, worldY, wolf.x, wolf.y) < 38);
 
       if (clickedEnemy) {
+        // A left-hand skill takes priority: chase into range, then release it.
+        if (this.combat.getLeftSkill?.()) {
+          this.combat.castLeftSkill(clickedEnemy);
+          return;
+        }
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedEnemy.x, clickedEnemy.y);
         if (dist <= 85) {
           this.player.stopMovement();
@@ -333,8 +341,9 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Left click on terrain: Move to destination
+      // Left click on terrain: Move to destination (and abandon a skill chase).
       this.isPointerMoving = true;
+      this.combat.cancelPendingCast();
       this.player.moveTo(worldX, worldY);
       this.showClickIndicator(worldX, worldY, 0xffdd59);
     });
@@ -351,6 +360,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
+      this.combat.cancelPendingCast();
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -364,16 +374,41 @@ export class JiangHuScene extends Phaser.Scene {
       const tag = typeof document !== "undefined" && document.activeElement?.tagName;
       return tag === "INPUT" || tag === "TEXTAREA";
     };
+    this.isTyping = isTyping;
 
-    // Keyboard Hotkeys
-    this.input.keyboard.on("keydown-SPACE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performAttack();
+    // Skill selection keys are player-configurable (see keybinds.js). Movement is
+    // click/joystick only, and normal attack / PK live on UI buttons, so no other
+    // action steals a key the player may want to bind.
+    this.skillBinds = loadSkillBinds(readSession()?.activeCharacter?.id);
+    this.bindSkillKeys();
+
+    // Right mouse button releases the skill assigned to the right hand.
+    // A DOM listener reliably reports the secondary button (Phaser's pointerdown
+    // can be flaky for right-click across browsers).
+    this.rightMouseHandler = (event) => {
+      if (event.button !== 2) return;
+      if (event.target !== this.game.canvas) return;
+      if (!this.started || this.isPaused) return;
+      // Derive the clicked ground point from the raw event instead of relying on
+      // Phaser having updated its pointer first.
+      const canvas = this.game.canvas;
+      const rect = canvas.getBoundingClientRect();
+      const sx = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const sy = (event.clientY - rect.top) * (canvas.height / rect.height);
+      const world = this.cameras.main.getWorldPoint(sx, sy);
+      this.combat.castSelectedSkill(fromIso(world.x, world.y));
+    };
+    this.contextMenuHandler = (event) => {
+      if (this.started) event.preventDefault();
+    };
+    window.addEventListener("mousedown", this.rightMouseHandler);
+    window.addEventListener("contextmenu", this.contextMenuHandler);
+    this.events.once("shutdown", () => {
+      window.removeEventListener("mousedown", this.rightMouseHandler);
+      window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
-    this.input.keyboard.on("keydown-Q", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
-    });
-
+    // Consumable hotkeys stay fixed on 1-4.
     this.input.keyboard.on("keydown-ONE", () => {
       if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
     });
@@ -390,14 +425,6 @@ export class JiangHuScene extends Phaser.Scene {
       if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
     });
 
-    this.input.keyboard.on("keydown-EIGHT", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.combat.performSkill();
-    });
-
-    this.input.keyboard.on("keydown-P", () => {
-      if (!isTyping() && this.started) this.togglePk();
-    });
-
     // Listen to React UI Actions via Game Bridge
     this.unsubscribers.push(
       bridge.on(EVENTS.ACTION_START, () => this.startGame()),
@@ -405,7 +432,18 @@ export class JiangHuScene extends Phaser.Scene {
         if (this.started && !this.isPaused) this.combat.performAttack();
       }),
       bridge.on(EVENTS.ACTION_SKILL, () => {
-        if (this.started && !this.isPaused) this.combat.performSkill();
+        if (this.started && !this.isPaused) this.combat.castSelectedSkill();
+      }),
+      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, slot } = {}) => {
+        if (this.started) this.combat.equipSkill(hand, slot);
+      }),
+      bridge.on(EVENTS.SET_SKILL_LOADOUT, ({ left, right } = {}) => {
+        if (Number.isInteger(left)) this.combat.leftSkillSlot = left;
+        if (Number.isInteger(right)) this.combat.selectedSkillSlot = right;
+        this.combat?.cancelPendingCast?.();
+      }),
+      bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
+        this.player?.setSect(normalizeSect(sect));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
@@ -413,7 +451,10 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_EQUIP_ITEM, (itemId) => this.equipItem(itemId)),
       bridge.on(EVENTS.ACTION_UNEQUIP_SLOT, (slot) => this.unequipSlot(slot)),
       bridge.on(EVENTS.ACTION_MOVE, (direction) => {
-        if (!this.isPaused) this.player.setTouchDirection(direction);
+        if (!this.isPaused) {
+          this.combat.cancelPendingCast();
+          this.player.setTouchDirection(direction);
+        }
       }),
       bridge.on(EVENTS.ACTION_SAVE, () => this.saveGame(true)),
       bridge.on(EVENTS.ACTION_RESET, () => this.resetGame()),
@@ -870,6 +911,7 @@ export class JiangHuScene extends Phaser.Scene {
         username;
     }
 
+    const effective = this.combat?.getEffectiveStats?.() || this.player.stats;
     this.remotePlayerManager.setLocalPlayerId(playerId);
     this.combat.setLocalPlayerId(playerId);
     this.networkClient.join({
@@ -887,9 +929,39 @@ export class JiangHuScene extends Phaser.Scene {
       gender: normalizeGender(this.player.gender),
       hp: this.player.stats?.hp || 100,
       mp: this.player.stats?.mp || 0,
-      defense: this.player.stats?.defense ?? 6,
+      defense: effective.defense ?? 6,
+      attack: effective.attack ?? 24,
+      critRate: effective.critRate ?? 0.12,
       pkFlag: this.player.pkFlag === true
     });
+  }
+
+  /**
+   * Rebuild the key -> slot lookup from the current player bindings.
+   */
+  updateSkillKeyMap() {
+    this.skillKeyMap = keyToSlot(this.skillBinds);
+  }
+
+  /**
+   * Bind the configurable skill-selection keys. Only one raw keydown listener is
+   * registered; rebinding just swaps the lookup map.
+   */
+  bindSkillKeys() {
+    this.updateSkillKeyMap();
+    if (this.skillKeyHandler) return;
+    this.skillKeyHandler = (event) => {
+      if (!this.started || this.isPaused) return;
+      if (this.isTyping?.()) return;
+      if (event.repeat) return;
+      const key = normalizeKey(event);
+      if (!key) return;
+      const slot = this.skillKeyMap?.get(key);
+      if (slot === undefined) return;
+      event.preventDefault();
+      this.combat.selectSkill(slot);
+    };
+    this.input.keyboard.on("keydown", this.skillKeyHandler);
   }
 
   startGame() {
@@ -949,6 +1021,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Update player movement and animation
     this.player.update(time, delta);
+    // Drive pending melee approaches (walk into range, then release the skill).
+    this.combat.update?.(time);
 
     // Update remote players (interpolation and animations)
     if (this.remotePlayerManager) {
@@ -988,12 +1062,19 @@ export class JiangHuScene extends Phaser.Scene {
           });
         }
 
-        // Report the one stat the client still owns: defense (used to roll wolf
-        // bites). Level, HP ceiling and current HP are server-owned.
-        const { defense } = this.player.stats;
-        if (defense !== this.lastReportedDefense) {
+        // Report the stats the client owns: defense (rolls wolf bites), attack and
+        // crit (the server uses them to validate skill damage). Level/HP/MP stay
+        // server-owned.
+        const { defense, attack, critRate } = this.combat?.getEffectiveStats?.() || this.player.stats;
+        if (
+          defense !== this.lastReportedDefense ||
+          attack !== this.lastReportedAttack ||
+          critRate !== this.lastReportedCrit
+        ) {
           this.lastReportedDefense = defense;
-          this.networkClient.sendStats({ defense });
+          this.lastReportedAttack = attack;
+          this.lastReportedCrit = critRate;
+          this.networkClient.sendStats({ defense, attack, critRate });
         }
       }
     }

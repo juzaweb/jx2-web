@@ -8,18 +8,18 @@ const NAME_MIN = 2;
 const NAME_MAX = 16;
 
 /**
- * Character creation choices: just the two genders. The tile index is stored as
- * the character's appearance so the chosen face can be restored.
+ * Character creation choices: the four playable sects. Only Nga My admits
+ * female characters; the other sects are male.
  */
-const PORTRAITS = [
-  { index: 0, gender: "male", labelKey: "characterSelect.genderMale", glyph: "♂" },
-  { index: 1, gender: "female", labelKey: "characterSelect.genderFemale", glyph: "♀" }
+const SECTS = [
+  { key: "thieu-lam", labelKey: "characterSelect.sectThieuLam", glyph: "少" },
+  { key: "nga-my", labelKey: "characterSelect.sectNgaMy", glyph: "峨" },
+  { key: "vo-dang", labelKey: "characterSelect.sectVoDang", glyph: "武" },
+  { key: "ngu-doc", labelKey: "characterSelect.sectNguDoc", glyph: "毒" }
 ];
 
-const GENDER_LABEL = {
-  male: "characterSelect.genderMale",
-  female: "characterSelect.genderFemale"
-};
+const SECT_BY_KEY = Object.fromEntries(SECTS.map((sect) => [sect.key, sect]));
+const DEFAULT_SECT = SECTS[0];
 
 const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", zh: "zh-CN" };
 
@@ -56,7 +56,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
   const [selectedId, setSelectedId] = useState("");
   const [mode, setMode] = useState("select"); // "select" | "create"
   const [nameInput, setNameInput] = useState("");
-  const [portraitIndex, setPortraitIndex] = useState(0);
+  const [sectKey, setSectKey] = useState(DEFAULT_SECT.key);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -99,12 +99,13 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
   }, [isOpen, user?.id, reload]);
 
   const selected = characters.find((c) => c.id === selectedId) || null;
-  const activePortrait = PORTRAITS.find((p) => p.index === portraitIndex) || PORTRAITS[0];
+  const activeSect = SECT_BY_KEY[sectKey] || DEFAULT_SECT;
+  const selectedSect = selected ? SECT_BY_KEY[selected.sect] || DEFAULT_SECT : null;
 
   const handleOpenCreate = () => {
     setMode("create");
     setNameInput("");
-    setPortraitIndex(0);
+    setSectKey(DEFAULT_SECT.key);
     setError("");
     setNotice("");
   };
@@ -131,8 +132,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       const data = await apiClient.createCharacter(
         user.id,
         cleanName,
-        activePortrait.gender,
-        activePortrait.index
+        activeSect.key
       );
       const createdId = data?.character?.id;
       await reload();
@@ -201,21 +201,19 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
           <div className="jx2-cs-stage">
             {mode === "create" ? (
               <>
-                <div className={`jx2-cs-portrait ${activePortrait.gender}`}>
-                  <span className="jx2-cs-portrait-glyph">{activePortrait.glyph}</span>
+                <div className={`jx2-cs-portrait sect-${activeSect.key}`}>
+                  <span className="jx2-cs-portrait-glyph">{activeSect.glyph}</span>
                 </div>
                 <div className="jx2-cs-stage-name">
                   {nameInput.trim() || t("characterSelect.newCharacter")}
                 </div>
-                <div className="jx2-cs-stage-meta">{t("characterSelect.gender")}: {t(GENDER_LABEL[activePortrait.gender])}</div>
+                <div className="jx2-cs-stage-meta">{t("characterSelect.sect")}: {t(activeSect.labelKey)}</div>
               </>
             ) : (
               <>
-                <div className={`jx2-cs-portrait ${selected?.gender || ""}`}>
-                  {selected ? (
-                    <span className="jx2-cs-portrait-glyph">
-                      {selected.gender === "female" ? "♀" : "♂"}
-                    </span>
+                <div className={`jx2-cs-portrait ${selectedSect ? `sect-${selectedSect.key}` : ""}`}>
+                  {selectedSect ? (
+                    <span className="jx2-cs-portrait-glyph">{selectedSect.glyph}</span>
                   ) : (
                     <span className="jx2-cs-portrait-glyph empty">?</span>
                   )}
@@ -225,7 +223,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                 </div>
                 {selected && (
                   <div className="jx2-cs-stage-meta">
-                    {t(GENDER_LABEL[selected.gender] || GENDER_LABEL.male)} ·{" "}
+                    {t((SECT_BY_KEY[selected.sect] || DEFAULT_SECT).labelKey)} ·{" "}
                     {t("common.level")} {selected.level} · {formatDateTime(selected.createdAt, language)}
                   </div>
                 )}
@@ -240,15 +238,15 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                 <div className="jx2-cs-panel-title">{t("characterSelect.create")}</div>
 
                 <div className="jx2-cs-portraits">
-                  {PORTRAITS.map((p) => (
+                  {SECTS.map((p) => (
                     <button
-                      key={p.index}
+                      key={p.key}
                       type="button"
-                      className={`jx2-cs-portrait-tile ${p.gender} ${
-                        p.index === portraitIndex ? "selected" : ""
+                      className={`jx2-cs-portrait-tile sect-${p.key} ${
+                        p.key === sectKey ? "selected" : ""
                       }`}
-                      onClick={() => setPortraitIndex(p.index)}
-                      title={t("characterSelect.appearance", { label: t(p.labelKey), index: p.index + 1 })}
+                      onClick={() => setSectKey(p.key)}
+                      title={t(p.labelKey)}
                     >
                       <span className="jx2-cs-portrait-tile-glyph">{p.glyph}</span>
                       <span className="jx2-cs-portrait-tile-label">{t(p.labelKey)}</span>
@@ -310,7 +308,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                         <>
                           <span className="jx2-cs-slot-name">{char.name}</span>
                           <span className="jx2-cs-slot-info">
-                            {t(GENDER_LABEL[char.gender] || GENDER_LABEL.male)} ·{" "}
+                            {t((SECT_BY_KEY[char.sect] || DEFAULT_SECT).labelKey)} ·{" "}
                             {t("common.level")} {char.level}
                           </span>
                           <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>

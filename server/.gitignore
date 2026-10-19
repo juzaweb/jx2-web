@@ -1,6 +1,1 @@
 node_modules/
-data/*.json
-data/*.sqlite*
-data/*.db*
-*.log
-

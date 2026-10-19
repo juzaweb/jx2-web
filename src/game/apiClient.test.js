@@ -147,18 +147,21 @@ describe("ApiClient", () => {
       ok: true,
       json: async () => ({
         success: true,
-        data: { character: { id: "c1", name: "Độc Cô Cầu Bại", gender: "female" } }
+        data: {
+          character: { id: "c1", name: "Độc Cô Cầu Bại", sect: "nga-my", gender: "female" }
+        }
       })
     });
 
-    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "female", 2);
+    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "nga-my");
     expect(res.character.id).toBe("c1");
+    expect(res.character.sect).toBe("nga-my");
     expect(res.character.gender).toBe("female");
     expect(global.fetch).toHaveBeenCalledWith(
       "http://mock-api:5000/api/users/u1/characters",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ name: "Độc Cô Cầu Bại", gender: "female", appearance: 2 })
+        body: JSON.stringify({ name: "Độc Cô Cầu Bại", sect: "nga-my" })
       })
     );
   });

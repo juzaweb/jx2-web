@@ -9,9 +9,26 @@ const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const CHARACTER_NAME_REGEX = /^[\p{L}\p{N}_ -]+$/u;
 const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 16;
-const GENDERS = ["male", "female"];
-const DEFAULT_GENDER = "male";
-const MAX_APPEARANCE = 3;
+
+/**
+ * Playable sects. A sect determines the character's gender: only Nga My admits
+ * women; Thiếu Lâm, Võ Đang and Ngũ Độc are male.
+ */
+const SECTS = ["thieu-lam", "nga-my", "vo-dang", "ngu-doc"];
+const DEFAULT_SECT = "thieu-lam";
+const SECT_GENDER = {
+  "thieu-lam": "male",
+  "nga-my": "female",
+  "vo-dang": "male",
+  "ngu-doc": "male"
+};
+
+/**
+ * Normalise an unknown sect to the default.
+ * @param {*} sect
+ * @returns {string}
+ */
+const normalizeSect = (sect) => (SECTS.includes(sect) ? sect : DEFAULT_SECT);
 // SQLite extended result code for a UNIQUE constraint violation.
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 
@@ -63,11 +80,13 @@ const normalizeName = (name) =>
  */
 const mapRow = (row) => {
   if (!row) return null;
+  const sect = normalizeSect(row.sect);
   return {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    gender: row.gender === "female" ? "female" : DEFAULT_GENDER,
+    sect,
+    gender: SECT_GENDER[sect],
     appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
@@ -107,6 +126,7 @@ export class CharacterDatabase {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
+        sect TEXT NOT NULL DEFAULT 'thieu-lam',
         gender TEXT NOT NULL DEFAULT 'male',
         appearance INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
@@ -134,6 +154,10 @@ export class CharacterDatabase {
     if (!columns.includes("appearance")) {
       this.db.exec("ALTER TABLE characters ADD COLUMN appearance INTEGER NOT NULL DEFAULT 0");
     }
+    const addedSect = !columns.includes("sect");
+    if (addedSect) {
+      this.db.exec("ALTER TABLE characters ADD COLUMN sect TEXT NOT NULL DEFAULT 'thieu-lam'");
+    }
 
     // Normalise legacy gender values ("nam"/"nu") to the current English keys.
     this.db.exec(`
@@ -141,8 +165,14 @@ export class CharacterDatabase {
       UPDATE characters SET gender = 'male' WHERE gender = 'nam';
     `);
 
+    if (addedSect) {
+      // Existing female characters are mapped to Nga My; all others keep the
+      // default sect (Thiếu Lâm).
+      this.db.exec("UPDATE characters SET sect = 'nga-my' WHERE gender = 'female'");
+    }
+
     this.stmtListByUser = this.db.prepare(
-      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
+      "SELECT id, user_id, name, sect, gender, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
     );
     this.stmtCountByUser = this.db.prepare(
       "SELECT COUNT(*) AS count FROM characters WHERE user_id = ?"
@@ -151,10 +181,10 @@ export class CharacterDatabase {
       "SELECT id FROM characters WHERE name = ? COLLATE NOCASE"
     );
     this.stmtFindById = this.db.prepare(
-      "SELECT id, user_id, name, gender, appearance, level, created_at, last_played FROM characters WHERE id = ? AND user_id = ?"
+      "SELECT id, user_id, name, sect, gender, appearance, level, created_at, last_played FROM characters WHERE id = ? AND user_id = ?"
     );
     this.stmtInsert = this.db.prepare(
-      "INSERT INTO characters (id, user_id, name, gender, appearance, level, created_at, last_played) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO characters (id, user_id, name, sect, gender, level, created_at, last_played) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     this.stmtDelete = this.db.prepare(
       "DELETE FROM characters WHERE id = ? AND user_id = ?"
@@ -297,6 +327,17 @@ export class CharacterDatabase {
   }
 
   /**
+   * Fetch a character owned by a user.
+   * @param {string} userId
+   * @param {string} characterId
+   * @returns {Object|null} Sanitized character or null
+   */
+  findById(userId, characterId) {
+    if (!isValidUserId(userId) || typeof characterId !== "string" || !characterId) return null;
+    return mapRow(this.stmtFindById.get(characterId, userId));
+  }
+
+  /**
    * Count characters owned by a user.
    * @param {string} userId
    * @returns {number}
@@ -311,11 +352,10 @@ export class CharacterDatabase {
    * Create a character for a user.
    * @param {string} userId
    * @param {string} name
-   * @param {string} [gender="male"] One of GENDERS
-   * @param {number} [appearance=0] Portrait index (0..MAX_APPEARANCE)
+   * @param {string} [sect="thieu-lam"] One of SECTS
    * @returns {Object} Sanitized character
    */
-  create(userId, name, gender = DEFAULT_GENDER, appearance = 0) {
+  create(userId, name, sect = DEFAULT_SECT) {
     if (!isValidUserId(userId)) {
       const err = new Error("Thông tin tài khoản không hợp lệ.");
       err.code = "INVALID_USER";
@@ -335,15 +375,13 @@ export class CharacterDatabase {
       throw err;
     }
 
-    const cleanGender = gender === undefined || gender === null ? DEFAULT_GENDER : gender;
-    if (!GENDERS.includes(cleanGender)) {
-      const err = new Error("Giới tính không hợp lệ. Chỉ chấp nhận 'male' hoặc 'female'.");
-      err.code = "INVALID_GENDER";
+    const cleanSect = sect === undefined || sect === null ? DEFAULT_SECT : sect;
+    if (!SECTS.includes(cleanSect)) {
+      const err = new Error(`Môn phái không hợp lệ. Chỉ chấp nhận: ${SECTS.join(", ")}.`);
+      err.code = "INVALID_SECT";
       throw err;
     }
-
-    const rawAppearance = Number.isInteger(appearance) ? appearance : 0;
-    const cleanAppearance = Math.min(Math.max(rawAppearance, 0), MAX_APPEARANCE);
+    const cleanGender = SECT_GENDER[cleanSect];
 
     if (this.countByUser(userId) >= MAX_CHARACTER_SLOTS) {
       const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
@@ -358,7 +396,7 @@ export class CharacterDatabase {
     const id = `char_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
     try {
-      this.stmtInsert.run(id, userId, cleanName, cleanGender, cleanAppearance, 1, createdAt, createdAt);
+      this.stmtInsert.run(id, userId, cleanName, cleanSect, cleanGender, 1, createdAt, createdAt);
     } catch (error) {
       // The unique index is the ultimate guard: a concurrent writer (multiple
       // server processes sharing the file) can slip past the check above.

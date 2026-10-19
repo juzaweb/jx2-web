@@ -11,8 +11,11 @@ import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
+import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
+import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
+import { skillsForSect } from "./game/skills.js";
 import {
   defaultQuantities,
   applyQuantities,
@@ -104,6 +107,13 @@ export function App() {
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
+  const [selectedSkillSlot, setSelectedSkillSlot] = useState(
+    () => loadSkillLoadout(readSession()?.activeCharacter?.id).right
+  );
+  const [leftSkillSlot, setLeftSkillSlot] = useState(
+    () => loadSkillLoadout(readSession()?.activeCharacter?.id).left
+  );
+  const [skillPickerHand, setSkillPickerHand] = useState(null);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -140,6 +150,17 @@ export function App() {
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  // Switching characters loads that hero's skill layout and sect kit.
+  useEffect(() => {
+    const loadout = loadSkillLoadout(activeCharacter?.id);
+    setSelectedSkillSlot(loadout.right);
+    setLeftSkillSlot(loadout.left);
+    bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
+    if (activeCharacter?.sect) {
+      bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
+    }
+  }, [activeCharacter?.id, activeCharacter?.sect]);
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
   // rename in the users table reaches the HUD, the game scene and the network join.
@@ -224,6 +245,14 @@ export function App() {
       }
     });
 
+    const unsubSkillSelected = bridge.on(EVENTS.SKILL_SELECTED, (slot) => {
+      if (typeof slot === "number") setSelectedSkillSlot(slot);
+    });
+
+    const unsubLeftSkillSelected = bridge.on(EVENTS.LEFT_SKILL_SELECTED, (slot) => {
+      if (typeof slot === "number") setLeftSkillSlot(slot);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -233,6 +262,8 @@ export function App() {
       unsubInventory();
       unsubEquipment();
       unsubStarted();
+      unsubSkillSelected();
+      unsubLeftSkillSelected();
     };
   }, []);
 
@@ -367,6 +398,33 @@ export function App() {
   const handleSkill = useCallback(() => {
     bridge.emit(EVENTS.ACTION_SKILL);
   }, []);
+
+  const handleOpenSkillPicker = useCallback((hand) => {
+    dismissHelp();
+    setSkillPickerHand(hand);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+  }, [dismissHelp]);
+
+  const handleCloseSkillPicker = useCallback(() => {
+    setSkillPickerHand(null);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleEquipSkill = useCallback(
+    (hand, slot) => {
+      const next = {
+        left: hand === "left" ? slot : leftSkillSlot,
+        right: hand === "right" ? slot : selectedSkillSlot
+      };
+      if (hand === "left") setLeftSkillSlot(slot);
+      else setSelectedSkillSlot(slot);
+      saveSkillLoadout(activeCharacter?.id, next);
+      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, slot });
+      setSkillPickerHand(null);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+    },
+    [activeCharacter?.id, leftSkillSlot, selectedSkillSlot]
+  );
 
   const handleUseItem = useCallback((slot) => {
     bridge.emit(EVENTS.ACTION_USE_POTION, slot);
@@ -504,9 +562,6 @@ export function App() {
           audioEnabled={audioEnabled}
           items={inventory.quickItems}
           onUseItem={handleUseItem}
-          onAttack={handleAttack}
-          onSkill={handleSkill}
-          onSave={handleSave}
           onInventory={handleOpenInventory}
           onCharacter={handleOpenCharacter}
           onOpenHelp={handleOpenHelp}
@@ -514,6 +569,10 @@ export function App() {
           onLogout={handleLogout}
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
+          skills={skillsForSect(activeCharacter?.sect)}
+          selectedSkillSlot={selectedSkillSlot}
+          leftSkillSlot={leftSkillSlot}
+          onPickSkill={handleOpenSkillPicker}
         />
 
         <MobileControls
@@ -577,6 +636,17 @@ export function App() {
         equipment={equipment}
         onUnequipSlot={handleUnequipSlot}
         onEquipItem={handleEquipItem}
+      />
+
+      {/* Choose the skill bound to each mouse button */}
+      <SkillPickerModal
+        isOpen={skillPickerHand !== null}
+        hand={skillPickerHand}
+        skills={skillsForSect(activeCharacter?.sect)}
+        level={stats.level}
+        selectedSlot={skillPickerHand === "left" ? leftSkillSlot : selectedSkillSlot}
+        onSelect={handleEquipSkill}
+        onClose={handleCloseSkillPicker}
       />
     </main>
   );

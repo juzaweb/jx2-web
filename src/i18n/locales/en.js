@@ -100,9 +100,9 @@ export default {
   hotbar: {
     slotTitle: "Key [{key}]: {name}",
     skillSlotTitle: "Key [8] or [Q]: Sword Aura ultimate",
-    attackTitle: "Left Click / Space: Limitless Sword Art",
+    attackTitle: "Basic attack (melee)",
     skillTitle: "Right Click / Key Q: Eight Desolations Sword Aura",
-    leftClick: "Left Click",
+    leftClick: "Attack",
     rightClickQ: "Right Click [Q]",
     martialName: "Crane-Character Brocade",
     martialSub: "Milky Way Secret Tome",
@@ -112,16 +112,16 @@ export default {
     character: "Character",
     inventory: "Inventory",
     help: "Guide",
-    pkTitle: "Toggle PK flag (Key P)",
+    pkTitle: "Toggle PK flag",
     pkOn: "PK",
     pkOff: "Peace"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",
     title: "Beginner's Guide",
-    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use W, A, S, D / the arrow keys.",
-    combat: "Combat: Press Space to strike, or left-click a monster directly to attack it.",
-    skill: "Sword Aura ultimate: Press Q or key 8 to unleash an area blast of inner force (costs 15 MP).",
+    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use the mobile joystick.",
+    combat: "Combat: Use the Attack button on the bottom bar (or the attack button on mobile).",
+    skill: "Skills: click the Left click / Right click slot to choose a skill. Left-click an enemy to run in and strike. Right-click an enemy to run in; right-click empty ground to cast in place. Hotkeys assign skills to the right hand.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
@@ -178,7 +178,11 @@ export default {
     loading: "Loading...",
     noCharacters: "No characters yet",
     newCharacter: "New character",
-    gender: "Gender",
+    sect: "Sect",
+    sectThieuLam: "Shaolin",
+    sectNgaMy: "Nga My",
+    sectVoDang: "Wudang",
+    sectNguDoc: "Ngu Doc",
     emptySlot: "(Empty)",
     characterList: "Character list",
     nameLabel: "Name:",
@@ -188,9 +192,6 @@ export default {
     createCharacter: "Create character",
     deleteCharacter: "Delete character",
     start: "Start",
-    appearance: "{label} appearance {index}",
-    genderMale: "Male",
-    genderFemale: "Female",
     errors: {
       load: "Could not load the character list.",
       nameLength: "Character name must be {min}-{max} characters.",
@@ -203,6 +204,38 @@ export default {
     notice: {
       created: 'Created character "{name}".',
       deleted: 'Deleted character "{name}".'
+    }
+  },
+  skills: {
+    handLeft: "Left click",
+    handRight: "Right click",
+    leftHandTitle: "Left-click skill (click to choose)",
+    rightHandTitle: "Right-click skill (click to choose)",
+    picker: {
+      eyebrow: "Assign skill",
+      title: "Choose a skill for {hand}",
+      locked: "Requires level {level}"
+    },
+    keybind: {
+      short: "Keys",
+      eyebrow: "Settings",
+      title: "Skill hotkeys",
+      hint: "Click a key box, then press the key to bind. A key only assigns its skill to the right hand; right-click casts it.",
+      press: "Press a key...",
+      error: {
+        reserved: "That key is reserved by the UI.",
+        duplicate: "That key is already bound to another skill.",
+        empty: "Invalid key.",
+        "invalid-slot": "Invalid skill slot."
+      }
+    },
+    thieuLam: {
+      laHanQuyen: { name: "Arhat Fist", desc: "Entry fist art with fast melee strikes." },
+      caDiepThoai: { name: "Kasyapa Kick", desc: "Basic leg art that slows the target." },
+      viDaQuyen: { name: "Veda Fist", desc: "Mid-tier fist art with strong finishing power." },
+      daiTuDiChuong: { name: "Great Sumeru Palm", desc: "Wide palm strike that stuns nearby foes." },
+      hueNhanChu: { name: "Wisdom Eye", desc: "Secret mantra boosting crit and attack briefly." },
+      nhuLaiThanThuong: { name: "Tathagata Palm", desc: "Signature ultimate: wide damage and a long stun." }
     }
   },
   character: {

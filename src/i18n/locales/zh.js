@@ -100,9 +100,9 @@ export default {
   hotbar: {
     slotTitle: "按键 [{key}]：{name}",
     skillSlotTitle: "按键 [8] 或 [Q]：剑气绝技",
-    attackTitle: "左键 / 空格：无极剑法",
+    attackTitle: "普通攻击（近战）",
     skillTitle: "右键 / Q 键：剑气八荒",
-    leftClick: "左键",
+    leftClick: "攻击",
     rightClickQ: "右键 [Q]",
     martialName: "鹤字锦",
     martialSub: "天河秘笈",
@@ -112,16 +112,16 @@ export default {
     character: "角色",
     inventory: "行囊",
     help: "秘笈",
-    pkTitle: "开启/关闭 PK 标记（P 键）",
+    pkTitle: "开启/关闭 PK 标记",
     pkOn: "PK",
     pkOff: "和平"
   },
   help: {
     eyebrow: "行走江湖秘笈",
     title: "新手指导",
-    move: "移动：左键点击地图（或按住鼠标跟随光标），也可使用 W、A、S、D / 方向键。",
-    combat: "战斗：按空格出招，或直接左键点击怪物进行攻击。",
-    skill: "剑气绝技：按 Q 键或数字 8 键，释放大范围罡气（消耗 15 MP）。",
+    move: "移动：左键点击地图（或按住鼠标跟随光标），或使用手机虚拟摇杆。",
+    combat: "战斗：使用底部栏的攻击按钮（手机端为攻击按钮）。",
+    skill: "招式：点击“左键/右键”槽位选择招式。左键点击敌人会跑过去攻击；右键点击敌人会跑过去，右键点击空地则原地施放。快捷键用于绑定右手招式。",
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与银两：击败灰狼可获得经验、银两，并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
@@ -178,7 +178,11 @@ export default {
     loading: "加载中……",
     noCharacters: "暂无角色",
     newCharacter: "新角色",
-    gender: "性别",
+    sect: "门派",
+    sectThieuLam: "少林",
+    sectNgaMy: "峨眉",
+    sectVoDang: "武当",
+    sectNguDoc: "五毒",
     emptySlot: "（空）",
     characterList: "角色列表",
     nameLabel: "名称：",
@@ -188,9 +192,6 @@ export default {
     createCharacter: "创建角色",
     deleteCharacter: "删除角色",
     start: "开始",
-    appearance: "{label}外观 {index}",
-    genderMale: "男",
-    genderFemale: "女",
     errors: {
       load: "无法加载角色列表。",
       nameLength: "角色名称必须为 {min}-{max} 个字符。",
@@ -203,6 +204,38 @@ export default {
     notice: {
       created: "已创建角色“{name}”。",
       deleted: "已删除角色“{name}”。"
+    }
+  },
+  skills: {
+    handLeft: "左键",
+    handRight: "右键",
+    leftHandTitle: "左键招式（点击选择）",
+    rightHandTitle: "右键招式（点击选择）",
+    picker: {
+      eyebrow: "绑定招式",
+      title: "为{hand}选择招式",
+      locked: "需要等级 {level}"
+    },
+    keybind: {
+      short: "快捷键",
+      eyebrow: "设置",
+      title: "招式快捷键",
+      hint: "点击按键框后按下想要绑定的按键。按键只把招式装到右手，右键才会施放。",
+      press: "请按键...",
+      error: {
+        reserved: "该按键已被界面占用。",
+        duplicate: "该按键已绑定其他招式。",
+        empty: "按键无效。",
+        "invalid-slot": "招式槽无效。"
+      }
+    },
+    thieuLam: {
+      laHanQuyen: { name: "罗汉拳", desc: "入门拳法，快速近身攻击。" },
+      caDiepThoai: { name: "迦叶腿", desc: "基础腿法，击中后使敌人迟缓。" },
+      viDaQuyen: { name: "韦陀拳", desc: "中级拳法，终结威力强劲。" },
+      daiTuDiChuong: { name: "大须弥掌", desc: "范围掌法，击晕周围敌人。" },
+      hueNhanChu: { name: "慧眼咒", desc: "独门心法，短时间提升暴击与攻击。" },
+      nhuLaiThanThuong: { name: "如来神掌", desc: "镇派绝学，大范围伤害并长时间定身。" }
     }
   },
   character: {

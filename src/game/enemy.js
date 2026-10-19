@@ -28,6 +28,10 @@ export class Wolf {
     this.stats = { ...WOLF_COMBAT };
     this.isDead = false;
     this.nextBite = 0;
+    // Skill control state: a stunned wolf holds still, a slowed one moves slower.
+    this.stunUntil = 0;
+    this.slowUntil = 0;
+    this.slowPct = 0;
     // Where the server last reported this wolf (see applyServerState). Left null
     // until then, so a wolf never slides toward a position nobody has claimed.
     this.targetX = null;
@@ -83,12 +87,18 @@ export class Wolf {
   update(time, delta, player, onBite) {
     if (!this.sprite.active || this.isDead) return;
 
+    // A stunned wolf holds position; a slowed one advances its clock slower.
+    const stunned = time < this.stunUntil;
+    const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
+
     // Online the server steps the AI and this render follows its lead; offline the
     // client steps the same shared AI with the local player as the only target
-    if (this.usesServerMovement()) {
-      this.followServerPosition(delta);
+    if (stunned) {
+      this.sprite.setVelocity(0, 0);
+    } else if (this.usesServerMovement()) {
+      this.followServerPosition(delta * slowFactor);
     } else {
-      this.stepLocally(delta, player);
+      this.stepLocally(delta * slowFactor, player);
     }
 
     const x = this.sprite.x;
@@ -260,6 +270,21 @@ export class Wolf {
   }
 }
 
+/**
+ * Default wolf spawn points (ids are indices). Mirrors the server roster so the
+ * client has targets offline and can reconcile by id when the server connects.
+ */
+export const DEFAULT_ENEMY_SPAWNS = [
+  [8400, 6000],
+  [9500, 6700],
+  [11100, 5900],
+  [12600, 6500],
+  [13800, 5900],
+  [7600, 8000],
+  [10500, 8200],
+  [13200, 7900]
+];
+
 export class EnemyManager {
   /**
    * @param {Phaser.Scene} scene
@@ -327,6 +352,13 @@ export class EnemyManager {
    */
   applyServerSnapshot(enemies) {
     if (!Array.isArray(enemies)) return;
-    enemies.forEach((enemy) => this.applyEnemyState(enemy));
+    enemies.forEach((enemy) => {
+      if (!this.getById(enemy.id)) {
+        const wolf = new Wolf(this.scene, enemy.x, enemy.y, enemy.id);
+        this.group.add(wolf.sprite);
+        this.enemies.push(wolf);
+      }
+      this.applyEnemyState(enemy);
+    });
   }
 }

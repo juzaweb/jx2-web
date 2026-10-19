@@ -25,6 +25,8 @@ export class Player {
     this.name = name;
     /** Character gender drives the rig's silhouette ("male" | "female"). */
     this.gender = normalizeGender(gender);
+    /** Sect id selects the skill kit (see skills.js). */
+    this.sect = "thieu-lam";
 
     this.stats = {
       level: 1,
@@ -60,7 +62,6 @@ export class Player {
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
-    this.createKeyboard();
   }
 
   createPhysicsSprite(x, y) {
@@ -164,8 +165,13 @@ export class Player {
     this.rig?.set(direction, this.equipment, this.gender);
   }
 
-  createKeyboard() {
-    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Q", false);
+  /**
+   * Switch the skill kit's sect id.
+   * @param {string} sect
+   */
+  setSect(sect) {
+    this.sect = typeof sect === "string" && sect ? sect : this.sect;
+    return this.sect;
   }
 
   update(time, delta) {
@@ -242,6 +248,7 @@ export class Player {
 
   playAttackMotion() {
     if (!this.body) return;
+    this.rig?.attack?.("slash");
     this.scene.tweens.add({
       targets: this.body,
       x: 7,
@@ -256,35 +263,38 @@ export class Player {
     });
   }
 
-  playSkillMotion() {
+  /**
+   * Play the limb animation for a skill cast.
+   * @param {"slash"|"kick"|"shockwave"|"aura"|string} [kind]
+   */
+  playSkillMotion(kind = "slash") {
     if (!this.body) return;
+    this.rig?.attack?.(kind);
+
+    const isKick = kind === "kick";
+    const isChannel = kind === "aura";
     this.scene.tweens.add({
       targets: this.body,
-      scaleX: 1.15,
-      scaleY: 0.88,
-      duration: 80,
+      x: isChannel ? 0 : isKick ? -4 : 6,
+      scaleX: isChannel ? 1.05 : 1.15,
+      scaleY: isChannel ? 1.05 : 0.88,
+      duration: isKick ? 110 : 90,
       yoyo: true,
-      ease: "Quad.easeOut"
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        if (this.body) this.body.x = 0;
+      }
     });
   }
 
   updateMovement() {
-    const isTyping = typeof document !== "undefined" && (
-      document.activeElement?.tagName === "INPUT" ||
-      document.activeElement?.tagName === "TEXTAREA"
-    );
-    if (isTyping) {
-      this.sprite.setVelocity(0, 0);
-      return;
-    }
+    // Movement is click-to-move or the mobile virtual joystick; keyboard movement
+    // was removed so WASD/arrow keys are free for skill selection.
+    const keyLeft = this.touchDirection === "left";
+    const keyRight = this.touchDirection === "right";
+    const keyUp = this.touchDirection === "up";
+    const keyDown = this.touchDirection === "down";
 
-    const k = this.keys;
-    const keyLeft = k.A.isDown || k.LEFT.isDown || this.touchDirection === "left";
-    const keyRight = k.D.isDown || k.RIGHT.isDown || this.touchDirection === "right";
-    const keyUp = k.W.isDown || k.UP.isDown || this.touchDirection === "up";
-    const keyDown = k.S.isDown || k.DOWN.isDown || this.touchDirection === "down";
-
-    // If keyboard or touch-dpad is active, cancel target movement and prioritize keys
     if (keyLeft || keyRight || keyUp || keyDown) {
       this.isMovingToTarget = false;
       this.targetX = null;
