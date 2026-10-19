@@ -12,13 +12,13 @@ const NAME_MAX = 16;
  * the character's appearance so the chosen face can be restored.
  */
 const PORTRAITS = [
-  { index: 0, gender: "nam", labelKey: "characterSelect.genderMale", glyph: "♂" },
-  { index: 1, gender: "nu", labelKey: "characterSelect.genderFemale", glyph: "♀" }
+  { index: 0, gender: "male", labelKey: "characterSelect.genderMale", glyph: "♂" },
+  { index: 1, gender: "female", labelKey: "characterSelect.genderFemale", glyph: "♀" }
 ];
 
 const GENDER_LABEL = {
-  nam: "characterSelect.genderMale",
-  nu: "characterSelect.genderFemale"
+  male: "characterSelect.genderMale",
+  female: "characterSelect.genderFemale"
 };
 
 const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", zh: "zh-CN" };
@@ -214,7 +214,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                 <div className={`jx2-cs-portrait ${selected?.gender || ""}`}>
                   {selected ? (
                     <span className="jx2-cs-portrait-glyph">
-                      {selected.gender === "nu" ? "♀" : "♂"}
+                      {selected.gender === "female" ? "♀" : "♂"}
                     </span>
                   ) : (
                     <span className="jx2-cs-portrait-glyph empty">?</span>
@@ -225,7 +225,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                 </div>
                 {selected && (
                   <div className="jx2-cs-stage-meta">
-                    {t(GENDER_LABEL[selected.gender] || GENDER_LABEL.nam)} ·{" "}
+                    {t(GENDER_LABEL[selected.gender] || GENDER_LABEL.male)} ·{" "}
                     {t("common.level")} {selected.level} · {formatDateTime(selected.createdAt, language)}
                   </div>
                 )}
@@ -310,7 +310,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
                         <>
                           <span className="jx2-cs-slot-name">{char.name}</span>
                           <span className="jx2-cs-slot-info">
-                            {t(GENDER_LABEL[char.gender] || GENDER_LABEL.nam)} ·{" "}
+                            {t(GENDER_LABEL[char.gender] || GENDER_LABEL.male)} ·{" "}
                             {t("common.level")} {char.level}
                           </span>
                           <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>

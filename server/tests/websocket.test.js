@@ -249,6 +249,44 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client2.close();
   });
 
+  await t.test("Gender is carried on join and broadcast to peers", async () => {
+    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    client1.send({
+      type: "player_join",
+      payload: { id: "usr_g1", username: "G1", x: 400, y: 400, gender: "female" }
+    });
+    await client1.waitFor((m) => m.type === "init_world");
+
+    // Client 2 connects only now, so it never sees the initial g1 broadcast and
+    // its init snapshot is the first (and only) place g1's gender appears.
+    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client2.send({ type: "player_join", payload: { id: "usr_g2", username: "G2", x: 410, y: 410, gender: "bogus" } });
+    const init2 = await client2.waitFor((m) => m.type === "init_world");
+    const snap = init2.payload.players.find((p) => p.id === "usr_g1");
+    assert.equal(snap.gender, "female");
+
+    // Unknown genders fall back to "male" (client 2 reported a bogus value).
+    const joinBroadcast = await client1.waitFor(
+      (m) => m.type === "player_joined" && m.payload.player.id === "usr_g2"
+    );
+    assert.equal(joinBroadcast.payload.player.gender, "male");
+
+    // A character switch re-joins; the new gender rides the join broadcast so
+    // peers redraw from player_joined (no dedicated gender packet exists).
+    client1.send({
+      type: "player_join",
+      payload: { id: "usr_g1", username: "G1", x: 400, y: 400, gender: "male" }
+    });
+    const rejoined = await client2.waitFor(
+      (m) => m.type === "player_joined" && m.payload.player.id === "usr_g1"
+    );
+    assert.equal(rejoined.payload.player.gender, "male");
+
+    await client1.close();
+    await client2.close();
+  });
+
   await t.test("Player HP is server-authoritative (stats set the ceiling, heals clamp)", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);

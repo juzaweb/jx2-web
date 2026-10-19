@@ -11,6 +11,7 @@ import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
+import { normalizeGender } from "./game/gender.js";
 import {
   defaultQuantities,
   applyQuantities,
@@ -390,6 +391,9 @@ export function App() {
     setInventory(loadCharacterInventory(character.id));
     setEquipment(StorageManager.loadEquipment());
 
+    // Set the gender before the name: the name change triggers a re-join, so the
+    // join snapshot then already carries the correct gender (peers redraw from it).
+    bridge.emit(EVENTS.SET_PLAYER_GENDER, normalizeGender(character.gender));
     bridge.emit(EVENTS.SET_PLAYER_NAME, character.name);
     bridge.emit(EVENTS.ACTION_START);
     bridge.emit(EVENTS.LOG_ADDED, {
@@ -410,6 +414,7 @@ export function App() {
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
       setIsLoginOpen(true);
+      bridge.emit(EVENTS.SET_PLAYER_GENDER, "male");
       bridge.emit(EVENTS.SET_PLAYER_NAME, t("app.defaultPlayerName"));
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
     }

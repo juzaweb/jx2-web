@@ -9,8 +9,8 @@ const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const CHARACTER_NAME_REGEX = /^[\p{L}\p{N}_ -]+$/u;
 const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 16;
-const GENDERS = ["nam", "nu"];
-const DEFAULT_GENDER = "nam";
+const GENDERS = ["male", "female"];
+const DEFAULT_GENDER = "male";
 const MAX_APPEARANCE = 3;
 // SQLite extended result code for a UNIQUE constraint violation.
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
@@ -67,7 +67,7 @@ const mapRow = (row) => {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    gender: row.gender === "nu" ? "nu" : DEFAULT_GENDER,
+    gender: row.gender === "female" ? "female" : DEFAULT_GENDER,
     appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
@@ -107,7 +107,7 @@ export class CharacterDatabase {
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
-        gender TEXT NOT NULL DEFAULT 'nam',
+        gender TEXT NOT NULL DEFAULT 'male',
         appearance INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -129,11 +129,17 @@ export class CharacterDatabase {
       .all()
       .map((c) => c.name);
     if (!columns.includes("gender")) {
-      this.db.exec("ALTER TABLE characters ADD COLUMN gender TEXT NOT NULL DEFAULT 'nam'");
+      this.db.exec("ALTER TABLE characters ADD COLUMN gender TEXT NOT NULL DEFAULT 'male'");
     }
     if (!columns.includes("appearance")) {
       this.db.exec("ALTER TABLE characters ADD COLUMN appearance INTEGER NOT NULL DEFAULT 0");
     }
+
+    // Normalise legacy gender values ("nam"/"nu") to the current English keys.
+    this.db.exec(`
+      UPDATE characters SET gender = 'female' WHERE gender = 'nu';
+      UPDATE characters SET gender = 'male' WHERE gender = 'nam';
+    `);
 
     this.stmtListByUser = this.db.prepare(
       "SELECT id, user_id, name, gender, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
@@ -291,7 +297,7 @@ export class CharacterDatabase {
    * Create a character for a user.
    * @param {string} userId
    * @param {string} name
-   * @param {string} [gender="nam"] One of GENDERS
+   * @param {string} [gender="male"] One of GENDERS
    * @param {number} [appearance=0] Portrait index (0..MAX_APPEARANCE)
    * @returns {Object} Sanitized character
    */
@@ -317,7 +323,7 @@ export class CharacterDatabase {
 
     const cleanGender = gender === undefined || gender === null ? DEFAULT_GENDER : gender;
     if (!GENDERS.includes(cleanGender)) {
-      const err = new Error("Giới tính không hợp lệ. Chỉ chấp nhận 'nam' hoặc 'nu'.");
+      const err = new Error("Giới tính không hợp lệ. Chỉ chấp nhận 'male' hoặc 'female'.");
       err.code = "INVALID_GENDER";
       throw err;
     }
