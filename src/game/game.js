@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { WorldManager, WORLD_CONFIG } from "./world.js";
-import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
+import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
 import { EnemyManager } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
@@ -17,6 +17,9 @@ import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+
+/** Ground tiles the gameplay camera shows across the screen width. */
+const CAMERA_TILES = 10;
 import { normalizeGender } from "./gender.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
@@ -699,13 +702,11 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   updateCameraZoom() {
-    // The Biện Kinh map is now a large square city, so the camera keeps a wider
-    // view than the original 1:1 ratio: the player sees a generous slice of the
-    // city (matching the world map) instead of a cramped corner.
-    const h = this.scale.height || 600;
+    // The gameplay camera is defined in ground tiles: it always shows
+    // CAMERA_TILES tiles across the screen width, whatever the resolution.
     const w = this.scale.width || 800;
-    const targetZoom = Math.min(h / (700 * WORLD_SCALE), w / (600 * WORLD_SCALE));
-    const zoom = Phaser.Math.Clamp(targetZoom, 0.15, 3.0);
+    const targetZoom = w / (CAMERA_TILES * WORLD_TILE);
+    const zoom = Phaser.Math.Clamp(targetZoom, 0.1, 3.0);
     this.cameras.main.setZoom(zoom);
   }
 

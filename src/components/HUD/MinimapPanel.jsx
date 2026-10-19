@@ -58,8 +58,8 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           <canvas
             id="minimap-canvas"
             ref={canvasRef}
-            width={zoomed ? 1100 : 220}
-            height={zoomed ? 750 : 150}
+            width={zoomed ? 1000 : 220}
+            height={zoomed ? 682 : 150}
           ></canvas>
           <div className="minimap-radar-sweep"></div>
         </div>
