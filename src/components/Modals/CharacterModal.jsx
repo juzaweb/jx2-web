@@ -4,7 +4,7 @@ import { getItemById } from "../../game/items.js";
 import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
-import { setDragPayload, readDragPayload, acceptDragPayload } from "./dragItem.js";
+import { setDragPayload, readDragPayload, canDropOnSlot, acceptDrop } from "./dragItem.js";
 
 /**
  * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
@@ -122,6 +122,16 @@ export function CharacterModal({
 
   const sheet = deriveCharacterSheet(stats);
 
+  // Only highlight a slot for a bag item that belongs in it; other drags pass through.
+  const handleSlotDragOver = (event, slot) => {
+    if (!canDropOnSlot(event, slot.source)) return;
+    acceptDrop(event);
+    setDragOverKey(slot.key);
+  };
+
+  const clearSlotDragOver = (slot) =>
+    setDragOverKey((key) => (key === slot.key ? null : key));
+
   // Dropping a bag item on a doll slot equips it when the slot matches.
   const handleSlotDrop = (event, slot) => {
     setDragOverKey(null);
@@ -145,9 +155,8 @@ export function CharacterModal({
           title={t("character.unequipTitle", { name: item.name })}
           draggable
           onDragStart={(event) => setDragPayload(event, { kind: "equipment", slot: slot.source })}
-          onDragOver={acceptDragPayload}
-          onDragEnter={() => setDragOverKey(slot.key)}
-          onDragLeave={() => setDragOverKey((key) => (key === slot.key ? null : key))}
+          onDragOver={(event) => handleSlotDragOver(event, slot)}
+          onDragLeave={() => clearSlotDragOver(slot)}
           onDrop={(event) => handleSlotDrop(event, slot)}
           onClick={() => onUnequipSlot?.(slot.source)}
         >
@@ -162,9 +171,8 @@ export function CharacterModal({
         className={`equip-slot${dragOverKey === slot.key ? " drag-over" : ""}`}
         key={slot.key}
         title={t("character.notEquipped", { label: t(slot.labelKey) })}
-        onDragOver={droppable ? acceptDragPayload : undefined}
-        onDragEnter={droppable ? () => setDragOverKey(slot.key) : undefined}
-        onDragLeave={droppable ? () => setDragOverKey((key) => (key === slot.key ? null : key)) : undefined}
+        onDragOver={droppable ? (event) => handleSlotDragOver(event, slot) : undefined}
+        onDragLeave={droppable ? () => clearSlotDragOver(slot) : undefined}
         onDrop={droppable ? (event) => handleSlotDrop(event, slot) : undefined}
       >
         <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
