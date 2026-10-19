@@ -5,8 +5,8 @@
   "main": "combat.js",
   "type": "module",
   "scripts": {
+    "install:all": "npm install && npm --prefix server install",
     "dev": "node scripts/dev.js",
-    "dev:all": "node scripts/dev.js",
     "dev:client": "vite",
     "build": "vite build",
     "preview": "vite preview",
