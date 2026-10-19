@@ -208,6 +208,47 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.close();
   });
 
+  await t.test("Equipment is sanitized on join and relayed when it changes", async () => {
+    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    client1.send({
+      type: "player_join",
+      payload: {
+        id: "usr_eq1",
+        username: "Eq1",
+        x: 400,
+        y: 400,
+        // Unknown slots and non-string ids must be dropped.
+        equipment: { armor: "cam-y-bao", helmet: "phuong-vu-bao", bogus: "x", boots: 5 }
+      }
+    });
+    await client1.waitFor((m) => m.type === "init_world");
+
+    // Client 2's init snapshot must carry client 1's worn slots, sanitized.
+    client2.send({ type: "player_join", payload: { id: "usr_eq2", username: "Eq2", x: 410, y: 410 } });
+    const init2 = await client2.waitFor((m) => m.type === "init_world");
+    const snap = init2.payload.players.find((p) => p.id === "usr_eq1");
+    assert.equal(snap.equipment.armor, "cam-y-bao");
+    assert.equal(snap.equipment.helmet, "phuong-vu-bao");
+    assert.equal(snap.equipment.boots, null);
+    assert.equal(snap.equipment.bogus, undefined);
+
+    // A later change is relayed to peers only, with the same sanitizing.
+    client1.send({
+      type: "player_equipment",
+      payload: { equipment: { weapon: "hac-ung-kiem", armor: null, junk: "x" } }
+    });
+    const relay = await client2.waitFor((m) => m.type === "player_equipment");
+    assert.equal(relay.payload.id, "usr_eq1");
+    assert.equal(relay.payload.equipment.weapon, "hac-ung-kiem");
+    assert.equal(relay.payload.equipment.armor, null);
+    assert.equal(relay.payload.equipment.junk, undefined);
+
+    await client1.close();
+    await client2.close();
+  });
+
   await t.test("Player HP is server-authoritative (stats set the ceiling, heals clamp)", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);

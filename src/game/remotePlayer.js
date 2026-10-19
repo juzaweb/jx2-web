@@ -1,14 +1,8 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import {
-  directionFromVelocity,
-  idleFrame,
-  walkAnimKey,
-  ensureHeroWalkAnims,
-  HERO8_DISPLAY,
-  HERO8_FOOT_Y
-} from "./heroDirections.js";
+import { directionFromVelocity } from "./heroDirections.js";
+import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 
 /** Distance (px) a packet may move a peer before it is treated as a teleport. */
 const TELEPORT_SNAP_THRESHOLD = 200;
@@ -33,13 +27,15 @@ export class RemotePlayer {
     this.targetY = this.y;
     this.vx = data.vx || 0;
     this.vy = data.vy || 0;
-    /** Sprite column (0..7) the peer currently faces on the 8-direction sheet. */
-    this.facingColumn = 0;
+    /** Direction the peer faces (0..7, see heroDirections.js). */
+    this.facingDirection = 0;
+    /** Worn equipment slots (slot -> item id), synced from the server. */
+    this.equipment = data.equipment || {};
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
     this.pkFlag = data.pkFlag === true;
+    this.walkPhase = 0;
 
-    this.stepPhase = 0;
     this.createVisuals();
   }
 
@@ -49,27 +45,15 @@ export class RemotePlayer {
     this.container.setDepth(isoDepth(this.x, this.y));
 
     // 1. Soft ground shadow under feet
-    this.shadow = this.scene.add.ellipse(0, 41, 42, 13, 0x090e0c, 0.45);
+    this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
 
     // 2. Body container for animations
     this.body = this.scene.add.container(0, 0);
 
-    // 3. Animated 8-direction hero (falls back to the static sprite)
-    this.has8Dir = this.scene.textures.exists("hero-8dir");
-    ensureHeroWalkAnims(this.scene);
-
-    if (this.has8Dir) {
-      this.heroImage = this.scene.add.sprite(0, 0, "hero-8dir", idleFrame(this.facingColumn));
-      this.heroImage.setOrigin(0.5, 1);
-      this.heroImage.setDisplaySize(HERO8_DISPLAY.w, HERO8_DISPLAY.h);
-      this.heroImage.y = HERO8_FOOT_Y;
-      this.body.add(this.heroImage);
-    } else if (this.scene.textures.exists("hero-sprite")) {
-      this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
-      this.heroImage.setDisplaySize(30, 82);
-      this.heroImage.setOrigin(0.5, 0.5);
-      this.body.add(this.heroImage);
-    }
+    // 3. Vector hero rig, drawn wearing the peer's synced equipment
+    this.rig = new HeroRigView(this.scene, { footOffsetY: HERO_FOOT_Y });
+    this.rig.set(this.facingDirection, this.equipment);
+    this.body.add(this.rig.container);
 
     this.container.add([this.shadow, this.body]);
 
@@ -93,26 +77,22 @@ export class RemotePlayer {
   }
 
   /**
-   * Turn the peer to a sprite column (0..7) and start that direction's walk
-   * cycle.
-   * @param {number} column
+   * Turn the peer to face a direction (0..7) and redraw the rig.
+   * @param {number} direction
    */
-  faceDirection(column) {
-    if (!this.heroImage || !this.has8Dir) return;
-    this.facingColumn = column;
-    const key = walkAnimKey(column);
-    if (this.scene.anims.exists(key)) {
-      this.heroImage.play(key, true);
-    }
+  faceDirection(direction) {
+    if (direction === this.facingDirection) return;
+    this.facingDirection = direction;
+    this.rig?.set(direction, this.equipment);
   }
 
-  /** Stop the walk cycle and hold the idle pose for the current direction. */
-  idlePose() {
-    if (!this.heroImage || !this.has8Dir) return;
-    if (this.heroImage.anims.isPlaying) {
-      this.heroImage.stop();
-    }
-    this.heroImage.setFrame(idleFrame(this.facingColumn));
+  /**
+   * Replace the peer's worn slots (synced from the server) and redraw the rig.
+   * @param {Record<string, string|null>} equipment
+   */
+  applyEquipment(equipment) {
+    this.equipment = equipment || {};
+    this.rig?.set(this.facingDirection, this.equipment);
   }
 
   /**
@@ -124,11 +104,6 @@ export class RemotePlayer {
     layoutHealthBar({ back: this.hpBack, fill: this.hpFill }, x, y, isoDepth(this.x, this.y), this.hp, this.maxHp);
   }
 
-  /**
-   * Apply an authoritative HP report relayed by the server so peers see each
-   * other's health. Unusable values are ignored rather than clearing the bar.
-   * @param {{hp?:number, maxHp?:number}} stats
-   */
   /**
    * Update this peer's PK flag and recolour the overhead name accordingly.
    * @param {boolean} flagged
@@ -242,19 +217,15 @@ export class RemotePlayer {
         mdy = this.targetY - this.y;
       }
 
-      if (this.has8Dir) {
-        this.faceDirection(directionFromVelocity(mdx, mdy));
-        if (this.body) this.body.y = Phaser.Math.Linear(this.body.y, 0, 0.3);
-      } else {
-        this.stepPhase += delta * 0.012;
-        const bounceY = -Math.abs(Math.sin(this.stepPhase)) * 3.5;
-        if (this.body) this.body.y = bounceY;
-      }
+      this.faceDirection(directionFromVelocity(mdx, mdy));
+      this.walkPhase += delta * 0.012;
+      this.rig?.animate(this.walkPhase);
+      if (this.body) this.body.y = -Math.abs(Math.sin(this.walkPhase)) * 3.5;
     } else {
       this.x = this.targetX;
       this.y = this.targetY;
       if (this.body) this.body.y = 0;
-      this.idlePose();
+      this.rig?.animate(0);
     }
 
     // Depth sorting (isometric)

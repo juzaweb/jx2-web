@@ -83,6 +83,18 @@ export class RemotePlayerManager {
   }
 
   /**
+   * A player changed the gear they are wearing; redraw that peer's rig.
+   * @param {Object} payload
+   */
+  handlePlayerEquipment(payload = {}) {
+    if (!payload.id) return;
+    const player = this.players.get(payload.id);
+    if (player) {
+      player.applyEquipment(payload.equipment);
+    }
+  }
+
+  /**
    * Authoritative HP pushed by the server; drives the peer's overhead bar.
    * @param {Object} payload
    */

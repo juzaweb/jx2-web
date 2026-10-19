@@ -159,6 +159,14 @@ export class NetworkClient {
   }
 
   /**
+   * Report the worn equipment slots so peers can redraw the player's rig.
+   * @param {Record<string, string|null>} equipment
+   */
+  sendEquipment(equipment) {
+    this.send("player_equipment", { equipment });
+  }
+
+  /**
    * Report the parts of the player block the client owns (HP ceiling + defense).
    * The server owns the current HP itself.
    * @param {{maxHp:number, defense:number, level?:number}} statsData

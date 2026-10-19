@@ -28,6 +28,26 @@ const clampNum = (val, min, max, fallback) => {
   return Math.min(Math.max(val, min), max);
 };
 
+/** Equipment slots the client renders (see src/game/equipment.js). */
+const EQUIPMENT_SLOTS = ["boots", "armor", "helmet", "accessory", "weapon"];
+
+/**
+ * Reduce a client-reported equipment map to the known slots with short string
+ * ids (or null). Peers only render *which* slots are filled, so the id is opaque
+ * and only its presence matters.
+ * @param {Object} val
+ * @returns {Record<string, string|null>}
+ */
+const sanitizeEquipment = (val) => {
+  const out = {};
+  if (!val || typeof val !== "object") return out;
+  for (const slot of EQUIPMENT_SLOTS) {
+    const id = val[slot];
+    out[slot] = typeof id === "string" && id.length > 0 ? id.slice(0, 64) : null;
+  }
+  return out;
+};
+
 /** World bounds shared with the client scene (see src/game/world.js). */
 const WORLD_WIDTH = 2200;
 const WORLD_HEIGHT = 1250;
@@ -192,6 +212,10 @@ export class GameSocketManager {
         this.handlePlayerMove(ws, msg.payload);
         break;
 
+      case "player_equipment":
+        this.handlePlayerEquipment(ws, msg.payload);
+        break;
+
       case "player_stats":
         this.handlePlayerStats(ws, msg.payload);
         break;
@@ -262,6 +286,7 @@ export class GameSocketManager {
       vy: clampNum(payload.vy, -500, 500, 0),
       direction: payload.direction === "left" ? "left" : "right",
       stance: payload.stance === "side" ? "side" : "front",
+      equipment: sanitizeEquipment(payload.equipment),
       level: clampNum(payload.level, 1, 150, 1),
       // Server-authoritative health. The join snapshot seeds it; every later
       // change is driven by the server (bite, PvP hit, heal), never by a raw
@@ -321,6 +346,7 @@ export class GameSocketManager {
       vy: player.vy,
       direction: player.direction,
       stance: player.stance,
+      equipment: player.equipment,
       level: player.level,
       hp: player.hp,
       maxHp: player.maxHp,
@@ -360,6 +386,25 @@ export class GameSocketManager {
         direction: player.direction,
         stance: player.stance
       }
+    });
+  }
+
+  /**
+   * Relay a change to the slots a player is wearing so peers can redraw their
+   * rig. The reported map is sanitized to known slots; the sender already knows
+   * its own gear, so it is only broadcast to everyone else.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerEquipment(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    player.equipment = sanitizeEquipment(payload.equipment);
+
+    this.broadcast(ws, {
+      type: "player_equipment",
+      payload: { id: player.id, equipment: player.equipment }
     });
   }
 
