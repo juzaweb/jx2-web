@@ -1,6 +1,7 @@
 import React from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { skillUnlocked } from "../../game/skills.js";
+import { SkillIcon } from "../SkillIcon.jsx";
 
 /**
  * Pick which sect skill is bound to the left or right mouse button.
@@ -33,7 +34,7 @@ export function SkillPickerModal({ isOpen, hand, skills = [], level = 1, selecte
                 disabled={!unlocked}
                 onClick={() => onSelect(hand, skill.slot)}
               >
-                <span className="skill-picker-glyph">{skill.glyph}</span>
+                <SkillIcon skill={skill} className="skill-picker-glyph" />
                 <span className="skill-picker-name">{t(skill.nameKey, undefined, skill.id)}</span>
                 <span className="skill-picker-meta">
                   {unlocked

@@ -191,9 +191,9 @@ export class HeroRigView {
   }
 }
 
-/** Compact change key for the equipped slots (only presence matters, not item). */
+/** Change key for the equipped slots; item ids matter because the rig draws them. */
 function slotSignature(equipment = {}) {
-  return EQUIPMENT_SLOT_KEYS.map((slot) => (equipment[slot] ? "1" : "0")).join("");
+  return EQUIPMENT_SLOT_KEYS.map((slot) => equipment[slot] || "").join("|");
 }
 
 function createPrimitive(scene, p) {

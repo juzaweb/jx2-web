@@ -3,6 +3,7 @@ import { QUICK_ITEMS } from "../../game/items.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
+import { SkillIcon } from "../SkillIcon.jsx";
 
 export function HotbarDock({
   coins = 0,
@@ -96,7 +97,7 @@ export function HotbarDock({
             title={t("skills.leftHandTitle")}
             onClick={() => onPickSkill?.("left")}
           >
-            <span className="hand-glyph">{leftSkill?.glyph || "?"}</span>
+            <SkillIcon skill={leftSkill} className="hand-glyph" />
             {leftCooldown > 0 && <span className="hand-cd">{Math.ceil(leftCooldown / 1000)}</span>}
             <span className="click-badge">{t("skills.handLeft")}</span>
           </button>
@@ -108,7 +109,7 @@ export function HotbarDock({
             title={t("skills.rightHandTitle")}
             onClick={() => onPickSkill?.("right")}
           >
-            <span className="hand-glyph">{selectedSkill?.glyph || "?"}</span>
+            <SkillIcon skill={selectedSkill} className="hand-glyph" />
             {rightCooldown > 0 && <span className="hand-cd">{Math.ceil(rightCooldown / 1000)}</span>}
             <span className="click-badge">{t("skills.handRight")}</span>
           </button>

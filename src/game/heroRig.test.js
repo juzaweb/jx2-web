@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHero, poseFor } from "./heroRig.js";
+import { buildHero, poseFor, weaponKindFor } from "./heroRig.js";
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 
 describe("poseFor", () => {
@@ -58,5 +58,30 @@ describe("buildHero", () => {
     const male = buildHero({ direction: 1, gender: "male" });
     expect(buildHero({ direction: 1, gender: "other" })).toEqual(male);
     expect(buildHero({ direction: 1 })).toEqual(male);
+  });
+});
+
+describe("held weapon", () => {
+  it("maps catalog weapons to the matching rig shape", () => {
+    expect(weaponKindFor("hac-ung-kiem")).toBe("jian");
+    expect(weaponKindFor("thanh-long-dao")).toBe("blade");
+    expect(weaponKindFor("phach-dao")).toBe("blade");
+    expect(weaponKindFor("thiet-trao")).toBe("claw");
+    expect(weaponKindFor("unknown-item")).toBe("jian");
+    expect(weaponKindFor(null)).toBeNull();
+    expect(weaponKindFor(undefined)).toBeNull();
+    expect(weaponKindFor("")).toBeNull();
+  });
+
+  it("draws the equipped weapon instead of a default sword", () => {
+    const unarmed = buildHero({ direction: 0 });
+    const jian = buildHero({ direction: 0, equipment: { weapon: "hac-ung-kiem" } });
+    const blade = buildHero({ direction: 0, equipment: { weapon: "thanh-long-dao" } });
+    const claw = buildHero({ direction: 0, equipment: { weapon: "thiet-trao" } });
+
+    expect(jian.length).toBeGreaterThan(unarmed.length);
+    expect(blade).not.toEqual(jian);
+    expect(claw).not.toEqual(jian);
+    expect(claw).not.toEqual(blade);
   });
 });
