@@ -14,7 +14,7 @@ import {
 import "./inventory.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
-import { setDragPayload, readDragPayload, hasDragPayload } from "./dragItem.js";
+import { setDragPayload, readDragPayload, acceptDragPayload } from "./dragItem.js";
 
 const GRID_COLUMNS = 5;
 const TOOLTIP_OFFSET = 16;
@@ -80,13 +80,6 @@ export function InventoryModal({
   };
 
   // Dropping an item dragged off the character paper-doll returns it to the bag.
-  const handlePanelDragOver = (event) => {
-    if (hasDragPayload(event)) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-    }
-  };
-
   const handlePanelDrop = (event) => {
     const payload = readDragPayload(event);
     if (payload?.kind === "equipment") {
@@ -118,7 +111,7 @@ export function InventoryModal({
         aria-label={t("inventory.title")}
         onMouseMove={handlePanelMouseMove}
         onMouseLeave={() => setHovered(null)}
-        onDragOver={handlePanelDragOver}
+        onDragOver={acceptDragPayload}
         onDrop={handlePanelDrop}
       >
         <div className="inv-titlebar">

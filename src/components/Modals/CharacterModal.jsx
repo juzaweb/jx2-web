@@ -4,7 +4,7 @@ import { getItemById } from "../../game/items.js";
 import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
-import { setDragPayload, readDragPayload, hasDragPayload } from "./dragItem.js";
+import { setDragPayload, readDragPayload, acceptDragPayload } from "./dragItem.js";
 
 /**
  * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
@@ -123,13 +123,6 @@ export function CharacterModal({
   const sheet = deriveCharacterSheet(stats);
 
   // Dropping a bag item on a doll slot equips it when the slot matches.
-  const handleSlotDragOver = (event, slot) => {
-    if (hasDragPayload(event)) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-    }
-  };
-
   const handleSlotDrop = (event, slot) => {
     setDragOverKey(null);
     const payload = readDragPayload(event);
@@ -152,7 +145,7 @@ export function CharacterModal({
           title={t("character.unequipTitle", { name: item.name })}
           draggable
           onDragStart={(event) => setDragPayload(event, { kind: "equipment", slot: slot.source })}
-          onDragOver={(event) => handleSlotDragOver(event, slot)}
+          onDragOver={acceptDragPayload}
           onDragEnter={() => setDragOverKey(slot.key)}
           onDragLeave={() => setDragOverKey((key) => (key === slot.key ? null : key))}
           onDrop={(event) => handleSlotDrop(event, slot)}
@@ -166,10 +159,10 @@ export function CharacterModal({
     const droppable = Boolean(slot.source);
     return (
       <div
-        className={`equip-slot${droppable ? " droppable" : ""}${dragOverKey === slot.key ? " drag-over" : ""}`}
+        className={`equip-slot${dragOverKey === slot.key ? " drag-over" : ""}`}
         key={slot.key}
         title={t("character.notEquipped", { label: t(slot.labelKey) })}
-        onDragOver={droppable ? (event) => handleSlotDragOver(event, slot) : undefined}
+        onDragOver={droppable ? acceptDragPayload : undefined}
         onDragEnter={droppable ? () => setDragOverKey(slot.key) : undefined}
         onDragLeave={droppable ? () => setDragOverKey((key) => (key === slot.key ? null : key)) : undefined}
         onDrop={droppable ? (event) => handleSlotDrop(event, slot) : undefined}

@@ -47,3 +47,16 @@ export function readDragPayload(event) {
 export function hasDragPayload(event) {
   return Array.from(event.dataTransfer?.types || []).includes(DRAG_MIME);
 }
+
+/**
+ * Mark `event` as an accepted drop target for our payload. Call from dragover;
+ * returns false (and does nothing) for foreign drags so they stay untouched.
+ * @param {DragEvent} event
+ * @returns {boolean}
+ */
+export function acceptDragPayload(event) {
+  if (!hasDragPayload(event)) return false;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  return true;
+}

@@ -220,12 +220,8 @@ export default {
     nextLevel: "Tăng cấp:",
     playerAlt: "Nhân vật",
     slots: {
-      helm: "Mũ",
-      armor: "Áo giáp",
       belt: "Đai lưng",
-      gloves: "Găng tay",
       bracers: "Hộ uyển",
-      weapon: "Vũ khí",
       secretManual: "Mật tịch",
       subManual: "Phó mật tịch",
       cosHat: "Ngoại trang - Nón",

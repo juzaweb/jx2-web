@@ -220,12 +220,8 @@ export default {
     nextLevel: "Next level:",
     playerAlt: "Character",
     slots: {
-      helm: "Helm",
-      armor: "Armor",
       belt: "Belt",
-      gloves: "Gloves",
       bracers: "Bracers",
-      weapon: "Weapon",
       secretManual: "Secret manual",
       subManual: "Sub-manual",
       cosHat: "Costume - Hat",

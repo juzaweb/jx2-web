@@ -220,12 +220,8 @@ export default {
     nextLevel: "升级：",
     playerAlt: "角色",
     slots: {
-      helm: "头盔",
-      armor: "战甲",
       belt: "腰带",
-      gloves: "手套",
       bracers: "护腕",
-      weapon: "武器",
       secretManual: "秘籍",
       subManual: "副秘籍",
       cosHat: "外装 - 头饰",
