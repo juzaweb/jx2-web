@@ -167,12 +167,20 @@ export class NetworkClient {
   }
 
   /**
-   * Report the parts of the player block the client owns (HP ceiling + defense).
-   * The server owns the current HP itself.
-   * @param {{maxHp:number, defense:number, level?:number}} statsData
+   * Report the parts of the player block the client still owns (defense). Level,
+   * the HP ceiling and current HP are all server-owned now.
+   * @param {{defense:number}} statsData
    */
   sendStats(statsData) {
     this.send("player_stats", statsData);
+  }
+
+  /**
+   * Ask the server to pay the one-off quest reward. The server is the payout
+   * authority and ignores repeat claims.
+   */
+  sendQuestClaim() {
+    this.send("quest_claim", {});
   }
 
   /**
@@ -181,6 +189,14 @@ export class NetworkClient {
    */
   sendHeal(healData) {
     this.send("player_heal", healData);
+  }
+
+  /**
+   * Request an MP restore (potion, pickup). The server clamps it to the MP ceiling.
+   * @param {{amount:number}} restoreData
+   */
+  sendRestoreMp(restoreData) {
+    this.send("player_restore_mp", restoreData);
   }
 
   /**

@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
+import { skillMpCost } from "./skills.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack } from "./pvp.js";
 import { computeDamage } from "./damage.js";
@@ -50,6 +51,10 @@ const MAX_DROPS = 32;
 
 /** Lifetime (ms) of a drop this client is not allowed to collect. */
 const UNOWNED_DROP_TTL_MS = 8000;
+
+/** Coerce a server-sent stat to a finite number, keeping the current value otherwise. */
+const toStat = (value, fallback) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
 export class CombatSystem {
   /**
@@ -147,7 +152,8 @@ export class CombatSystem {
 
   performSkill() {
     if (!this.skillReady) return;
-    if (this.player.stats.mp < 15) {
+    const cost = skillMpCost("kiem_khi");
+    if (this.player.stats.mp < cost) {
       this.ui.addLog("Nội lực không đủ để thi triển Kiếm Khí.");
       return;
     }
@@ -160,7 +166,9 @@ export class CombatSystem {
     // Trigger martial focus & release animation
     this.player.playSkillMotion?.();
 
-    this.player.stats.mp -= 15;
+    // Predict the cost locally; the server spends it authoritatively and streams
+    // the resulting MP back (a refused cast resyncs this number).
+    this.player.stats.mp -= cost;
     playTone(420, 0.18, "triangle", 0.035);
 
     // Broadcast skill to other players via network
@@ -315,20 +323,22 @@ export class CombatSystem {
   handleWolfKill(wolf) {
     wolf.die();
 
-    // Enemy health is server-owned, so the server also rolls the reward and
-    // broadcasts `enemy_reward`; applyServerReward() pays out from that message.
+    // Online, enemy health and the reward are server-owned: the server rolls the
+    // payout and broadcasts `enemy_reward` + an authoritative `player_progress`.
     if (this.usesServerRewards()) {
       this.ui.addLog("Đánh bại Sói Xám!");
       return;
     }
 
+    // Offline (no server connection) progression is frozen: the kill plays out,
+    // but the client never mints coins/EXP of its own.
     const reward = rollKillReward(Math.random);
     this.spawnDrop(
       wolf.x + Phaser.Math.Between(-20, 20),
       wolf.y + Phaser.Math.Between(-10, 10),
       reward.drop
     );
-    this.grantKillReward(reward, { x: wolf.x, y: wolf.y - 25 });
+    this.ui.addLog("Đánh bại Sói Xám! (ngoại tuyến — không nhận tiến trình)");
 
     // Schedule enemy revive (the server drives respawn while connected)
     this.scene.time.delayedCall(10000, () => {
@@ -337,8 +347,9 @@ export class CombatSystem {
   }
 
   /**
-   * Apply the authoritative reward the server rolled for a defeated enemy.
-   * Every client renders the shared drop; only the attributed killer is paid.
+   * Render the authoritative reward the server rolled for a defeated enemy. The
+   * payout itself is not applied here — the server credits the killer's ledger and
+   * sends a `player_progress` update, which applyServerProgress() mirrors.
    * @param {Object} payload - `enemy_reward` payload
    */
   applyServerReward(payload) {
@@ -357,38 +368,57 @@ export class CombatSystem {
 
     if (!killedByMe) return;
 
-    this.grantKillReward(
-      { exp: reward.exp, coins: reward.coins },
-      { x, y: y - 25 }
-    );
+    this.ui.addLog(`Đánh bại Sói Xám! +${reward.exp} EXP`);
+    this.showFloatText(x, y - 25, `+${reward.exp} EXP`, "#f3d17f");
   }
 
   /**
-   * Pay a kill reward to the local player: EXP, bạc, kill count and the
-   * level-up / quest / save side effects. Loot is spawned by the caller, which
-   * knows whether the drop is a local roll or an authoritative one.
-   * @param {{exp:number, coins:number}} reward
-   * @param {{x:number, y:number}} feedbackPosition - where the +EXP float text appears
+   * Mirror the server-owned progression ledger onto the local stats. The client
+   * never adds coins/EXP/level itself — it only renders what the server sends and
+   * reacts to a level-up for feedback.
+   * @param {{level:number, exp:number, nextExp?:number, coins:number, kills:number, maxHp?:number, maxMp?:number, levelUps?:number}} progress
    */
-  grantKillReward(reward, feedbackPosition) {
-    this.player.stats.kills++;
-    this.player.stats.coins += reward.coins;
-    this.player.stats.exp += reward.exp;
+  applyServerProgress(progress) {
+    if (!progress) return;
+    const stats = this.player.stats;
+    const prevLevel = stats.level;
 
-    this.ui.addLog(
-      `Đánh bại Sói Xám! +${reward.exp} EXP, nhận được ${reward.coins} bạc.`
-    );
-    this.showFloatText(feedbackPosition.x, feedbackPosition.y, `+${reward.exp} EXP`, "#f3d17f");
+    stats.level = toStat(progress.level, stats.level);
+    stats.exp = toStat(progress.exp, stats.exp);
+    stats.coins = toStat(progress.coins, stats.coins);
+    stats.kills = toStat(progress.kills, stats.kills);
+    if (progress.nextExp !== undefined) stats.nextExp = toStat(progress.nextExp, stats.nextExp);
+    if (progress.maxHp !== undefined) stats.maxHp = toStat(progress.maxHp, stats.maxHp);
+    if (progress.maxMp !== undefined) stats.maxMp = toStat(progress.maxMp, stats.maxMp);
 
-    this.checkLevelUp();
-    this.ui.updateHud(this.player.stats);
+    stats.hp = Math.min(stats.hp, stats.maxHp);
+    stats.mp = Math.min(stats.mp, stats.maxMp);
+
+    // The server remembers whether the one-off quest reward was already paid, so
+    // the client can never offer it a second time.
+    if (progress.questRewarded !== undefined) {
+      this.ui.setQuestRewarded?.(Boolean(progress.questRewarded));
+    }
+
+    if (stats.level > prevLevel) {
+      // The server also heals/refills and streams the new HP/MP; mirror it for a
+      // snappy HUD before those packets land.
+      stats.hp = stats.maxHp;
+      stats.mp = stats.maxMp;
+      this.ui.addLog(`Chúc mừng! Bạn đã lên cấp ${stats.level}. HP/MP được hồi đầy.`);
+      playTone(660, 0.2, "triangle", 0.04);
+      this.showFloatText(this.player.x, this.player.y - 70, "LÊN CẤP!", "#ffe7a0");
+    }
+
+    this.ui.updateHud(stats);
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
     }
 
-    // Check quest progress after a brief interval
+    // Quest completion is detected client-side from the kill count, but the
+    // payout is claimed from the server.
     this.scene.time.delayedCall(650, () => {
-      this.ui.updateQuest(this.player.stats, () => this.handleQuestReward());
+      this.ui.updateQuest(stats, () => this.handleQuestReward());
     });
   }
 
@@ -416,42 +446,16 @@ export class CombatSystem {
     return Boolean(this.localPlayerId) && attackerId === this.localPlayerId;
   }
 
+  /**
+   * The quest payout is server-owned: ask the server to grant it (idempotent via
+   * the persisted `quest_rewarded` flag). Offline, nothing is paid. The resulting
+   * `player_progress` arrives through applyServerProgress().
+   */
   handleQuestReward() {
-    this.player.stats.exp += 50;
-    this.player.stats.coins += 20;
-    this.checkLevelUp();
-    this.ui.addLog("Nhiệm vụ hoàn thành! Thưởng thêm 50 EXP và 20 bạc.");
-    this.ui.updateHud(this.player.stats);
-    if (typeof this.onStateChange === "function") {
-      this.onStateChange();
+    if (this.usesServerRewards()) {
+      this.scene.networkClient?.sendQuestClaim?.();
     }
-  }
-
-  checkLevelUp() {
-    let leveledUp = false;
-    while (this.player.stats.exp >= this.player.stats.nextExp) {
-      this.player.stats.exp -= this.player.stats.nextExp;
-      this.player.stats.level++;
-      this.player.stats.nextExp = Math.floor(this.player.stats.nextExp * 1.45);
-      this.player.stats.maxHp += 20;
-      this.player.stats.maxMp += 10;
-      this.player.stats.hp = this.player.stats.maxHp;
-      this.player.stats.mp = this.player.stats.maxMp;
-      leveledUp = true;
-
-      this.ui.addLog(
-        `Chúc mừng! Bạn đã lên cấp ${this.player.stats.level}. HP/MP được hồi đầy.`
-      );
-      playTone(660, 0.2, "triangle", 0.04);
-      this.showFloatText(this.player.x, this.player.y - 70, "LÊN CẤP!", "#ffe7a0");
-    }
-
-    if (leveledUp) {
-      this.ui.updateHud(this.player.stats);
-      if (typeof this.onStateChange === "function") {
-        this.onStateChange();
-      }
-    }
+    this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
   }
 
   /**
@@ -527,16 +531,18 @@ export class CombatSystem {
     drop.active = false;
     drop.visual.destroy();
 
-    this.player.stats.coins += 5;
+    // Coins are server-owned, so a pickup grants no bạc on the client. MP is
+    // server-owned too: predict locally and mirror the restore into the pool.
     this.player.stats.mp = Math.min(
       this.player.stats.maxMp,
       this.player.stats.mp + 5
     );
+    this.scene.networkClient?.sendRestoreMp?.({ amount: 5 });
 
     addQuantity(drop.itemId, drop.qty);
 
     const dropName = drop.name || drop.itemId;
-    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 bạc, +5 nội lực.`);
+    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 nội lực.`);
     this.ui.updateHud(this.player.stats);
     this.ui.updateInventory();
     if (typeof this.onStateChange === "function") {

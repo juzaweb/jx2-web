@@ -276,7 +276,7 @@ describe("CombatSystem kill rewards", () => {
       return node;
     };
     const scene = {
-      networkClient: { isConnected },
+      networkClient: { isConnected, sendRestoreMp: vi.fn() },
       time: { delayedCall: vi.fn() },
       add: { container: visualStub, circle: visualStub, polygon: visualStub }
     };
@@ -302,16 +302,17 @@ describe("CombatSystem kill rewards", () => {
     ...overrides
   });
 
-  it("pays a server reward to the client the kill was attributed to", () => {
+  it("renders the kill's drop for the attributed killer without minting stats", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
 
     combat.applyServerReward(serverReward());
 
-    expect(player.stats.kills).toBe(1);
-    expect(player.stats.exp).toBe(935);
-    expect(player.stats.coins).toBe(17);
+    // The payout is the server's job (it sends player_progress separately).
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
     expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
-    expect(onStateChange).toHaveBeenCalledTimes(1);
+    expect(onStateChange).not.toHaveBeenCalled();
   });
 
   it("renders the shared drop for bystanders without paying them", () => {
@@ -339,18 +340,17 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it("rolls the reward locally while offline", () => {
+  it("freezes progression offline but still drops loot", () => {
     const { combat, player } = makeCombat({ isConnected: false });
     const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
 
     combat.handleWolfKill(wolf);
 
     expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(player.stats.kills).toBe(1);
-    expect(player.stats.exp).toBe(935);
-    expect(player.stats.coins).toBeGreaterThanOrEqual(13);
-    expect(player.stats.coins).toBeLessThanOrEqual(19);
     expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(player.stats.kills).toBe(0);
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(10);
   });
 
   it("leaves the payout to the server while connected", () => {
@@ -364,6 +364,46 @@ describe("CombatSystem kill rewards", () => {
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
     expect(combat.spawnDrop).not.toHaveBeenCalled();
+  });
+
+  it("mirrors the server ledger onto the local stats", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerProgress({ level: 1, exp: 30, nextExp: 100, coins: 25, kills: 2, maxHp: 100, maxMp: 60 });
+
+    expect(player.stats).toMatchObject({
+      level: 1,
+      exp: 30,
+      nextExp: 100,
+      coins: 25,
+      kills: 2,
+      maxHp: 100,
+      maxMp: 60
+    });
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("heals to the new ceiling on a level-up", () => {
+    const { combat, player, ui } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    player.stats.hp = 10;
+
+    combat.applyServerProgress({ level: 2, exp: 5, nextExp: 145, coins: 40, kills: 3, maxHp: 120, maxMp: 70 });
+
+    expect(player.stats.level).toBe(2);
+    expect(player.stats.maxHp).toBe(120);
+    expect(player.stats.hp).toBe(120);
+    expect(ui.addLog).toHaveBeenCalled();
+  });
+
+  it("keeps current values for malformed progress fields", () => {
+    const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerProgress({ level: 1, exp: Number.NaN, coins: 25, kills: 0 });
+    combat.applyServerProgress(null);
+
+    expect(player.stats.exp).toBe(900);
+    expect(player.stats.coins).toBe(25);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
   });
 
   it("marks the kill's drop collectable only for the attributed killer", () => {
@@ -405,9 +445,11 @@ describe("CombatSystem kill rewards", () => {
     combat.updateDrops(0);
 
     expect(drop.active).toBe(false);
-    // 10 starting bạc + 7 from the kill + 5 pickup bonus
-    expect(player.stats.coins).toBe(22);
+    // Coins are server-owned, so a pickup adds no bạc on the client
+    expect(player.stats.coins).toBe(10);
     expect(getQuantities()[drop.itemId]).toBe(before + drop.qty);
+    // The pickup's MP restore is mirrored into the server-owned pool
+    expect(combat.scene.networkClient.sendRestoreMp).toHaveBeenCalledWith({ amount: 5 });
   });
 
   it("fades the loot a bystander cannot take and keeps the killer's drop", () => {

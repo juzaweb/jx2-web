@@ -1,9 +1,20 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { rollEnemyReward } from "../rewards.js";
+import { store } from "../data/playerDb.js";
+import { characterDb } from "../data/characterDb.js";
+import { userDb } from "../data/userDb.js";
+import { verifySessionToken } from "../auth/session.js";
 import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
+import {
+  applyReward,
+  normalizeProgress,
+  progressPayload,
+  vitalsForLevel
+} from "../../../src/game/progression.js";
+import { skillMpCost } from "../../../src/game/skills.js";
 
 /**
  * Clean sanitization for player strings
@@ -111,6 +122,12 @@ export class GameSocketManager {
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
     this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
+
+    // Identity is proven by the session token, and the character must belong to
+    // that account. Both are injectable so tests can supply their own authority.
+    this.verifyToken = options.verifyToken || verifySessionToken;
+    this.ownsCharacter =
+      options.ownsCharacter || ((userId, characterId) => characterDb.ownsCharacter(userId, characterId));
 
     this.setupServer();
     this.startHeartbeat();
@@ -225,6 +242,10 @@ export class GameSocketManager {
         this.handlePlayerHeal(ws, msg.payload);
         break;
 
+      case "player_restore_mp":
+        this.handlePlayerRestoreMp(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
@@ -245,6 +266,10 @@ export class GameSocketManager {
         this.handleEnemyHit(ws, msg.payload);
         break;
 
+      case "quest_claim":
+        this.handleQuestClaim(ws);
+        break;
+
       case "ping":
         this.send(ws, { type: "pong", time: Date.now() });
         break;
@@ -263,6 +288,31 @@ export class GameSocketManager {
     const playerId = sanitizeStr(payload.id || `guest_${Math.random().toString(36).slice(2, 9)}`, 64);
     const username = sanitizeStr(payload.username || "Lãng Khách", 32);
     const displayName = sanitizeStr(payload.displayName || username, 32);
+    // Identity: the session token names the account, and the requested character
+    // must belong to it. An unauthenticated (or foreign-character) join is still
+    // allowed to be *present* in the world, but owns no ledger and earns nothing.
+    const userId = this.verifyToken(payload.token);
+    const requestedCharacter = sanitizeStr(payload.characterId || "", 64);
+    const characterId =
+      userId && requestedCharacter && this.ownsCharacter(userId, requestedCharacter)
+        ? requestedCharacter
+        : null;
+
+    // The server is the economy's source of truth: a fresh character starts at
+    // level 1; an existing one resumes from its persisted ledger, never from a
+    // client-reported level.
+    const saved = characterId ? store.getProgress(characterId) : null;
+    const progress = characterId
+      ? saved
+        ? normalizeProgress(saved)
+        : { level: 1, exp: 0, coins: 0, kills: 0 }
+      : null;
+    const vitals = progress ? vitalsForLevel(progress.level) : null;
+    // Persist the ledger (creating it on a first visit) and stamp the account's
+    // authoritative display name so the derived leaderboard never shows a blank.
+    if (characterId) {
+      store.setProgress(characterId, progress, userDb.resolveDisplayName(userId, displayName));
+    }
 
     // If this player ID was already connected from an old socket, remove old one
     if (this.playerById.has(playerId)) {
@@ -290,12 +340,18 @@ export class GameSocketManager {
       equipment: sanitizeEquipment(payload.equipment),
       // Character gender drives the peer's rig silhouette ("male" | "female").
       gender: payload.gender === "female" ? "female" : "male",
-      level: clampNum(payload.level, 1, 150, 1),
-      // Server-authoritative health. The join snapshot seeds it; every later
-      // change is driven by the server (bite, PvP hit, heal), never by a raw
-      // client HP report.
-      maxHp: clampNum(payload.maxHp, 1, 9999, 100),
+      characterId,
+      progress,
+      questRewarded: saved?.questRewarded ?? false,
+      // Level and the HP ceiling are derived from the server-owned ledger, never
+      // from the client.
+      level: progress ? progress.level : 1,
+      maxHp: vitals ? vitals.maxHp : 100,
       hp: 0,
+      // MP is server-owned like HP: the join seeds it, every later change is
+      // driven by the server (skill cost, potion, level-up refill).
+      maxMp: vitals ? vitals.maxMp : 60,
+      mp: 0,
       // Reported purely so the server can roll wolf bites against it.
       defense: clampNum(payload.defense, 0, 9999, 6),
       pkFlag: payload.pkFlag === true,
@@ -304,6 +360,7 @@ export class GameSocketManager {
     };
 
     playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
+    playerData.mp = clampNum(payload.mp, 0, playerData.maxMp, playerData.maxMp);
 
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
@@ -324,6 +381,15 @@ export class GameSocketManager {
         enemies: this.getEnemyState()
       }
     });
+
+    // The authoritative ledger for this character, so the HUD renders server
+    // progress instead of whatever the client had stored locally.
+    if (progress) {
+      this.send(ws, {
+        type: "player_progress",
+        payload: { ...progressPayload(progress), questRewarded: playerData.questRewarded }
+      });
+    }
 
     // 2. Announce the new player to everyone else in the world
     this.broadcast(ws, {
@@ -413,10 +479,10 @@ export class GameSocketManager {
   }
 
   /**
-   * Update the parts of a player's block the server trusts the client to own: the
-   * HP ceiling (grows on level-up) and defense (used for wolf bites). The current
-   * HP itself is never taken from the client — only the server changes it.
-   * A level-up (a higher maxHp) heals the player to full, matching the client.
+   * Update the one part of a player's block the server trusts the client to own:
+   * defense (used to roll wolf bites). The level, HP ceiling and current HP are
+   * all server-owned now — a level-up grows maxHp and heals on the server, and a
+   * client stat report can never change them.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -424,21 +490,7 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    const maxHp = clampNum(payload.maxHp, 1, 9999, player.maxHp);
-    const grew = maxHp > player.maxHp;
-    player.maxHp = maxHp;
     player.defense = clampNum(payload.defense, 0, 9999, player.defense);
-
-    if (grew) {
-      player.hp = player.maxHp;
-    } else if (player.hp > player.maxHp) {
-      player.hp = player.maxHp;
-    }
-
-    this.broadcastAll({
-      type: "player_hp",
-      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
-    });
   }
 
   /**
@@ -463,7 +515,34 @@ export class GameSocketManager {
   }
 
   /**
-   * Player triggers attack / skill animation
+   * Restore MP the client requested (potion, pickup). Clamped to the server's
+   * ceiling, so a client can never raise another player's MP or overflow its own.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerRestoreMp(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const amount = clampNum(payload.amount, 0, 9999, 0);
+    if (amount <= 0) return;
+
+    player.mp = Math.min(player.maxMp, player.mp + amount);
+    this.broadcastMp(player);
+  }
+
+  /** Broadcast a player's authoritative MP pool. */
+  broadcastMp(player) {
+    this.broadcastAll({
+      type: "player_mp",
+      payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+    });
+  }
+
+  /**
+   * Player triggers attack / skill animation. A skill's MP cost is spent from the
+   * server-owned pool; an unaffordable cast is refused (and the caster resynced),
+   * so the client can never cast past its mana.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -472,6 +551,17 @@ export class GameSocketManager {
     if (!player) return;
 
     const skill = payload.skill === "kiem_khi" ? "kiem_khi" : "normal";
+    const cost = skillMpCost(skill);
+    if (cost > 0) {
+      if (player.mp < cost) {
+        // Refuse the cast and resync the caster so its HUD matches the server.
+        this.broadcastMp(player);
+        return;
+      }
+      player.mp -= cost;
+      this.broadcastMp(player);
+    }
+
     const x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
     const y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
     const facingRight = payload.facingRight !== false;
@@ -692,10 +782,82 @@ export class GameSocketManager {
     if (killed) {
       // Rolled from the server's own health pool and attributed to the killing
       // blow, so the client that landed it cannot mint its own payout
+      const reward = rollEnemyReward(player.id, enemy);
+      this.broadcastAll({ type: "enemy_reward", payload: reward });
+
+      // The credited killer's ledger is updated here, on the server. The reward
+      // broadcast above is only for rendering (drop + float text).
+      this.creditReward(ws, player, { exp: reward.exp, coins: reward.coins, kills: 1 });
+      this.persistProgress(player);
+    }
+  }
+
+  /**
+   * Apply a reward to a player's server-owned ledger, announce any level-up, and
+   * push the authoritative ledger back to that player. Only the server calls
+   * this, so a client can never decide its own coins, EXP or level.
+   * @param {WebSocket} ws - the credited player's socket
+   * @param {Object} player - server player object
+   * @param {{exp?:number, coins?:number, kills?:number}} reward
+   * @returns {ReturnType<typeof applyReward>}
+   */
+  creditReward(ws, player, reward) {
+    // No verified identity / ledger -> the player is present-only and earns nothing.
+    if (!player.progress || !player.characterId) return null;
+
+    const next = applyReward(player.progress, reward);
+    player.progress = { level: next.level, exp: next.exp, coins: next.coins, kills: next.kills };
+    player.level = next.level;
+    const vitals = vitalsForLevel(next.level);
+    player.maxHp = vitals.maxHp;
+    player.maxMp = vitals.maxMp;
+
+    if (next.levelUps > 0) {
+      // A level-up heals HP and refills MP, matching the client's expectation.
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
       this.broadcastAll({
-        type: "enemy_reward",
-        payload: rollEnemyReward(player.id, enemy)
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
       });
+      this.broadcastMp(player);
+    }
+
+    this.send(ws, {
+      type: "player_progress",
+      payload: { ...progressPayload(player.progress), levelUps: next.levelUps }
+    });
+    return next;
+  }
+
+  /**
+   * One-off quest payout, gated on the persisted `quest_rewarded` flag so a client
+   * cannot claim it twice by replaying the message.
+   * @param {WebSocket} ws
+   */
+  handleQuestClaim(ws) {
+    const player = this.players.get(ws);
+    if (!player || !player.progress || player.questRewarded) return;
+
+    player.questRewarded = true;
+    this.creditReward(ws, player, { exp: 50, coins: 20 });
+    store.setQuestRewarded(player.characterId, true);
+    this.persistProgress(player);
+  }
+
+  /**
+   * Write a player's ledger to the database. Best-effort: a failed write is logged
+   * but never breaks the socket, and the next reward retries.
+   * @param {Object} player
+   */
+  persistProgress(player) {
+    if (!player.characterId || !player.progress) return;
+    try {
+      store.setProgress(player.characterId, player.progress);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to persist progress:", err.message);
+      }
     }
   }
 

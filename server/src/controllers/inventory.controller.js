@@ -1,4 +1,4 @@
-import { store } from "../data/store.js";
+import { store } from "../data/playerDb.js";
 
 export const getInventory = async (req, res, next) => {
   try {

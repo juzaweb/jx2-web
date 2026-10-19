@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import healthRoutes from "./routes/health.routes.js";
-import saveRoutes from "./routes/save.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 import inventoryRoutes from "./routes/inventory.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -38,7 +37,6 @@ export const createApp = () => {
 
   // Mount API Routes
   app.use("/api", healthRoutes);
-  app.use("/api", saveRoutes);
   app.use("/api", leaderboardRoutes);
   app.use("/api", inventoryRoutes);
   app.use("/api", userRoutes);

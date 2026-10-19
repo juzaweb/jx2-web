@@ -283,6 +283,20 @@ export class CharacterDatabase {
   }
 
   /**
+   * Whether `characterId` belongs to `userId`. Used to keep a session from acting
+   * on another account's character.
+   * @param {string} userId
+   * @param {string} characterId
+   * @returns {boolean}
+   */
+  ownsCharacter(userId, characterId) {
+    if (!isValidUserId(userId) || typeof characterId !== "string" || !characterId) {
+      return false;
+    }
+    return Boolean(this.stmtFindById.get(characterId, userId));
+  }
+
+  /**
    * Count characters owned by a user.
    * @param {string} userId
    * @returns {number}

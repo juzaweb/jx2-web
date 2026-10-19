@@ -11,7 +11,7 @@ const server = app.listen(config.port, config.host, () => {
   console.log(`🩺 Health:    http://localhost:${config.port}/api/health`);
   console.log(`🏆 Leader:    http://localhost:${config.port}/api/leaderboard`);
   console.log(`⚡ WebSocket: ws://localhost:${config.port}/ws`);
-  console.log(`📁 Data Path: ${config.dataPath}`);
+  console.log(`🗄️  Database:  ${config.dbPath}`);
   console.log("==========================================");
 });
 
