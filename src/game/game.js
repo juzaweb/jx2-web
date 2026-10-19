@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { WorldManager, WORLD_CONFIG } from "./world.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
 import { Player } from "./player.js";
-import { EnemyManager } from "./enemy.js";
+import { EnemyManager, DEFAULT_ENEMY_SPAWNS } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
@@ -89,7 +89,7 @@ export class JiangHuScene extends Phaser.Scene {
     );
     this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
     this.enemyManager = new EnemyManager(this);
-    this.enemyManager.create([]);
+    this.enemyManager.create(DEFAULT_ENEMY_SPAWNS);
 
     // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();
@@ -259,10 +259,10 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      if (pointer.rightButtonDown()) {
-        this.combat.performSkill();
-        return;
-      }
+      // Right-click casting is handled by the DOM mousedown listener so it can
+      // pass the clicked ground point for target selection; never treat it as a
+      // left-click move.
+      if (pointer.rightButtonDown()) return;
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       const worldX = ground.x;
@@ -274,6 +274,11 @@ export class JiangHuScene extends Phaser.Scene {
         .find((wolf) => Phaser.Math.Distance.Between(worldX, worldY, wolf.x, wolf.y) < 38);
 
       if (clickedEnemy) {
+        // A left-hand skill takes priority: chase into range, then release it.
+        if (this.combat.getLeftSkill?.()) {
+          this.combat.castLeftSkill(clickedEnemy);
+          return;
+        }
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedEnemy.x, clickedEnemy.y);
         if (dist <= 85) {
           this.player.stopMovement();
@@ -333,8 +338,9 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Left click on terrain: Move to destination
+      // Left click on terrain: Move to destination (and abandon a skill chase).
       this.isPointerMoving = true;
+      this.combat.cancelPendingCast();
       this.player.moveTo(worldX, worldY);
       this.showClickIndicator(worldX, worldY, 0xffdd59);
     });
@@ -351,6 +357,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
+      this.combat.cancelPendingCast();
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -379,7 +386,14 @@ export class JiangHuScene extends Phaser.Scene {
       if (event.button !== 2) return;
       if (event.target !== this.game.canvas) return;
       if (!this.started || this.isPaused) return;
-      this.combat.castSelectedSkill();
+      // Derive the clicked ground point from the raw event instead of relying on
+      // Phaser having updated its pointer first.
+      const canvas = this.game.canvas;
+      const rect = canvas.getBoundingClientRect();
+      const sx = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const sy = (event.clientY - rect.top) * (canvas.height / rect.height);
+      const world = this.cameras.main.getWorldPoint(sx, sy);
+      this.combat.castSelectedSkill(fromIso(world.x, world.y));
     };
     this.contextMenuHandler = (event) => {
       if (this.started) event.preventDefault();
@@ -417,12 +431,13 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_SKILL, () => {
         if (this.started && !this.isPaused) this.combat.castSelectedSkill();
       }),
-      bridge.on(EVENTS.ACTION_SELECT_SKILL, (slot) => {
-        if (this.started && !this.isPaused) this.combat.selectSkill(slot);
+      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, slot } = {}) => {
+        if (this.started) this.combat.equipSkill(hand, slot);
       }),
-      bridge.on(EVENTS.SKILL_BINDS_CHANGED, (binds) => {
-        if (Array.isArray(binds)) this.skillBinds = binds;
-        this.updateSkillKeyMap();
+      bridge.on(EVENTS.SET_SKILL_LOADOUT, ({ left, right } = {}) => {
+        if (Number.isInteger(left)) this.combat.leftSkillSlot = left;
+        if (Number.isInteger(right)) this.combat.selectedSkillSlot = right;
+        this.combat?.cancelPendingCast?.();
       }),
       bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
         this.player?.setSect(normalizeSect(sect));
@@ -433,7 +448,10 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_EQUIP_ITEM, (itemId) => this.equipItem(itemId)),
       bridge.on(EVENTS.ACTION_UNEQUIP_SLOT, (slot) => this.unequipSlot(slot)),
       bridge.on(EVENTS.ACTION_MOVE, (direction) => {
-        if (!this.isPaused) this.player.setTouchDirection(direction);
+        if (!this.isPaused) {
+          this.combat.cancelPendingCast();
+          this.player.setTouchDirection(direction);
+        }
       }),
       bridge.on(EVENTS.ACTION_SAVE, () => this.saveGame(true)),
       bridge.on(EVENTS.ACTION_RESET, () => this.resetGame()),
@@ -1002,6 +1020,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Update player movement and animation
     this.player.update(time, delta);
+    // Drive pending melee approaches (walk into range, then release the skill).
+    this.combat.update?.(time);
 
     // Update remote players (interpolation and animations)
     if (this.remotePlayerManager) {

@@ -100,9 +100,9 @@ export default {
   hotbar: {
     slotTitle: "按键 [{key}]：{name}",
     skillSlotTitle: "按键 [8] 或 [Q]：剑气绝技",
-    attackTitle: "左键 / 空格：无极剑法",
+    attackTitle: "普通攻击（近战）",
     skillTitle: "右键 / Q 键：剑气八荒",
-    leftClick: "左键",
+    leftClick: "攻击",
     rightClickQ: "右键 [Q]",
     martialName: "鹤字锦",
     martialSub: "天河秘笈",
@@ -121,7 +121,7 @@ export default {
     title: "新手指导",
     move: "移动：左键点击地图（或按住鼠标跟随光标），或使用手机虚拟摇杆。",
     combat: "战斗：使用底部栏的攻击按钮（手机端为攻击按钮）。",
-    skill: "招式：按已绑定的按键将招式装到右手，再右键施放。可在招式栏的快捷键按钮中重新绑定。",
+    skill: "招式：点击“左键/右键”槽位选择招式。左键点击敌人会跑过去攻击；右键点击敌人会跑过去，右键点击空地则原地施放。快捷键用于绑定右手招式。",
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与银两：击败灰狼可获得经验、银两，并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
@@ -207,8 +207,15 @@ export default {
     }
   },
   skills: {
-    rightHandTitle: "右手招式（右键使用）",
-    rightClickCast: "右键",
+    handLeft: "左键",
+    handRight: "右键",
+    leftHandTitle: "左键招式（点击选择）",
+    rightHandTitle: "右键招式（点击选择）",
+    picker: {
+      eyebrow: "绑定招式",
+      title: "为{hand}选择招式",
+      locked: "需要等级 {level}"
+    },
     keybind: {
       short: "快捷键",
       eyebrow: "设置",

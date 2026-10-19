@@ -38,6 +38,9 @@ export class HeroRigView {
     this.pose = poseFor(0);
     /** group name -> [{ obj, baseX, baseY }] */
     this.groups = {};
+    /** While an attack pose is playing, the walk cycle must not overwrite it. */
+    this.acting = false;
+    this.actionTween = null;
   }
 
   /**
@@ -54,6 +57,9 @@ export class HeroRigView {
     this.key = key;
     this.gender = g;
     this.pose = poseFor(direction);
+    this.actionTween?.stop();
+    this.actionTween = null;
+    this.acting = false;
 
     this.container.removeAll(true);
     this.groups = {};
@@ -78,6 +84,7 @@ export class HeroRigView {
    * @param {number} phase
    */
   animate(phase) {
+    if (this.acting) return;
     const swing = Math.sin(phase);
     const { depth } = this.pose;
     const pivots = limbPivots(this.pose, this.gender);
@@ -90,6 +97,67 @@ export class HeroRigView {
     this.pivot("legL", -legAngle, pivots.legL, 0, -Math.max(0, -swing) * step);
     this.pivot("armR", -armAngle, pivots.armR);
     this.pivot("armL", armAngle, pivots.armL);
+  }
+
+  /**
+   * Play a short melee action pose derived from a skill's VFX type.
+   * @param {"slash"|"kick"|"shockwave"|"aura"|string} kind
+   */
+  attack(kind = "slash") {
+    const pose = {
+      slash: "punch",
+      kick: "kick",
+      shockwave: "palm",
+      aura: "channel"
+    }[kind] || "punch";
+
+    this.actionTween?.stop();
+    this.acting = true;
+    const counter = { t: 0 };
+    this.actionTween = this.scene.tweens.add({
+      targets: counter,
+      t: 1,
+      duration: pose === "kick" ? 130 : 110,
+      yoyo: true,
+      ease: "Quad.easeOut",
+      onUpdate: () => this.applyActionPose(pose, counter.t),
+      onComplete: () => {
+        this.actionTween = null;
+        this.acting = false;
+        this.applyActionPose(pose, 0);
+      }
+    });
+  }
+
+  /**
+   * Pose the limbs for an action at progress `t` (0 idle, 1 full extension).
+   * @param {"punch"|"kick"|"palm"|"channel"} pose
+   * @param {number} t
+   */
+  applyActionPose(pose, t) {
+    const pivots = limbPivots(this.pose, this.gender);
+    const k = Math.max(0, Math.min(1, t));
+
+    // Start from neutral so an interrupted pose never leaves a limb stuck.
+    this.pivot("legR", 0, pivots.legR);
+    this.pivot("legL", 0, pivots.legL);
+    this.pivot("armR", 0, pivots.armR);
+    this.pivot("armL", 0, pivots.armL);
+
+    if (pose === "punch") {
+      this.pivot("armR", -1.35 * k, pivots.armR);
+      this.pivot("armL", 0.45 * k, pivots.armL);
+    } else if (pose === "kick") {
+      this.pivot("legR", -1.2 * k, pivots.legR);
+      this.pivot("armL", 0.55 * k, pivots.armL);
+      this.pivot("armR", 0.2 * k, pivots.armR);
+    } else if (pose === "palm") {
+      this.pivot("armR", -1.0 * k, pivots.armR);
+      this.pivot("armL", 1.0 * k, pivots.armL);
+    } else if (pose === "channel") {
+      this.pivot("armR", -0.4 * k, pivots.armR);
+      this.pivot("armL", 0.4 * k, pivots.armL);
+    }
   }
 
   /**
@@ -114,6 +182,8 @@ export class HeroRigView {
   }
 
   destroy() {
+    this.actionTween?.stop();
+    this.actionTween = null;
     if (this.container) {
       this.container.destroy(true);
       this.container = null;

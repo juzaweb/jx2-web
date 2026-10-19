@@ -100,9 +100,9 @@ export default {
   hotbar: {
     slotTitle: "Key [{key}]: {name}",
     skillSlotTitle: "Key [8] or [Q]: Sword Aura ultimate",
-    attackTitle: "Left Click / Space: Limitless Sword Art",
+    attackTitle: "Basic attack (melee)",
     skillTitle: "Right Click / Key Q: Eight Desolations Sword Aura",
-    leftClick: "Left Click",
+    leftClick: "Attack",
     rightClickQ: "Right Click [Q]",
     martialName: "Crane-Character Brocade",
     martialSub: "Milky Way Secret Tome",
@@ -121,7 +121,7 @@ export default {
     title: "Beginner's Guide",
     move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use the mobile joystick.",
     combat: "Combat: Use the Attack button on the bottom bar (or the attack button on mobile).",
-    skill: "Skills: Press a bound key to assign a skill to the right hand, then right-click to cast it. Rebind keys from the Keys button on the skill bar.",
+    skill: "Skills: click the Left click / Right click slot to choose a skill. Left-click an enemy to run in and strike. Right-click an enemy to run in; right-click empty ground to cast in place. Hotkeys assign skills to the right hand.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
@@ -207,8 +207,15 @@ export default {
     }
   },
   skills: {
-    rightHandTitle: "Right-hand skill (right-click to use)",
-    rightClickCast: "Right click",
+    handLeft: "Left click",
+    handRight: "Right click",
+    leftHandTitle: "Left-click skill (click to choose)",
+    rightHandTitle: "Right-click skill (click to choose)",
+    picker: {
+      eyebrow: "Assign skill",
+      title: "Choose a skill for {hand}",
+      locked: "Requires level {level}"
+    },
     keybind: {
       short: "Keys",
       eyebrow: "Settings",

@@ -248,6 +248,7 @@ export class Player {
 
   playAttackMotion() {
     if (!this.body) return;
+    this.rig?.attack?.("slash");
     this.scene.tweens.add({
       targets: this.body,
       x: 7,
@@ -262,15 +263,27 @@ export class Player {
     });
   }
 
-  playSkillMotion() {
+  /**
+   * Play the limb animation for a skill cast.
+   * @param {"slash"|"kick"|"shockwave"|"aura"|string} [kind]
+   */
+  playSkillMotion(kind = "slash") {
     if (!this.body) return;
+    this.rig?.attack?.(kind);
+
+    const isKick = kind === "kick";
+    const isChannel = kind === "aura";
     this.scene.tweens.add({
       targets: this.body,
-      scaleX: 1.15,
-      scaleY: 0.88,
-      duration: 80,
+      x: isChannel ? 0 : isKick ? -4 : 6,
+      scaleX: isChannel ? 1.05 : 1.15,
+      scaleY: isChannel ? 1.05 : 0.88,
+      duration: isKick ? 110 : 90,
       yoyo: true,
-      ease: "Quad.easeOut"
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        if (this.body) this.body.x = 0;
+      }
     });
   }
 

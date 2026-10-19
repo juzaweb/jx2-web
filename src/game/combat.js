@@ -83,12 +83,16 @@ export class CombatSystem {
 
     this.attackReady = true;
     this.drops = [];
-    /** Skill assigned to the right-hand slot (slot index into the sect kit). */
+    /** Skill slots assigned to the left and right mouse buttons. */
     this.selectedSkillSlot = 0;
+    this.leftSkillSlot = 0;
     /** id -> timestamp (ms) the skill becomes castable again. */
     this.skillCooldowns = new Map();
     /** Active timed buffs: { stat, amount, until }. */
     this.buffs = [];
+    /** Melee approach in flight: { skill, targetId }. */
+    this.pendingCast = null;
+    this.lastChaseAt = 0;
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
   }
@@ -185,12 +189,20 @@ export class CombatSystem {
   }
 
   /**
-   * Assign a skill slot to the right hand. Keys only select; the cast itself is
-   * the right mouse button.
-   * @param {number} slot
-   * @returns {boolean} whether the slot was assigned
+   * The skill assigned to the left mouse button.
+   * @returns {Object|undefined}
    */
-  selectSkill(slot) {
+  getLeftSkill() {
+    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.leftSkillSlot);
+  }
+
+  /**
+   * Validate and assign a skill slot to one mouse button.
+   * @param {"left"|"right"} hand
+   * @param {number} slot
+   * @returns {boolean}
+   */
+  equipSkill(hand, slot) {
     const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
     if (!skill) {
       this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
@@ -200,45 +212,151 @@ export class CombatSystem {
       this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
       return false;
     }
-    this.selectedSkillSlot = slot;
-    bridge.emit(EVENTS.SKILL_SELECTED, slot);
-    this.ui.addLog(`Tay phải: ${translate(skill.nameKey, undefined, skill.id)} (chuột phải để dùng).`);
+    this.cancelPendingCast();
+    if (hand === "left") {
+      this.leftSkillSlot = slot;
+      bridge.emit(EVENTS.LEFT_SKILL_SELECTED, slot);
+    } else {
+      this.selectedSkillSlot = slot;
+      bridge.emit(EVENTS.SKILL_SELECTED, slot);
+    }
     return true;
   }
 
   /**
-   * Cast whatever skill is assigned to the right hand.
+   * Keyboard shortcut: assign a skill to the right mouse button.
+   * @param {number} slot
+   * @returns {boolean}
    */
-  castSelectedSkill() {
-    this.performSkill();
+  selectSkill(slot) {
+    const ok = this.equipSkill("right", slot);
+    if (ok) {
+      const skill = this.getSelectedSkill();
+      this.ui.addLog(`Tay phải: ${translate(skill.nameKey, undefined, skill.id)} (chuột phải để dùng).`);
+    }
+    return ok;
   }
 
-  performSkill() {
+  /**
+   * Right mouse button: cast on the clicked target, or release in place when the
+   * click did not land on an enemy.
+   * @param {{x:number,y:number}|null} [aim]
+   */
+  castSelectedSkill(aim = null) {
+    this.performSkill(aim);
+  }
+
+  /**
+   * Left mouse button: cast on a clicked enemy. The hero walks into range first.
+   * @param {Object} target
+   */
+  castLeftSkill(target) {
+    const skill = this.getLeftSkill();
+    if (!skill || !target) return false;
+    if (!this.canCast(skill)) return true;
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
+      return true;
+    }
+    this.approachAndCast(skill, target);
+    return true;
+  }
+
+  /**
+   * Start a cast. Melee skills first walk the hero into range (VLTK2 behaviour);
+   * the actual release happens in update() once the target is reachable.
+   * @param {{x:number,y:number}|null} [aim]
+   */
+  performSkill(aim = null) {
     const skill = this.getSelectedSkill();
     if (!skill) {
       this.ui.addLog("Chưa gán chiêu thức vào tay phải.");
       return;
     }
+    if (!this.canCast(skill)) return;
+
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
+      return;
+    }
+
+    const target = this.findTarget(aim);
+    if (!target) {
+      // Right-click on empty ground: release in place.
+      this.executeSkill(skill, null);
+      return;
+    }
+
+    this.approachAndCast(skill, target);
+  }
+
+  /**
+   * Walk the hero into the skill's reach, then release it. Used by both mouse
+   * buttons when an enemy is targeted.
+   * @param {Object} skill
+   * @param {Object} target
+   */
+  approachAndCast(skill, target) {
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance <= this.skillReach(skill)) {
+      this.executeSkill(skill, target);
+      return;
+    }
+
+    this.pendingCast = { skill, targetId: target.id };
+    this.lastChaseAt = 0;
+    this.player.moveTo(target.x, target.y);
+    this.ui.addLog(
+      `Đang tiếp cận mục tiêu để dùng ${translate(skill.nameKey, undefined, skill.id)}...`
+    );
+  }
+
+  /**
+   * Validate level, cooldown and MP without spending anything.
+   * @param {Object} skill
+   * @returns {boolean}
+   */
+  canCast(skill) {
     const now = this.scene.time?.now ?? 0;
     const readyAt = this.skillCooldowns.get(skill.id) || 0;
     if (now < readyAt) {
-      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} còn ${Math.ceil((readyAt - now) / 1000)}s hồi.`);
-      return;
+      this.ui.addLog(
+        `${translate(skill.nameKey, undefined, skill.id)} còn ${Math.ceil((readyAt - now) / 1000)}s hồi.`
+      );
+      return false;
     }
     if (!skillUnlocked(skill, this.player.stats.level)) {
       this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
-      return;
+      return false;
     }
-    const cost = skillMpCost(skill.id);
-    if (this.player.stats.mp < cost) {
+    if (this.player.stats.mp < skillMpCost(skill.id)) {
       this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  /**
+   * Spend the cost and release the skill.
+   * @param {Object} skill
+   * @param {Object|null} target
+   */
+  executeSkill(skill, target) {
+    if (!this.canCast(skill)) return;
+    const now = this.scene.time?.now ?? 0;
+    const cost = skillMpCost(skill.id);
+
     this.skillCooldowns.set(skill.id, now + skill.cooldown);
     if (cost > 0) this.player.stats.mp -= cost;
 
-    this.player.playSkillMotion?.();
+    this.player.playSkillMotion?.(skill.vfx?.cast);
     playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
+    this.showFloatText(
+      this.player.x,
+      this.player.y - 62,
+      translate(skill.nameKey, undefined, skill.id),
+      "#ffe9a8"
+    );
 
     this.scene.networkClient?.sendAttack?.({
       skill: skill.id,
@@ -254,8 +372,91 @@ export class CombatSystem {
       readyAt: this.skillCooldowns.get(skill.id)
     });
 
-    this.applySkill(skill, now);
+    this.applySkill(skill, now, target);
     this.ui.updateHud(this.player.stats);
+  }
+
+  /**
+   * Distance at which a skill can release.
+   * @param {Object} skill
+   * @returns {number}
+   */
+  skillReach(skill) {
+    return skill.radius > 0 ? skill.radius : skill.range;
+  }
+
+  /**
+   * Pick the enemy nearest to the clicked point, or to the hero when no point
+   * was supplied.
+   * @param {{x:number,y:number}|null} aim
+   * @returns {Object|null}
+   */
+  findTarget(aim) {
+    const alive = this.enemyManager.getAlive();
+    if (!alive.length) return null;
+
+    if (aim) {
+      // Only treat a click as a target when it is actually near a wolf, instead
+      // of chasing whichever wolf happens to be closest to an empty click.
+      const clicked = alive
+        .filter((wolf) => Phaser.Math.Distance.Between(aim.x, aim.y, wolf.x, wolf.y) <= 150)
+        .sort(
+          (a, b) =>
+            Phaser.Math.Distance.Between(aim.x, aim.y, a.x, a.y) -
+            Phaser.Math.Distance.Between(aim.x, aim.y, b.x, b.y)
+        );
+      return clicked[0] || null;
+    }
+
+    const nearest = alive
+      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) <= 600)
+      .sort(
+        (a, b) =>
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
+      );
+    return nearest[0] || null;
+  }
+
+  /**
+   * Drive a pending approach. Called from the scene's update loop.
+   * @param {number} time
+   */
+  update(time) {
+    const pending = this.pendingCast;
+    if (!pending) return;
+
+    const target = this.enemyManager
+      .getAlive()
+      .find((wolf) => wolf.id === pending.targetId);
+    if (!target) {
+      this.cancelPendingCast();
+      this.ui.addLog("Mục tiêu đã biến mất.");
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance <= this.skillReach(pending.skill)) {
+      this.pendingCast = null;
+      this.player.stopMovement?.();
+      this.executeSkill(pending.skill, target);
+      return;
+    }
+
+    // Re-issue the move every 400ms so a moving target is still chased.
+    if (!this.lastChaseAt || time - this.lastChaseAt > 400) {
+      this.lastChaseAt = time;
+      this.player.moveTo(target.x, target.y);
+    }
+  }
+
+  /**
+   * Cancel a pending approach (left-click movement, joystick, skill change).
+   */
+  cancelPendingCast() {
+    if (!this.pendingCast) return;
+    this.pendingCast = null;
+    this.player.stopMovement?.();
   }
 
   /**
@@ -264,7 +465,7 @@ export class CombatSystem {
    * @param {Object} skill
    * @param {number} now
    */
-  applySkill(skill, now) {
+  applySkill(skill, now, preferredTarget = null) {
     if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
       playSkillCastVfx(this.scene, this.player, skill);
       this.applySelfEffects(skill, now);
@@ -272,7 +473,9 @@ export class CombatSystem {
       return;
     }
 
-    const targets = this.resolveTargets(skill);
+    const targets = skill.radius > 0
+      ? this.resolveTargets(skill)
+      : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill));
     const primary = targets[0] || null;
     this.aimAt(primary);
     playSkillCastVfx(this.scene, this.player, skill, primary);

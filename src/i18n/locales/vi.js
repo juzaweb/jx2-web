@@ -100,9 +100,9 @@ export default {
   hotbar: {
     slotTitle: "Phím [{key}]: {name}",
     skillSlotTitle: "Phím [8] hoặc [Q]: Tuyệt kỹ Kiếm Khí",
-    attackTitle: "Chuột Trái / Space: Vô Cực Kiếm Pháp",
+    attackTitle: "Đánh thường (cận chiến)",
     skillTitle: "Chuột Phải / Phím Q: Kiếm Khí Bát Hoang",
-    leftClick: "Chuột Trái",
+    leftClick: "Tấn công",
     rightClickQ: "Chuột Phải [Q]",
     martialName: "Phần Cẩm Chữ Hạc",
     martialSub: "Thiên Hà Mật Tịch",
@@ -121,7 +121,7 @@ export default {
     title: "Hướng Dẫn Tân Thủ",
     move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng cần gạt ảo trên mobile.",
     combat: "Chiến đấu: Dùng nút Tấn công trên thanh dưới (hoặc nút tấn công trên mobile).",
-    skill: "Chiêu thức: Nhấn phím tắt đã gán để đưa chiêu vào tay phải, rồi nhấp chuột phải để thi triển. Đổi phím trong nút Đổi phím trên thanh chiêu.",
+    skill: "Chiêu thức: Bấm ô Chuột trái / Chuột phải để chọn chiêu. Chuột trái vào quái: lao tới đánh. Chuột phải vào quái: lao tới đánh; chuột phải đất trống: xuất chiêu tại chỗ. Phím tắt gán chiêu vào tay phải.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
@@ -207,8 +207,15 @@ export default {
     }
   },
   skills: {
-    rightHandTitle: "Chiêu tay phải (chuột phải để dùng)",
-    rightClickCast: "Chuột phải",
+    handLeft: "Chuột trái",
+    handRight: "Chuột phải",
+    leftHandTitle: "Chiêu chuột trái (bấm để chọn)",
+    rightHandTitle: "Chiêu chuột phải (bấm để chọn)",
+    picker: {
+      eyebrow: "Gán chiêu",
+      title: "Chọn chiêu cho {hand}",
+      locked: "Cần cấp {level}"
+    },
     keybind: {
       short: "Đổi phím",
       eyebrow: "Thiết lập",
