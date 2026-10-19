@@ -9,7 +9,6 @@ export const config = {
   host: process.env.HOST || "0.0.0.0",
   clientOrigin: process.env.CLIENT_ORIGIN || "*",
   env: process.env.NODE_ENV || "development",
-  dataPath: process.env.DATA_PATH || path.resolve(__dirname, "../data/db.json"),
   dbPath: process.env.DB_PATH || path.resolve(__dirname, "../data/jx2.sqlite"),
   sessionSecret: process.env.SESSION_SECRET || "jx2-wuxia-secret-salt-2026",
 };

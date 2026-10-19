@@ -17,7 +17,6 @@ describe("Character API Test Suite", () => {
     // Point the SQLite store at an isolated file *before* importing the app,
     // so this suite never contends with the other suites' shared database.
     process.env.DB_PATH = path.join(testDataDir, "characters.sqlite");
-    process.env.DATA_PATH = path.join(testDataDir, "db.json");
     process.env.NODE_ENV = "test";
 
     const { createApp } = await import("../src/app.js");

@@ -102,30 +102,6 @@
   height: 58px;
 }
 
-/* Equipment slots row (mũ / giáp / trang sức / vũ khí / giày) */
-.inv-equiprow {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg, #23303a 0%, #121b20 100%);
-  border-bottom: 1px solid #3a2f1f;
-}
-.inv-slot.equip {
-  height: 58px;
-}
-.inv-slot.equip.filled {
-  border-color: #ffd43b;
-  box-shadow: 0 0 8px rgba(255, 212, 59, 0.4), inset 2px 2px 5px rgba(0, 0, 0, 0.8);
-}
-.inv-equip-label {
-  font-size: 10px;
-  color: #8a9aa3;
-  letter-spacing: 0.5px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
 /* Aggregate bonuses from all worn items */
 .inv-equip-bonus {
   flex-shrink: 0;
@@ -140,11 +116,6 @@
 }
 .inv-equip-bonus-item b {
   color: #d8ffe9;
-}
-.inv-slot.equipped {
-  opacity: 0.6;
-  border-color: #8fd7b2;
-  cursor: default;
 }
 .inv-slot.locked {
   background: radial-gradient(circle at 50% 35%, #232a2e 0%, #0a0d0f 100%);

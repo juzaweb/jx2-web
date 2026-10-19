@@ -1,9 +1,20 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { rollEnemyReward } from "../rewards.js";
+import { store } from "../data/playerDb.js";
+import { characterDb } from "../data/characterDb.js";
+import { userDb } from "../data/userDb.js";
+import { verifySessionToken } from "../auth/session.js";
 import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
+import {
+  applyReward,
+  normalizeProgress,
+  progressPayload,
+  vitalsForLevel
+} from "../../../src/game/progression.js";
+import { skillMpCost } from "../../../src/game/skills.js";
 
 /**
  * Clean sanitization for player strings
@@ -30,7 +41,7 @@ const clampNum = (val, min, max, fallback) => {
 };
 
 /** Equipment slots the client renders (see src/game/equipment.js). */
-const EQUIPMENT_SLOTS = ["boots", "armor", "helmet", "accessory", "weapon"];
+const EQUIPMENT_SLOTS = ["armor", "helmet", "accessory", "weapon"];
 
 /**
  * Reduce a client-reported equipment map to the known slots with short string
@@ -61,6 +72,25 @@ export const ENEMY_TICK_MS = 100;
 
 /** Invulnerability window (ms) granted after any hit the server applies. */
 export const PLAYER_IFRAME_MS = 700;
+
+/**
+ * Minimum gap (ms) between a player's combat actions. Each action fans out to
+ * every client, so this caps amplification: a spamming client can't turn one
+ * socket into thousands of broadcast messages. Matches the client's own ~330ms
+ * attack cadence, so it never throttles legitimate play.
+ */
+export const ACTION_COOLDOWN_MS = 300;
+
+/** Drop broadcasts to a socket once it has this much unflushed data (backpressure). */
+const MAX_BUFFERED_BYTES = 1_000_000;
+
+/**
+ * Area-of-interest radius (world px) for *streaming* events. Movement, combat and
+ * HP/MP updates only reach players whose character is within this distance of the
+ * event, turning the aggregate cost from O(N²) into O(N × neighbours). Identity
+ * events (join/leave/snapshot) stay global so the roster and minimap are complete.
+ */
+export const AOI_RADIUS = 800;
 
 /** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
 export const PLAYER_SPAWN = { x: 6400, y: 6200 };
@@ -111,6 +141,16 @@ export class GameSocketManager {
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
     this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
+
+    // Identity is proven by the session token, and the character must belong to
+    // that account. Both are injectable so tests can supply their own authority.
+    this.verifyToken = options.verifyToken || verifySessionToken;
+    this.ownsCharacter =
+      options.ownsCharacter || ((userId, characterId) => characterDb.ownsCharacter(userId, characterId));
+    this.maxBufferedBytes = Number.isFinite(options.maxBufferedBytes)
+      ? options.maxBufferedBytes
+      : MAX_BUFFERED_BYTES;
+    this.aoiRadius = Number.isFinite(options.aoiRadius) ? options.aoiRadius : AOI_RADIUS;
 
     this.setupServer();
     this.startHeartbeat();
@@ -182,9 +222,11 @@ export class GameSocketManager {
   broadcast(senderWs, data) {
     const payload = JSON.stringify(data);
     this.wss.clients.forEach((client) => {
-      if (client !== senderWs && client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-      }
+      if (client === senderWs || client.readyState !== WebSocket.OPEN) return;
+      // Backpressure: a client that can't keep up is skipped rather than queued
+      // unboundedly. It catches up on the next state snapshot.
+      if (client.bufferedAmount >= this.maxBufferedBytes) return;
+      client.send(payload);
     });
   }
 
@@ -194,6 +236,49 @@ export class GameSocketManager {
    */
   broadcastAll(data) {
     this.broadcast(null, data);
+  }
+
+  /**
+   * Send a streaming event to the players within the AOI radius of a point,
+   * skipping `senderWs` and any socket under backpressure.
+   * @param {number} sourceX
+   * @param {number} sourceY
+   * @param {WebSocket|null} senderWs
+   * @param {Object} data
+   */
+  broadcastNear(sourceX, sourceY, senderWs, data) {
+    const payload = JSON.stringify(data);
+    const radiusSquared = this.aoiRadius * this.aoiRadius;
+    this.wss.clients.forEach((client) => {
+      if (client === senderWs || client.readyState !== WebSocket.OPEN) return;
+      if (client.bufferedAmount >= this.maxBufferedBytes) return;
+      const receiver = this.players.get(client);
+      if (!receiver) return;
+      const dx = receiver.x - sourceX;
+      const dy = receiver.y - sourceY;
+      if (dx * dx + dy * dy > radiusSquared) return;
+      client.send(payload);
+    });
+  }
+
+  /**
+   * Fan a batch of enemy positions out to players near *any* of them.
+   * @param {Array<{id:number, x:number, y:number}>} moved
+   */
+  broadcastEnemiesMoved(moved) {
+    if (!moved.length) return;
+    const payload = JSON.stringify({ type: "enemy_moved", payload: { enemies: moved } });
+    const radiusSquared = this.aoiRadius * this.aoiRadius;
+    this.wss.clients.forEach((client) => {
+      if (client.readyState !== WebSocket.OPEN) return;
+      if (client.bufferedAmount >= this.maxBufferedBytes) return;
+      const receiver = this.players.get(client);
+      if (!receiver) return;
+      const near = moved.some(
+        (enemy) => (receiver.x - enemy.x) ** 2 + (receiver.y - enemy.y) ** 2 <= radiusSquared
+      );
+      if (near) client.send(payload);
+    });
   }
 
   /**
@@ -225,6 +310,10 @@ export class GameSocketManager {
         this.handlePlayerHeal(ws, msg.payload);
         break;
 
+      case "player_restore_mp":
+        this.handlePlayerRestoreMp(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
@@ -245,6 +334,10 @@ export class GameSocketManager {
         this.handleEnemyHit(ws, msg.payload);
         break;
 
+      case "quest_claim":
+        this.handleQuestClaim(ws);
+        break;
+
       case "ping":
         this.send(ws, { type: "pong", time: Date.now() });
         break;
@@ -263,6 +356,31 @@ export class GameSocketManager {
     const playerId = sanitizeStr(payload.id || `guest_${Math.random().toString(36).slice(2, 9)}`, 64);
     const username = sanitizeStr(payload.username || "Lãng Khách", 32);
     const displayName = sanitizeStr(payload.displayName || username, 32);
+    // Identity: the session token names the account, and the requested character
+    // must belong to it. An unauthenticated (or foreign-character) join is still
+    // allowed to be *present* in the world, but owns no ledger and earns nothing.
+    const userId = this.verifyToken(payload.token);
+    const requestedCharacter = sanitizeStr(payload.characterId || "", 64);
+    const characterId =
+      userId && requestedCharacter && this.ownsCharacter(userId, requestedCharacter)
+        ? requestedCharacter
+        : null;
+
+    // The server is the economy's source of truth: a fresh character starts at
+    // level 1; an existing one resumes from its persisted ledger, never from a
+    // client-reported level.
+    const saved = characterId ? store.getProgress(characterId) : null;
+    const progress = characterId
+      ? saved
+        ? normalizeProgress(saved)
+        : { level: 1, exp: 0, coins: 0, kills: 0 }
+      : null;
+    const vitals = progress ? vitalsForLevel(progress.level) : null;
+    // Persist the ledger (creating it on a first visit) and stamp the account's
+    // authoritative display name so the derived leaderboard never shows a blank.
+    if (characterId) {
+      store.setProgress(characterId, progress, userDb.resolveDisplayName(userId, displayName));
+    }
 
     // If this player ID was already connected from an old socket, remove old one
     if (this.playerById.has(playerId)) {
@@ -290,20 +408,29 @@ export class GameSocketManager {
       equipment: sanitizeEquipment(payload.equipment),
       // Character gender drives the peer's rig silhouette ("male" | "female").
       gender: payload.gender === "female" ? "female" : "male",
-      level: clampNum(payload.level, 1, 150, 1),
-      // Server-authoritative health. The join snapshot seeds it; every later
-      // change is driven by the server (bite, PvP hit, heal), never by a raw
-      // client HP report.
-      maxHp: clampNum(payload.maxHp, 1, 9999, 100),
+      characterId,
+      progress,
+      questRewarded: saved?.questRewarded ?? false,
+      // Level and the HP ceiling are derived from the server-owned ledger, never
+      // from the client.
+      level: progress ? progress.level : 1,
+      maxHp: vitals ? vitals.maxHp : 100,
       hp: 0,
+      // MP is server-owned like HP: the join seeds it, every later change is
+      // driven by the server (skill cost, potion, level-up refill).
+      maxMp: vitals ? vitals.maxMp : 60,
+      mp: 0,
       // Reported purely so the server can roll wolf bites against it.
       defense: clampNum(payload.defense, 0, 9999, 6),
       pkFlag: payload.pkFlag === true,
       invulnerableUntil: 0,
-      nextBiteAt: 0
+      nextBiteAt: 0,
+      nextAttackAt: 0,
+      nextHitAt: 0
     };
 
     playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
+    playerData.mp = clampNum(payload.mp, 0, playerData.maxMp, playerData.maxMp);
 
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
@@ -324,6 +451,15 @@ export class GameSocketManager {
         enemies: this.getEnemyState()
       }
     });
+
+    // The authoritative ledger for this character, so the HUD renders server
+    // progress instead of whatever the client had stored locally.
+    if (progress) {
+      this.send(ws, {
+        type: "player_progress",
+        payload: { ...progressPayload(progress), questRewarded: playerData.questRewarded }
+      });
+    }
 
     // 2. Announce the new player to everyone else in the world
     this.broadcast(ws, {
@@ -378,8 +514,8 @@ export class GameSocketManager {
       player.stance = payload.stance === "side" ? "side" : "front";
     }
 
-    // Broadcast position update to all other connected players
-    this.broadcast(ws, {
+    // Broadcast the position to nearby players only (AOI)
+    this.broadcastNear(player.x, player.y, ws, {
       type: "player_moved",
       payload: {
         id: player.id,
@@ -406,17 +542,17 @@ export class GameSocketManager {
 
     player.equipment = sanitizeEquipment(payload.equipment);
 
-    this.broadcast(ws, {
+    this.broadcastNear(player.x, player.y, ws, {
       type: "player_equipment",
       payload: { id: player.id, equipment: player.equipment }
     });
   }
 
   /**
-   * Update the parts of a player's block the server trusts the client to own: the
-   * HP ceiling (grows on level-up) and defense (used for wolf bites). The current
-   * HP itself is never taken from the client — only the server changes it.
-   * A level-up (a higher maxHp) heals the player to full, matching the client.
+   * Update the one part of a player's block the server trusts the client to own:
+   * defense (used to roll wolf bites). The level, HP ceiling and current HP are
+   * all server-owned now — a level-up grows maxHp and heals on the server, and a
+   * client stat report can never change them.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -424,21 +560,7 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    const maxHp = clampNum(payload.maxHp, 1, 9999, player.maxHp);
-    const grew = maxHp > player.maxHp;
-    player.maxHp = maxHp;
     player.defense = clampNum(payload.defense, 0, 9999, player.defense);
-
-    if (grew) {
-      player.hp = player.maxHp;
-    } else if (player.hp > player.maxHp) {
-      player.hp = player.maxHp;
-    }
-
-    this.broadcastAll({
-      type: "player_hp",
-      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
-    });
   }
 
   /**
@@ -456,14 +578,41 @@ export class GameSocketManager {
 
     player.hp = Math.min(player.maxHp, player.hp + amount);
 
-    this.broadcastAll({
+    this.broadcastNear(player.x, player.y, null, {
       type: "player_hp",
       payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
     });
   }
 
   /**
-   * Player triggers attack / skill animation
+   * Restore MP the client requested (potion, pickup). Clamped to the server's
+   * ceiling, so a client can never raise another player's MP or overflow its own.
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handlePlayerRestoreMp(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const amount = clampNum(payload.amount, 0, 9999, 0);
+    if (amount <= 0) return;
+
+    player.mp = Math.min(player.maxMp, player.mp + amount);
+    this.broadcastMp(player);
+  }
+
+  /** Broadcast a player's authoritative MP pool to nearby players. */
+  broadcastMp(player) {
+    this.broadcastNear(player.x, player.y, null, {
+      type: "player_mp",
+      payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+    });
+  }
+
+  /**
+   * Player triggers attack / skill animation. A skill's MP cost is spent from the
+   * server-owned pool; an unaffordable cast is refused (and the caster resynced),
+   * so the client can never cast past its mana.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -471,12 +620,27 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
+    const now = Date.now();
+    if (now < player.nextAttackAt) return;
+    player.nextAttackAt = now + ACTION_COOLDOWN_MS;
+
     const skill = payload.skill === "kiem_khi" ? "kiem_khi" : "normal";
+    const cost = skillMpCost(skill);
+    if (cost > 0) {
+      if (player.mp < cost) {
+        // Refuse the cast and resync the caster so its HUD matches the server.
+        this.broadcastMp(player);
+        return;
+      }
+      player.mp -= cost;
+      this.broadcastMp(player);
+    }
+
     const x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
     const y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
     const facingRight = payload.facingRight !== false;
 
-    this.broadcast(ws, {
+    this.broadcastNear(x, y, ws, {
       type: "player_attacked",
       payload: {
         id: player.id,
@@ -517,6 +681,12 @@ export class GameSocketManager {
     const attacker = this.players.get(ws);
     if (!attacker) return;
 
+    // Rate-limit hits per attacker so a spamming client can't amplify one socket
+    // into a broadcast storm. (The target's 700ms iframe already caps the damage.)
+    const now = Date.now();
+    if (now < attacker.nextHitAt) return;
+    attacker.nextHitAt = now + ACTION_COOLDOWN_MS;
+
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
     if (!target) return;
@@ -547,7 +717,8 @@ export class GameSocketManager {
     target.hp = Math.max(0, target.hp - damage);
     target.invulnerableUntil = now + PLAYER_IFRAME_MS;
 
-    this.broadcastAll({
+    // The victim always receives their own HP (distance 0); only nearby players do.
+    this.broadcastNear(target.x, target.y, null, {
       type: "player_hp",
       payload: {
         id: target.id,
@@ -573,12 +744,16 @@ export class GameSocketManager {
    * @param {"pvp"|"wolf"} source
    */
   respawnPlayer(victim, attacker = null, source = "wolf") {
+    // The defeat is announced where the fight happened, before the teleport.
+    const defeatX = victim.x;
+    const defeatY = victim.y;
+
     victim.hp = victim.maxHp;
     victim.x = PLAYER_SPAWN.x;
     victim.y = PLAYER_SPAWN.y;
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
 
-    this.broadcastAll({
+    const defeatMessage = {
       type: "player_defeated",
       payload: {
         victimId: victim.id,
@@ -588,9 +763,15 @@ export class GameSocketManager {
         source,
         respawn: { ...PLAYER_SPAWN }
       }
-    });
+    };
 
-    this.broadcastAll({
+    // The victim is already teleported, so it now sits outside the fight's AOI.
+    // Always deliver its own defeat; nearby players get it through the AOI.
+    const victimWs = this.playerById.get(victim.id)?.ws || null;
+    this.send(victimWs, defeatMessage);
+    this.broadcastNear(defeatX, defeatY, victimWs, defeatMessage);
+
+    this.broadcastNear(victim.x, victim.y, null, {
       type: "player_hp",
       payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
     });
@@ -680,7 +861,7 @@ export class GameSocketManager {
       this.scheduleEnemyRespawn(enemy.id);
     }
 
-    this.broadcastAll({
+    this.broadcastNear(enemy.x, enemy.y, null, {
       type: "enemy_hit",
       payload: {
         ...this.enemySnapshot(enemy),
@@ -692,10 +873,82 @@ export class GameSocketManager {
     if (killed) {
       // Rolled from the server's own health pool and attributed to the killing
       // blow, so the client that landed it cannot mint its own payout
-      this.broadcastAll({
-        type: "enemy_reward",
-        payload: rollEnemyReward(player.id, enemy)
+      const reward = rollEnemyReward(player.id, enemy);
+      this.broadcastNear(enemy.x, enemy.y, null, { type: "enemy_reward", payload: reward });
+
+      // The credited killer's ledger is updated here, on the server. The reward
+      // broadcast above is only for rendering (drop + float text).
+      this.creditReward(ws, player, { exp: reward.exp, coins: reward.coins, kills: 1 });
+      this.persistProgress(player);
+    }
+  }
+
+  /**
+   * Apply a reward to a player's server-owned ledger, announce any level-up, and
+   * push the authoritative ledger back to that player. Only the server calls
+   * this, so a client can never decide its own coins, EXP or level.
+   * @param {WebSocket} ws - the credited player's socket
+   * @param {Object} player - server player object
+   * @param {{exp?:number, coins?:number, kills?:number}} reward
+   * @returns {ReturnType<typeof applyReward>}
+   */
+  creditReward(ws, player, reward) {
+    // No verified identity / ledger -> the player is present-only and earns nothing.
+    if (!player.progress || !player.characterId) return null;
+
+    const next = applyReward(player.progress, reward);
+    player.progress = { level: next.level, exp: next.exp, coins: next.coins, kills: next.kills };
+    player.level = next.level;
+    const vitals = vitalsForLevel(next.level);
+    player.maxHp = vitals.maxHp;
+    player.maxMp = vitals.maxMp;
+
+    if (next.levelUps > 0) {
+      // A level-up heals HP and refills MP, matching the client's expectation.
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
+      this.broadcastNear(player.x, player.y, null, {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
       });
+      this.broadcastMp(player);
+    }
+
+    this.send(ws, {
+      type: "player_progress",
+      payload: { ...progressPayload(player.progress), levelUps: next.levelUps }
+    });
+    return next;
+  }
+
+  /**
+   * One-off quest payout, gated on the persisted `quest_rewarded` flag so a client
+   * cannot claim it twice by replaying the message.
+   * @param {WebSocket} ws
+   */
+  handleQuestClaim(ws) {
+    const player = this.players.get(ws);
+    if (!player || !player.progress || player.questRewarded) return;
+
+    player.questRewarded = true;
+    this.creditReward(ws, player, { exp: 50, coins: 20 });
+    store.setQuestRewarded(player.characterId, true);
+    this.persistProgress(player);
+  }
+
+  /**
+   * Write a player's ledger to the database. Best-effort: a failed write is logged
+   * but never breaks the socket, and the next reward retries.
+   * @param {Object} player
+   */
+  persistProgress(player) {
+    if (!player.characterId || !player.progress) return;
+    try {
+      store.setProgress(player.characterId, player.progress);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to persist progress:", err.message);
+      }
     }
   }
 
@@ -735,7 +988,7 @@ export class GameSocketManager {
     });
 
     if (moved.length) {
-      this.broadcastAll({ type: "enemy_moved", payload: { enemies: moved } });
+      this.broadcastEnemiesMoved(moved);
     }
 
     // Player health is server-owned, so the wolves bite on the server clock too.
@@ -801,7 +1054,7 @@ export class GameSocketManager {
     enemy.y = enemy.homeY;
     enemy.isDead = false;
 
-    this.broadcastAll({
+    this.broadcastNear(enemy.x, enemy.y, null, {
       type: "enemy_respawned",
       payload: this.enemySnapshot(enemy)
     });

@@ -33,7 +33,7 @@ describe("buildHero", () => {
     expect(buildHero({ direction: 0, equipment: { helmet: "x" } }).length).toBeGreaterThan(base);
     const full = buildHero({
       direction: 0,
-      equipment: { armor: "x", boots: "x", helmet: "x", accessory: "x", weapon: "x" }
+      equipment: { armor: "x", helmet: "x", accessory: "x", weapon: "x" }
     }).length;
     expect(full).toBeGreaterThan(buildHero({ direction: 0, equipment: { helmet: "x" } }).length);
   });

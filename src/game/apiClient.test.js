@@ -26,34 +26,6 @@ describe("ApiClient", () => {
     expect(isHealthy).toBe(false);
   });
 
-  it("loadSave returns null on 404", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-    });
-
-    const data = await client.loadSave("player_999");
-    expect(data).toBeNull();
-  });
-
-  it("saveProgress posts payload correctly", async () => {
-    const payload = { stats: { level: 10 } };
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, data: { playerId: "p1", ...payload } }),
-    });
-
-    const res = await client.saveProgress("p1", payload);
-    expect(res.playerId).toBe("p1");
-    expect(global.fetch).toHaveBeenCalledWith(
-      "http://mock-api:5000/api/save/p1",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
-    );
-  });
-
   it("getLeaderboard constructs query params correctly", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -36,40 +36,6 @@ export class ApiClient {
   }
 
   /**
-   * Load saved player data from backend
-   * @param {string} playerId
-   * @returns {Promise<Object|null>}
-   */
-  async loadSave(playerId) {
-    const res = await fetch(`${this.baseUrl}/save/${encodeURIComponent(playerId)}`);
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error(`Failed to load save: HTTP ${res.status}`);
-    }
-    const json = await res.json();
-    return json.data;
-  }
-
-  /**
-   * Save player progress to backend
-   * @param {string} playerId
-   * @param {Object} data
-   * @returns {Promise<Object>}
-   */
-  async saveProgress(playerId, data) {
-    const res = await fetch(`${this.baseUrl}/save/${encodeURIComponent(playerId)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      throw new Error(`Failed to save progress: HTTP ${res.status}`);
-    }
-    const json = await res.json();
-    return json.data;
-  }
-
-  /**
    * Fetch current leaderboard
    * @param {"level"|"kills"|"coins"|"exp"} [sortBy="level"]
    * @param {number} [limit=10]

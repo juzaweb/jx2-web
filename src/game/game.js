@@ -186,6 +186,11 @@ export class JiangHuScene extends Phaser.Scene {
       this.handlePlayerHp(payload);
     });
 
+    // Server-authoritative MP, mirroring the HP model.
+    this.networkClient.on("player_mp", (payload) => {
+      this.handlePlayerMp(payload);
+    });
+
     this.networkClient.on("player_defeated", (payload) => {
       this.handlePlayerDefeated(payload);
     });
@@ -216,6 +221,11 @@ export class JiangHuScene extends Phaser.Scene {
     // Kill rewards (EXP, bạc, drops) are rolled by the server on the killing blow
     this.networkClient.on("enemy_reward", (payload) => {
       this.combat.applyServerReward(payload);
+    });
+
+    // The server owns progression (level, EXP, coins, kills); the client mirrors it.
+    this.networkClient.on("player_progress", (payload) => {
+      this.combat.applyServerProgress(payload);
     });
 
     this.networkClient.on("connected", () => {
@@ -528,6 +538,8 @@ export class JiangHuScene extends Phaser.Scene {
         return false;
       }
       const restored = this.player.restoreMp(25);
+      // The server owns MP, so mirror the restore into the authoritative pool too.
+      this.networkClient?.sendRestoreMp?.({ amount: 25 });
       this.combat.showFloatText(this.player.x, this.player.y - 68, `+${restored} MP`, "#74c0fc");
       playTone(580, 0.12, "sine", 0.03);
       this.uiBridge.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
@@ -547,6 +559,7 @@ export class JiangHuScene extends Phaser.Scene {
       const healed = this.player.heal(50);
       const restored = this.player.restoreMp(30);
       this.networkClient?.sendHeal?.({ amount: 50 });
+      this.networkClient?.sendRestoreMp?.({ amount: 30 });
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Ấm lòng! +HP +MP`, "#ffd43b");
       playTone(440, 0.15, "triangle", 0.035);
       this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
@@ -771,6 +784,27 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
+   * Apply the server's authoritative MP for the local player. Peers carry no MP
+   * bar, so a remote id is ignored.
+   * @param {{id?:string, mp?:number, maxMp?:number}} payload
+   */
+  handlePlayerMp(payload = {}) {
+    const isLocal =
+      payload.id === this.combat?.localPlayerId ||
+      payload.id === this.remotePlayerManager?.localPlayerId;
+    if (!isLocal) return;
+
+    if (Number.isFinite(payload.maxMp) && payload.maxMp > 0) {
+      this.player.stats.maxMp = payload.maxMp;
+    }
+    if (Number.isFinite(payload.mp)) {
+      this.player.stats.mp = Math.min(payload.mp, this.player.stats.maxMp);
+    }
+
+    this.uiBridge.updateHud(this.player.stats);
+  }
+
+  /**
    * The server declared a player defeated. The victim is teleported to the respawn
    * point; the killer gets credit and everyone else sees the outcome.
    * @param {{victimId?:string, victimName?:string, attackerId?:string, attackerName?:string, respawn?:{x:number,y:number}}} payload
@@ -839,6 +873,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.combat.setLocalPlayerId(playerId);
     this.networkClient.join({
       id: playerId,
+      token: session?.token || null,
+      characterId: session?.activeCharacter?.id || null,
       username,
       displayName,
       x: Math.round(this.player.x),
@@ -848,9 +884,8 @@ export class JiangHuScene extends Phaser.Scene {
       direction: this.player.facing,
       equipment: { ...this.player.equipment },
       gender: normalizeGender(this.player.gender),
-      level: this.player.stats?.level || 1,
       hp: this.player.stats?.hp || 100,
-      maxHp: this.player.stats?.maxHp || 100,
+      mp: this.player.stats?.mp || 0,
       defense: this.player.stats?.defense ?? 6,
       pkFlag: this.player.pkFlag === true
     });
@@ -952,13 +987,12 @@ export class JiangHuScene extends Phaser.Scene {
           });
         }
 
-        // Report the parts of the player block the client owns (HP ceiling from
-        // level-ups, defense for wolf bites). The server owns the current HP.
-        const { maxHp, defense, level } = this.player.stats;
-        if (maxHp !== this.lastReportedMaxHp || defense !== this.lastReportedDefense) {
-          this.lastReportedMaxHp = maxHp;
+        // Report the one stat the client still owns: defense (used to roll wolf
+        // bites). Level, HP ceiling and current HP are server-owned.
+        const { defense } = this.player.stats;
+        if (defense !== this.lastReportedDefense) {
           this.lastReportedDefense = defense;
-          this.networkClient.sendStats({ maxHp, defense, level });
+          this.networkClient.sendStats({ defense });
         }
       }
     }

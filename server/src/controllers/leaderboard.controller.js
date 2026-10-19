@@ -1,16 +1,17 @@
-import { store } from "../data/store.js";
+import { store } from "../data/playerDb.js";
 import { userDb } from "../data/userDb.js";
 
 export const getLeaderboard = async (req, res, next) => {
   try {
     const { sortBy = "level", limit = 10 } = req.query;
     const leaderboard = await store.getLeaderboard(sortBy, limit);
+    const total = await store.countLeaderboard();
 
     res.json({
       success: true,
       data: {
         sortBy,
-        total: leaderboard.length,
+        total,
         rankings: leaderboard
       }
     });

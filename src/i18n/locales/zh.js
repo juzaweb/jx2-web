@@ -209,22 +209,19 @@ export default {
     title: "角色",
     helpTitle: "帮助",
     closeTitle: "关闭（F3 / Esc）",
-    hint: "战斗属性由角色等级推算。装备系统与潜能点将在后续阶段开放。",
+    hint: "战斗属性由角色等级推算。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
     tabEquip: "装备",
     tabNews: "消息",
     locked: "{label}（未开放）",
     notEquipped: "{label}（未装备）",
+    unequipTitle: "{name}（点击卸下）",
     potential: "潜能",
     points: "点数：",
     nextLevel: "升级：",
     playerAlt: "角色",
     slots: {
-      helm: "头盔",
-      armor: "战甲",
       belt: "腰带",
-      gloves: "手套",
       bracers: "护腕",
-      weapon: "武器",
       secretManual: "秘籍",
       subManual: "副秘籍",
       cosHat: "外装 - 头饰",
@@ -237,11 +234,9 @@ export default {
     title: "行囊",
     helpTitle: "行囊帮助",
     closeTitle: "关闭（Esc）",
-    hint: "点击药品或符咒即可使用。将鼠标悬停在物品上可查看描述。击败野兽可获得更多战利品。",
+    hint: "点击药品或符咒即可使用。将装备拖到人物面板（F3）即可穿戴。将鼠标悬停在物品上可查看描述。",
     equip: "装备",
-    equipped: "已装备",
     use: "使用",
-    equipTitle: "{label}：{name}（点击卸下）",
     useTitle: "{name}",
     weight: "负重",
     count: "{used}/{total}",
@@ -255,7 +250,6 @@ export default {
     useHint: "点击使用"
   },
   slots: {
-    boots: "鞋",
     armor: "战甲",
     helmet: "头盔",
     accessory: "饰品",
@@ -417,10 +411,6 @@ export default {
     "tu-kim-quan": {
       name: "紫金冠",
       desc: "嵌玉金冠，提升防御与命中。"
-    },
-    "van-ly-hai": {
-      name: "云履鞋",
-      desc: "绣云之鞋，行走轻盈如踏云端。"
     }
   }
 };

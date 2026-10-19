@@ -14,7 +14,6 @@ describe("Giang Ho Backend API Test Suite", () => {
     // Setup temporary test data directory and point every store at it BEFORE the
     // app modules load, so tests never write to the development database.
     testDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-test-"));
-    process.env.DATA_PATH = path.join(testDataDir, "test-db.json");
     process.env.DB_PATH = path.join(testDataDir, "test-users.sqlite");
     process.env.NODE_ENV = "test";
 
@@ -52,65 +51,6 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(typeof json.uptime, "number");
     // Verify X-Powered-By is omitted
     assert.equal(res.headers.get("x-powered-by"), null);
-  });
-
-  test("GET /api/save/unknown_user returns 404", async () => {
-    const res = await fetch(`${baseUrl}/save/unknown_user_999`);
-    assert.equal(res.status, 404);
-    const json = await res.json();
-    assert.equal(json.success, false);
-  });
-
-  test("POST /api/save/:playerId saves player progress and syncs to leaderboard", async () => {
-    const payload = {
-      playerName: "Kiếm Khách Vô Danh",
-      stats: {
-        level: 25,
-        hp: 450,
-        mp: 300,
-        exp: 15400,
-        coins: 8800,
-        kills: 66
-      },
-      position: { x: 120, y: 340 },
-      questRewarded: true,
-      audioEnabled: true,
-      inventory: {
-        potion_hp: 15,
-        potion_mp: 8
-      }
-    };
-
-    const saveRes = await fetch(`${baseUrl}/save/player_test_01`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    assert.equal(saveRes.status, 200);
-    const saveJson = await saveRes.json();
-    assert.equal(saveJson.success, true);
-    assert.equal(saveJson.data.stats.level, 25);
-    assert.equal(saveJson.data.inventory.potion_hp, 15);
-
-    // Verify GET retrieves saved data
-    const getRes = await fetch(`${baseUrl}/save/player_test_01`);
-    assert.equal(getRes.status, 200);
-    const getJson = await getRes.json();
-    assert.equal(getJson.success, true);
-    assert.equal(getJson.data.playerName, "Kiếm Khách Vô Danh");
-    assert.equal(getJson.data.stats.level, 25);
-    assert.equal(getJson.data.position.x, 120);
-
-    // Verify player is now in leaderboard
-    const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=10`);
-    assert.equal(lbRes.status, 200);
-    const lbJson = await lbRes.json();
-    assert.equal(lbJson.success, true);
-    const found = lbJson.data.rankings.find((r) => r.playerId === "player_test_01");
-    assert.ok(found, "Player should appear in leaderboard");
-    assert.equal(found.level, 25);
-    assert.equal(found.kills, 66);
   });
 
   test("Inventory endpoints: GET and PUT", async () => {
@@ -199,28 +139,17 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.success, false);
   });
 
-  test("DELETE /api/save/:playerId removes player", async () => {
-    const delRes = await fetch(`${baseUrl}/save/player_test_01`, {
-      method: "DELETE"
-    });
-    assert.equal(delRes.status, 200);
-
-    // Now GET should return 404
-    const getRes = await fetch(`${baseUrl}/save/player_test_01`);
-    assert.equal(getRes.status, 404);
-  });
-
   test("Validation: rejects invalid playerId", async () => {
-    const res = await fetch(`${baseUrl}/save/invalid@id!`);
+    const res = await fetch(`${baseUrl}/inventory/invalid@id!`);
     assert.equal(res.status, 400);
     const json = await res.json();
     assert.equal(json.success, false);
   });
 
   test("Validation: prevents prototype pollution attacks", async () => {
-    const evilPayload = JSON.parse('{"__proto__": {"admin": true}, "stats": {"level": 10}}');
-    const res = await fetch(`${baseUrl}/save/safe_player`, {
-      method: "POST",
+    const evilPayload = JSON.parse('{"__proto__": {"admin": true}, "inventory": {"potion_hp": 3}}');
+    const res = await fetch(`${baseUrl}/inventory/safe_player`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(evilPayload)
     });
@@ -250,7 +179,7 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.data.user.salt, undefined);
   });
 
-  test("Users: renaming display_name propagates to saves and leaderboard", async () => {
+  test("Users: renaming display_name propagates to the leaderboard", async () => {
     const registerRes = await fetch(`${baseUrl}/users/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -264,36 +193,29 @@ describe("Giang Ho Backend API Test Suite", () => {
     const registerJson = await registerRes.json();
     const userId = registerJson.data.user.id;
 
-    const firstSave = await fetch(`${baseUrl}/save/${userId}`, {
+    const firstSubmit = await fetch(`${baseUrl}/leaderboard/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerName: "theanh",
-        stats: { level: 12, hp: 100, mp: 50, exp: 200, coins: 30, kills: 4 }
-      })
+      body: JSON.stringify({ playerId: userId, playerName: "theanh", level: 12, kills: 4, coins: 30, exp: 200 })
     });
-    const firstJson = await firstSave.json();
+    const firstJson = await firstSubmit.json();
     assert.equal(firstJson.data.playerName, "theanh");
 
     // Simulate an out-of-band rename straight in the users table
     userDb.db.prepare("UPDATE users SET display_name = ? WHERE id = ?").run("Hiệp Khách Vô Danh", userId);
 
-    const renameSave = await fetch(`${baseUrl}/save/${userId}`, {
+    await fetch(`${baseUrl}/leaderboard/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerName: "theanh",
-        stats: { level: 13, hp: 110, mp: 55, exp: 260, coins: 40, kills: 5 }
-      })
+      body: JSON.stringify({ playerId: userId, playerName: "theanh", level: 13, kills: 5, coins: 40, exp: 260 })
     });
-    const renameJson = await renameSave.json();
-    assert.equal(renameJson.data.playerName, "Hiệp Khách Vô Danh");
 
     const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=50`);
     const lbJson = await lbRes.json();
     const entry = lbJson.data.rankings.find((r) => r.playerId === userId);
     assert.ok(entry, "Renamed player should appear in the leaderboard");
     assert.equal(entry.playerName, "Hiệp Khách Vô Danh");
+    assert.equal(entry.level, 13);
   });
 
   test("Leaderboard: submit uses the registered display name over the payload name", async () => {
@@ -433,15 +355,12 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.success, false);
   });
 
-  test("Concurrency: handles concurrent saves without race conditions or file corruption", async () => {
+  test("Concurrency: handles concurrent inventory updates without corruption", async () => {
     const promises = Array.from({ length: 10 }, (_, i) =>
-      fetch(`${baseUrl}/save/concurrent_player_${i}`, {
-        method: "POST",
+      fetch(`${baseUrl}/inventory/concurrent_player_${i}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playerName: `Chiến Tướng ${i}`,
-          stats: { level: i + 1, kills: i * 5 }
-        })
+        body: JSON.stringify({ inventory: { potion_hp: i + 1 } })
       })
     );
 
@@ -450,12 +369,12 @@ describe("Giang Ho Backend API Test Suite", () => {
       assert.equal(res.status, 200);
     }
 
-    // Verify all 10 saves are intact
+    // Verify all 10 inventories are intact
     for (let i = 0; i < 10; i++) {
-      const getRes = await fetch(`${baseUrl}/save/concurrent_player_${i}`);
+      const getRes = await fetch(`${baseUrl}/inventory/concurrent_player_${i}`);
       assert.equal(getRes.status, 200);
       const json = await getRes.json();
-      assert.equal(json.data.stats.level, i + 1);
+      assert.equal(json.data.inventory.potion_hp, i + 1);
     }
   });
 });

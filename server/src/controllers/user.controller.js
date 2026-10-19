@@ -1,15 +1,5 @@
 import { userDb } from "../data/userDb.js";
-import { config } from "../config.js";
-import crypto from "node:crypto";
-
-/**
- * Generate a lightweight HMAC-signed session token
- */
-const generateSessionToken = (userId) => {
-  const payload = `${userId}:${Date.now()}`;
-  const hmac = crypto.createHmac("sha256", config.sessionSecret).update(payload).digest("hex");
-  return `${Buffer.from(payload).toString("base64url")}.${hmac}`;
-};
+import { createSessionToken } from "../auth/session.js";
 
 /**
  * Handle user registration
@@ -31,7 +21,7 @@ export const registerUser = async (req, res, next) => {
     }
 
     const user = userDb.register(username, password, displayName);
-    const token = generateSessionToken(user.id);
+    const token = createSessionToken(user.id);
 
     return res.status(201).json({
       success: true,
@@ -78,7 +68,7 @@ export const loginUser = async (req, res, next) => {
     }
 
     const user = userDb.login(username, password);
-    const token = generateSessionToken(user.id);
+    const token = createSessionToken(user.id);
 
     return res.status(200).json({
       success: true,

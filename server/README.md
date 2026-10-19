@@ -30,7 +30,7 @@ Bạn có thể truyền các biến môi trường khi chạy:
 - `PORT`: Cổng chạy API (mặc định: `5000`).
 - `HOST`: Host bind (mặc định: `0.0.0.0`).
 - `CLIENT_ORIGIN`: Domain frontend cho phép CORS (mặc định: `*`).
-- `DATA_PATH`: Đường dẫn file lưu trữ dữ liệu JSON (mặc định: `server/data/db.json`).
+- `DB_PATH`: Đường dẫn file SQLite (users, characters, saves + leaderboard) (mặc định: `server/data/jx2.sqlite`).
 
 Ví dụ:
 ```bash
@@ -137,67 +137,6 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 
 ---
 
-### 2. Lưu & Tải tiến trình nhân vật (Save Progress)
-
-#### 🔹 Tải tiến trình
-- **URL:** `GET /api/save/:playerId`
-- **Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "playerId": "player_01",
-    "playerName": "Tiêu Dao Tử",
-    "stats": {
-      "level": 15,
-      "hp": 250,
-      "mp": 160,
-      "exp": 4500,
-      "coins": 3200,
-      "kills": 38
-    },
-    "position": { "x": 450, "y": 620 },
-    "questRewarded": true,
-    "audioEnabled": true,
-    "inventory": {
-      "potion_hp": 10,
-      "potion_mp": 5
-    },
-    "updatedAt": 1700000000000
-  }
-}
-```
-
-#### 🔹 Lưu tiến trình (Tự động đồng bộ lên Bảng xếp hạng)
-- **URL:** `POST /api/save/:playerId`
-- **Ghi chú:** nếu `:playerId` trùng `users.id` của một tài khoản đã đăng ký, `display_name` trong bảng `users` sẽ được dùng làm `playerName` thay cho giá trị client gửi lên (nhờ vậy đổi tên tài khoản là tiến trình đã lưu và bảng xếp hạng tự hiện tên mới). Với khách vãng lai (`guest_*`, id ghép thêm tab), giá trị `playerName` trong body được giữ nguyên.
-- **Body:**
-```json
-{
-  "playerName": "Tiêu Dao Tử",
-  "stats": {
-    "level": 15,
-    "hp": 250,
-    "mp": 160,
-    "exp": 4500,
-    "coins": 3200,
-    "kills": 38
-  },
-  "position": { "x": 450, "y": 620 },
-  "questRewarded": true,
-  "audioEnabled": true,
-  "inventory": {
-    "potion_hp": 10,
-    "potion_mp": 5
-  }
-}
-```
-
-#### 🔹 Xóa tiến trình
-- **URL:** `DELETE /api/save/:playerId`
-
----
-
 ### 3. Bảng Xếp Hạng (Leaderboard)
 
 #### 🔹 Xem bảng xếp hạng
@@ -268,4 +207,4 @@ PORT=8080 CLIENT_ORIGIN="http://localhost:3000" npm run dev
 - **Prototype Pollution Defense:** Tự động lọc các thuộc tính nguy hiểm (`__proto__`, `constructor`, `prototype`).
 - **Validation Middleware:** Kiểm tra nghiêm ngặt định dạng `playerId` (chỉ chấp nhận `[a-zA-Z0-9_-]`) và các giá trị số học âm / không hợp lệ.
 - **Graceful Shutdown:** Bắt tín hiệu `SIGINT` / `SIGTERM` và đóng kết nối HTTP an toàn trước khi dừng.
-- **Atomic File Writing:** Ghi dữ liệu file tạm (`.tmp`) rồi rename để đảm bảo dữ liệu không bị hỏng khi mất điện hoặc tắt đột ngột.
+- **SQLite Persistence:** Users, characters, saves và leaderboard dùng chung một file SQLite (`node:sqlite`, WAL). Leaderboard là view suy ra từ bảng `saves` nên không lệch với tiến trình đã lưu.
