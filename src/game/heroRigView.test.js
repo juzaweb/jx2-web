@@ -77,4 +77,15 @@ describe("HeroRigView", () => {
     view.set(3, { helmet: "x" });
     expect(scene._container.children.length).toBe(count);
   });
+
+  it("rebuilds when the gender changes and remembers it for animation", () => {
+    const scene = makeScene();
+    const view = new HeroRigView(scene);
+    view.set(2, {}, "male");
+    const count = scene._container.children.length;
+    view.set(2, {}, "female");
+    expect(view.gender).toBe("female");
+    expect(scene._container.children.length).not.toBe(count);
+    expect(view.groups.legR.length).toBeGreaterThan(0);
+  });
 });

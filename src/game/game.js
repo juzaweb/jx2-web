@@ -16,6 +16,7 @@ import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { normalizeGender } from "./gender.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
 const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
@@ -74,8 +75,9 @@ export class JiangHuScene extends Phaser.Scene {
       session?.user?.displayName ||
       session?.user?.username ||
       initialName;
+    const initialGender = normalizeGender(session?.activeCharacter?.gender);
 
-    this.player = new Player(this, 640, 620, initialName);
+    this.player = new Player(this, 640, 620, initialName, initialGender);
     this.enemyManager = new EnemyManager(this);
     this.enemyManager.create([]);
 
@@ -407,6 +409,9 @@ export class JiangHuScene extends Phaser.Scene {
           this.player.setName(name);
           this.sendNetworkJoin();
         }
+      }),
+      bridge.on(EVENTS.SET_PLAYER_GENDER, (gender) => {
+        this.player?.setGender(gender);
       }),
       bridge.on(EVENTS.ACTION_CHAT, (payload) => {
         if (this.networkClient?.isConnected) {
@@ -829,6 +834,7 @@ export class JiangHuScene extends Phaser.Scene {
       vy: 0,
       direction: this.player.facing,
       equipment: { ...this.player.equipment },
+      gender: normalizeGender(this.player.gender),
       level: this.player.stats?.level || 1,
       hp: this.player.stats?.hp || 100,
       maxHp: this.player.stats?.maxHp || 100,

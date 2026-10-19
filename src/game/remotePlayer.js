@@ -3,6 +3,7 @@ import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { normalizeGender } from "./gender.js";
 
 /** Distance (px) a packet may move a peer before it is treated as a teleport. */
 const TELEPORT_SNAP_THRESHOLD = 200;
@@ -34,6 +35,8 @@ export class RemotePlayer {
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
     this.pkFlag = data.pkFlag === true;
+    /** Gender synced from the server; drives the rig silhouette. */
+    this.gender = normalizeGender(data.gender);
     this.walkPhase = 0;
 
     this.createVisuals();
@@ -52,7 +55,7 @@ export class RemotePlayer {
 
     // 3. Vector hero rig, drawn wearing the peer's synced equipment
     this.rig = new HeroRigView(this.scene, { footOffsetY: HERO_FOOT_Y });
-    this.rig.set(this.facingDirection, this.equipment);
+    this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
     this.container.add([this.shadow, this.body]);
@@ -83,7 +86,7 @@ export class RemotePlayer {
   faceDirection(direction) {
     if (direction === this.facingDirection) return;
     this.facingDirection = direction;
-    this.rig?.set(direction, this.equipment);
+    this.rig?.set(direction, this.equipment, this.gender);
   }
 
   /**
@@ -92,7 +95,7 @@ export class RemotePlayer {
    */
   applyEquipment(equipment) {
     this.equipment = equipment || {};
-    this.rig?.set(this.facingDirection, this.equipment);
+    this.rig?.set(this.facingDirection, this.equipment, this.gender);
   }
 
   /**

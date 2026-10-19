@@ -4,6 +4,7 @@ import { toIso, isoDepth } from "./isoProjection.js";
 import { defaultEquipment } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { normalizeGender } from "./gender.js";
 
 export class Player {
   /**
@@ -11,12 +12,15 @@ export class Player {
    * @param {number} x
    * @param {number} y
    * @param {string} [name]
+   * @param {"male"|"female"} [gender]
    */
-  constructor(scene, x = 640, y = 620, name = "Lãng Khách") {
+  constructor(scene, x = 640, y = 620, name = "Lãng Khách", gender = "male") {
     this.scene = scene;
     this.spawnX = x;
     this.spawnY = y;
     this.name = name;
+    /** Character gender drives the rig's silhouette ("male" | "female"). */
+    this.gender = normalizeGender(gender);
 
     this.stats = {
       level: 1,
@@ -114,10 +118,23 @@ export class Player {
     // Body container carries the walk bob and attack recoil; the rig lives inside.
     this.body = this.scene.add.container(0, 0);
     this.rig = new HeroRigView(this.scene, { footOffsetY: HERO_FOOT_Y });
-    this.rig.set(this.facingDirection, this.equipment);
+    this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
     container.add([this.shadow, this.body]);
+  }
+
+  /**
+   * Switch the hero's rendered silhouette (male/female) and redraw the rig.
+   * @param {"male"|"female"} gender
+   * @returns {boolean} whether the gender actually changed
+   */
+  setGender(gender) {
+    const next = normalizeGender(gender);
+    if (next === this.gender) return false;
+    this.gender = next;
+    this.rig?.set(this.facingDirection, this.equipment, this.gender);
+    return true;
   }
 
   /**
@@ -126,7 +143,7 @@ export class Player {
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
-    this.rig?.set(this.facingDirection, this.equipment);
+    this.rig?.set(this.facingDirection, this.equipment, this.gender);
   }
 
   /**
@@ -136,7 +153,7 @@ export class Player {
   faceDirection(direction) {
     if (direction === this.facingDirection) return;
     this.facingDirection = direction;
-    this.rig?.set(direction, this.equipment);
+    this.rig?.set(direction, this.equipment, this.gender);
   }
 
   createKeyboard() {
