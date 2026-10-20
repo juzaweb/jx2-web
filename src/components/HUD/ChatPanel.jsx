@@ -3,7 +3,7 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 const TABS = ["all", "system", "near", "combat"];
 
-export function ChatPanel({ logs, onSendMessage }) {
+export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose }) {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
   const [inputText, setInputText] = useState("");
@@ -14,6 +14,8 @@ export function ChatPanel({ logs, onSendMessage }) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
   }, [logs]);
+
+  if (collapsed) return null;
 
   const handleSend = () => {
     const text = inputText.trim();
@@ -41,6 +43,7 @@ export function ChatPanel({ logs, onSendMessage }) {
     <section className="bottom-left-panel" id="chat-panel">
       <div className="chat-box metal-card">
         <div className="chat-tabs">
+          <button type="button" className="chat-close" onClick={onClose} title="×">×</button>
           {TABS.map((tab) => (
             <button
               key={tab}

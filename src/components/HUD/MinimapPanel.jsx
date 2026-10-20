@@ -3,12 +3,13 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false }) {
+export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false, collapsed = false, onClose }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
 
   useEffect(() => {
+    if (collapsed) return undefined;
     // Register on mount, and again whenever the game asks (the Phaser scene may
     // have been created after this panel mounted, so its initial registration was
     // emitted before anyone was listening). Re-register on zoom so the radar can
@@ -25,7 +26,9 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
 
     registerMinimap();
     return bridge.on(EVENTS.ACTION_REQUEST_MINIMAP, registerMinimap);
-  }, [zoomed]);
+  }, [zoomed, collapsed]);
+
+  if (collapsed) return null;
 
   return (
     <section className={`top-right-panel${zoomed ? " is-zoomed" : ""}`} id="minimap-panel">
@@ -36,6 +39,9 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           </div>
           <div className="minimap-actions">
             <LanguageSwitcher variant="hud" />
+            <button id="map-close-btn" className="mini-btn" title="×" onClick={onClose}>
+              ×
+            </button>
             <button
               id="map-help-btn"
               className="mini-btn gold"

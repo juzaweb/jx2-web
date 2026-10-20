@@ -105,6 +105,8 @@ export function App() {
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMinimapOpen, setIsMinimapOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
   const [selectedSkillSlot, setSelectedSkillSlot] = useState(
@@ -553,9 +555,35 @@ export function App() {
           onOpenHelp={handleOpenHelp}
           quest={quest}
           zoomed={isMinimapZoomed}
+          collapsed={!isMinimapOpen}
+          onClose={() => setIsMinimapOpen(false)}
         />
 
-        <ChatPanel logs={logs} onSendMessage={handleSendMessage} />
+        <ChatPanel
+          logs={logs}
+          onSendMessage={handleSendMessage}
+          collapsed={!isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
+
+        <div className="hud-side-toggles" id="hud-side-toggles">
+          <button
+            type="button"
+            className="hud-toggle-btn"
+            title={t("minimap.mapTitle")}
+            onClick={() => setIsMinimapOpen((open) => !open)}
+          >
+            🗺
+          </button>
+          <button
+            type="button"
+            className="hud-toggle-btn"
+            title={t("chat.tabs.all")}
+            onClick={() => setIsChatOpen((open) => !open)}
+          >
+            💬
+          </button>
+        </div>
 
         <HotbarDock
           coins={stats.coins}

@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
-import { WorldManager, WORLD_CONFIG } from "./world.js";
+import { WorldManager } from "./marketWorld.js";
+import { WORLD_CONFIG } from "./worldConfig.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
 import { EnemyManager, DEFAULT_ENEMY_SPAWNS } from "./enemy.js";
@@ -15,11 +16,20 @@ import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
 import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
-import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
+import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { MARKET_BOUNDS, MARKET_SPAWN } from "./marketLayout.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
-const CAMERA_TILES = 10;
+const CAMERA_TILES = 15;
+
+/** Map descriptor shared with the minimap / full-map canvas. */
+const MARKET_WORLD_CONFIG = {
+  ...WORLD_CONFIG,
+  width: MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0,
+  height: MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0,
+  cityBounds: MARKET_BOUNDS
+};
 import { normalizeGender } from "./gender.js";
 import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
 import { normalizeSect } from "./skills.js";
@@ -56,17 +66,13 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.destroy();
     }
 
-    // Configure world and camera bounds. Physics/collisions stay in the flat
-    // "ground" plane; the camera lives in isometric screen space, so its bounds
-    // come from the projected diamond that contains the whole ground rectangle.
-    const isoBox = isoBounds(WORLD_CONFIG.width, WORLD_CONFIG.height);
-    this.cameras.main.setBounds(
-      isoBox.minX - 400,
-      isoBox.minY - 400,
-      isoBox.maxX - isoBox.minX + 800,
-      isoBox.maxY - isoBox.minY + 800
-    );
-    this.physics.world.setBounds(0, 0, WORLD_CONFIG.width, WORLD_CONFIG.height);
+    // The playable map is exactly the yellow dirt area. Both the camera and the
+    // physics world are clamped to that rectangle so the player can never walk
+    // out onto the empty grass backdrop.
+    const mapW = MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0;
+    const mapH = MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0;
+    this.cameras.main.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
+    this.physics.world.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
 
     // Initialize subsystems
     this.worldManager = new WorldManager(this);
@@ -85,8 +91,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.player = new Player(
       this,
-      640 * WORLD_POSITION_SCALE,
-      620 * WORLD_POSITION_SCALE,
+      MARKET_SPAWN.x,
+      MARKET_SPAWN.y,
       initialName,
       initialGender
     );
@@ -139,7 +145,10 @@ export class JiangHuScene extends Phaser.Scene {
         this.player.loadStats(this.savedData.stats);
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
-        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+        const { x, y } = this.savedData.position;
+        const insideMarket =
+          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
+        if (insideMarket) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -516,13 +525,13 @@ export class JiangHuScene extends Phaser.Scene {
     this.uiBridge.drawMinimap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
     this.uiBridge.drawCityMap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
 
@@ -613,7 +622,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (slot === 4) {
       // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
-      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
+      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
@@ -985,7 +994,10 @@ export class JiangHuScene extends Phaser.Scene {
         this.player.loadStats(this.savedData.stats);
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
-        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+        const { x, y } = this.savedData.position;
+        const insideMarket =
+          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
+        if (insideMarket) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -1006,7 +1018,7 @@ export class JiangHuScene extends Phaser.Scene {
       );
     } else {
       this.uiBridge.addLog("Bạn đã đặt chân đến Biện Kinh. Chúc hiệp khách hành tẩu bình an.", "system");
-      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
+      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
     }
 
     this.saveGame(false);
@@ -1092,13 +1104,13 @@ export class JiangHuScene extends Phaser.Scene {
     this.uiBridge.drawMinimap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
     this.uiBridge.drawCityMap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
   }

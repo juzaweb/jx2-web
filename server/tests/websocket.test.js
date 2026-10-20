@@ -7,6 +7,7 @@ import path from "node:path";
 import { WebSocket } from "ws";
 import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { DROP_TABLE } from "../../src/game/items.js";
+import { MARKET_SPAWN } from "../../src/game/marketLayout.js";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -777,7 +778,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(defeat.payload.victimId, "usr_pk2");
     assert.equal(defeat.payload.attackerId, "usr_pk1");
     assert.equal(defeat.payload.attackerName, "Kiếm Khách");
-    assert.deepEqual(defeat.payload.respawn, { x: 6400, y: 6200 });
+    assert.deepEqual(defeat.payload.respawn, { x: MARKET_SPAWN.x, y: MARKET_SPAWN.y });
 
     const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
     assert.equal(restored.payload.maxHp, 100);

@@ -52,6 +52,8 @@ export class Player {
     this.pkFlag = false;
     this.targetX = null;
     this.targetY = null;
+    this.finalX = null;
+    this.finalY = null;
     this.isMovingToTarget = false;
 
     // Movement & wuxia animation states
@@ -122,6 +124,44 @@ export class Player {
    * with the current gear (so the hero is never blank before the game starts).
    */
   drawHero(container) {
+    // Soft golden aura + ground shadow, matching the glowing hero in the
+    // reference market screenshot.
+    this.aura = this.scene.add.ellipse(0, HERO_FOOT_Y - 2, 96, 38, 0xffd36a, 0.2);
+    this.aura.setBlendMode(Phaser.BlendModes.ADD);
+    this.scene.tweens.add({
+      targets: this.aura,
+      alpha: { from: 0.14, to: 0.4 },
+      scaleX: { from: 0.92, to: 1.08 },
+      scaleY: { from: 0.92, to: 1.08 },
+      duration: 1400,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1
+    });
+    this.sparkles = this.scene.add.container(0, HERO_FOOT_Y);
+    for (let i = 0; i < 7; i++) {
+      const angle = (i / 7) * Math.PI * 2;
+      const dot = this.scene.add.circle(
+        Math.cos(angle) * (20 + (i % 3) * 8),
+        -8 - (i % 4) * 7,
+        2.0 + (i % 2) * 1.1,
+        0xffe9a6,
+        0.85
+      );
+      dot.setBlendMode(Phaser.BlendModes.ADD);
+      this.scene.tweens.add({
+        targets: dot,
+        alpha: { from: 0.15, to: 0.95 },
+        y: dot.y - 8,
+        duration: 900 + i * 140,
+        delay: i * 90,
+        ease: "Sine.easeInOut",
+        yoyo: true,
+        repeat: -1
+      });
+      this.sparkles.add(dot);
+    }
+
     this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
 
     // Body container carries the walk bob and attack recoil; the rig lives inside.
@@ -130,7 +170,7 @@ export class Player {
     this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
-    container.add([this.shadow, this.body]);
+    container.add([this.aura, this.sparkles, this.shadow, this.body]);
   }
 
   /**
@@ -316,36 +356,72 @@ export class Player {
       return;
     }
 
-    // Click-to-move handling
+    // Click-to-move handling: travel one axis at a time (four-way movement).
     if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
-      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
+      const dx = this.targetX - this.sprite.x;
+      const dy = this.targetY - this.sprite.y;
+      const speed = 175 * POS * WORLD_SPEED_SCALE;
 
-      if (dist <= 8) {
-        this.stopMovement();
+      if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) {
+        // Snap the finished leg, then continue with the other axis.
+        this.sprite.setPosition(this.targetX, this.targetY);
+        const isFinalLeg =
+          this.finalX === null ||
+          this.finalY === null ||
+          (Math.abs(this.finalX - this.targetX) <= 8 && Math.abs(this.finalY - this.targetY) <= 8);
+        if (isFinalLeg) {
+          this.stopMovement();
+          return;
+        }
+        if (Math.abs(this.finalX - this.targetX) > 8) {
+          this.targetX = this.finalX;
+          this.targetY = this.sprite.y;
+        } else {
+          this.targetX = this.sprite.x;
+          this.targetY = this.finalY;
+        }
         return;
       }
 
-      const angle = Phaser.Math.Angle.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
-      const vx = Math.cos(angle) * 175 * POS * WORLD_SPEED_SCALE;
-      const vy = Math.sin(angle) * 175 * POS * WORLD_SPEED_SCALE;
-
-      this.sprite.setVelocity(vx, vy);
+      if (Math.abs(dx) > Math.abs(dy)) {
+        this.sprite.setVelocity(Math.sign(dx) * speed, 0);
+      } else {
+        this.sprite.setVelocity(0, Math.sign(dy) * speed);
+      }
       return;
     }
 
     this.sprite.setVelocity(0, 0);
   }
 
+  /**
+   * Walk to a point using four-way movement. The longer axis is travelled
+   * first, then the shorter one, so the character never moves diagonally.
+   * @param {number} x
+   * @param {number} y
+   */
   moveTo(x, y) {
-    this.targetX = x;
-    this.targetY = y;
+    this.finalX = x;
+    this.finalY = y;
     this.isMovingToTarget = true;
+
+    const dx = x - this.sprite.x;
+    const dy = y - this.sprite.y;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      this.targetX = x;
+      this.targetY = this.sprite.y;
+    } else {
+      this.targetX = this.sprite.x;
+      this.targetY = y;
+    }
   }
 
   stopMovement() {
     this.isMovingToTarget = false;
     this.targetX = null;
     this.targetY = null;
+    this.finalX = null;
+    this.finalY = null;
     if (this.sprite?.body) {
       this.sprite.setVelocity(0, 0);
     }

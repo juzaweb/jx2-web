@@ -62,12 +62,13 @@ export function HotbarDock({
   const leftCooldown = cooldownLeft(leftSkill?.id);
   const rightCooldown = cooldownLeft(selectedSkill?.id);
 
-  // The bottom bar always shows eight numbered slots; 1-4 hold consumables and
-  // the rest stay as empty placeholders.
-  const quickSlots = Array.from({ length: 8 }, (_, index) => {
+  // The bottom bar mirrors the reference: consumables in 1-4, skill icons in
+  // 5-10 and two spare slots at the end.
+  const quickSlots = Array.from({ length: 12 }, (_, index) => {
     const useSlot = index + 1;
     const raw = items.find((entry) => entry.useSlot === useSlot);
-    return { useSlot, item: raw ? localizeItem(raw, t) : null };
+    const skill = useSlot >= 5 && useSlot <= 10 ? skills[useSlot - 5] : null;
+    return { useSlot, item: raw ? localizeItem(raw, t) : null, skill };
   });
 
   return (
@@ -75,11 +76,24 @@ export function HotbarDock({
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {quickSlots.map(({ useSlot, item }) => {
-            if (!item) {
+          {quickSlots.map(({ useSlot, item, skill }) => {
+            if (!item && !skill) {
               return (
                 <div className="slot-item empty" id={`slot-${useSlot}`} key={`slot-${useSlot}`}>
                   <span className="slot-key">{useSlot}</span>
+                </div>
+              );
+            }
+            if (!item && skill) {
+              return (
+                <div
+                  className="slot-item skill-slot"
+                  id={`slot-${useSlot}`}
+                  key={`skill-${skill.id}`}
+                  title={t(skill.nameKey, undefined, skill.nameKey)}
+                >
+                  <span className="slot-key">{useSlot}</span>
+                  <img className="slot-skill-img" src={skill.icon} alt="" draggable={false} />
                 </div>
               );
             }
