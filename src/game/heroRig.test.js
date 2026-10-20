@@ -1,0 +1,87 @@
+import { describe, expect, it } from "vitest";
+import { buildHero, poseFor, weaponKindFor } from "./heroRig.js";
+import { HERO_DIRECTIONS } from "./heroDirections.js";
+
+describe("poseFor", () => {
+  it("turns the cardinal directions into the right pose parameters", () => {
+    expect(poseFor(0)).toEqual({ side: 0, back: 0, depth: 0 }); // front
+    const right = poseFor(2);
+    expect(right.side).toBeCloseTo(1);
+    expect(right.back).toBeCloseTo(0.5);
+    expect(right.depth).toBeCloseTo(1);
+    expect(poseFor(4).back).toBeCloseTo(1); // away
+    expect(poseFor(6).side).toBeCloseTo(-1); // left
+  });
+
+  it("wraps out-of-range indices into 0..7", () => {
+    expect(poseFor(8)).toEqual(poseFor(0));
+    expect(poseFor(-1)).toEqual(poseFor(7));
+  });
+});
+
+describe("buildHero", () => {
+  it("draws a non-empty rig for every direction", () => {
+    for (let d = 0; d < HERO_DIRECTIONS; d++) {
+      const parts = buildHero({ direction: d });
+      expect(parts.length).toBeGreaterThan(10);
+      expect(parts.every((p) => typeof p.kind === "string")).toBe(true);
+    }
+  });
+
+  it("adds one extra layer per equipped slot", () => {
+    const base = buildHero({ direction: 0 }).length;
+    expect(buildHero({ direction: 0, equipment: { helmet: "x" } }).length).toBeGreaterThan(base);
+    const full = buildHero({
+      direction: 0,
+      equipment: { armor: "x", helmet: "x", accessory: "x", weapon: "x" }
+    }).length;
+    expect(full).toBeGreaterThan(buildHero({ direction: 0, equipment: { helmet: "x" } }).length);
+  });
+
+  it("ignores empty slots", () => {
+    const base = buildHero({ direction: 0 }).length;
+    expect(buildHero({ direction: 0, equipment: { helmet: null, armor: undefined } }).length).toBe(base);
+  });
+
+  it("draws a distinct non-empty female rig for every direction", () => {
+    for (let d = 0; d < HERO_DIRECTIONS; d++) {
+      const female = buildHero({ direction: d, gender: "female" });
+      expect(female.length).toBeGreaterThan(10);
+      expect(female.some((p) => p.group === "legR")).toBe(true);
+      expect(female.some((p) => p.group === "armR")).toBe(true);
+      // The female body is not simply a recolour of the male one.
+      expect(female).not.toEqual(buildHero({ direction: d, gender: "male" }));
+    }
+  });
+
+  it("falls back to the male rig for unknown genders", () => {
+    const male = buildHero({ direction: 1, gender: "male" });
+    expect(buildHero({ direction: 1, gender: "other" })).toEqual(male);
+    expect(buildHero({ direction: 1 })).toEqual(male);
+  });
+});
+
+describe("held weapon", () => {
+  it("maps catalog weapons to the matching rig shape", () => {
+    expect(weaponKindFor("hac-ung-kiem")).toBe("jian");
+    expect(weaponKindFor("thanh-long-dao")).toBe("blade");
+    expect(weaponKindFor("phach-dao")).toBe("blade");
+    expect(weaponKindFor("thiet-trao")).toBe("claw");
+    expect(weaponKindFor("unknown-item")).toBe("jian");
+    expect(weaponKindFor(null)).toBeNull();
+    expect(weaponKindFor(undefined)).toBeNull();
+    expect(weaponKindFor("")).toBeNull();
+  });
+
+  it("draws the equipped weapon instead of a default sword", () => {
+    const unarmed = buildHero({ direction: 0 });
+    const jian = buildHero({ direction: 0, equipment: { weapon: "hac-ung-kiem" } });
+    const blade = buildHero({ direction: 0, equipment: { weapon: "thanh-long-dao" } });
+    const claw = buildHero({ direction: 0, equipment: { weapon: "thiet-trao" } });
+
+    expect(jian.length).toBeGreaterThan(unarmed.length);
+    expect(blade).not.toEqual(jian);
+    expect(claw).not.toEqual(jian);
+    expect(claw).not.toEqual(blade);
+  });
+});

@@ -60,9 +60,6 @@
 .icon-armor {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M16 4 l8 3 v9 c0 6 -4 10 -8 12 c-4 -2 -8 -6 -8 -12 v-9 z" fill="%237a4a4a" stroke="%23d9c27a" stroke-width="1.4"/><path d="M16 6 v18" stroke="%23d9c27a" stroke-width="1" opacity="0.6"/><circle cx="16" cy="13" r="2" fill="%23f0e0a0"/></svg>');
 }
-.icon-boots {
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M9 5 h6 v14 c0 3 2 4 5 5 c3 1 4 3 4 3 h-15 z" fill="%23577a4a" stroke="%232d4030" stroke-width="1.3"/><path d="M9 22 h15" stroke="%23d9c27a" stroke-width="1.5"/></svg>');
-}
 .icon-crown {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M6 22 h20 l-2.5 -12 -4.5 5 -3 -8 -3 8 -4.5 -5 z" fill="%23c9a24a" stroke="%237a5a1e" stroke-width="1.3"/><circle cx="16" cy="11" r="1.7" fill="%23fff2c0"/><rect x="6" y="22" width="20" height="3" rx="1" fill="%23a8853a"/></svg>');
 }

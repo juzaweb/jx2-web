@@ -1,53 +1,87 @@
-const STORAGE_KEY = "giang_ho_game_save_v1";
+import { sanitizeQuantities } from "./items.js";
+import { sanitizeEquipment, defaultEquipment } from "./equipment.js";
 
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const STORAGE_KEY = "giang_ho_game_save_v1";
+const INVENTORY_KEY = "giang_ho_inventory_v1";
+const EQUIPMENT_KEY = "giang_ho_equipment_v1";
 
 /**
- * Coerce an arbitrary value into a safe id -> non-negative integer map.
+ * Coerce an arbitrary value into a safe id -> non-negative integer map, or `{}`
+ * when it is not a plain object. Shared with the server inventory sync.
  * @param {*} value
- * @returns {Record<string, number> | undefined}
+ * @returns {Record<string, number>}
  */
-const sanitizeInventory = (value) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const out = {};
-  Object.entries(value).forEach(([id, qty]) => {
-    if (DANGEROUS_KEYS.has(id)) return;
-    if (typeof qty !== "number" || !Number.isFinite(qty) || qty < 0) return;
-    out[id] = Math.floor(qty);
-  });
-  return out;
-};
+const sanitizeInventory = (value) => sanitizeQuantities(value) || {};
 
 export class StorageManager {
+  static activeUserId = null;
+  static activeCharacterId = null;
+
   /**
-   * Save game state to localStorage
+   * Set active user ID to isolate account-scoped progress (stats, position).
+   * @param {string|null} id
+   */
+  static setUserId(id) {
+    this.activeUserId = id || null;
+  }
+
+  /**
+   * Set the active character ID. The bag is character-scoped, so each hero keeps
+   * its own local inventory instead of sharing one account-wide bag.
+   * @param {string|null} id
+   */
+  static setCharacterId(id) {
+    this.activeCharacterId = id || null;
+  }
+
+  /**
+   * Get the active account-scoped storage key.
+   * @returns {string}
+   */
+  static getKey() {
+    return this.activeUserId ? `${STORAGE_KEY}_${this.activeUserId}` : STORAGE_KEY;
+  }
+
+  /**
+   * Get the active inventory storage key. Prefers the character so bags never leak
+   * between characters; falls back to the account (guests / no character chosen).
+   * @returns {string}
+   */
+  static getInventoryKey() {
+    if (this.activeCharacterId) return `${INVENTORY_KEY}_${this.activeCharacterId}`;
+    return this.activeUserId ? `${INVENTORY_KEY}_${this.activeUserId}` : INVENTORY_KEY;
+  }
+
+  /**
+   * Get the active equipment storage key, scoped the same way as the bag so
+   * gear never leaks between characters.
+   * @returns {string}
+   */
+  static getEquipmentKey() {
+    if (this.activeCharacterId) return `${EQUIPMENT_KEY}_${this.activeCharacterId}`;
+    return this.activeUserId ? `${EQUIPMENT_KEY}_${this.activeUserId}` : EQUIPMENT_KEY;
+  }
+
+  /**
+   * Save account progress to localStorage. The bag is persisted separately via
+   * {@link StorageManager.saveInventory} under the character key.
    * @param {Object} data
    * @param {Object} data.stats Player stats (level, hp, mp, exp, coins, kills)
    * @param {{ x: number, y: number }} [data.position] Player coordinates
    * @param {boolean} [data.questRewarded] Quest completion state
    * @param {boolean} [data.audioEnabled] Sound setting
-   * @param {Record<string, number>} [data.inventory] Stack quantities keyed by item id
    * @returns {boolean} Success status
    */
   static save(data) {
     try {
-      // Preserve previously saved stack quantities when a caller (e.g. the game
-      // loop) saves unrelated state without passing inventory.
-      let inventory = data.inventory;
-      if (inventory === undefined) {
-        const previous = this.load();
-        inventory = previous ? previous.inventory : undefined;
-      }
-
       const payload = {
         stats: data.stats,
         position: data.position,
         questRewarded: !!data.questRewarded,
         audioEnabled: data.audioEnabled,
-        inventory: sanitizeInventory(inventory),
         savedAt: Date.now()
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      localStorage.setItem(this.getKey(), JSON.stringify(payload));
       return true;
     } catch (error) {
       console.warn("StorageManager: Failed to save game state:", error);
@@ -56,12 +90,12 @@ export class StorageManager {
   }
 
   /**
-   * Load saved game state from localStorage
-   * @returns {Object|null} Saved game payload or null
+   * Load saved account progress from localStorage.
+   * @returns {Object|null} Saved progress payload or null
    */
   static load() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(this.getKey());
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data || typeof data !== "object" || !data.stats) {
@@ -75,27 +109,105 @@ export class StorageManager {
   }
 
   /**
-   * Load persisted stack quantities, merged over catalog defaults so that
+   * Load the active character's persisted bag, merged over catalog defaults so
    * newly added items keep their catalog quantity.
    * @param {Record<string, number>} [defaults]
    * @returns {Record<string, number>}
    */
   static loadInventory(defaults = {}) {
-    const data = this.load();
-    const saved = data && data.inventory ? data.inventory : {};
-    return { ...defaults, ...saved };
+    try {
+      const raw = localStorage.getItem(this.getInventoryKey());
+      const saved = raw ? sanitizeInventory(JSON.parse(raw)) : {};
+      return { ...defaults, ...saved };
+    } catch (error) {
+      console.warn("StorageManager: Failed to parse saved inventory:", error);
+      return { ...defaults };
+    }
   }
 
   /**
-   * Remove saved game from localStorage
+   * Persist the active character's bag.
+   * @param {Record<string, number>} quantities
+   * @returns {boolean} Success status
+   */
+  static saveInventory(quantities) {
+    try {
+      localStorage.setItem(this.getInventoryKey(), JSON.stringify(sanitizeInventory(quantities)));
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to save inventory:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Load the active character's persisted equipment, merged over empty defaults
+   * so every slot is always present.
+   * @returns {Record<string, string|null>}
+   */
+  static loadEquipment() {
+    try {
+      const raw = localStorage.getItem(this.getEquipmentKey());
+      return raw ? sanitizeEquipment(JSON.parse(raw)) : defaultEquipment();
+    } catch (error) {
+      console.warn("StorageManager: Failed to parse saved equipment:", error);
+      return defaultEquipment();
+    }
+  }
+
+  /**
+   * Persist the active character's equipment.
+   * @param {Record<string, string|null>} equipment
+   * @returns {boolean} Success status
+   */
+  static saveEquipment(equipment) {
+    try {
+      localStorage.setItem(this.getEquipmentKey(), JSON.stringify(sanitizeEquipment(equipment)));
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to save equipment:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove saved account progress from localStorage
    * @returns {boolean}
    */
   static clear() {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(this.getKey());
       return true;
     } catch (error) {
       console.warn("StorageManager: Failed to clear save data:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove the active character's saved bag (used by the reset flow).
+   * @returns {boolean}
+   */
+  static clearInventory() {
+    try {
+      localStorage.removeItem(this.getInventoryKey());
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to clear inventory:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove the active character's saved equipment (used by the reset flow).
+   * @returns {boolean}
+   */
+  static clearEquipment() {
+    try {
+      localStorage.removeItem(this.getEquipmentKey());
+      return true;
+    } catch (error) {
+      console.warn("StorageManager: Failed to clear equipment:", error);
       return false;
     }
   }
@@ -106,7 +218,7 @@ export class StorageManager {
    */
   static exists() {
     try {
-      return !!localStorage.getItem(STORAGE_KEY);
+      return !!localStorage.getItem(this.getKey());
     } catch {
       return false;
     }

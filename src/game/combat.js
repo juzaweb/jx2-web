@@ -1,4 +1,20 @@
 import * as Phaser from "phaser";
+import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
+import { parseEnemyReward } from "./rewardSync.js";
+import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
+import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
+import {
+  playSkillCastVfx,
+  playSkillImpactVfx,
+  playRangeIndicator,
+  playTargetMarker
+} from "./skillVfx.js";
+import { directionFromVelocity } from "./heroDirections.js";
+import { toIso, isoDepth } from "./isoProjection.js";
+import { canPvpAttack } from "./pvp.js";
+import { computeDamage } from "./damage.js";
+import { bridge, EVENTS } from "./bridge.js";
+import { translate } from "../i18n/translator.js";
 
 let audioEnabled = true;
 let audioContext = null;
@@ -37,6 +53,19 @@ export function playTone(frequency = 220, duration = 0.07, type = "sine", volume
   } catch (_) {}
 }
 
+/**
+ * Ceiling on remembered drops. Every client renders every kill's loot, so swept-up
+ * entries must not accumulate for the whole session.
+ */
+const MAX_DROPS = 32;
+
+/** Lifetime (ms) of a drop this client is not allowed to collect. */
+const UNOWNED_DROP_TTL_MS = 8000;
+
+/** Coerce a server-sent stat to a finite number, keeping the current value otherwise. */
+const toStat = (value, fallback) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
 export class CombatSystem {
   /**
    * @param {Phaser.Scene} scene
@@ -53,8 +82,30 @@ export class CombatSystem {
     this.onStateChange = onStateChange;
 
     this.attackReady = true;
-    this.skillReady = true;
     this.drops = [];
+    /** Skill slots assigned to the left and right mouse buttons. */
+    this.selectedSkillSlot = 0;
+    this.leftSkillSlot = 0;
+    /** id -> timestamp (ms) the skill becomes castable again. */
+    this.skillCooldowns = new Map();
+    /** Active timed buffs: { stat, amount, until }. */
+    this.buffs = [];
+    /** Melee approach in flight: { skill, targetId }. */
+    this.pendingCast = null;
+    this.lastChaseAt = 0;
+    /** Player id this client joined with, used to match server kill attribution. */
+    this.localPlayerId = null;
+  }
+
+  /**
+   * The player's stats with active timed buffs applied. The server is told these
+   * numbers so its authoritative skill damage matches the client's prediction.
+   * @returns {Object}
+   */
+  getEffectiveStats() {
+    const now = this.scene?.time?.now ?? 0;
+    this.buffs = this.buffs.filter((buff) => buff.until > now);
+    return applyBuffsToStats(this.player.stats, this.buffs, now);
   }
 
   performAttack() {
@@ -71,11 +122,20 @@ export class CombatSystem {
 
     const facingRight = this.player.visual.scaleX >= 0;
     const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.player.x, this.player.y);
+
+    // Broadcast attack to other players via network
+    this.scene.networkClient?.sendAttack?.({
+      skill: "normal",
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight
+    });
 
     const slash = this.scene.add
       .arc(
-        this.player.x + slashOffsetX,
-        this.player.y - 7,
+        base.x + slashOffsetX,
+        base.y - 7,
         34,
         facingRight ? -70 : 110,
         facingRight ? 70 : 250,
@@ -84,7 +144,7 @@ export class CombatSystem {
         0.9
       )
       .setStrokeStyle(5, 0xf2e3bd, 0.95)
-      .setDepth(this.player.y + 10);
+      .setDepth(isoDepth(this.player.x, this.player.y) + 10);
 
     this.scene.tweens.add({
       targets: slash,
@@ -109,62 +169,531 @@ export class CombatSystem {
         Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
     );
 
-    this.damageEnemy(candidates[0], Phaser.Math.Between(17, 25));
+    const targetEnemy = candidates[0];
+    const result = computeDamage(this.player, targetEnemy, Math.random);
+    this.damageEnemy(targetEnemy, result.damage, result.crit);
+
+    if (result.crit) {
+      this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương!`);
+    } else {
+      this.ui.addLog(`Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương.`);
+    }
   }
 
-  performSkill() {
-    if (!this.skillReady) return;
-    if (this.player.stats.mp < 15) {
-      this.ui.addLog("Nội lực không đủ để thi triển Kiếm Khí.");
+  /**
+   * The skill currently assigned to the right hand.
+   * @returns {Object|undefined}
+   */
+  getSelectedSkill() {
+    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.selectedSkillSlot);
+  }
+
+  /**
+   * The skill assigned to the left mouse button.
+   * @returns {Object|undefined}
+   */
+  getLeftSkill() {
+    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.leftSkillSlot);
+  }
+
+  /**
+   * Validate and assign a skill slot to one mouse button.
+   * @param {"left"|"right"} hand
+   * @param {number} slot
+   * @returns {boolean}
+   */
+  equipSkill(hand, slot) {
+    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
+    if (!skill) {
+      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
+      return false;
+    }
+    if (!skillUnlocked(skill, this.player.stats.level)) {
+      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      return false;
+    }
+    this.cancelPendingCast();
+    if (hand === "left") {
+      this.leftSkillSlot = slot;
+      bridge.emit(EVENTS.LEFT_SKILL_SELECTED, slot);
+    } else {
+      this.selectedSkillSlot = slot;
+      bridge.emit(EVENTS.SKILL_SELECTED, slot);
+    }
+    return true;
+  }
+
+  /**
+   * Keyboard shortcut: assign a skill to the right mouse button.
+   * @param {number} slot
+   * @returns {boolean}
+   */
+  selectSkill(slot) {
+    const ok = this.equipSkill("right", slot);
+    if (ok) {
+      const skill = this.getSelectedSkill();
+      this.ui.addLog(`Tay phải: ${translate(skill.nameKey, undefined, skill.id)} (chuột phải để dùng).`);
+    }
+    return ok;
+  }
+
+  /**
+   * Right mouse button: cast on the clicked target, or release in place when the
+   * click did not land on an enemy.
+   * @param {{x:number,y:number}|null} [aim]
+   */
+  castSelectedSkill(aim = null) {
+    this.performSkill(aim);
+  }
+
+  /**
+   * Left mouse button: cast on a clicked enemy. The hero walks into range first.
+   * @param {Object} target
+   */
+  castLeftSkill(target) {
+    const skill = this.getLeftSkill();
+    if (!skill || !target) return false;
+    if (!this.canCast(skill)) return true;
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
+      return true;
+    }
+    this.approachAndCast(skill, target);
+    return true;
+  }
+
+  /**
+   * Start a cast. Melee skills first walk the hero into range (VLTK2 behaviour);
+   * the actual release happens in update() once the target is reachable.
+   * @param {{x:number,y:number}|null} [aim]
+   */
+  performSkill(aim = null) {
+    const skill = this.getSelectedSkill();
+    if (!skill) {
+      this.ui.addLog("Chưa gán chiêu thức vào tay phải.");
+      return;
+    }
+    if (!this.canCast(skill)) return;
+
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
       return;
     }
 
-    this.skillReady = false;
-    this.scene.time.delayedCall(1800, () => {
-      this.skillReady = true;
-    });
+    const target = this.findTarget(aim);
+    if (!target) {
+      // Right-click on empty ground: release in place.
+      this.executeSkill(skill, null);
+      return;
+    }
 
-    // Trigger martial focus & release animation
-    this.player.playSkillMotion?.();
+    this.approachAndCast(skill, target);
+  }
 
-    this.player.stats.mp -= 15;
-    playTone(420, 0.18, "triangle", 0.035);
+  /**
+   * Walk the hero into the skill's reach, then release it. Used by both mouse
+   * buttons when an enemy is targeted.
+   * @param {Object} skill
+   * @param {Object} target
+   */
+  approachAndCast(skill, target) {
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance <= this.skillReach(skill)) {
+      this.executeSkill(skill, target);
+      return;
+    }
 
-    const ring = this.scene.add
-      .circle(this.player.x, this.player.y, 24, 0x80d7e9, 0.2)
-      .setStrokeStyle(4, 0xb8e9f0, 0.9)
-      .setDepth(this.player.y + 5);
-
-    this.scene.tweens.add({
-      targets: ring,
-      scale: 4,
-      alpha: 0,
-      duration: 380,
-      onComplete: () => ring.destroy()
-    });
-
-    let hits = 0;
-    this.enemyManager.getAlive().forEach((wolf) => {
-      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < 145) {
-        this.damageEnemy(wolf, Phaser.Math.Between(28, 36));
-        hits++;
-      }
-    });
-
+    this.pendingCast = { skill, targetId: target.id };
+    this.lastChaseAt = 0;
+    this.player.moveTo(target.x, target.y);
     this.ui.addLog(
-      hits
-        ? `Kiếm Khí quét trúng ${hits} mục tiêu!`
-        : "Kiếm Khí tung ra, nhưng không trúng kẻ địch."
+      `Đang tiếp cận mục tiêu để dùng ${translate(skill.nameKey, undefined, skill.id)}...`
     );
+  }
+
+  /**
+   * Validate level, cooldown and MP without spending anything.
+   * @param {Object} skill
+   * @returns {boolean}
+   */
+  canCast(skill) {
+    const now = this.scene.time?.now ?? 0;
+    const readyAt = this.skillCooldowns.get(skill.id) || 0;
+    if (now < readyAt) {
+      this.ui.addLog(
+        `${translate(skill.nameKey, undefined, skill.id)} còn ${Math.ceil((readyAt - now) / 1000)}s hồi.`
+      );
+      return false;
+    }
+    if (!skillUnlocked(skill, this.player.stats.level)) {
+      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      return false;
+    }
+    if (this.player.stats.mp < skillMpCost(skill.id)) {
+      this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Spend the cost and release the skill.
+   * @param {Object} skill
+   * @param {Object|null} target
+   */
+  executeSkill(skill, target) {
+    if (!this.canCast(skill)) return;
+    const now = this.scene.time?.now ?? 0;
+    const cost = skillMpCost(skill.id);
+
+    this.skillCooldowns.set(skill.id, now + skill.cooldown);
+    if (cost > 0) this.player.stats.mp -= cost;
+
+    this.player.playSkillMotion?.(skill.vfx?.cast);
+    playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
+    this.showFloatText(
+      this.player.x,
+      this.player.y - 62,
+      translate(skill.nameKey, undefined, skill.id),
+      "#ffe9a8"
+    );
+
+    this.scene.networkClient?.sendAttack?.({
+      skill: skill.id,
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight: this.player.visual.scaleX >= 0
+    });
+
+    bridge.emit(EVENTS.SKILL_CAST, {
+      slot: skill.slot,
+      skillId: skill.id,
+      cooldown: skill.cooldown,
+      readyAt: this.skillCooldowns.get(skill.id)
+    });
+
+    this.applySkill(skill, now, target);
     this.ui.updateHud(this.player.stats);
   }
 
-  damageEnemy(wolf, damage) {
+  /**
+   * Distance at which a skill can release.
+   * @param {Object} skill
+   * @returns {number}
+   */
+  skillReach(skill) {
+    return skill.radius > 0 ? skill.radius : skill.range;
+  }
+
+  /**
+   * Pick the enemy nearest to the clicked point, or to the hero when no point
+   * was supplied.
+   * @param {{x:number,y:number}|null} aim
+   * @returns {Object|null}
+   */
+  findTarget(aim) {
+    const alive = this.enemyManager.getAlive();
+    if (!alive.length) return null;
+
+    if (aim) {
+      // Only treat a click as a target when it is actually near a wolf, instead
+      // of chasing whichever wolf happens to be closest to an empty click.
+      const clicked = alive
+        .filter((wolf) => Phaser.Math.Distance.Between(aim.x, aim.y, wolf.x, wolf.y) <= 150)
+        .sort(
+          (a, b) =>
+            Phaser.Math.Distance.Between(aim.x, aim.y, a.x, a.y) -
+            Phaser.Math.Distance.Between(aim.x, aim.y, b.x, b.y)
+        );
+      return clicked[0] || null;
+    }
+
+    const nearest = alive
+      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) <= 600)
+      .sort(
+        (a, b) =>
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
+      );
+    return nearest[0] || null;
+  }
+
+  /**
+   * Drive a pending approach. Called from the scene's update loop.
+   * @param {number} time
+   */
+  update(time) {
+    const pending = this.pendingCast;
+    if (!pending) return;
+
+    const target = this.enemyManager
+      .getAlive()
+      .find((wolf) => wolf.id === pending.targetId);
+    if (!target) {
+      this.cancelPendingCast();
+      this.ui.addLog("Mục tiêu đã biến mất.");
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance <= this.skillReach(pending.skill)) {
+      this.pendingCast = null;
+      this.player.stopMovement?.();
+      this.executeSkill(pending.skill, target);
+      return;
+    }
+
+    // Re-issue the move every 400ms so a moving target is still chased.
+    if (!this.lastChaseAt || time - this.lastChaseAt > 400) {
+      this.lastChaseAt = time;
+      this.player.moveTo(target.x, target.y);
+    }
+  }
+
+  /**
+   * Cancel a pending approach (left-click movement, joystick, skill change).
+   */
+  cancelPendingCast() {
+    if (!this.pendingCast) return;
+    this.pendingCast = null;
+    this.player.stopMovement?.();
+  }
+
+  /**
+   * Resolve a cast against the world: self buffs/heals, or damage and control on
+   * the nearest enemy / an area around the hero.
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySkill(skill, now, preferredTarget = null) {
+    if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
+      playSkillCastVfx(this.scene, this.player, skill);
+      this.applySelfEffects(skill, now);
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} đã thi triển.`);
+      return;
+    }
+
+    const targets = skill.radius > 0
+      ? this.resolveTargets(skill)
+      : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill));
+    const primary = targets[0] || null;
+    this.aimAt(primary);
+    playSkillCastVfx(this.scene, this.player, skill, primary);
+    if (skill.radius > 0) {
+      playRangeIndicator(this.scene, this.player.x, this.player.y, skill.radius, skill.vfx?.color);
+    }
+
+    if (!targets.length) {
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tung ra, nhưng không trúng kẻ địch.`);
+      return;
+    }
+
+    const attacker = applyBuffsToStats(this.player.stats, this.buffs, now);
+    let hits = 0;
+    let anyCrit = false;
+
+    for (const wolf of targets) {
+      playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
+      const result = computeSkillDamage(skill, attacker, wolf, Math.random);
+      if (result.damage > 0) {
+        if (result.crit) anyCrit = true;
+        this.damageEnemy(wolf, result.damage, result.crit, { skill: skill.id });
+        hits++;
+      }
+      this.applySkillEffectsToEnemy(wolf, skill, now);
+    }
+
+    const critText = anyCrit ? " (Chí mạng!)" : "";
+    this.ui.addLog(
+      `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!${critText}`
+    );
+  }
+
+  /**
+   * Enemies this cast can hit: everything inside the AoE radius, or the nearest
+   * enemy inside the single-target range. Extracted so aiming and hit resolution
+   * use exactly the same target set.
+   * @param {Object} skill
+   * @returns {Object[]}
+   */
+  resolveTargets(skill) {
+    const alive = this.enemyManager.getAlive();
+    const distanceTo = (wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
+
+    if (skill.radius > 0) {
+      return alive
+        .filter((wolf) => distanceTo(wolf) <= skill.radius)
+        .sort((a, b) => distanceTo(a) - distanceTo(b));
+    }
+
+    const nearest = alive
+      .filter((wolf) => distanceTo(wolf) <= skill.range)
+      .sort((a, b) => distanceTo(a) - distanceTo(b))[0];
+    return nearest ? [nearest] : [];
+  }
+
+  /**
+   * Turn the hero toward the primary target so the cast VFX and attack motion
+   * visibly point at whoever is about to be hit.
+   * @param {Object|null} target
+   */
+  aimAt(target) {
+    if (!target) return;
+    const from = toIso(this.player.x, this.player.y);
+    const to = toIso(target.x, target.y);
+    const direction = directionFromVelocity(to.x - from.x, to.y - from.y);
+    this.player.faceDirection?.(direction);
+  }
+
+  /**
+   * Apply a skill's timed effects to the caster (buff, heal).
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySelfEffects(skill, now) {
+    for (const effect of skill.effects || []) {
+      if (effect.kind === "buff") {
+        this.buffs.push({
+          stat: effect.stat,
+          amount: effect.amount,
+          until: now + effect.duration
+        });
+      } else if (effect.kind === "heal") {
+        const amount = Math.round((effect.amount || 0) + (this.player.stats.maxHp * (effect.pctMaxHp || 0)));
+        if (amount > 0) {
+          if (this.scene.networkClient?.isConnected) {
+            this.scene.networkClient.sendHeal({ amount });
+          } else {
+            this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a skill's timed effects to a struck enemy (slow, stun).
+   * @param {Object} wolf
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySkillEffectsToEnemy(wolf, skill, now) {
+    for (const effect of skill.effects || []) {
+      if (effect.kind === "slow") {
+        wolf.slowPct = effect.pct;
+        wolf.slowUntil = now + effect.duration;
+      } else if (effect.kind === "stun") {
+        wolf.stunUntil = now + effect.duration;
+      }
+    }
+  }
+
+  /**
+   * Strike another player. Both fighters must fly the PK flag. The damage is
+   * computed here as an optimistic estimate, but the server re-validates it and
+   * applies it to the target's authoritative HP — this client only reports intent.
+   * @param {import("./remotePlayer.js").RemotePlayer} target
+   */
+  performPvpAttack(target) {
+    if (!this.attackReady) return;
+    if (!this.scene.networkClient?.isConnected) {
+      this.ui.addLog("Cần kết nối máy chủ để tỷ thí cùng cao thủ.");
+      return;
+    }
+
+    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
+    const defender = { id: target?.id, pkFlag: target?.pkFlag === true };
+    const distance = target
+      ? Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y)
+      : Number.NaN;
+
+    if (!canPvpAttack(attacker, defender, distance)) {
+      this.ui.addLog(
+        this.player.pkFlag === true
+          ? `${target?.displayName || "Đối thủ"} chưa bật cờ PK.`
+          : "Hãy bật cờ PK trước khi tấn công người chơi khác."
+      );
+      return;
+    }
+
+    this.attackReady = false;
+    this.scene.time.delayedCall(330, () => {
+      this.attackReady = true;
+    });
+
+    this.player.playAttackMotion?.();
+    playTone(300, 0.07, "sawtooth", 0.022);
+
+    const facingRight = target.x >= this.player.x;
+    const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.player.x, this.player.y);
+
+    this.scene.networkClient?.sendAttack?.({
+      skill: "normal",
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      facingRight
+    });
+
+    const slash = this.scene.add
+      .arc(
+        base.x + slashOffsetX,
+        base.y - 7,
+        34,
+        facingRight ? -70 : 110,
+        facingRight ? 70 : 250,
+        false,
+        0xe9d59c,
+        0.9
+      )
+      .setStrokeStyle(5, 0xf2e3bd, 0.95)
+      .setDepth(isoDepth(this.player.x, this.player.y) + 10);
+
+    this.scene.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.4,
+      duration: 190,
+      onComplete: () => slash.destroy()
+    });
+
+    const result = computeDamage(this.player, target, Math.random);
+    this.scene.networkClient?.sendPlayerHit?.({
+      targetId: target.id,
+      damage: result.damage
+    });
+
+    // Optimistic feedback; the authoritative HP arrives back from the server.
+    this.showFloatText(
+      target.x,
+      target.y - 30,
+      result.crit ? `-${result.damage} BẠO KÍCH!` : `-${result.damage}`,
+      result.crit ? "#ffcc00" : "#ffb49a"
+    );
+    this.ui.addLog(
+      `${result.crit ? "Chí mạng! " : ""}Kiếm chiêu chém tới ${target.displayName || "đối thủ"}!`
+    );
+  }
+
+  damageEnemy(wolf, damage, isCrit = false, meta = {}) {
     if (wolf.isDead) return;
 
     wolf.takeHit(damage);
-    this.showFloatText(wolf.x, wolf.y - 30, `-${damage}`, "#ffb49a");
-    playTone(120, 0.06, "square", 0.012);
+    const floatText = isCrit ? `-${damage} BẠO KÍCH!` : `-${damage}`;
+    const floatColor = isCrit ? "#ffcc00" : "#ffb49a";
+    this.showFloatText(wolf.x, wolf.y - 30, floatText, floatColor);
+    playTone(isCrit ? 180 : 120, 0.06, "square", isCrit ? 0.025 : 0.012);
+
+    const skill = meta.skill ? skillById(meta.skill) : null;
+    if (skill) playSkillImpactVfx(this.scene, wolf.x, wolf.y, skill);
+
+    // The server owns the wolf's health: a skill hit names the skill so the server
+    // can recompute the damage itself; a plain attack still reports its estimate.
+    this.scene.networkClient?.sendEnemyHit?.({
+      id: wolf.id,
+      damage,
+      ...(meta.skill ? { skill: meta.skill } : {})
+    });
 
     if (wolf.hp <= 0) {
       this.handleWolfKill(wolf);
@@ -174,107 +703,173 @@ export class CombatSystem {
   handleWolfKill(wolf) {
     wolf.die();
 
-    const coinsGained = Phaser.Math.Between(3, 9);
-    this.player.stats.kills++;
-    this.player.stats.coins += coinsGained;
-    this.player.stats.exp += 35;
-
-    this.ui.addLog(`Đánh bại Sói Xám! +35 EXP, nhận được ${coinsGained} bạc.`);
-    this.showFloatText(wolf.x, wolf.y - 25, "+35 EXP", "#f3d17f");
-
-    this.spawnDrop(
-      wolf.x + Phaser.Math.Between(-20, 20),
-      wolf.y + Phaser.Math.Between(-10, 10)
-    );
-
-    this.checkLevelUp();
-    this.ui.updateHud(this.player.stats);
-    if (typeof this.onStateChange === "function") {
-      this.onStateChange();
+    // Online, enemy health and the reward are server-owned: the server rolls the
+    // payout and broadcasts `enemy_reward` + an authoritative `player_progress`.
+    if (this.usesServerRewards()) {
+      this.ui.addLog("Đánh bại Sói Xám!");
+      return;
     }
 
-    // Check quest progress after a brief interval
-    this.scene.time.delayedCall(650, () => {
-      this.ui.updateQuest(this.player.stats, () => this.handleQuestReward());
-    });
+    // Offline (no server connection) progression is frozen: the kill plays out,
+    // but the client never mints coins/EXP of its own.
+    const reward = rollKillReward(Math.random);
+    this.spawnDrop(
+      wolf.x + Phaser.Math.Between(-20, 20),
+      wolf.y + Phaser.Math.Between(-10, 10),
+      reward.drop
+    );
+    this.ui.addLog("Đánh bại Sói Xám! (ngoại tuyến — không nhận tiến trình)");
 
-    // Schedule enemy revive
+    // Schedule enemy revive (the server drives respawn while connected)
     this.scene.time.delayedCall(10000, () => {
       wolf.revive();
     });
   }
 
-  handleQuestReward() {
-    this.player.stats.exp += 50;
-    this.player.stats.coins += 20;
-    this.checkLevelUp();
-    this.ui.addLog("Nhiệm vụ hoàn thành! Thưởng thêm 50 EXP và 20 bạc.");
-    this.ui.updateHud(this.player.stats);
-    if (typeof this.onStateChange === "function") {
-      this.onStateChange();
-    }
-  }
+  /**
+   * Render the authoritative reward the server rolled for a defeated enemy. The
+   * payout itself is not applied here — the server credits the killer's ledger and
+   * sends a `player_progress` update, which applyServerProgress() mirrors.
+   * @param {Object} payload - `enemy_reward` payload
+   */
+  applyServerReward(payload) {
+    const reward = parseEnemyReward(payload);
+    if (!reward) return;
 
-  damagePlayer(amount) {
-    if (this.player.invulnerable) return;
+    const x = reward.x ?? this.player.x;
+    const y = reward.y ?? this.player.y;
+    const killedByMe = this.isLocalKiller(reward.attackerId);
 
-    this.player.stats.hp = Math.max(0, this.player.stats.hp - amount);
-    this.player.invulnerable = true;
-    this.player.visual.setAlpha(0.45);
-
-    this.scene.time.delayedCall(700, () => {
-      this.player.invulnerable = false;
-      this.player.visual.setAlpha(1);
-    });
-
-    this.ui.addLog(`Bị Sói Xám cắn! -${amount} HP.`);
-
-    if (this.player.stats.hp <= 0) {
-      this.player.stats.hp = this.player.stats.maxHp;
-      this.player.stats.mp = Math.max(20, this.player.stats.mp);
-      this.player.respawn();
-      this.ui.addLog("Bạn được đưa về điểm hồi sinh tại Trường An.");
+    if (reward.drop) {
+      // Every client renders the kill's loot, but only the attributed killer may
+      // pick it up, so bystanders cannot duplicate the reward
+      this.spawnDrop(x, y, reward.drop, { collectable: killedByMe });
     }
 
-    this.ui.updateHud(this.player.stats);
+    if (!killedByMe) return;
+
+    this.ui.addLog(`Đánh bại Sói Xám! +${reward.exp} EXP`);
+    this.showFloatText(x, y - 25, `+${reward.exp} EXP`, "#f3d17f");
   }
 
-  checkLevelUp() {
-    let leveledUp = false;
-    while (this.player.stats.exp >= this.player.stats.nextExp) {
-      this.player.stats.exp -= this.player.stats.nextExp;
-      this.player.stats.level++;
-      this.player.stats.nextExp = Math.floor(this.player.stats.nextExp * 1.45);
-      this.player.stats.maxHp += 20;
-      this.player.stats.maxMp += 10;
-      this.player.stats.hp = this.player.stats.maxHp;
-      this.player.stats.mp = this.player.stats.maxMp;
-      leveledUp = true;
+  /**
+   * Mirror the server-owned progression ledger onto the local stats. The client
+   * never adds coins/EXP/level itself — it only renders what the server sends and
+   * reacts to a level-up for feedback.
+   * @param {{level:number, exp:number, nextExp?:number, coins:number, kills:number, maxHp?:number, maxMp?:number, levelUps?:number}} progress
+   */
+  applyServerProgress(progress) {
+    if (!progress) return;
+    const stats = this.player.stats;
+    const prevLevel = stats.level;
 
-      this.ui.addLog(
-        `Chúc mừng! Bạn đã lên cấp ${this.player.stats.level}. HP/MP được hồi đầy.`
-      );
+    stats.level = toStat(progress.level, stats.level);
+    stats.exp = toStat(progress.exp, stats.exp);
+    stats.coins = toStat(progress.coins, stats.coins);
+    stats.kills = toStat(progress.kills, stats.kills);
+    if (progress.nextExp !== undefined) stats.nextExp = toStat(progress.nextExp, stats.nextExp);
+    if (progress.maxHp !== undefined) stats.maxHp = toStat(progress.maxHp, stats.maxHp);
+    if (progress.maxMp !== undefined) stats.maxMp = toStat(progress.maxMp, stats.maxMp);
+
+    stats.hp = Math.min(stats.hp, stats.maxHp);
+    stats.mp = Math.min(stats.mp, stats.maxMp);
+
+    // The server remembers whether the one-off quest reward was already paid, so
+    // the client can never offer it a second time.
+    if (progress.questRewarded !== undefined) {
+      this.ui.setQuestRewarded?.(Boolean(progress.questRewarded));
+    }
+
+    if (stats.level > prevLevel) {
+      // The server also heals/refills and streams the new HP/MP; mirror it for a
+      // snappy HUD before those packets land.
+      stats.hp = stats.maxHp;
+      stats.mp = stats.maxMp;
+      this.ui.addLog(`Chúc mừng! Bạn đã lên cấp ${stats.level}. HP/MP được hồi đầy.`);
       playTone(660, 0.2, "triangle", 0.04);
       this.showFloatText(this.player.x, this.player.y - 70, "LÊN CẤP!", "#ffe7a0");
     }
 
-    if (leveledUp) {
-      this.ui.updateHud(this.player.stats);
-      if (typeof this.onStateChange === "function") {
-        this.onStateChange();
-      }
+    this.ui.updateHud(stats);
+    if (typeof this.onStateChange === "function") {
+      this.onStateChange();
     }
+
+    // Quest completion is detected client-side from the kill count, but the
+    // payout is claimed from the server.
+    this.scene.time.delayedCall(650, () => {
+      this.ui.updateQuest(stats, () => this.handleQuestReward());
+    });
   }
 
-  spawnDrop(x, y) {
+  /**
+   * True while a multiplayer connection owns enemy state; the reward then comes
+   * from the server instead of a local roll.
+   * @returns {boolean}
+   */
+  usesServerRewards() {
+    return this.scene?.networkClient?.isConnected === true;
+  }
+
+  /**
+   * @param {string|null} playerId
+   */
+  setLocalPlayerId(playerId) {
+    this.localPlayerId = playerId;
+  }
+
+  /**
+   * @param {string|null} attackerId
+   * @returns {boolean} whether the server attributed the kill to this client
+   */
+  isLocalKiller(attackerId) {
+    return Boolean(this.localPlayerId) && attackerId === this.localPlayerId;
+  }
+
+  /**
+   * The quest payout is server-owned: ask the server to grant it (idempotent via
+   * the persisted `quest_rewarded` flag). Offline, nothing is paid. The resulting
+   * `player_progress` arrives through applyServerProgress().
+   */
+  handleQuestReward() {
+    if (this.usesServerRewards()) {
+      this.scene.networkClient?.sendQuestClaim?.();
+    }
+    this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
+  }
+
+  /**
+   * Spawn a collectable drop. Without an explicit entry the loot is rolled
+   * locally (offline play); while connected the server supplies the entry so
+   * every client renders the same item.
+   * @param {number} x
+   * @param {number} y
+   * @param {?{id:string, qty:number}} [loot]
+   * @param {{collectable?:boolean}} [options] - `collectable: false` renders loot
+   *   owned by another player, which only shows up in the world
+   */
+  spawnDrop(x, y, loot = null, { collectable = true } = {}) {
+    const rolled = loot || rollDrop();
+    const dropEntry = DROP_TABLE.find((entry) => entry.id === rolled.id);
+
     const drop = {
       x,
       y,
       phase: Math.random() * 6,
-      active: true
+      active: true,
+      collectable,
+      itemId: rolled.id,
+      qty: rolled.qty ?? dropEntry?.qty ?? 1,
+      name: dropEntry ? dropEntry.name : rolled.id,
+      // Someone else's loot can never be picked up, so it fades instead of littering
+      expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
     };
 
-    drop.visual = this.scene.add.container(x, y).setDepth(y + 5);
+    const dropIso = toIso(x, y);
+    drop.visual = this.scene.add.container(dropIso.x, dropIso.y).setDepth(isoDepth(x, y) + 5);
+    if (!collectable) {
+      drop.visual.setAlpha(0.55);
+    }
     drop.visual.add(this.scene.add.circle(0, 0, 13, 0xe9bd59, 0.12));
     drop.visual.add(
       this.scene.add
@@ -287,13 +882,21 @@ export class CombatSystem {
   }
 
   updateDrops(time) {
+    if (this.drops.length > MAX_DROPS) {
+      this.drops = this.drops.filter((drop) => drop.active).slice(-MAX_DROPS);
+    }
+
     this.drops.forEach((drop) => {
       if (!drop.active) return;
 
-      drop.visual.setPosition(
-        drop.x,
-        drop.y + Math.sin(time / 180 + drop.phase) * 4
-      );
+      if (!drop.collectable && time >= drop.expiresAt) {
+        drop.active = false;
+        drop.visual.destroy();
+        return;
+      }
+
+      const dropIso = toIso(drop.x, drop.y + Math.sin(time / 180 + drop.phase) * 4);
+      drop.visual.setPosition(dropIso.x, dropIso.y);
 
       if (
         Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38
@@ -304,26 +907,33 @@ export class CombatSystem {
   }
 
   collectDrop(drop) {
-    if (!drop.active) return;
+    if (!drop.active || !drop.collectable) return;
     drop.active = false;
     drop.visual.destroy();
 
-    this.player.stats.coins += 5;
+    // Coins are server-owned, so a pickup grants no bạc on the client. MP is
+    // server-owned too: predict locally and mirror the restore into the pool.
     this.player.stats.mp = Math.min(
       this.player.stats.maxMp,
       this.player.stats.mp + 5
     );
+    this.scene.networkClient?.sendRestoreMp?.({ amount: 5 });
 
-    this.ui.addLog("Nhặt được Túi Bạc: +5 bạc, +5 nội lực.");
+    addQuantity(drop.itemId, drop.qty);
+
+    const dropName = drop.name || drop.itemId;
+    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 nội lực.`);
     this.ui.updateHud(this.player.stats);
+    this.ui.updateInventory();
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
     }
   }
 
   showFloatText(x, y, text, color) {
+    const base = toIso(x, y);
     const label = this.scene.add
-      .text(x, y, text, {
+      .text(base.x, base.y, text, {
         fontFamily: "Arial",
         fontSize: "14px",
         fontStyle: "bold",
@@ -336,7 +946,7 @@ export class CombatSystem {
 
     this.scene.tweens.add({
       targets: label,
-      y: y - 35,
+      y: base.y - 35,
       alpha: 0,
       duration: 800,
       onComplete: () => label.destroy()

@@ -1,18 +1,66 @@
 import { bridge, EVENTS } from "./bridge.js";
+import { applyQuantities, getQuantities } from "./items.js";
+import {
+  CITY_AVENUES,
+  CITY_BUILDINGS,
+  CITY_HOUSES,
+  CITY_PAGODAS,
+  CITY_PLAZA,
+  CITY_TREES,
+  WORLD_TILE
+} from "./worldConfig.js";
+
+/** Local radar view width, in ground tiles (enlarged view shows more tiles). */
+const MINIMAP_TILES = 20;
+const MINIMAP_ZOOM_TILES = 50;
 
 export class UIBridgeAdapter {
   constructor() {
     this.questRewarded = false;
     this.minimapCanvas = null;
     this.minimapCtx = null;
+    this.cityMapCanvas = null;
+    this.cityMapCtx = null;
     this.coordsElement = null;
 
     // Listen for canvas attachment from React Minimap component
-    this.unsubMinimap = bridge.on(EVENTS.ACTION_REGISTER_MINIMAP, ({ canvas, coordsEl }) => {
-      this.minimapCanvas = canvas;
-      this.minimapCtx = canvas ? canvas.getContext("2d") : null;
-      this.coordsElement = coordsEl;
+    this.unsubMinimap = bridge.on(EVENTS.ACTION_REGISTER_MINIMAP, (registration) => {
+      this.attachMinimap(registration);
     });
+
+    // The full-city map modal mounts independently of the scene.
+    this.unsubCityMap = bridge.on(EVENTS.ACTION_REGISTER_CITY_MAP, (registration) => {
+      this.attachCityMap(registration);
+    });
+
+    // React effects run before Phaser's first frame, so the panels may have
+    // already fired their one-shot registration before this adapter existed and
+    // the event was dropped. Ask any mounted panel to (re)send its canvas.
+    bridge.emit(EVENTS.ACTION_REQUEST_MINIMAP);
+    bridge.emit(EVENTS.ACTION_REQUEST_CITY_MAP);
+  }
+
+  /**
+   * Bind the React minimap canvas/coords nodes for drawing.
+   * @param {{canvas?: HTMLCanvasElement, coordsEl?: HTMLElement}|null} registration
+   */
+  attachMinimap(registration) {
+    const canvas = registration?.canvas;
+    this.minimapCanvas = canvas || null;
+    this.minimapCtx = canvas ? canvas.getContext("2d") : null;
+    this.coordsElement = registration?.coordsEl || null;
+    // Enlarged radar (Tab) also shows twice the local view distance.
+    this.minimapZoomed = !!registration?.zoomed;
+  }
+
+  /**
+   * Bind the full-city map modal canvas.
+   * @param {{canvas?: HTMLCanvasElement}|null} registration
+   */
+  attachCityMap(registration) {
+    const canvas = registration?.canvas;
+    this.cityMapCanvas = canvas || null;
+    this.cityMapCtx = canvas ? canvas.getContext("2d") : null;
   }
 
   setQuestRewarded(rewarded) {
@@ -30,6 +78,16 @@ export class UIBridgeAdapter {
   updateHud(stats) {
     if (!stats) return;
     bridge.emit(EVENTS.STATS_UPDATED, { ...stats });
+  }
+
+  /**
+   * Push the current bag to the React HUD so hotbar / inventory quantities stay
+   * live after a use or a loot pickup (the HUD otherwise holds a mount snapshot).
+   * @param {Record<string, number>} [quantities] - Defaults to the shared store
+   */
+  updateInventory(quantities) {
+    const { quickItems, inventoryItems } = applyQuantities(quantities || getQuantities());
+    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems });
   }
 
   updateQuest(stats, onQuestComplete) {
@@ -55,77 +113,46 @@ export class UIBridgeAdapter {
     bridge.emit(EVENTS.AUDIO_CHANGED, isEnabled);
   }
 
-  drawMinimap(player, enemies, worldConfig) {
+  drawMinimap(player, enemies, worldConfig, remotePlayers = []) {
     if (!this.minimapCtx || !player || !worldConfig) return;
 
-    const ctx = this.minimapCtx;
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
 
-    const scaleX = w / worldConfig.width;
-    const scaleY = h / worldConfig.height;
-
-    // Background terrain (Dark ancient earth)
-    ctx.fillStyle = "#1e3324";
-    ctx.fillRect(0, 0, w, h);
-
-    // Stone road (Central crossway)
-    ctx.fillStyle = "#5c5344";
-    ctx.fillRect(0, 510 * scaleY, w, 210 * scaleY);
-
-    // River stream
-    ctx.fillStyle = "#2c5b66";
-    ctx.beginPath();
-    ctx.moveTo(0, 925 * scaleY);
-    ctx.lineTo(w * 0.3, 910 * scaleY);
-    ctx.lineTo(w * 0.6, 950 * scaleY);
-    ctx.lineTo(w, 960 * scaleY);
-    ctx.lineTo(w, 1080 * scaleY);
-    ctx.lineTo(0, 1080 * scaleY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Buildings footprint (Brown rectangles)
-    ctx.fillStyle = "#4a3c2e";
-    // Inn (Khách Sạn)
-    ctx.fillRect(260 * scaleX, 280 * scaleY, 220 * scaleX, 150 * scaleY);
-    // Martial Academy (Võ Quán)
-    ctx.fillRect(1510 * scaleX, 260 * scaleY, 230 * scaleX, 160 * scaleY);
-    // Apothecary (Dược Điếm)
-    ctx.fillRect(900 * scaleX, 220 * scaleY, 180 * scaleX, 130 * scaleY);
-
-    // Enemies (Red radar blips)
-    if (enemies && enemies.length) {
-      enemies.forEach((wolf) => {
-        if (!wolf.active || wolf.isDead) return;
-        const ex = wolf.x * scaleX;
-        const ey = wolf.y * scaleY;
-
-        ctx.fillStyle = "#ff4d4f";
-        ctx.beginPath();
-        ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
+    // The minimap is a local radar: it follows the player and shows a fixed
+    // number of ground tiles around them, so Biện Kinh feels as large as the
+    // classic VLTK2 maps. Without city bounds (tests/other regions) it shows
+    // the whole world instead.
+    const city = worldConfig.cityBounds || {
+      x0: 0,
+      y0: 0,
+      x1: worldConfig.width,
+      y1: worldConfig.height
+    };
+    let view;
+    if (worldConfig.cityBounds) {
+      // Measured in ground tiles (not a share of the city) and shaped to the
+      // canvas so the view stays undistorted. The enlarged minimap (Tab) simply
+      // shows more tiles.
+      const spanX = (this.minimapZoomed ? MINIMAP_ZOOM_TILES : MINIMAP_TILES) * WORLD_TILE;
+      const spanY = spanX * (h / w);
+      view = {
+        x0: player.x - spanX / 2,
+        y0: player.y - spanY / 2,
+        x1: player.x + spanX / 2,
+        y1: player.y + spanY / 2
+      };
+    } else {
+      view = { x0: 0, y0: 0, x1: worldConfig.width, y1: worldConfig.height };
     }
 
-    // Player position (Golden yellow glowing beacon)
-    const px = player.x * scaleX;
-    const py = player.y * scaleY;
-
-    // Player sight radius
-    ctx.fillStyle = "rgba(255, 215, 0, 0.18)";
-    ctx.beginPath();
-    ctx.arc(px, py, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Player center dot
-    ctx.fillStyle = "#ffdd59";
-    ctx.beginPath();
-    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    this.drawMap(this.minimapCtx, this.minimapCanvas, {
+      view,
+      city,
+      player,
+      enemies,
+      remotePlayers
+    });
 
     // Direct DOM text update for 60fps performance without triggering React re-renders
     if (this.coordsElement) {
@@ -133,9 +160,202 @@ export class UIBridgeAdapter {
     }
   }
 
+  /**
+   * Draw the entire walled city (the M shortcut map) into the modal canvas.
+   * @param {object} player
+   * @param {Array<object>} [enemies]
+   * @param {{cityBounds?: object}} worldConfig
+   * @param {Array<object>} [remotePlayers]
+   */
+  drawCityMap(player, enemies, worldConfig, remotePlayers = []) {
+    if (!this.cityMapCtx || !player || !worldConfig?.cityBounds) return;
+
+    const city = worldConfig.cityBounds;
+    const padX = (city.x1 - city.x0) * 0.02;
+    const padY = (city.y1 - city.y0) * 0.02;
+    const view = {
+      x0: city.x0 - padX,
+      y0: city.y0 - padY,
+      x1: city.x1 + padX,
+      y1: city.y1 + padY
+    };
+
+    this.drawMap(this.cityMapCtx, this.cityMapCanvas, {
+      view,
+      city,
+      player,
+      enemies,
+      remotePlayers
+    });
+  }
+
+  /**
+   * Render one map view (terrain, walls, buildings, blips) into a canvas.
+   * Shared by the local radar and the full-city modal.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {HTMLCanvasElement} canvas
+   * @param {{view: object, city: object, player: object, enemies: Array<object>, remotePlayers: Array<object>}} frame
+   */
+  drawMap(ctx, canvas, { view, city, player, enemies, remotePlayers }) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const scaleX = w / (view.x1 - view.x0);
+    const scaleY = h / (view.y1 - view.y0);
+    const mapX = (gx) => (gx - view.x0) * scaleX;
+    const mapY = (gy) => (gy - view.y0) * scaleY;
+    // Marker sizes track the canvas resolution so the full-city modal stays legible.
+    const mark = Math.max(1, w / 220);
+
+    const cityX = mapX(city.x0);
+    const cityY = mapY(city.y0);
+    const cityW = (city.x1 - city.x0) * scaleX;
+    const cityH = (city.y1 - city.y0) * scaleY;
+
+    // 1. Forest ring around the ramparts
+    ctx.fillStyle = "#1e3324";
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Inner city stone ground
+    ctx.fillStyle = "#4a4237";
+    ctx.fillRect(cityX, cityY, cityW, cityH);
+
+    // 3. Paving grid (subtle texture, mirrors the 76-unit floor tiles)
+    ctx.strokeStyle = "rgba(184, 176, 161, 0.22)";
+    ctx.lineWidth = Math.max(0.5, 0.5 * mark);
+    ctx.beginPath();
+    for (let gx = city.x0; gx <= city.x1; gx += 152) {
+      ctx.moveTo(mapX(gx), cityY);
+      ctx.lineTo(mapX(gx), cityY + cityH);
+    }
+    for (let gy = city.y0; gy <= city.y1; gy += 152) {
+      ctx.moveTo(cityX, mapY(gy));
+      ctx.lineTo(cityX + cityW, mapY(gy));
+    }
+    ctx.stroke();
+
+    // 4. Paved avenues
+    const avenueH = CITY_AVENUES.horizontal;
+    const avenueV = CITY_AVENUES.vertical;
+    ctx.fillStyle = "rgba(105, 95, 78, 0.85)";
+    ctx.fillRect(mapX(city.x0), mapY(avenueH.y), cityW, avenueH.height * scaleY);
+    ctx.fillRect(mapX(avenueV.x), mapY(city.y0), avenueV.width * scaleX, cityH);
+
+    // 5. Central plaza
+    ctx.fillStyle = "#e6dfd0";
+    ctx.fillRect(mapX(CITY_PLAZA.x), mapY(CITY_PLAZA.y), CITY_PLAZA.w * scaleX, CITY_PLAZA.h * scaleY);
+
+    // 6. City walls outline
+    ctx.strokeStyle = "#80735a";
+    ctx.lineWidth = Math.max(1.5, 0.7 * mark);
+    ctx.beginPath();
+    ctx.moveTo(cityX, cityY);
+    ctx.lineTo(cityX + cityW, cityY);
+    ctx.lineTo(cityX + cityW, cityY + cityH);
+    ctx.lineTo(cityX, cityY + cityH);
+    ctx.closePath();
+    ctx.stroke();
+
+    // 7. Residential blocks (blue-tiled roofs)
+    ctx.fillStyle = "#3a5157";
+    CITY_HOUSES.forEach(({ x, y, w: bw, d: bh }) => {
+      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
+    });
+
+    // 8. Landmark buildings (shared with the Phaser scene)
+    ctx.fillStyle = "#33261c";
+    CITY_BUILDINGS.forEach(({ x, y, w: bw, d: bh }) => {
+      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
+    });
+
+    // 9. Pagodas
+    ctx.fillStyle = "#ffdd59";
+    CITY_PAGODAS.forEach(({ cx, cy }) => {
+      ctx.beginPath();
+      ctx.arc(mapX(cx), mapY(cy), 3.5 * mark, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // 10. Trees
+    ctx.fillStyle = "#3c7347";
+    CITY_TREES.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(mapX(x), mapY(y), 1.6 * mark, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // 11. Vạn Sự Thông Pavilion (green point)
+    const pavilion = CITY_BUILDINGS.find((building) => building.id === "pavilion");
+    if (pavilion) {
+      ctx.fillStyle = "#22c55e";
+      ctx.beginPath();
+      ctx.arc(
+        mapX(pavilion.x + pavilion.w / 2),
+        mapY(pavilion.y + pavilion.d / 2),
+        3.5 * mark,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+
+    // Enemies (Red radar blips)
+    if (enemies && enemies.length) {
+      enemies.forEach((wolf) => {
+        if (!wolf.active || wolf.isDead) return;
+        ctx.fillStyle = "#ff4d4f";
+        ctx.beginPath();
+        ctx.arc(mapX(wolf.x), mapY(wolf.y), 2.5 * mark, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Remote Players (Cyan radar blips)
+    if (remotePlayers && remotePlayers.length) {
+      remotePlayers.forEach((rp) => {
+        // A RemotePlayer renders through `container` (it has no physics `sprite`);
+        // a destroyed one has already nulled it.
+        if (!rp.container || !rp.container.active) return;
+        const rx = mapX(rp.x);
+        const ry = mapY(rp.y);
+
+        ctx.fillStyle = "rgba(0, 210, 211, 0.25)";
+        ctx.beginPath();
+        ctx.arc(rx, ry, 6 * mark, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#00d2d3";
+        ctx.beginPath();
+        ctx.arc(rx, ry, 3 * mark, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    // Player position (Golden yellow glowing beacon)
+    const px = mapX(player.x);
+    const py = mapY(player.y);
+
+    // Player sight radius
+    ctx.fillStyle = "rgba(255, 215, 0, 0.18)";
+    ctx.beginPath();
+    ctx.arc(px, py, 10 * mark, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Player center dot
+    ctx.fillStyle = "#ffdd59";
+    ctx.beginPath();
+    ctx.arc(px, py, 3.5 * mark, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = Math.max(1, 0.5 * mark);
+    ctx.stroke();
+  }
+
   destroy() {
     if (this.unsubMinimap) {
       this.unsubMinimap();
+    }
+    if (this.unsubCityMap) {
+      this.unsubCityMap();
     }
   }
 }

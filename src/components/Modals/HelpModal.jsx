@@ -1,7 +1,11 @@
 import React from "react";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 export function HelpModal({ isOpen, onClose, onReset }) {
+  const { t } = useI18n();
   if (!isOpen) return null;
+
+  const potionLines = t("help.potions").split("\n");
 
   return (
     <div id="help-modal" className="overlay">
@@ -9,39 +13,30 @@ export function HelpModal({ isOpen, onClose, onReset }) {
         <button id="close-help" className="modal-close-x" onClick={onClose}>
           ×
         </button>
-        <div className="modal-eyebrow">CẨM NANG HÀNH TẨU</div>
-        <h2>Hướng Dẫn Tân Thủ</h2>
+        <div className="modal-eyebrow">{t("help.eyebrow")}</div>
+        <h2>{t("help.title")}</h2>
         <div className="guide-scroll">
+          <p>{t("help.move")}</p>
+          <p>{t("help.combat")}</p>
+          <p>{t("help.skill")}</p>
           <p>
-            <b>Di chuyển:</b> Nhấp <b>chuột trái</b> vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng phím <b>W, A, S, D / phím mũi tên</b>.
+            {potionLines.map((line, index) => (
+              <React.Fragment key={index}>
+                {line}
+                {index < potionLines.length - 1 && <br />}
+              </React.Fragment>
+            ))}
           </p>
-          <p>
-            <b>Chiến đấu:</b> Nhấn <b>Space</b> để xuất chiêu, hoặc nhấp chuột trái trực tiếp vào quái vật để tấn công.
-          </p>
-          <p>
-            <b>Tuyệt kỹ Kiếm Khí:</b> Nhấn phím <b>Q</b> hoặc <b>Phím 8</b>, phát kình khí diện rộng (tiêu hao 15 MP).
-          </p>
-          <p>
-            <b>Dược phẩm cấp tốc:</b>
-            <br />• Phím <b>1</b>: Uống Kim Sáng Dược (+35 HP).
-            <br />• Phím <b>2</b>: Uống Đại Hoàn Đan (+25 MP).
-            <br />• Phím <b>3</b>: Uống Nữ Nhi Hồng (+50 HP & +30 MP).
-          </p>
-          <p>
-            <b>Túi đồ & Tiền bạc:</b> Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.
-          </p>
-          <p>
-            <b>Lưu tiến trình:</b> Bấm nút <b>Lưu</b> ở góc dưới hoặc hệ thống tự động lưu mỗi 15 giây.
-          </p>
-          <p>
-            <b>Tạm dừng:</b> Nhấn <b>Esc</b> hoặc mở bảng Hướng Dẫn để tạm dừng game.
-          </p>
+          <p>{t("help.loot")}</p>
+          <p>{t("help.save")}</p>
+          <p>{t("help.map")}</p>
+          <p>{t("help.pause")}</p>
         </div>
         <button id="resume-btn" className="wuxia-btn-primary" onClick={onClose}>
-          ĐÃ THÔNG SUỐT
+          {t("help.resume")}
         </button>
         <button id="reset-btn" className="wuxia-btn-danger" onClick={onReset}>
-          LÀM LẠI TỪ ĐẦU (RESET TIẾN TRÌNH)
+          {t("help.reset")}
         </button>
       </div>
     </div>

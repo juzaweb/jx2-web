@@ -3,6 +3,9 @@
  * The catalog itself is static; stack quantities are persisted via src/game/storage.js.
  */
 
+/** Keys that would poison a plain-object quantity map if copied verbatim. */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
  * Quick-slot consumables bound to hotbar keys 1-4.
  * `useSlot` maps to the slot handled by JiangHuScene.useItem().
@@ -39,7 +42,7 @@ export const QUICK_ITEMS = [
     name: "Hồi Thành Phù",
     icon: "icon-scroll",
     qty: 10,
-    desc: "Phù chú không gian, đưa hành giả trở về cố hương Trường An."
+    desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
   }
 ];
 
@@ -57,21 +60,22 @@ export const INVENTORY_TREASURY = {
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 
 /**
- * 5 columns x 6 rows grid. An entry of `null` renders an empty slot.
- * @type {Array<null | {id:string, name:string, icon:string, qty?:number, desc:string, useSlot?:number}>}
+ * 5-column grid (scrolls when it overflows). An entry of `null` renders an empty
+ * slot. Items tagged with `slot` are equipment and can be worn (see equipment.js).
+ * @type {Array<null | {id:string, name:string, icon:string, qty?:number, slot?:string, bonuses?:Record<string,number>, desc:string, useSlot?:number}>}
  */
 export const INVENTORY_ITEMS = [
   { id: "ho-lo-tuu", name: "Hồ Lô Tửu", icon: "icon-gourd", desc: "Bầu rượu của hành khách, hương thơm nồng đượm." },
   { id: "lenh-bai", name: "Lệnh Bài Môn Phái", icon: "icon-token", desc: "Tín vật Võ Đang, chứng minh thân phận đệ tử." },
-  { id: "thiet-trao", name: "Thiết Trảo", icon: "icon-claw", desc: "Binh khí lợi hại, sử dụng trong cận chiến." },
-  { id: "hac-ung-kiem", name: "Hắc Ưng Kiếm", icon: "icon-jian", desc: "Thanh kiếm huyền thiết, sắc bén vô song." },
+  { id: "thiet-trao", name: "Thiết Trảo", icon: "icon-claw", qty: 1, slot: "weapon", bonuses: { attack: 6 }, desc: "Binh khí lợi hại, sử dụng trong cận chiến." },
+  { id: "hac-ung-kiem", name: "Hắc Ưng Kiếm", icon: "icon-jian", qty: 1, slot: "weapon", bonuses: { attack: 10, critRate: 0.02 }, desc: "Thanh kiếm huyền thiết, sắc bén vô song." },
   kimSangDuoc,
 
   { id: "bi-kip-vo-cong", name: "Bí Kíp Võ Công", icon: "icon-book", qty: 1, desc: "Sách cổ ghi chép tâm pháp luyện công." },
   { id: "thien-ha-mat-tich", name: "Thiên Hà Mật Tịch", icon: "icon-book-red", desc: "Mật tịch thượng thừa của phái Thiên Hà." },
-  { id: "cam-y-bao", name: "Cẩm Y Bào", icon: "icon-armor", desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự." },
-  { id: "thanh-long-dao", name: "Thanh Long Đao", icon: "icon-blade", desc: "Đại đao khắc hình thanh long, uy lực trầm hùng." },
-  { id: "ngoc-bo-dao", name: "Ngọc Bồi Dương Chi", icon: "icon-ring", desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ." },
+  { id: "cam-y-bao", name: "Cẩm Y Bào", icon: "icon-armor", qty: 1, slot: "armor", bonuses: { defense: 8, maxHp: 40 }, desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự." },
+  { id: "thanh-long-dao", name: "Thanh Long Đao", icon: "icon-blade", qty: 1, slot: "weapon", bonuses: { attack: 14 }, desc: "Đại đao khắc hình thanh long, uy lực trầm hùng." },
+  { id: "ngoc-bo-dao", name: "Ngọc Bồi Dương Chi", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { maxMp: 30 }, desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ." },
 
   daiHoanDan,
   nuNhiHong,
@@ -82,21 +86,37 @@ export const INVENTORY_ITEMS = [
   { id: "duoc-vuong-lo", name: "Dược Vương Lộ", icon: "icon-vase", qty: 113, desc: "Linh dịch chữa lành, chiết từ ngàn loại thảo dược." },
   { id: "than-bi-hop", name: "Thần Bí Hộp", icon: "icon-chest", qty: 99, desc: "Bảo hộp chưa mở, bên trong ẩn chứa kỳ vật." },
   { id: "yeu-dan", name: "Yêu Đan", icon: "icon-pills", qty: 473, desc: "Nội đan của yêu thú, tinh túy linh khí." },
-  { id: "huyet-chien-giap", name: "Huyết Chiến Giáp", icon: "icon-armor", desc: "Chiến giáp nhuốm huyết, phòng ngự cực cao." },
+  { id: "huyet-chien-giap", name: "Huyết Chiến Giáp", icon: "icon-armor", qty: 1, slot: "armor", bonuses: { defense: 14, maxHp: 80 }, desc: "Chiến giáp nhuốm huyết, phòng ngự cực cao." },
   { id: "bach-nien-linh-chi", name: "Bách Niên Linh Chi", icon: "icon-herb", qty: 574, desc: "Linh chi trăm năm, đại bổ nguyên khí." },
 
   { id: "tu-kim-ho-lo", name: "Tử Kim Hồ Lô", icon: "icon-gourd", qty: 45, desc: "Hồ lô tử kim, tích linh đan hồi phục." },
   { id: "ngoc-tinh-binh", name: "Ngọc Tịnh Bình", icon: "icon-vase", qty: 485, desc: "Bình ngọc tịnh khí, thanh lọc tâm thần." },
-  { id: "phuong-vu-bao", name: "Phượng Vũ Bào", icon: "icon-crown", desc: "Bào phục thêu lông phượng, tôn quý phi thường." },
-  { id: "phach-dao", name: "Phách Đao", icon: "icon-blade", desc: "Đao nhẹ, tốc độ xuất thủ cực nhanh." },
-  { id: "tu-tinh-nhan", name: "Tứ Tinh Nhẫn", icon: "icon-ring", desc: "Nhẫn khảm bốn viên linh thạch." },
+  { id: "phuong-vu-bao", name: "Phượng Vũ Bào", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 6, maxHp: 25 }, desc: "Bào phục thêu lông phượng, tôn quý phi thường." },
+  { id: "phach-dao", name: "Phách Đao", icon: "icon-blade", qty: 1, slot: "weapon", bonuses: { attack: 16, critRate: 0.03 }, desc: "Đao nhẹ, tốc độ xuất thủ cực nhanh." },
+  { id: "tu-tinh-nhan", name: "Tứ Tinh Nhẫn", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { attack: 4, critRate: 0.02 }, desc: "Nhẫn khảm bốn viên linh thạch." },
 
   { id: "linh-duong", name: "Thịt Rừng", icon: "icon-meat", qty: 3, desc: "Thịt thú tươi, dùng để nấu nướng hồi phục." },
   { id: "tang-kinh-do", name: "Tàng Kinh Đồ", icon: "icon-scroll", qty: 1, desc: "Bản đồ địa đạo bí mật dẫn tới tàng kinh các." },
-  { id: "ngoc-nhan", name: "Ngọc Nhẫn", icon: "icon-ring", desc: "Nhẫn ngọc đơn sơ nhưng ẩn chứa linh khí." },
+  { id: "ngoc-nhan", name: "Ngọc Nhẫn", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { maxHp: 15 }, desc: "Nhẫn ngọc đơn sơ nhưng ẩn chứa linh khí." },
   { id: "hoang-kim-huyen-thiet", name: "Huyền Thiết Kim", icon: "icon-gem", qty: 67, desc: "Kim loại huyền thiết, chế tạo binh khí thượng hạng." },
-  { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." }
+  { id: "huyet-bo-dao", name: "Huyết Bồ Đào", icon: "icon-pills", qty: 13, desc: "Linh dược huyết sắc, hồi phục thương thế." },
+
+  { id: "tu-kim-quan", name: "Tử Kim Quan", icon: "icon-crown", qty: 1, slot: "helmet", bonuses: { defense: 9, accuracy: 30 }, desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác." }
 ];
+
+/**
+ * Look up a catalog item by id across both the quick-slot and grid catalogs.
+ * @param {string} id
+ * @returns {object|null}
+ */
+export function getItemById(id) {
+  if (typeof id !== "string" || id.length === 0) return null;
+  return (
+    QUICK_ITEMS.find((item) => item.id === id) ||
+    INVENTORY_ITEMS.find((item) => item && item.id === id) ||
+    null
+  );
+}
 
 /**
  * Build the default id -> quantity map from the static catalog.
@@ -147,6 +167,176 @@ export function setQuantities(quantities = {}) {
  */
 export function getQuantities() {
   return currentQuantities || defaultQuantities();
+}
+
+/**
+ * Add `amount` to the shared in-memory quantity for `id`, seeding the store from
+ * catalog defaults first when nothing has been loaded yet. Missing ids start at 0.
+ * Invalid input (non-string/empty id, or an amount that is not a finite number > 0)
+ * is ignored without throwing and leaves the store untouched.
+ * @param {string} id - Catalog item id
+ * @param {number} [amount=1] - Positive quantity to add
+ * @returns {number} The resulting non-negative integer quantity for `id`
+ */
+export function addQuantity(id, amount = 1) {
+  const hasValidId = typeof id === "string" && id.length > 0;
+  if (!hasValidId) {
+    return 0;
+  }
+
+  if (currentQuantities === null) {
+    setQuantities();
+  }
+
+  const stored = currentQuantities[id];
+  const base =
+    typeof stored === "number" && Number.isFinite(stored)
+      ? Math.max(0, Math.floor(stored))
+      : 0;
+
+  const hasValidAmount =
+    typeof amount === "number" && Number.isFinite(amount) && amount > 0;
+  if (!hasValidAmount) {
+    return base;
+  }
+
+  currentQuantities[id] = base + Math.floor(amount);
+  return currentQuantities[id];
+}
+
+/**
+ * Coerce an arbitrary value into a safe id -> non-negative integer map, or null
+ * when it is not a plain object. Shared by localStorage persistence and the server
+ * inventory sync, so both reject prototype keys and negative / non-finite stacks
+ * identically.
+ * @param {*} value
+ * @returns {Record<string, number>|null}
+ */
+export function sanitizeQuantities(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const out = {};
+  for (const [id, qty] of Object.entries(value)) {
+    if (DANGEROUS_KEYS.has(id)) continue;
+    if (typeof qty !== "number" || !Number.isFinite(qty) || qty < 0) continue;
+    out[id] = Math.floor(qty);
+  }
+  return out;
+}
+
+/**
+ * Current stack quantity for `id` as a non-negative integer, or 0 when the id is
+ * invalid or carries no quantity. Never mutates the store.
+ * @param {string} id - Catalog item id
+ * @returns {number}
+ */
+export function getQuantity(id) {
+  if (typeof id !== "string" || id.length === 0) {
+    return 0;
+  }
+  const store = currentQuantities || defaultQuantities();
+  const stored = store[id];
+  return typeof stored === "number" && Number.isFinite(stored)
+    ? Math.max(0, Math.floor(stored))
+    : 0;
+}
+
+/**
+ * Attempt to remove `amount` of `id` from the shared in-memory store. The removal
+ * is all-or-nothing: an invalid id/amount, or a stack smaller than `amount`, leaves
+ * the store untouched (so an item can never be consumed into a negative quantity).
+ * @param {string} id - Catalog item id
+ * @param {number} [amount=1] - Positive quantity to remove
+ * @returns {{ ok: boolean, quantity: number }} Whether it was removed and the
+ *   resulting quantity (the current quantity when the removal was rejected)
+ */
+export function consumeQuantity(id, amount = 1) {
+  if (currentQuantities === null) {
+    setQuantities();
+  }
+
+  const current = getQuantity(id);
+  const hasValidAmount =
+    typeof amount === "number" && Number.isFinite(amount) && amount > 0;
+  if (!hasValidAmount || current < amount) {
+    return { ok: false, quantity: current };
+  }
+
+  const next = current - Math.floor(amount);
+  currentQuantities[id] = next;
+  return { ok: true, quantity: next };
+}
+
+/**
+ * Weighted loot table for enemy drops. Every `id` exists in the catalog.
+ * `weight` is relative (higher = more common); `qty` is the stack size granted.
+ * @type {Array<{id:string, name:string, weight:number, qty:number}>}
+ */
+export const DROP_TABLE = [
+  { id: "tui-bac", name: "Túi Bạc", weight: 50, qty: 1 },
+  { id: "linh-duong", name: "Thịt Rừng", weight: 30, qty: 2 },
+  { id: "yeu-dan", name: "Yêu Đan", weight: 15, qty: 1 },
+  { id: "huyen-kim-thach", name: "Huyễn Kim Thạch", weight: 5, qty: 1 }
+];
+
+/**
+ * Pick a loot entry from DROP_TABLE with a weighted roll. Pure and deterministic:
+ * the same rng value always yields the same entry, and the final bucket is
+ * clamped so floating-point drift or a roll of 1 can never return an unknown id.
+ * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
+ * @returns {{ id: string, qty: number }}
+ */
+export function rollDrop(rng = Math.random) {
+  const totalWeight = DROP_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
+  const drawn = typeof rng === "function" ? rng() : rng;
+  const roll = typeof drawn === "number" && Number.isFinite(drawn) ? drawn : 0;
+  const target = Math.min(Math.max(roll, 0), 1) * totalWeight;
+
+  let cursor = 0;
+  for (let i = 0; i < DROP_TABLE.length; i++) {
+    cursor += DROP_TABLE[i].weight;
+    if (target < cursor) {
+      return { id: DROP_TABLE[i].id, qty: DROP_TABLE[i].qty };
+    }
+  }
+
+  const last = DROP_TABLE[DROP_TABLE.length - 1];
+  return { id: last.id, qty: last.qty };
+}
+
+/**
+ * Kill-reward tuning shared with the server, which rolls the reward from its own
+ * authoritative enemy health (see server/src/rewards.js).
+ */
+export const KILL_REWARD = {
+  exp: 35,
+  coinsMin: 3,
+  coinsMax: 9
+};
+
+/**
+ * Roll the full reward for one defeated enemy: EXP, bạc and the loot entry.
+ * Pure and deterministic for a fixed rng, so the server and a client derive the
+ * same reward from the same roll.
+ * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
+ * @returns {{ exp: number, coins: number, drop: { id: string, qty: number } }}
+ */
+export function rollKillReward(rng = Math.random) {
+  const next = () => {
+    const drawn = typeof rng === "function" ? rng() : rng;
+    return typeof drawn === "number" && Number.isFinite(drawn)
+      ? Math.min(Math.max(drawn, 0), 1)
+      : 0;
+  };
+
+  const span = KILL_REWARD.coinsMax - KILL_REWARD.coinsMin + 1;
+  const coins = Math.min(
+    KILL_REWARD.coinsMin + Math.floor(next() * span),
+    KILL_REWARD.coinsMax
+  );
+  const drop = rollDrop(next());
+
+  return { exp: KILL_REWARD.exp, coins, drop: { id: drop.id, qty: drop.qty } };
 }
 
 /**

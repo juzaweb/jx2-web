@@ -241,11 +241,22 @@ body {
   top: 10px;
   right: 12px;
   z-index: 15;
+  transform-origin: top right;
 }
 
 .minimap-frame {
-  width: 176px;
+  width: 228px;
   padding: 4px;
+}
+
+.minimap-frame.is-zoomed {
+  width: min(900px, 38vw);
+}
+
+.minimap-frame.is-zoomed .minimap-view {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 22 / 15;
 }
 
 .minimap-header {
@@ -305,8 +316,8 @@ body {
 }
 
 .minimap-view {
-  width: 168px;
-  height: 116px;
+  width: 220px;
+  height: 150px;
   background: #19271c;
   border: 1.5px inset #4a3c26;
   position: relative;
@@ -477,6 +488,7 @@ body {
 }
 
 .dock-container {
+  position: relative;
   max-width: 1260px;
   margin: 0 auto;
   display: flex;
@@ -541,8 +553,12 @@ body {
 
 /* Middle: Martial Arts Display */
 .martial-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   background: rgba(14, 20, 24, 0.9);
   padding: 4px 8px;
@@ -610,6 +626,261 @@ body {
   font-size: 9px;
   color: #8ce99a;
   margin-top: 1px;
+}
+
+/* Left/right mouse skill slots */
+.hand-slot {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: radial-gradient(circle, #3a2a12 0%, #17110a 100%);
+  border: 2px solid #ffd166;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.9), 0 0 8px rgba(255, 209, 102, 0.5);
+  border-radius: 3px;
+}
+
+.hand-slot:hover {
+  box-shadow: 0 0 12px #ffd166;
+}
+
+.hand-glyph {
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffe9a8;
+  text-shadow: 0 2px 4px #000;
+}
+
+.skill-icon-img {
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.hand-glyph.skill-icon-img {
+  width: 42px;
+  height: 42px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.hand-cd {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+/* Sect skill bar */
+.skill-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.skill-slot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: 2px solid #574630;
+  border-radius: 3px;
+  background: radial-gradient(circle, #24313a 0%, #101418 100%);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.skill-slot:hover {
+  border-color: #ffd43b;
+}
+
+.skill-slot.selected {
+  border-color: #ffd166;
+  box-shadow: 0 0 10px rgba(255, 209, 102, 0.7);
+  background: radial-gradient(circle, #3a2a12 0%, #17110a 100%);
+}
+
+.skill-slot.cooling {
+  filter: grayscale(0.6) brightness(0.7);
+}
+
+.skill-slot-glyph {
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffe9a8;
+  text-shadow: 0 2px 3px #000;
+}
+
+.skill-slot-key {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #ffdd59;
+  text-shadow: 0 1px 2px #000;
+}
+
+.skill-slot-cd {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 2px;
+}
+
+.skill-bind-btn {
+  height: 44px;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffe9a8;
+  background: linear-gradient(180deg, #3a3125, #1c1811);
+  border: 1.5px solid #9c7c3d;
+  border-radius: 3px;
+}
+
+.skill-bind-btn:hover {
+  border-color: #ffd43b;
+}
+
+/* Skill hotkey modal */
+.skill-keybind-box {
+  width: min(460px, 92vw);
+  text-align: left;
+}
+
+.skill-keybind-hint {
+  font-size: 12px;
+  color: #cbb78d;
+  margin: 6px 0 10px;
+}
+
+.skill-keybind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.skill-keybind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(156, 124, 61, 0.5);
+  border-radius: 3px;
+}
+
+.skill-keybind-glyph {
+  width: 26px;
+  text-align: center;
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd166;
+}
+
+.skill-keybind-name {
+  flex: 1;
+  font-size: 13px;
+  color: #f0e2c0;
+}
+
+.skill-keybind-key {
+  min-width: 84px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffe9a8;
+  background: #241d12;
+  border: 1.5px solid #9c7c3d;
+  border-radius: 3px;
+}
+
+.skill-keybind-key.listening {
+  border-color: #ffd166;
+  color: #ffd166;
+  box-shadow: 0 0 8px rgba(255, 209, 102, 0.6);
+}
+
+/* Skill picker (choose a skill for a mouse button) */
+.skill-picker-box {
+  width: min(520px, 92vw);
+  text-align: left;
+}
+
+.skill-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.skill-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1.5px solid rgba(156, 124, 61, 0.5);
+  border-radius: 3px;
+  color: #f0e2c0;
+}
+
+.skill-picker-row:hover:not(:disabled) {
+  border-color: #ffd166;
+}
+
+.skill-picker-row.selected {
+  border-color: #ffd166;
+  box-shadow: 0 0 8px rgba(255, 209, 102, 0.5);
+}
+
+.skill-picker-row.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skill-picker-glyph {
+  width: 26px;
+  text-align: center;
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd166;
+}
+
+.skill-picker-glyph.skill-icon-img {
+  width: 26px;
+  height: 26px;
+}
+
+.skill-picker-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.skill-picker-meta {
+  font-size: 11px;
+  color: #9fb8b2;
+  white-space: nowrap;
 }
 
 /* Character Portrait */
@@ -685,6 +956,13 @@ body {
 }
 .sys-btn.pk-mode .sys-lbl {
   color: #81c784;
+}
+.sys-btn.pk-mode.pk-active {
+  border-color: #d32f2f;
+  background: linear-gradient(180deg, #4a1c1c 0%, #200c0c 100%);
+}
+.sys-btn.pk-mode.pk-active .sys-lbl {
+  color: #ff8a80;
 }
 
 /* ====================================================
@@ -890,6 +1168,73 @@ body {
   line-height: 1;
 }
 
+/* Full-city map modal (M shortcut) */
+.city-map-overlay {
+  align-items: flex-start;
+  overflow: auto;
+  padding: 16px 0;
+}
+.city-map-box {
+  display: flex;
+  flex-direction: column;
+  width: min(1500px, calc(100% - 24px));
+  max-height: 92vh;
+  padding: 18px;
+  text-align: left;
+}
+.city-map-box h2 {
+  font-family: 'Cinzel', serif;
+  color: #f7e8c6;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.city-map-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  background: #1e3324;
+  border: 2px solid #80735a;
+  outline: 1px solid #231b13;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.75);
+}
+.city-map-canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+}
+.city-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #d8c7a1;
+}
+.city-map-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.city-map-dot.player { background: #ffdd59; }
+.city-map-dot.enemy { background: #ff4d4f; }
+.city-map-dot.remote { background: #00d2d3; }
+.city-map-dot.pavilion { background: #22c55e; }
+.city-map-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #8f9a91;
+  text-align: right;
+}
+
 
 /* ====================================================
    Responsive Adjustments
@@ -932,5 +1277,92 @@ body {
   }
   .system-icons-tray .sys-btn:nth-child(n+4) {
     display: none;
+  }
+}
+
+/* ====================================================
+   LANGUAGE SWITCHER
+==================================================== */
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(10, 20, 18, 0.8);
+  border: 1px solid rgba(110, 231, 183, 0.35);
+  border-radius: 3px;
+  color: #ffe9a8;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 60;
+}
+
+.language-switcher-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.language-switcher-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffe9a8;
+  font-family: "Be Vietnam Pro", "Cinzel", serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  padding: 0 1px;
+}
+
+.language-switcher-select option {
+  background: #13201e;
+  color: #ffe9a8;
+}
+
+.language-switcher:hover,
+.language-switcher:focus-within {
+  border-color: #d4af37;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.35);
+}
+
+.language-switcher--login {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 30;
+}
+
+.language-switcher--character {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 5;
+}
+
+.language-switcher--hud {
+  padding: 0 3px;
+  gap: 2px;
+  background: #252f36;
+  border-color: #5a4b35;
+}
+
+.language-switcher--hud .language-switcher-icon {
+  display: none;
+}
+
+.language-switcher--hud .language-switcher-select {
+  font-size: 9px;
+  color: #d8c7a1;
+  padding: 1px 0;
+}
+
+@media (max-width: 640px) {
+  .language-switcher--login {
+    top: 10px;
+    left: 10px;
   }
 }

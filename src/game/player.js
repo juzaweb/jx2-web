@@ -1,15 +1,32 @@
 import * as Phaser from "phaser";
+import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
+import { toIso, isoDepth } from "./isoProjection.js";
+import { defaultEquipment } from "./equipment.js";
+import { directionFromVelocity } from "./heroDirections.js";
+import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { normalizeGender } from "./gender.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+
+const S = WORLD_SCALE;
+const POS = WORLD_POSITION_SCALE;
 
 export class Player {
   /**
    * @param {Phaser.Scene} scene
    * @param {number} x
    * @param {number} y
+   * @param {string} [name]
+   * @param {"male"|"female"} [gender]
    */
-  constructor(scene, x = 640, y = 620) {
+  constructor(scene, x = 640 * POS, y = 620 * POS, name = "Lãng Khách", gender = "male") {
     this.scene = scene;
     this.spawnX = x;
     this.spawnY = y;
+    this.name = name;
+    /** Character gender drives the rig's silhouette ("male" | "female"). */
+    this.gender = normalizeGender(gender);
+    /** Sect id selects the skill kit (see skills.js). */
+    this.sect = "thieu-lam";
 
     this.stats = {
       level: 1,
@@ -17,6 +34,10 @@ export class Player {
       maxHp: 100,
       mp: 60,
       maxMp: 60,
+      attack: 24,
+      defense: 6,
+      critRate: 0.12,
+      critDamage: 1.5,
       exp: 0,
       nextExp: 100,
       coins: 0,
@@ -25,6 +46,10 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
+    /** Worn items, slot -> item id. Rendered by the vector rig. */
+    this.equipment = defaultEquipment();
+    // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
+    this.pkFlag = false;
     this.targetX = null;
     this.targetY = null;
     this.isMovingToTarget = false;
@@ -32,235 +57,121 @@ export class Player {
     // Movement & wuxia animation states
     this.stepPhase = 0;
     this.lastDustTime = 0;
-    this.lastTrailTime = 0;
-    this.currentStance = "front"; // "front" | "side"
+    // Direction the hero faces (0..7, see heroDirections.js).
+    this.facingDirection = 0;
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
-    this.createKeyboard();
   }
 
   createPhysicsSprite(x, y) {
     this.sprite = this.scene.physics.add.sprite(x, y, "entity-dot");
-    this.sprite.setSize(24, 20);
+    this.sprite.setSize(24 * S, 20 * S);
     this.sprite.setCollideWorldBounds(true);
     this.sprite.setDepth(y);
-    this.sprite.body.setDrag(700, 700);
-    this.sprite.body.setMaxVelocity(220, 220);
+    this.sprite.body.setDrag(700 * POS * WORLD_SPEED_SCALE, 700 * POS * WORLD_SPEED_SCALE);
+    this.sprite.body.setMaxVelocity(220 * POS * WORLD_SPEED_SCALE, 220 * POS * WORLD_SPEED_SCALE);
     this.sprite.setVisible(false);
   }
 
   createVisuals(x, y) {
-    this.visual = this.scene.add.container(x, y);
-    this.visual.setDepth(y);
+    const iso = toIso(x, y);
+    this.visual = this.scene.add.container(iso.x, iso.y);
+    this.visual.setDepth(isoDepth(x, y));
+    this.visual.setScale(S);
     this.drawHero(this.visual);
 
-    this.nameText = this.scene.add.text(x, y - 42, "Lãng Khách", {
-      fontFamily: "Arial",
+    this.nameText = this.scene.add.text(iso.x, iso.y - 60 * S, this.name, {
+      fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "12px",
-      color: "#fff0c5",
-      stroke: "#1c211c",
-      strokeThickness: 3,
+      color: "#5cfc5c",
+      stroke: "#081008",
+      strokeThickness: 2,
       fontStyle: "bold"
-    }).setOrigin(0.5).setDepth(700);
+    }).setOrigin(0.5).setDepth(isoDepth(x, y) + 100);
+
+    this.nameText.setScale(S);
+
+    // Health bar sits between the name and the character's head
+    const healthBar = createHealthBar(this.scene, iso.x, iso.y, S);
+    this.hpBack = healthBar.back;
+    this.hpFill = healthBar.fill;
+    this.updateHealthBar(iso.x, iso.y, isoDepth(x, y));
   }
 
+  /**
+   * Reposition and redraw the overhead health bar from the current stats.
+   * @param {number} x
+   * @param {number} y - world Y the bar is drawn relative to (follows the walk bob)
+   * @param {number} [depthBase=y] - stable Y used for depth sorting
+   */
+  updateHealthBar(x, y, depthBase = y) {
+    layoutHealthBar(
+      { back: this.hpBack, fill: this.hpFill },
+      x,
+      y,
+      depthBase,
+      this.stats.hp,
+      this.stats.maxHp,
+      S
+    );
+  }
+
+  /**
+   * Build the shadow + the vector hero rig, drawn facing the current direction
+   * with the current gear (so the hero is never blank before the game starts).
+   */
   drawHero(container) {
-    // 1. Soft ground shadow
-    this.shadow = this.scene.add.ellipse(0, 34, 40, 13, 0x090e0c, 0.45);
+    this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
 
-    // 2. Character body container for isolated walk cycle, squash/stretch, tilt & attack recoil
+    // Body container carries the walk bob and attack recoil; the rig lives inside.
     this.body = this.scene.add.container(0, 0);
-
-    // Register side walk animation (Clean 2-frame strides)
-    if (this.scene.textures.exists("hero-side-walk") && !this.scene.anims.exists("player-side-walk")) {
-      this.scene.anims.create({
-        key: "player-side-walk",
-        frames: this.scene.anims.generateFrameNumbers("hero-side-walk", { start: 0, end: 1 }),
-        frameRate: 6,
-        repeat: -1
-      });
-    }
-
-    // 2. High-definition character visuals (Clean 2-leg authentic models)
-    if (this.scene.textures.exists("hero-sprite")) {
-      this.aura = this.scene.add.circle(0, 0, 32, 0x3b82f6, 0.06);
-      this.heroImage = this.scene.add.sprite(0, 0, "hero-sprite");
-      this.heroImage.setDisplaySize(28, 76);
-      this.heroImage.setOrigin(0.5, 0.5);
-
-      this.body.add([this.aura, this.heroImage]);
-      container.add([this.shadow, this.body]);
-      return;
-    }
-
-    // Fallback vector drawing if texture fails to load
-
-    // 3. Back coat tails (Royal blue & white lining flowing behind)
-    const backCoat = this.scene.add.polygon(0, 10, [[-9, -6], [9, -6], [14, 16], [-14, 16]], 0x1e3a8a).setStrokeStyle(1.2, 0x172554);
-    const whiteTail = this.scene.add.polygon(-6, 12, [[-6, -6], [2, -6], [0, 14], [-10, 12]], 0xf1f5f9, 0.95).setStrokeStyle(1, 0xcfd8dc);
-
-    // 4. Lower body: Crimson red martial trousers & Purple greaves
-    const legL = this.scene.add.rectangle(-6, 13, 5.5, 10, 0xb91c1c);
-    const legR = this.scene.add.rectangle(6, 13, 5.5, 10, 0xb91c1c);
-
-    // Purple tall boots (Ủng chiến tím)
-    const bootL = this.scene.add.rectangle(-6, 21, 6.5, 11, 0x6b21a8).setStrokeStyle(1, 0x3b0764);
-    const bootR = this.scene.add.rectangle(6, 21, 6.5, 11, 0x6b21a8).setStrokeStyle(1, 0x3b0764);
-
-    // Silver circular knee ornaments (Họa tiết nguyệt ngân)
-    const kneeL = this.scene.add.circle(-6, 17, 2.6, 0xe2e8f0).setStrokeStyle(1, 0x475569);
-    const kneeR = this.scene.add.circle(6, 17, 2.6, 0xe2e8f0).setStrokeStyle(1, 0x475569);
-
-    // Cyan boot decorative bands
-    const bandL = this.scene.add.line(0, 0, -9, 23, -3, 23, 0x38bdf8).setLineWidth(1.2);
-    const bandR = this.scene.add.line(0, 0, 3, 23, 9, 23, 0x38bdf8).setLineWidth(1.2);
-
-    // Dark indigo martial shoes
-    const shoeL = this.scene.add.ellipse(-6, 26, 8, 3.5, 0x2e1065);
-    const shoeR = this.scene.add.ellipse(6, 26, 8, 3.5, 0x2e1065);
-
-    // 5. White front apron with red accents (Vạt áo trắng họa tiết đỏ)
-    const frontApron = this.scene.add.rectangle(0, 10, 14, 16, 0xf8fafc).setStrokeStyle(1, 0xcfd8dc);
-    const apronHem = this.scene.add.rectangle(0, 17, 14, 2.5, 0x1d4ed8);
-    const ribbonL = this.scene.add.line(0, 0, -4, 4, -4, 15, 0xdc2626).setLineWidth(1.8);
-    const ribbonR = this.scene.add.line(0, 0, 4, 4, 4, 15, 0xdc2626).setLineWidth(1.8);
-
-    // 6. Upper Torso (Áo lam Võ Đang - Royal Blue Tunic)
-    const tunic = this.scene.add.rectangle(0, -3, 20, 15, 0x2563eb).setStrokeStyle(1.5, 0x1d4ed8);
-    const tunicRoll = this.scene.add.ellipse(0, 3, 20, 5, 0x1e40af);
-    const collar = this.scene.add.arc(0, -9, 4.5, 0, 180, false, 0xdc2626).setStrokeStyle(1.8, 0xef4444);
-
-    // White shoulder racing stripes
-    const shoulderL = this.scene.add.line(0, 0, -8, -10, -11, -3, 0xffffff).setLineWidth(1.5);
-    const shoulderR = this.scene.add.line(0, 0, 8, -10, 11, -3, 0xffffff).setLineWidth(1.5);
-
-    // Red chest accent seams
-    const redSeamL = this.scene.add.line(0, 0, -4, -8, -7, -2, 0xdc2626).setLineWidth(1.4);
-    const redSeamR = this.scene.add.line(0, 0, 4, -8, 7, -2, 0xdc2626).setLineWidth(1.4);
-
-    // 7. Arms with studded leather bracers (Giáp cổ tay đinh tán)
-    // Left arm
-    const sleeveL = this.scene.add.rectangle(-11, -4, 5, 8, 0x2563eb);
-    const bracerL = this.scene.add.rectangle(-12, 1, 5.5, 5.5, 0x292524).setStrokeStyle(0.8, 0x78716c);
-    const studL1 = this.scene.add.circle(-12, 0, 0.9, 0xffffff);
-    const studL2 = this.scene.add.circle(-12, 2.4, 0.9, 0xffffff);
-    const handL = this.scene.add.circle(-12, 6, 2.2, 0xfcd34d);
-
-    // Right arm (Holding sword)
-    const sleeveR = this.scene.add.rectangle(11, -4, 5, 8, 0x2563eb);
-    const bracerR = this.scene.add.rectangle(12, 1, 5.5, 5.5, 0x292524).setStrokeStyle(0.8, 0x78716c);
-    const studR1 = this.scene.add.circle(12, 0, 0.9, 0xffffff);
-    const studR2 = this.scene.add.circle(12, 2.4, 0.9, 0xffffff);
-    const handR = this.scene.add.circle(12, 6, 2.2, 0xfcd34d);
-
-    // 8. Longsword (Trường kiếm chuôi vàng)
-    const swordPommel = this.scene.add.circle(13, 0, 1.8, 0xf59e0b);
-    const swordGuard = this.scene.add.rectangle(13, 3, 7, 2.5, 0xf59e0b).setStrokeStyle(0.6, 0xb45309);
-    const swordBlade = this.scene.add.line(0, 0, 13, 5, 16, 24, 0xe2e8f0).setLineWidth(2.5);
-    const swordTip = this.scene.add.circle(16, 24, 1.2, 0xffffff);
-
-    // 9. Head, Face & Hair Topknot (Búi tóc đỉnh đầu cài ngọc)
-    const neck = this.scene.add.rectangle(0, -11, 5, 4, 0xfde68a);
-    const face = this.scene.add.ellipse(0, -17, 12, 13.5, 0xfef08a).setStrokeStyle(1, 0xd97706, 0.4);
-
-    // Facial features (Eyes & Eyebrows)
-    const eyeL = this.scene.add.rectangle(-3, -17, 2, 1, 0x0f172a);
-    const eyeR = this.scene.add.rectangle(3, -17, 2, 1, 0x0f172a);
-    const eyebrowL = this.scene.add.line(0, 0, -4.5, -19, -1.5, -18.5, 0x0f172a).setLineWidth(1);
-    const eyebrowR = this.scene.add.line(0, 0, 1.5, -18.5, 4.5, -19, 0x0f172a).setLineWidth(1);
-
-    // Long hair framing locks (Lọn tóc dài rủ hai bên)
-    const lockL = this.scene.add.line(0, 0, -5.5, -20, -7.5, -9, 0x0f172a).setLineWidth(2);
-    const lockR = this.scene.add.line(0, 0, 5.5, -20, 7.5, -9, 0x0f172a).setLineWidth(2);
-    const fringe = this.scene.add.triangle(0, -21, -5.5, 0, 5.5, 0, 0, 3.5, 0x0f172a);
-    const hairCrown = this.scene.add.ellipse(0, -22, 13, 8, 0x0f172a);
-
-    // Topknot & Jade ring (Búi tóc & Trâm ngọc xanh)
-    const bun = this.scene.add.circle(0, -27, 4.2, 0x0f172a);
-    const jadeRing = this.scene.add.rectangle(0, -24.5, 5, 2.2, 0x10b981).setStrokeStyle(0.8, 0x047857);
-    const bunTop = this.scene.add.triangle(0, -31, -2.5, 2, 2.5, 2, 0, -2, 0x0f172a);
-
-    this.body.add([
-      backCoat,
-      whiteTail,
-      legL,
-      legR,
-      bootL,
-      bootR,
-      kneeL,
-      kneeR,
-      bandL,
-      bandR,
-      shoeL,
-      shoeR,
-      frontApron,
-      apronHem,
-      ribbonL,
-      ribbonR,
-      tunic,
-      tunicRoll,
-      collar,
-      shoulderL,
-      shoulderR,
-      redSeamL,
-      redSeamR,
-      sleeveL,
-      bracerL,
-      studL1,
-      studL2,
-      handL,
-      sleeveR,
-      bracerR,
-      studR1,
-      studR2,
-      handR,
-      swordBlade,
-      swordTip,
-      swordGuard,
-      swordPommel,
-      neck,
-      face,
-      eyeL,
-      eyeR,
-      eyebrowL,
-      eyebrowR,
-      lockL,
-      lockR,
-      fringe,
-      hairCrown,
-      bun,
-      jadeRing,
-      bunTop
-    ]);
+    this.rig = new HeroRigView(this.scene, { footOffsetY: HERO_FOOT_Y });
+    this.rig.set(this.facingDirection, this.equipment, this.gender);
+    this.body.add(this.rig.container);
 
     container.add([this.shadow, this.body]);
   }
 
-  setStance(stance) {
-    if (this.currentStance === stance || !this.heroImage) return;
-    this.currentStance = stance;
-
-    if (stance === "side") {
-      if (this.scene.textures.exists("hero-side-walk")) {
-        this.heroImage.setTexture("hero-side-walk", 0);
-        this.heroImage.setDisplaySize(67, 76);
-        this.heroImage.setOrigin(0.44, 0.5);
-      }
-    } else {
-      if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-      }
-      if (this.scene.textures.exists("hero-sprite")) {
-        this.heroImage.setTexture("hero-sprite");
-        this.heroImage.setDisplaySize(28, 76);
-        this.heroImage.setOrigin(0.5, 0.5);
-      }
-    }
+  /**
+   * Switch the hero's rendered silhouette (male/female) and redraw the rig.
+   * @param {"male"|"female"} gender
+   * @returns {boolean} whether the gender actually changed
+   */
+  setGender(gender) {
+    const next = normalizeGender(gender);
+    if (next === this.gender) return false;
+    this.gender = next;
+    this.rig?.set(this.facingDirection, this.equipment, this.gender);
+    return true;
   }
 
-  createKeyboard() {
-    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,Q");
+  /**
+   * Wear the given items and redraw the rig.
+   * @param {Record<string, string|null>} [equipment]
+   */
+  applyEquipment(equipment = this.equipment) {
+    this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
+    this.rig?.set(this.facingDirection, this.equipment, this.gender);
+  }
+
+  /**
+   * Turn the hero to face a direction (0..7) and redraw the rig.
+   * @param {number} direction
+   */
+  faceDirection(direction) {
+    if (direction === this.facingDirection) return;
+    this.facingDirection = direction;
+    this.rig?.set(direction, this.equipment, this.gender);
+  }
+
+  /**
+   * Switch the skill kit's sect id.
+   * @param {string} sect
+   */
+  setSect(sect) {
+    this.sect = typeof sect === "string" && sect ? sect : this.sect;
+    return this.sect;
   }
 
   update(time, delta) {
@@ -273,111 +184,54 @@ export class Player {
     const speed = this.sprite.body.velocity.length();
 
     if (speed > 15) {
-      // Prioritize side profile view when moving horizontally (turn sideways, not crab walking)
-      const isHorizontal = Math.abs(vx) >= Math.abs(vy) * 0.65;
-      this.setStance(isHorizontal ? "side" : "front");
+      // Face the way the hero appears to move on screen.
+      this.faceDirection(directionFromVelocity(vx, vy));
 
-      if (this.currentStance === "side") {
-        if (this.scene.anims.exists("player-side-walk") && !this.heroImage.anims.isPlaying) {
-          this.heroImage.play("player-side-walk");
-        }
-      } else {
-        if (this.heroImage.anims && this.heroImage.anims.isPlaying) {
-          this.heroImage.stop();
-        }
-      }
-
-      // Advance walk cycle synchronized with actual movement velocity
+      // Light procedural bob over the rig (the rig has no baked walk cycle).
       this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
+      this.rig?.animate(this.stepPhase);
+      this.body.y = -Math.abs(Math.sin(this.stepPhase)) * 3.5;
+      this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.2);
+      this.body.setScale(1, 1);
 
-      // Dynamic bobbing: natural arc of legs pushing up and landing
-      const sinStep = Math.sin(this.stepPhase);
-      const bounceY = -Math.abs(sinStep) * 4.5;
-
-      // Natural stride stretch & compression along movement pace (2 legs only, no 3rd leg)
-      const strideScale = Math.sin(this.stepPhase * 2) * 0.035;
-      this.body.setScale(1 + strideScale, 1 - strideScale);
-
-      // Subtle forward lean / aerodynamic sprint tilt
-      const targetTilt = 0.065;
-      this.body.rotation = Phaser.Math.Linear(this.body.rotation, targetTilt, 0.18);
-      this.body.y = bounceY;
-
-      // Dynamic ground shadow responds to elevation
-      const shadowFactor = 1 - (Math.abs(bounceY) / 4.5) * 0.22;
+      const shadowFactor = 1 - (Math.abs(this.body.y) / 3.5) * 0.2;
       this.shadow.setScale(shadowFactor, shadowFactor);
-      this.shadow.setAlpha(0.48 * shadowFactor);
+      this.shadow.setAlpha(0.45 * shadowFactor);
 
       // Footstep dust puff when foot strikes the road
       if (time - this.lastDustTime > 190) {
         this.lastDustTime = time;
-        this.spawnFootstepDust(this.sprite.x, this.sprite.y + 32, vx, vy);
-      }
-
-      // Wuxia Qinggong ghost afterimage trail
-      if (speed > 40 && time - this.lastTrailTime > 68) {
-        this.lastTrailTime = time;
-        this.spawnGhostTrail(this.sprite.x, this.sprite.y, this.visual.scaleX, this.body.rotation, this.body.y);
+        this.spawnFootstepDust(this.sprite.x, this.sprite.y + 40, vx, vy);
       }
     } else {
-      // Stopped moving - reset walk animation
-      if (this.currentStance === "side" && this.heroImage.anims && this.heroImage.anims.isPlaying) {
-        this.heroImage.stop();
-        this.heroImage.setFrame(0);
-      }
-
       // Idle breathing cycle (Qi Gong internal breathing)
+      this.rig?.animate(0);
       const breath = Math.sin(time * 0.0035);
-      const breathBounce = breath * 0.8;
-      const bodyScaleY = 1 + breath * 0.018;
-      const bodyScaleX = 1 - breath * 0.012;
-
-      this.body.y = breathBounce;
+      this.body.y = breath * 0.8;
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.14);
-      this.body.setScale(bodyScaleX, bodyScaleY);
+      this.body.setScale(1 - breath * 0.012, 1 + breath * 0.018);
 
       this.shadow.setScale(1 + breath * 0.02, 1 + breath * 0.02);
       this.shadow.setAlpha(0.45);
     }
 
-    // Depth sorting based on Y position
-    this.sprite.setDepth(this.sprite.y);
-    this.visual.setPosition(this.sprite.x, this.sprite.y);
-    this.visual.setDepth(this.sprite.y);
-    this.nameText.setPosition(this.sprite.x, this.sprite.y - 56 + this.body.y * 0.35);
-  }
-
-  spawnGhostTrail(x, y, facing, rotation, bodyOffsetY) {
-    if (!this.heroImage) return;
-
-    const currentTexture = this.heroImage.texture.key;
-    const currentFrame = this.heroImage.frame ? this.heroImage.frame.name : 0;
-    const ghost = this.scene.add.sprite(x, y + bodyOffsetY, currentTexture, currentFrame);
-    ghost.setDisplaySize(this.heroImage.displayWidth, this.heroImage.displayHeight);
-    ghost.setOrigin(this.heroImage.originX, this.heroImage.originY);
-    ghost.setScale(facing * (this.heroImage.displayWidth / (ghost.width || 1)), this.heroImage.displayHeight / (ghost.height || 1));
-    ghost.setRotation(rotation);
-    ghost.setDepth(y - 1);
-    ghost.setTint(0x38bdf8); // Azure martial sword qi tint
-    ghost.setAlpha(0.38);
-
-    this.scene.tweens.add({
-      targets: ghost,
-      alpha: 0,
-      scaleX: facing * (this.heroImage.displayWidth / (ghost.width || 1)) * 1.05,
-      scaleY: (this.heroImage.displayHeight / (ghost.height || 1)) * 1.05,
-      duration: 250,
-      ease: "Cubic.easeOut",
-      onComplete: () => ghost.destroy()
-    });
+    // Depth sorting based on the isometric position of the ground cell
+    const iso = toIso(this.sprite.x, this.sprite.y);
+    const depth = isoDepth(this.sprite.x, this.sprite.y);
+    this.visual.setPosition(iso.x, iso.y);
+    this.visual.setDepth(depth);
+    this.nameText.setPosition(iso.x, iso.y - 60 * S + this.body.y * 0.35);
+    this.nameText.setDepth(depth + 100);
+    this.updateHealthBar(iso.x, iso.y + this.body.y * 0.35, depth);
   }
 
   spawnFootstepDust(x, y, vx, vy) {
+    const base = toIso(x, y);
     const offsetX = -Math.sign(vx) * (7 + Math.random() * 4);
     const offsetY = (Math.random() - 0.5) * 3;
 
-    const dust = this.scene.add.ellipse(x + offsetX, y + offsetY, 7, 4, 0xc4b998, 0.42);
-    dust.setDepth(y - 2);
+    const dust = this.scene.add.ellipse(base.x + offsetX, base.y + offsetY, 7, 4, 0xc4b998, 0.42);
+    dust.setDepth(isoDepth(x, y) - 2);
 
     this.scene.tweens.add({
       targets: dust,
@@ -394,6 +248,7 @@ export class Player {
 
   playAttackMotion() {
     if (!this.body) return;
+    this.rig?.attack?.("slash");
     this.scene.tweens.add({
       targets: this.body,
       x: 7,
@@ -408,26 +263,38 @@ export class Player {
     });
   }
 
-  playSkillMotion() {
+  /**
+   * Play the limb animation for a skill cast.
+   * @param {"slash"|"kick"|"shockwave"|"aura"|string} [kind]
+   */
+  playSkillMotion(kind = "slash") {
     if (!this.body) return;
+    this.rig?.attack?.(kind);
+
+    const isKick = kind === "kick";
+    const isChannel = kind === "aura";
     this.scene.tweens.add({
       targets: this.body,
-      scaleX: 1.15,
-      scaleY: 0.88,
-      duration: 80,
+      x: isChannel ? 0 : isKick ? -4 : 6,
+      scaleX: isChannel ? 1.05 : 1.15,
+      scaleY: isChannel ? 1.05 : 0.88,
+      duration: isKick ? 110 : 90,
       yoyo: true,
-      ease: "Quad.easeOut"
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        if (this.body) this.body.x = 0;
+      }
     });
   }
 
   updateMovement() {
-    const k = this.keys;
-    const keyLeft = k.A.isDown || k.LEFT.isDown || this.touchDirection === "left";
-    const keyRight = k.D.isDown || k.RIGHT.isDown || this.touchDirection === "right";
-    const keyUp = k.W.isDown || k.UP.isDown || this.touchDirection === "up";
-    const keyDown = k.S.isDown || k.DOWN.isDown || this.touchDirection === "down";
+    // Movement is click-to-move or the mobile virtual joystick; keyboard movement
+    // was removed so WASD/arrow keys are free for skill selection.
+    const keyLeft = this.touchDirection === "left";
+    const keyRight = this.touchDirection === "right";
+    const keyUp = this.touchDirection === "up";
+    const keyDown = this.touchDirection === "down";
 
-    // If keyboard or touch-dpad is active, cancel target movement and prioritize keys
     if (keyLeft || keyRight || keyUp || keyDown) {
       this.isMovingToTarget = false;
       this.targetX = null;
@@ -442,14 +309,10 @@ export class Player {
 
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
-        vector.normalize().scale(175);
+        vector.normalize().scale(175 * POS * WORLD_SPEED_SCALE);
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
-
-      if (vx !== 0) {
-        this.visual.setScale(vx < 0 ? -1 : 1, 1);
-      }
       return;
     }
 
@@ -463,14 +326,10 @@ export class Player {
       }
 
       const angle = Phaser.Math.Angle.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
-      const vx = Math.cos(angle) * 175;
-      const vy = Math.sin(angle) * 175;
+      const vx = Math.cos(angle) * 175 * POS * WORLD_SPEED_SCALE;
+      const vy = Math.sin(angle) * 175 * POS * WORLD_SPEED_SCALE;
 
       this.sprite.setVelocity(vx, vy);
-
-      if (Math.abs(vx) > 10) {
-        this.visual.setScale(vx < 0 ? -1 : 1, 1);
-      }
       return;
     }
 
@@ -492,11 +351,49 @@ export class Player {
     }
   }
 
+  setName(name) {
+    if (!name) return;
+    this.name = name;
+    if (this.nameText) {
+      this.nameText.setText(name);
+    }
+  }
+
+  /**
+   * Brief hit reaction driven by a server HP drop: flicker the body and grant a
+   * short local immunity window so the render matches the server's i-frames.
+   */
+  flashHit() {
+    if (!this.visual) return;
+    this.invulnerable = true;
+    this.visual.setAlpha(0.45);
+    this.scene.time.delayedCall(700, () => {
+      this.invulnerable = false;
+      if (this.visual) this.visual.setAlpha(1);
+    });
+  }
+
+  /**
+   * Set the PK opt-in flag and reflect it on the overhead name (red when flagged).
+   * @param {boolean} flagged
+   */
+  setPkFlag(flagged) {
+    this.pkFlag = flagged === true;
+    if (this.nameText) {
+      this.nameText.setColor(this.pkFlag ? "#ff5555" : "#5cfc5c");
+    }
+  }
+
   setPosition(x, y) {
     this.stopMovement();
     this.sprite.setPosition(x, y);
-    this.visual.setPosition(x, y);
-    this.nameText.setPosition(x, y - 55);
+    const iso = toIso(x, y);
+    const depth = isoDepth(x, y);
+    this.visual.setPosition(iso.x, iso.y);
+    this.visual.setDepth(depth);
+    this.nameText.setPosition(iso.x, iso.y - 60 * S);
+    this.nameText.setDepth(depth + 100);
+    this.updateHealthBar(iso.x, iso.y, depth);
   }
 
   respawn() {
@@ -535,5 +432,26 @@ export class Player {
 
   get y() {
     return this.sprite ? this.sprite.y : this.spawnY;
+  }
+
+  /** Coarse left/right facing derived from the current direction. */
+  get facing() {
+    return this.facingDirection >= 5 && this.facingDirection <= 7 ? "left" : "right";
+  }
+
+  get attack() {
+    return this.stats?.attack ?? 24;
+  }
+
+  get defense() {
+    return this.stats?.defense ?? 6;
+  }
+
+  get critRate() {
+    return this.stats?.critRate ?? 0.12;
+  }
+
+  get critDamage() {
+    return this.stats?.critDamage ?? 1.5;
   }
 }

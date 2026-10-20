@@ -1,94 +1,140 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { QUICK_ITEMS } from "../../game/items.js";
+import { useI18n } from "../../i18n/I18nProvider.jsx";
+import { localizeItem } from "../../i18n/localize.js";
+import { bridge, EVENTS } from "../../game/bridge.js";
+import { SkillIcon } from "../SkillIcon.jsx";
 
 export function HotbarDock({
   coins = 0,
   audioEnabled,
   onUseItem,
-  onAttack,
-  onSkill,
-  onSave,
   onInventory,
+  onCharacter,
   onOpenHelp,
   onToggleAudio,
+  onLogout,
+  onTogglePk,
+  pkEnabled = false,
+  skills = [],
+  selectedSkillSlot = 0,
+  leftSkillSlot = 0,
+  onPickSkill,
   items = QUICK_ITEMS
 }) {
+  const { t } = useI18n();
+  const [cooldownEnds, setCooldownEnds] = useState({});
+  const [clock, setClock] = useState(0);
+
+  useEffect(() => {
+    const off = bridge.on(EVENTS.SKILL_CAST, ({ skillId, cooldown }) => {
+      if (!skillId) return;
+      const now = Date.now();
+      setClock(now);
+      setCooldownEnds((prev) => ({ ...prev, [skillId]: now + (cooldown || 0) }));
+    });
+    return off;
+  }, []);
+
+  useEffect(() => {
+    const active = Object.values(cooldownEnds).some((end) => end > Date.now());
+    if (!active) return undefined;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      setCooldownEnds((prev) => {
+        const next = {};
+        let changed = false;
+        for (const [slot, end] of Object.entries(prev)) {
+          if (end > now) next[slot] = end;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 200);
+    return () => clearInterval(id);
+  }, [cooldownEnds]);
+
+  const cooldownLeft = (skillId) =>
+    skillId ? Math.max(0, (cooldownEnds[skillId] || 0) - clock) : 0;
+  const selectedSkill = skills.find((skill) => skill.slot === selectedSkillSlot) || null;
+  const leftSkill = skills.find((skill) => skill.slot === leftSkillSlot) || null;
+  const leftCooldown = cooldownLeft(leftSkill?.id);
+  const rightCooldown = cooldownLeft(selectedSkill?.id);
+
+  // The bottom bar always shows eight numbered slots; 1-4 hold consumables and
+  // the rest stay as empty placeholders.
+  const quickSlots = Array.from({ length: 8 }, (_, index) => {
+    const useSlot = index + 1;
+    const raw = items.find((entry) => entry.useSlot === useSlot);
+    return { useSlot, item: raw ? localizeItem(raw, t) : null };
+  });
+
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
         {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
         <div className="hotbar-slots">
-          {items.map((item) => (
-            <div
-              className="slot-item"
-              id={`slot-${item.useSlot}`}
-              key={item.id}
-              title={`Phím [${item.useSlot}]: ${item.name}`}
-              onClick={() => onUseItem(item.useSlot)}
-            >
-              <span className="slot-key">{item.useSlot}</span>
-              <div className={`item-icon ${item.icon}`} />
-              <span className="slot-qty" id={`qty-${item.id}`}>
-                {item.qty}
-              </span>
-            </div>
-          ))}
-
-          {/* Slot 5 to 7: Martial shortcuts */}
-          <div className="slot-item empty">
-            <span className="slot-key">5</span>
-          </div>
-          <div className="slot-item empty">
-            <span className="slot-key">6</span>
-          </div>
-          <div className="slot-item empty">
-            <span className="slot-key">7</span>
-          </div>
-
-          {/* Slot 8 / Q: Kiếm Khí Skill */}
-          <div
-            className="slot-item skill-slot"
-            id="slot-8"
-            title="Phím [8] hoặc [Q]: Tuyệt kỹ Kiếm Khí"
-            onClick={onSkill}
-          >
-            <span className="slot-key">8/Q</span>
-            <div className="item-icon icon-sword-aura"></div>
-          </div>
+          {quickSlots.map(({ useSlot, item }) => {
+            if (!item) {
+              return (
+                <div className="slot-item empty" id={`slot-${useSlot}`} key={`slot-${useSlot}`}>
+                  <span className="slot-key">{useSlot}</span>
+                </div>
+              );
+            }
+            return (
+              <div
+                className="slot-item"
+                id={`slot-${useSlot}`}
+                key={item.id}
+                title={t("hotbar.slotTitle", { key: useSlot, name: item.name })}
+                onClick={() => onUseItem(useSlot)}
+              >
+                <span className="slot-key">{useSlot}</span>
+                <div className={`item-icon ${item.icon}`} />
+                <span className="slot-qty" id={`qty-${item.id}`}>
+                  {item.qty}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Middle: Active Martial Arts Cooldown & Skills Display */}
+        {/* Middle: the left/right mouse skills and the sect skill bar */}
         <div className="martial-center">
-          <div
-            className="martial-skill-box l-click"
-            id="skill-attack-box"
-            title="Chuột Trái / Space: Vô Cực Kiếm Pháp"
-            onClick={onAttack}
+          <button
+            type="button"
+            className="hand-slot"
+            id="left-hand-slot"
+            title={t("skills.leftHandTitle")}
+            onClick={() => onPickSkill?.("left")}
           >
-            <div className="skill-art art-sword"></div>
-            <span className="click-badge">Chuột Trái</span>
-          </div>
-          <div
-            className="martial-skill-box r-click"
-            id="skill-q-box"
-            title="Chuột Phải / Phím Q: Kiếm Khí Bát Hoang"
-            onClick={onSkill}
+            <SkillIcon skill={leftSkill} className="hand-glyph" />
+            {leftCooldown > 0 && <span className="hand-cd">{Math.ceil(leftCooldown / 1000)}</span>}
+            <span className="click-badge">{t("skills.handLeft")}</span>
+          </button>
+
+          <button
+            type="button"
+            className="hand-slot"
+            id="right-hand-slot"
+            title={t("skills.rightHandTitle")}
+            onClick={() => onPickSkill?.("right")}
           >
-            <div className="skill-art art-aura"></div>
-            <span className="click-badge">Chuột Phải [Q]</span>
-          </div>
-          <div className="martial-text-label">
-            <div className="martial-name">Phần Cẩm Chữ Hạc</div>
-            <div className="martial-sub">Thiên Hà Mật Tịch</div>
-          </div>
+            <SkillIcon skill={selectedSkill} className="hand-glyph" />
+            {rightCooldown > 0 && <span className="hand-cd">{Math.ceil(rightCooldown / 1000)}</span>}
+            <span className="click-badge">{t("skills.handRight")}</span>
+          </button>
+
         </div>
 
         {/* Hero Portrait */}
-        <div className="hero-portrait" title="Lãng Khách Võ Đang">
+        <div className="hero-portrait" title={t("hotbar.portraitTitle")}>
           <div className="portrait-avatar">
             <img
               src="/hero_portrait.png"
-              alt="Lãng Khách"
+              alt={t("hotbar.portraitAlt")}
               style={{
                 width: "100%",
                 height: "100%",
@@ -99,7 +145,7 @@ export function HotbarDock({
             />
           </div>
           <div className="portrait-coins" id="coin-label">
-            BẠC: {coins}
+            {t("hotbar.coins")}: {coins}
           </div>
         </div>
 
@@ -107,46 +153,39 @@ export function HotbarDock({
         <div className="system-icons-tray">
           <button
             className="sys-btn"
-            id="save-btn"
-            title="Lưu tiến trình vào trình duyệt (localStorage)"
-            onClick={onSave}
+            id="char-btn"
+            title={`${t("hotbar.character")} (F3)`}
+            onClick={onCharacter}
           >
-            <span className="sys-ico">💾</span>
-            <span className="sys-lbl">Lưu</span>
+            <span className="sys-ico">🧍</span>
+            <span className="sys-lbl">{t("hotbar.character")}</span>
           </button>
           <button
             className="sys-btn"
             id="inv-btn"
-            title="Hành Trang / Túi Đồ"
+            title={`${t("hotbar.inventory")} (F4)`}
             onClick={onInventory}
           >
             <span className="sys-ico">🎒</span>
-            <span className="sys-lbl">Hành Trang</span>
+            <span className="sys-lbl">{t("hotbar.inventory")}</span>
           </button>
           <button
             className="sys-btn"
             id="help-btn"
-            title="Cẩm Nang Hướng Dẫn"
+            title={t("hotbar.help")}
             onClick={onOpenHelp}
           >
             <span className="sys-ico">📜</span>
-            <span className="sys-lbl">Cẩm Nang</span>
+            <span className="sys-lbl">{t("hotbar.help")}</span>
           </button>
           <button
-            className="sys-btn"
-            id="sound-btn"
-            title="Cài đặt âm thanh"
-            style={{ opacity: audioEnabled ? 1 : 0.6 }}
-            onClick={onToggleAudio}
+            className={`sys-btn pk-mode${pkEnabled ? " pk-active" : ""}`}
+            id="pk-btn"
+            title={t("hotbar.pkTitle")}
+            onClick={onTogglePk}
           >
-            <span className="sys-ico">🔊</span>
-            <span className="sys-lbl">
-              {audioEnabled ? "Âm Thanh" : "Tắt Âm"}
-            </span>
-          </button>
-          <button className="sys-btn pk-mode" title="Trạng thái PK Hòa Bình">
             <span className="sys-ico">⚔️</span>
-            <span className="sys-lbl">Hòa Bình</span>
+            <span className="sys-lbl">{pkEnabled ? t("hotbar.pkOn") : t("hotbar.pkOff")}</span>
           </button>
         </div>
       </div>

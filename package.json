@@ -5,11 +5,16 @@
   "main": "combat.js",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "install:all": "npm install && npm --prefix server install",
+    "dev": "node scripts/dev.js",
+    "dev:client": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
+    "server:test": "npm --prefix server test"
   },
   "dependencies": {
     "phaser": "^3.90.0",
