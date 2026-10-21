@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: "江湖 — HTML5 RPG（武林群侠传II版）",
+    title: "江湖 — 武侠 RPG",
     defaultPlayerName: "浪客",
     serverFallback: "江湖",
     confirmReset: "确定要清除已保存的数据并重新开始吗？",
@@ -107,9 +107,9 @@ export default {
     reset: "从头开始（重置进度）"
   },
   login: {
-    brandTitle: "武林群侠传 II",
-    brandSubtitle: "豪杰雷争",
-    serverLoggedIn: "已登录服务器",
+    brandTitle: "江湖",
+    brandSubtitle: "行走江湖",
+    serverLoggedIn: "江湖之门",
     closeList: "关闭列表",
     chooseServer: "重新选择服务器",
     loginTab: "登录",

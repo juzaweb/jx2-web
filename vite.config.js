@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
         injectRegister: "auto",
         includeAssets: ["favicon.ico", "apple-touch-icon.png"],
         manifest: {
-          name: "Giang Hồ — HTML5 RPG (VL2 Edition)",
+          name: "Giang Hồ — Nhập Vai Giang Hồ",
           short_name: "Giang Hồ",
           description: "A small browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs.",
           theme_color: "#0f0b08",

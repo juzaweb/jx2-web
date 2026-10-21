@@ -1,5 +1,7 @@
 /* ====================================================
-   JX2 (Võ Lâm Truyền Kỳ 2) Authentic Login Screen Styles
+   Giang Hồ — Lobby backdrop & login screen
+   The backdrop is an original gradient + vector scene
+   (see src/components/LobbyScene.jsx). No bitmap art.
 ==================================================== */
 
 .jx2-login-overlay {
@@ -11,8 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url('/login_bg.png') no-repeat center center;
-  background-size: cover;
+  background: #04080c;
   user-select: none;
   font-family: 'Be Vietnam Pro', 'Noto Serif SC', 'Cinzel', serif;
 }
@@ -22,17 +23,165 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.1) 40%, rgba(0, 0, 0, 0.65) 100%);
+  z-index: 2;
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.5) 76%, rgba(0, 0, 0, 0.82) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, transparent 22%, transparent 68%, rgba(0, 0, 0, 0.5) 100%);
   pointer-events: none;
 }
 
 /* ----------------------------------------------------
-   Top-Right Game Logo Emblem (VL2 Hảo Kiệt Lôi Tranh)
+   Vector night scene
+---------------------------------------------------- */
+.jx2-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.jx2-scene-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(90% 55% at 20% 14%, rgba(122, 196, 204, 0.2) 0%, rgba(58, 116, 128, 0.07) 42%, transparent 68%),
+    radial-gradient(70% 26% at 46% 62%, rgba(214, 196, 150, 0.14) 0%, transparent 72%),
+    linear-gradient(180deg, #04080d 0%, #071119 30%, #0b1d26 52%, #122a2c 68%, #232a24 84%, #0a0b09 100%);
+}
+
+.jx2-scene-stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0.6;
+  background-image:
+    radial-gradient(1.6px 1.6px at 11% 13%, rgba(255, 255, 255, 0.95), transparent 62%),
+    radial-gradient(1.3px 1.3px at 26% 8%, rgba(224, 244, 255, 0.9), transparent 62%),
+    radial-gradient(1.8px 1.8px at 38% 17%, rgba(255, 255, 255, 0.8), transparent 62%),
+    radial-gradient(1.2px 1.2px at 47% 6%, rgba(224, 244, 255, 0.75), transparent 62%),
+    radial-gradient(1.6px 1.6px at 58% 20%, rgba(255, 255, 255, 0.85), transparent 62%),
+    radial-gradient(1.3px 1.3px at 66% 11%, rgba(224, 244, 255, 0.7), transparent 62%),
+    radial-gradient(1.7px 1.7px at 78% 18%, rgba(255, 255, 255, 0.8), transparent 62%),
+    radial-gradient(1.2px 1.2px at 86% 7%, rgba(224, 244, 255, 0.85), transparent 62%),
+    radial-gradient(1.5px 1.5px at 94% 23%, rgba(255, 255, 255, 0.7), transparent 62%),
+    radial-gradient(1.3px 1.3px at 18% 28%, rgba(224, 244, 255, 0.6), transparent 62%),
+    radial-gradient(1.4px 1.4px at 32% 32%, rgba(255, 255, 255, 0.5), transparent 62%),
+    radial-gradient(1.2px 1.2px at 72% 30%, rgba(255, 255, 255, 0.55), transparent 62%);
+  background-repeat: no-repeat;
+  animation: jx2Twinkle 7s ease-in-out infinite alternate;
+}
+
+.jx2-scene-moon {
+  position: absolute;
+  top: 11%;
+  left: 15%;
+  width: clamp(66px, 8.5vw, 124px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 64% 60%, rgba(176, 152, 106, 0.28) 0 7%, transparent 8%),
+    radial-gradient(circle at 40% 72%, rgba(176, 152, 106, 0.22) 0 5%, transparent 6%),
+    radial-gradient(circle at 36% 32%, #fffdf4 0%, #ffeec4 44%, #f0d49a 74%, #d5b881 100%);
+  box-shadow:
+    0 0 32px 6px rgba(255, 232, 176, 0.32),
+    0 0 110px 38px rgba(255, 208, 132, 0.14);
+  opacity: 0.96;
+}
+
+.jx2-scene-range {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  display: block;
+}
+
+.jx2-scene-range.far {
+  height: 66%;
+  fill: #17394a;
+  opacity: 0.92;
+}
+
+.jx2-scene-range.mid {
+  height: 50%;
+  fill: #0a1c24;
+}
+
+.jx2-scene-range.near {
+  height: 24%;
+  fill: #050d12;
+}
+
+.jx2-scene-pagoda {
+  fill: #061218;
+}
+
+.jx2-scene-mist {
+  position: absolute;
+  left: -10%;
+  bottom: 30%;
+  width: 120%;
+  height: 15%;
+  background: linear-gradient(180deg, transparent 0%, rgba(160, 210, 212, 0.11) 48%, rgba(160, 210, 212, 0.03) 78%, transparent 100%);
+  filter: blur(10px);
+  animation: jx2MistDrift 28s ease-in-out infinite alternate;
+}
+
+.jx2-scene-mist.lower {
+  bottom: 14%;
+  height: 12%;
+  opacity: 0.7;
+  animation-duration: 38s;
+  animation-direction: alternate-reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jx2-scene-stars,
+  .jx2-scene-mist {
+    animation: none;
+  }
+}
+
+.jx2-scene-birds {
+  position: absolute;
+  top: 24%;
+  right: 22%;
+  width: clamp(90px, 11vw, 160px);
+  height: auto;
+  opacity: 0.42;
+}
+
+.jx2-scene-pines {
+  position: absolute;
+  left: 1.5%;
+  bottom: 2%;
+  width: clamp(130px, 17vw, 250px);
+  opacity: 0.92;
+}
+
+.jx2-scene-pines svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes jx2Twinkle {
+  from { opacity: 0.4; }
+  to { opacity: 0.7; }
+}
+
+@keyframes jx2MistDrift {
+  from { transform: translateX(-4%); }
+  to { transform: translateX(4%); }
+}
+
+/* ----------------------------------------------------
+   Top-Right Title Emblem
 ---------------------------------------------------- */
 .jx2-login-logo {
   position: absolute;
-  top: 24px;
-  right: 36px;
+  top: 26px;
+  right: 38px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -44,39 +193,33 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .jx2-logo-sword-icon {
-  width: 44px;
-  height: 44px;
-  filter: drop-shadow(0 0 8px rgba(255, 60, 0, 0.8));
+  width: 42px;
+  height: 42px;
+  filter: drop-shadow(0 0 10px rgba(227, 194, 124, 0.45));
 }
 
 .jx2-logo-text {
   font-family: 'Noto Serif SC', 'Cinzel', serif;
-  font-size: 28px;
+  font-size: 29px;
   font-weight: 900;
-  color: #fff9e6;
-  text-shadow: 0 0 10px rgba(255, 120, 30, 0.9), 0 2px 4px #000, 2px 2px 0 #801000;
-  letter-spacing: 1px;
+  color: #fff4dc;
+  text-shadow: 0 0 14px rgba(227, 194, 124, 0.45), 0 2px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 3px;
 }
 
 .jx2-logo-subtitle {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 700;
-  color: #ffcc66;
-  text-shadow: 0 1px 3px #000, 0 0 8px rgba(255, 204, 102, 0.7);
-  letter-spacing: 2px;
-  margin-top: -2px;
-}
-
-.jx2-logo-domain {
-  font-size: 11px;
-  font-family: monospace;
-  color: rgba(255, 255, 255, 0.75);
+  color: #e6c98a;
+  text-shadow: 0 1px 3px #000;
+  letter-spacing: 4px;
   margin-top: 2px;
-  letter-spacing: 1px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(227, 194, 124, 0.35);
 }
 
 /* ----------------------------------------------------
@@ -87,14 +230,19 @@
   z-index: 20;
   width: 380px;
   max-width: min(380px, 94vw);
-  background: linear-gradient(180deg, #1b2c2a 0%, #111e1c 60%, #0a1413 100%);
-  border: 2px solid #4d7a70;
-  outline: 1.5px solid #162623;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85),
-              inset 0 1px 0 rgba(140, 215, 195, 0.3),
-              inset 0 0 20px rgba(0, 0, 0, 0.8);
-  border-radius: 4px;
-  padding: 8px 12px 14px 12px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(84, 148, 132, 0.18) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(10, 22, 24, 0.94) 0%, rgba(6, 13, 15, 0.96) 60%, rgba(4, 9, 11, 0.97) 100%);
+  border: 1.5px solid rgba(216, 184, 116, 0.5);
+  outline: 1px solid rgba(0, 0, 0, 0.9);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.75),
+              0 0 0 1px rgba(0, 0, 0, 0.55),
+              inset 0 1px 0 rgba(255, 236, 190, 0.12),
+              inset 0 0 40px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  border-radius: 6px;
+  padding: 10px 12px 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -103,9 +251,9 @@
 /* Metallic corner ornaments */
 .jx2-corner {
   position: absolute;
-  width: 8px;
-  height: 8px;
-  border-color: #7bc4b2;
+  width: 10px;
+  height: 10px;
+  border-color: #d8b874;
   border-style: solid;
   pointer-events: none;
 }
@@ -119,7 +267,7 @@
 ---------------------------------------------------- */
 .jx2-box-header {
   background: linear-gradient(180deg, #28443e 0%, #162925 100%);
-  border: 1px solid #4a756b;
+  border: 1px solid rgba(216, 184, 116, 0.42);
   border-radius: 3px;
   padding: 6px 12px;
   text-align: center;
@@ -129,9 +277,9 @@
 .jx2-box-title {
   font-size: 15px;
   font-weight: 700;
-  color: #c9ede2;
+  color: #ffe8b8;
   letter-spacing: 0.8px;
-  text-shadow: 0 1px 2px #000, 0 0 6px rgba(110, 231, 183, 0.4);
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(216, 184, 116, 0.35);
 }
 
 /* ----------------------------------------------------
@@ -179,8 +327,11 @@
   position: relative;
   width: 100%;
   height: 120px;
-  background: #050a09 url('/hero_portrait.png') no-repeat center center;
-  background-size: contain;
+  background-color: #050a09;
+  background-image: radial-gradient(circle at 50% 62%, rgba(84, 158, 146, 0.26), transparent 62%), url('/hero_portrait.png');
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, contain;
   border: 1px solid #1a2d28;
   border-radius: 2px;
   overflow: hidden;
@@ -593,7 +744,10 @@
 
 @media (max-height: 600px) {
   .jx2-login-logo {
-    display: none;
+    top: 12px;
+    right: 14px;
+    transform: scale(0.72);
+    transform-origin: top right;
   }
   .jx2-server-artwork {
     height: 70px;

@@ -3,6 +3,7 @@ import { apiClient } from "../../game/apiClient.js";
 import { writeSession } from "../../game/session.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { LobbyScene } from "../LobbyScene.jsx";
 import { requestLandscapeFullscreen } from "../../game/orientation.js";
 import "../../styles/login.css";
 
@@ -227,20 +228,22 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
   return (
     <div className="jx2-login-overlay" id="jx2-login-overlay">
+      <LobbyScene />
       <LanguageSwitcher variant="login" />
 
-      {/* Top-Right Official Emblem */}
+      {/* Top-Right Title Emblem */}
       <div className="jx2-login-logo">
         <div className="jx2-logo-title-wrap">
-          <svg className="jx2-logo-sword-icon" viewBox="0 0 64 64" fill="none">
-            <path d="M10 54 L32 32 M32 32 L46 18 M46 18 L54 10 L50 6 L42 14 L28 28" stroke="#ff4500" strokeWidth="4" strokeLinecap="round" />
-            <path d="M26 38 L38 26" stroke="#fcd34d" strokeWidth="3" />
-            <circle cx="10" cy="54" r="4" fill="#ef4444" />
+          <svg className="jx2-logo-sword-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <circle cx="32" cy="32" r="28" stroke="rgba(227, 194, 124, 0.62)" strokeWidth="1.3" />
+            <circle cx="32" cy="32" r="23" stroke="rgba(227, 194, 124, 0.25)" strokeWidth="1" />
+            <path d="M32 11 L36.5 29 L32 36 L27.5 29 Z" fill="#e9d3a0" />
+            <path d="M32 36 V50" stroke="#c9a961" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M23 43 H41" stroke="#c9a961" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
           <span className="jx2-logo-text">{t("login.brandTitle")}</span>
         </div>
         <div className="jx2-logo-subtitle">{t("login.brandSubtitle")}</div>
-        <div className="jx2-logo-domain">volam2.zing.vn</div>
       </div>
 
       {/* Main Login Box */}

@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: "Giang Hồ — HTML5 RPG (VL2 Edition)",
+    title: "Giang Hồ — Nhập Vai Giang Hồ",
     defaultPlayerName: "Lãng Khách",
     serverFallback: "Giang Hồ",
     confirmReset: "Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?",
@@ -107,9 +107,9 @@ export default {
     reset: "LÀM LẠI TỪ ĐẦU (RESET TIẾN TRÌNH)"
   },
   login: {
-    brandTitle: "Võ Lâm Truyền Kỳ II",
-    brandSubtitle: "HẢO KIỆT LÔI TRANH",
-    serverLoggedIn: "Máy chủ đã đăng nhập",
+    brandTitle: "Giang Hồ",
+    brandSubtitle: "HÀNH TẨU GIANG HỒ",
+    serverLoggedIn: "Cổng vào giang hồ",
     closeList: "Đóng danh sách",
     chooseServer: "Chọn lại máy chủ",
     loginTab: "Đăng nhập",

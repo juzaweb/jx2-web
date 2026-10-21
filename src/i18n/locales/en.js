@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: "Jianghu — HTML5 RPG (VL2 Edition)",
+    title: "Jianghu — Wuxia RPG",
     defaultPlayerName: "Wanderer",
     serverFallback: "Jianghu",
     confirmReset: "Are you sure you want to erase your saved progress and start over?",
@@ -107,9 +107,9 @@ export default {
     reset: "START OVER (RESET PROGRESS)"
   },
   login: {
-    brandTitle: "Legends of the Martial World II",
-    brandSubtitle: "HEROES RISE",
-    serverLoggedIn: "Logged-in server",
+    brandTitle: "Jianghu",
+    brandSubtitle: "WANDER THE MARTIAL WORLD",
+    serverLoggedIn: "Gateway to the Jianghu",
     closeList: "Close list",
     chooseServer: "Choose another server",
     loginTab: "Log in",

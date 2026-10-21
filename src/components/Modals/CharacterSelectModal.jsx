@@ -3,6 +3,7 @@ import { apiClient } from "../../game/apiClient.js";
 import "../../styles/character-select.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { LobbyScene } from "../LobbyScene.jsx";
 import { requestLandscapeFullscreen } from "../../game/orientation.js";
 
 const NAME_MIN = 2;
@@ -184,6 +185,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   return (
     <div className="jx2-login-overlay" id="jx2-character-overlay">
+      <LobbyScene />
       <LanguageSwitcher variant="character" />
 
       {/* Top status bar: account + server, mirroring the in-game header */}
