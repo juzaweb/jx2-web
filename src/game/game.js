@@ -440,8 +440,16 @@ export class JiangHuScene extends Phaser.Scene {
     // Allow standard typing in HTML form inputs (e.g. login form, chat)
     this.input.keyboard.preventDefault = false;
     const isTyping = () => {
-      const tag = typeof document !== "undefined" && document.activeElement?.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA";
+      if (typeof document === "undefined") return false;
+      const active = document.activeElement;
+      if (!active) return false;
+      const tag = active.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        !!active.isContentEditable ||
+        active.getAttribute?.("contenteditable") === "true"
+      );
     };
     this.isTyping = isTyping;
 
@@ -1229,6 +1237,10 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.shopFlow) {
       this.shopFlow.destroy();
       this.shopFlow = null;
+    }
+    if (this.player) {
+      this.player.destroy?.();
+      this.player = null;
     }
     if (this.uiBridge) {
       this.uiBridge.destroy();

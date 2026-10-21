@@ -93,7 +93,7 @@ export default {
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",
     title: "Hướng Dẫn Tân Thủ",
-    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng cần gạt ảo trên mobile.",
+    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), dùng phím Mũi tên (↑ ↓ ← →) hoặc W/A/S/D, hoặc cần gạt ảo trên mobile.",
     combat: "Chiến đấu: Dùng nút Tấn công trên thanh dưới (hoặc nút tấn công trên mobile).",
     skill: "Chiêu thức: Bấm ô Chuột trái / Chuột phải để chọn chiêu. Chuột trái vào quái: lao tới đánh. Chuột phải vào quái: lao tới đánh; chuột phải đất trống: xuất chiêu tại chỗ. Phím tắt gán chiêu vào tay phải.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",

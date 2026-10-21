@@ -54,6 +54,7 @@ describe("JiangHuScene teardown", () => {
     const unsubscribers = [vi.fn(), vi.fn()];
     const disconnect = vi.fn();
     const destroyRemotePlayers = vi.fn();
+    const destroyPlayer = vi.fn();
     const destroyBridge = vi.fn();
     const removeEventListener = vi.spyOn(window, "removeEventListener");
     const scope = {
@@ -61,6 +62,7 @@ describe("JiangHuScene teardown", () => {
       unsubscribers,
       networkClient: { disconnect },
       remotePlayerManager: { destroy: destroyRemotePlayers },
+      player: { destroy: destroyPlayer },
       uiBridge: { destroy: destroyBridge }
     };
 
@@ -68,9 +70,11 @@ describe("JiangHuScene teardown", () => {
 
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(destroyRemotePlayers).toHaveBeenCalledTimes(1);
+    expect(destroyPlayer).toHaveBeenCalledTimes(1);
     expect(destroyBridge).toHaveBeenCalledTimes(1);
     expect(scope.networkClient).toBeNull();
     expect(scope.remotePlayerManager).toBeNull();
+    expect(scope.player).toBeNull();
     expect(removeEventListener).toHaveBeenCalledWith("beforeunload", scope.unloadHandler);
     expect(scope.unsubscribers).toEqual([]);
     unsubscribers.forEach((unsub) => expect(unsub).toHaveBeenCalledTimes(1));

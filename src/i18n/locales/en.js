@@ -93,7 +93,7 @@ export default {
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",
     title: "Beginner's Guide",
-    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use the mobile joystick.",
+    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), use Arrow keys (↑ ↓ ← →) or W/A/S/D, or the mobile joystick.",
     combat: "Combat: Use the Attack button on the bottom bar (or the attack button on mobile).",
     skill: "Skills: click the Left click / Right click slot to choose a skill. Left-click an enemy to run in and strike. Right-click an enemy to run in; right-click empty ground to cast in place. Hotkeys assign skills to the right hand.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
