@@ -4,6 +4,7 @@ import {
   MARKET_BUILDINGS,
   MARKET_GRASS,
   MARKET_LANTERNS,
+  MARKET_NPCS,
   MARKET_PLAZA,
   MARKET_PROPS,
   MARKET_SPAWN,
@@ -60,7 +61,17 @@ describe("market layout", () => {
       expect(inside(x + w / 2, y + d / 2)).toBe(true);
     }
     for (const { x, y } of MARKET_PROPS) expect(inside(x, y)).toBe(true);
+    for (const { x, y } of MARKET_NPCS) expect(inside(x, y)).toBe(true);
     for (const [x, y] of MARKET_LANTERNS) expect(inside(x, y)).toBe(true);
+  });
+
+  it("places every NPC in front of its shop", () => {
+    for (const npc of MARKET_NPCS) {
+      const building = MARKET_BUILDINGS.find((entry) => entry.id === npc.building);
+      expect(building).toBeTruthy();
+      expect(Math.abs(npc.x - building.x)).toBeLessThan(building.w / 2);
+      expect(npc.y).toBeGreaterThan(building.y);
+    }
   });
 
   it("uses only known vegetation sprite kinds", () => {

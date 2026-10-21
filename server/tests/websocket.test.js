@@ -490,6 +490,67 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client2.close();
   });
 
+  await t.test("Shop purchases debit server silver and store the item", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: {
+        id: "usr_shop",
+        token: "test-token",
+        characterId: "char_shop_1",
+        username: "Shop",
+        x: 6400,
+        y: 6050
+      }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    // Earn silver deterministically from the one-off quest payout instead of
+    // killing shared enemies (that would perturb the later enemy-state tests).
+    client.send({ type: "quest_claim", payload: {} });
+    const earned = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins > 0);
+    assert.equal(earned.payload.coins, 20);
+
+    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const bought = await client.waitFor((m) => m.type === "shop_result");
+    assert.equal(bought.payload.ok, true);
+    assert.equal(bought.payload.itemId, "kim-sang-duoc");
+    assert.equal(bought.payload.qty, 1);
+    assert.equal(bought.payload.total, 8);
+    assert.equal(bought.payload.coins, earned.payload.coins - 8, "silver is debited by the server");
+
+    // The authoritative ledger and bag both reflect the purchase.
+    const progress = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins === earned.payload.coins - 8);
+    assert.equal(progress.payload.coins, earned.payload.coins - 8);
+
+    // Unknown stock and unaffordable quantities are refused without charging.
+    client.send({ type: "shop_buy", payload: { itemId: "thiet-trao", qty: 1 } });
+    const unknown = await client.waitFor((m) => m.type === "shop_result" && m.payload.ok === false);
+    assert.equal(unknown.payload.reason, "unknown");
+
+    client.send({ type: "shop_buy", payload: { itemId: "nu-nhi-hong", qty: 99 } });
+    const poor = await client.waitFor(
+      (m) => m.type === "shop_result" && m.payload.ok === false && m.payload.reason === "coins"
+    );
+    assert.equal(poor.payload.coins, earned.payload.coins - 8, "a refused purchase spends nothing");
+
+    await client.close();
+
+    // The server bag is authoritative and already contains the purchase.
+    const inventory = await (await fetch(`http://127.0.0.1:${port}/api/inventory/char_shop_1`)).json();
+    assert.equal(inventory.data.inventory["kim-sang-duoc"], 1, "the purchase is stored on the server bag");
+
+    // A guest (no verified character) cannot trade.
+    const guest = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    guest.send({ type: "player_join", payload: { id: "usr_shop_guest", username: "Guest" } });
+    await guest.waitFor((m) => m.type === "init_world");
+    guest.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const refused = await guest.waitFor((m) => m.type === "shop_result");
+    assert.equal(refused.payload.ok, false);
+    assert.equal(refused.payload.reason, "guest");
+    await guest.close();
+  });
+
   await t.test("Unauthenticated joins earn nothing", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     // No token: the player is present but owns no ledger.

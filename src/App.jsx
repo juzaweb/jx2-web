@@ -12,6 +12,7 @@ import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
+import { ShopModal } from "./components/Modals/ShopModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
 import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
@@ -116,6 +117,8 @@ export function App() {
     () => loadSkillLoadout(readSession()?.activeCharacter?.id).left
   );
   const [skillPickerHand, setSkillPickerHand] = useState(null);
+  const [shopNpc, setShopNpc] = useState(null);
+  const [shopResult, setShopResult] = useState(null);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -255,6 +258,17 @@ export function App() {
       if (typeof slot === "number") setLeftSkillSlot(slot);
     });
 
+    const unsubShopOpened = bridge.on(EVENTS.SHOP_OPENED, (npc) => {
+      if (!npc?.npcId) return;
+      setShopNpc(npc);
+      setShopResult(null);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+    });
+
+    const unsubShopResult = bridge.on(EVENTS.SHOP_RESULT, (result) => {
+      setShopResult(result || null);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -266,6 +280,8 @@ export function App() {
       unsubStarted();
       unsubSkillSelected();
       unsubLeftSkillSelected();
+      unsubShopOpened();
+      unsubShopResult();
     };
   }, []);
 
@@ -294,6 +310,17 @@ export function App() {
     setIsInventoryOpen(false);
   }, []);
 
+  const handleCloseShop = useCallback(() => {
+    setShopNpc(null);
+    setShopResult(null);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleBuyShopItem = useCallback((itemId) => {
+    setShopResult(null);
+    bridge.emit(EVENTS.ACTION_BUY_ITEM, { itemId, qty: 1 });
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isTypingTarget(e.target)) return;
@@ -305,6 +332,7 @@ export function App() {
         isInventoryOpen ||
         isCharacterOpen ||
         isCityMapOpen ||
+        !!shopNpc ||
         isLoginOpen ||
         (!activeCharacter && !!currentUser);
 
@@ -355,6 +383,11 @@ export function App() {
 
       if (e.key !== "Escape") return;
 
+      if (shopNpc) {
+        handleCloseShop();
+        return;
+      }
+
       if (isCityMapOpen) {
         setIsCityMapOpen(false);
         return;
@@ -387,10 +420,12 @@ export function App() {
     isLoginOpen,
     activeCharacter,
     currentUser,
+    shopNpc,
     handleOpenCharacter,
     handleCloseCharacter,
     handleOpenInventory,
-    handleCloseInventory
+    handleCloseInventory,
+    handleCloseShop
   ]);
 
   const handleAttack = useCallback(() => {
@@ -640,6 +675,16 @@ export function App() {
       <CityMapModal
         isOpen={isCityMapOpen}
         onClose={() => setIsCityMapOpen(false)}
+      />
+
+      {/* Herb-shop counter (talk to the Dược Sư NPC) */}
+      <ShopModal
+        isOpen={!!shopNpc}
+        npcName={shopNpc?.name || ""}
+        coins={stats.coins}
+        result={shopResult}
+        onBuy={handleBuyShopItem}
+        onClose={handleCloseShop}
       />
 
       {/* Character Inventory ("Hành trang") */}

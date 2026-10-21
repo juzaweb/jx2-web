@@ -200,6 +200,15 @@ export class NetworkClient {
   }
 
   /**
+   * Ask the server to buy `qty` of a stocked item. The server validates the
+   * price against its own ledger and only then debits silver.
+   * @param {{itemId:string, qty?:number}} purchase
+   */
+  sendShopBuy(purchase) {
+    this.send("shop_buy", purchase);
+  }
+
+  /**
    * Send attack / skill action
    * @param {Object} attackData
    */

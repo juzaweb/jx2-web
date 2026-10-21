@@ -18,9 +18,17 @@ import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
-import { MARKET_BOUNDS, MARKET_SPAWN } from "./marketLayout.js";
+import { MARKET_BOUNDS, MARKET_NPCS, MARKET_SPAWN } from "./marketLayout.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
+import {
+  NPC_DUOC,
+  NPC_INTERACT_RANGE,
+  createPharmacyNpc,
+  isPointOnNpc,
+  npcApproachPoint
+} from "./npc.js";
+import { ShopFlow } from "./shopFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
@@ -61,6 +69,12 @@ export class JiangHuScene extends Phaser.Scene {
     }
     this.load.image("hero-portrait", "/hero_portrait.png");
     this.load.image("ground-bricks", "/gach-tile.webp");
+    if (!this.textures.exists(NPC_DUOC.textureKey)) {
+      this.load.spritesheet(NPC_DUOC.textureKey, NPC_DUOC.url, {
+        frameWidth: NPC_DUOC.frameWidth,
+        frameHeight: NPC_DUOC.frameHeight
+      });
+    }
     for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
       this.load.image(key, url);
     }
@@ -90,6 +104,15 @@ export class JiangHuScene extends Phaser.Scene {
     // Initialize subsystems
     this.worldManager = new WorldManager(this);
     this.worldManager.create();
+
+    // Friendly shopkeepers (currently the Dược Điểm herbalist). Their bodies are
+    // added to the same static group as the buildings so the hero cannot walk
+    // through them.
+    this.npcs = MARKET_NPCS.map((def) => createPharmacyNpc(this, def));
+    for (const npc of MARKET_NPCS) {
+      this.worldManager.addBody(npc.x, npc.y, 46, 34);
+    }
+    this.pendingNpc = null;
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
@@ -182,6 +205,12 @@ export class JiangHuScene extends Phaser.Scene {
     // Real-time Multiplayer: Remote Player Manager & WebSocket Network Client
     this.remotePlayerManager = new RemotePlayerManager(this, this.uiBridge);
     this.networkClient = new NetworkClient();
+    this.shopFlow = new ShopFlow({
+      player: this.player,
+      uiBridge: this.uiBridge,
+      networkClient: this.networkClient,
+      saveGame: (showFeedback) => this.saveGame(showFeedback)
+    });
 
     this.networkClient.on("init_world", (payload) => {
       this.remotePlayerManager.handleInitWorld(payload);
@@ -256,6 +285,12 @@ export class JiangHuScene extends Phaser.Scene {
       this.combat.applyServerProgress(payload);
     });
 
+    // A server-validated shop purchase. The server has already debited silver
+    // and written the item to this character's bag; mirror the item locally.
+    this.networkClient.on("shop_result", (payload) => {
+      this.shopFlow.handleResult(payload);
+    });
+
     this.networkClient.on("connected", () => {
       this.sendNetworkJoin();
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
@@ -293,6 +328,10 @@ export class JiangHuScene extends Phaser.Scene {
       const worldX = ground.x;
       const worldY = ground.y;
 
+      // Any click re-targets the hero, so a pending NPC approach is cancelled
+      // unless this click selects one again below.
+      this.pendingNpc = null;
+
       // Check if clicking directly on a living enemy
       const clickedEnemy = this.enemyManager
         .getAlive()
@@ -311,6 +350,29 @@ export class JiangHuScene extends Phaser.Scene {
         } else {
           this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
           this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
+        }
+        return;
+      }
+
+      // Check if clicking directly on an NPC (shop interaction). The clickable
+      // box covers the sprite's body above its feet, not just the ground anchor.
+      const clickedNpc = (this.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
+
+      if (clickedNpc) {
+        const dist = Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          clickedNpc.gx,
+          clickedNpc.gy
+        );
+        if (dist <= NPC_INTERACT_RANGE) {
+          this.player.stopMovement();
+          this.shopFlow.open(clickedNpc);
+        } else {
+          const approach = npcApproachPoint(clickedNpc);
+          this.pendingNpc = clickedNpc;
+          this.player.moveTo(approach.x, approach.y);
+          this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
         }
         return;
       }
@@ -361,6 +423,7 @@ export class JiangHuScene extends Phaser.Scene {
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       this.combat.cancelPendingCast();
+      this.pendingNpc = null;
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -447,6 +510,9 @@ export class JiangHuScene extends Phaser.Scene {
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
+      }),
+      bridge.on(EVENTS.ACTION_BUY_ITEM, ({ itemId, qty } = {}) => {
+        if (this.started) this.shopFlow.buy(itemId, qty);
       }),
       bridge.on(EVENTS.ACTION_EQUIP_ITEM, (itemId) => this.equipItem(itemId)),
       bridge.on(EVENTS.ACTION_UNEQUIP_SLOT, (slot) => this.unequipSlot(slot)),
@@ -1027,6 +1093,22 @@ export class JiangHuScene extends Phaser.Scene {
     // Drive pending melee approaches (walk into range, then release the skill).
     this.combat.update?.(time);
 
+    // Open a shop once the hero has walked within talking distance.
+    if (this.pendingNpc) {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        this.pendingNpc.gx,
+        this.pendingNpc.gy
+      );
+      if (dist <= NPC_INTERACT_RANGE) {
+        const npc = this.pendingNpc;
+        this.pendingNpc = null;
+        this.player.stopMovement();
+        this.shopFlow.open(npc);
+      }
+    }
+
     // Update remote players (interpolation and animations)
     if (this.remotePlayerManager) {
       this.remotePlayerManager.update(time, delta);
@@ -1136,6 +1218,10 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.remotePlayerManager) {
       this.remotePlayerManager.destroy();
       this.remotePlayerManager = null;
+    }
+    if (this.shopFlow) {
+      this.shopFlow.destroy();
+      this.shopFlow = null;
     }
     if (this.uiBridge) {
       this.uiBridge.destroy();

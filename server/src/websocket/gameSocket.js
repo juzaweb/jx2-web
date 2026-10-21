@@ -17,6 +17,7 @@ import {
 } from "../../../src/game/progression.js";
 import { skillById, skillMpCost, skillCooldown } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
+import { shopPurchase } from "../../../src/game/shop.js";
 
 /**
  * Clean sanitization for player strings
@@ -325,6 +326,10 @@ export class GameSocketManager {
         this.handlePlayerRestoreMp(ws, msg.payload);
         break;
 
+      case "shop_buy":
+        this.handleShopBuy(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
@@ -622,6 +627,94 @@ export class GameSocketManager {
 
     player.mp = Math.min(player.maxMp, player.mp + amount);
     this.broadcastMp(player);
+  }
+
+  /**
+   * Buy stock from a shop NPC. Silver and the catalog price are server-owned:
+   * the client only names the item and quantity, and is answered with the
+   * authoritative result. The purchased units are written to the character's
+   * stored bag before the reply, so a purchase survives a disconnect.
+   * @param {WebSocket} ws
+   * @param {{itemId?:string, qty?:number}} payload
+   */
+  handleShopBuy(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const purchase = shopPurchase(sanitizeStr(payload.itemId, 64), payload.qty);
+    if (!purchase) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: sanitizeStr(payload.itemId, 64), reason: "unknown" }
+      });
+      return;
+    }
+
+    // Guests and unverified characters have no ledger to debit.
+    if (!player.progress || !player.characterId) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: purchase.item.id, qty: purchase.qty, reason: "guest" }
+      });
+      return;
+    }
+
+    if (player.progress.coins < purchase.total) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "coins"
+        }
+      });
+      return;
+    }
+
+    // Write the item first: if the bag cannot be persisted, no silver is spent.
+    try {
+      const bag = store.getInventory(player.characterId);
+      const stored = Math.max(0, Math.floor(Number(bag[purchase.item.id]) || 0));
+      bag[purchase.item.id] = stored + purchase.qty;
+      store.setInventory(player.characterId, bag);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to store purchase:", err.message);
+      }
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "error"
+        }
+      });
+      return;
+    }
+
+    player.progress = { ...player.progress, coins: player.progress.coins - purchase.total };
+    this.persistProgress(player);
+
+    this.send(ws, {
+      type: "player_progress",
+      payload: progressPayload(player.progress)
+    });
+    this.send(ws, {
+      type: "shop_result",
+      payload: {
+        ok: true,
+        itemId: purchase.item.id,
+        qty: purchase.qty,
+        total: purchase.total,
+        coins: player.progress.coins
+      }
+    });
   }
 
   /** Broadcast a player's authoritative MP pool to nearby players. */

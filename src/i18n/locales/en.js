@@ -255,6 +255,20 @@ export default {
     equipHint: "Click to equip in the {slot} slot",
     useHint: "Click to use"
   },
+  shop: {
+    eyebrow: "BIANJING HERB SHOP",
+    title: "Herb Shop",
+    greeting: "This old man sells elixirs for health and inner force. Take your pick, traveler.",
+    balance: "Silver:",
+    buy: "Buy",
+    result: {
+      ok: "Purchase complete — {qty} item(s) added to your bag.",
+      coins: "Not enough silver for this item.",
+      guest: "Log in and choose a character to trade.",
+      offline: "Connect to the server to trade.",
+      unknown: "This shop does not sell that item."
+    }
+  },
   slots: {
     armor: "Armor",
     helmet: "Helmet",
