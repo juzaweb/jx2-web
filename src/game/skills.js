@@ -73,13 +73,14 @@ const THIEU_LAM_SKILLS = [
       { kind: "buff", stat: "critRate", amount: 0.05, duration: 180000 }
     ],
     vfx: {
-      sprite: "vfx-la-han-tran-frame4",
+      sprite: "vfx-la-han-tran",
       type: "formation",
       cast: "shockwave",
       impact: null,
       color: 0xffd166,
       shake: 0,
-      scale: 0.8
+      scale: 0.85,
+      fps: 10
     }
   }
 ];

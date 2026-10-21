@@ -253,31 +253,34 @@ export class RemotePlayer {
   }
 
   /**
-   * Display a continuously rotating formation circle (frame-4) under the peer's feet.
-   * @param {string} [key="vfx-la-han-tran-frame4"]
+   * Display a continuously rotating ground formation circle under the peer's feet.
+   * Stays flat on the ground and follows the character while the buff is active.
+   * @param {string} [key="vfx-la-han-tran"]
    */
-  showFormation(key = "vfx-la-han-tran-frame4") {
+  showFormation(key = "vfx-la-han-tran") {
     if (!this.container || typeof this.scene?.add?.sprite !== "function") return;
+    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
-    let textureKey = key;
-    let frame = undefined;
-    if (this.scene.textures?.exists) {
-      if (this.scene.textures.exists(key)) {
-        textureKey = key;
-      } else if (this.scene.textures.exists("vfx-la-han-tran-frame4")) {
-        textureKey = "vfx-la-han-tran-frame4";
-      } else if (this.scene.textures.exists("vfx-la-han-tran")) {
-        textureKey = "vfx-la-han-tran";
-        frame = 3;
-      } else {
-        return;
+    const animKey = `${key}-spin`;
+    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
+      const texture = this.scene.textures?.get?.(key);
+      const frameTotal = texture?.frameTotal ?? 16;
+      const frameCount = Math.max(1, frameTotal - 1);
+      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
+      if (frames && frames.length > 0) {
+        this.scene.anims.create({
+          key: animKey,
+          frames,
+          frameRate: 10,
+          repeat: -1
+        });
       }
     }
 
     if (!this.formationSprite) {
-      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, textureKey, frame);
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
       this.formationSprite.setOrigin(0.5, 0.5);
-      this.formationSprite.setScale(0.8);
+      this.formationSprite.setScale(0.85);
       const bodyIndex = this.container.getIndex ? this.container.getIndex(this.body) : -1;
       if (bodyIndex >= 0 && this.container.addAt) {
         this.container.addAt(this.formationSprite, bodyIndex);
@@ -287,17 +290,8 @@ export class RemotePlayer {
     }
 
     this.formationSprite.setVisible?.(true);
-
-    if (!this.formationTween && this.scene?.tweens?.add) {
-      this.formationTween = this.scene.tweens.add({
-        targets: this.formationSprite,
-        angle: 360,
-        duration: 8000,
-        repeat: -1,
-        ease: "Linear"
-      });
-    } else if (this.formationTween?.isPaused?.()) {
-      this.formationTween.resume?.();
+    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
+      this.formationSprite.play(animKey, true);
     }
   }
 
@@ -307,18 +301,11 @@ export class RemotePlayer {
   hideFormation() {
     if (this.formationSprite) {
       this.formationSprite.setVisible?.(false);
-      this.formationSprite.setAngle?.(0);
-    }
-    if (this.formationTween) {
-      this.formationTween.pause?.();
+      this.formationSprite.stop?.();
     }
   }
 
   destroy() {
-    if (this.formationTween) {
-      this.formationTween.stop?.();
-      this.formationTween = null;
-    }
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;
