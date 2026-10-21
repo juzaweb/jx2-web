@@ -114,20 +114,6 @@
 }
 
 /* Aggregate bonuses from all worn items */
-.inv-equip-bonus {
-  flex-shrink: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 5px 10px;
-  font-size: 10px;
-  color: #e8cf95;
-  background: rgba(14, 9, 4, 0.7);
-  border-bottom: 1px solid #4a3520;
-}
-.inv-equip-bonus-item b {
-  color: #ffe9ad;
-}
 .inv-slot.locked {
   background: radial-gradient(circle at 50% 35%, #3a2a18 0%, #120c06 100%);
   border-color: #8c663a;

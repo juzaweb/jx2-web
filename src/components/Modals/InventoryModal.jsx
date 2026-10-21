@@ -7,9 +7,7 @@ import {
 } from "../../game/items.js";
 import {
   EQUIPMENT_SLOTS,
-  BONUS_LABELS,
-  bonusRows,
-  deriveEquipmentBonuses
+  bonusRows
 } from "../../game/equipment.js";
 import "./inventory.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
@@ -107,13 +105,6 @@ export function InventoryModal({
     EQUIPMENT_SLOTS.map((slot) => equipment?.[slot.key]).filter(Boolean)
   );
 
-  const bonusSummary = localizeBonusRows(
-    Object.entries(deriveEquipmentBonuses(equipment))
-      .filter(([, amount]) => amount !== 0)
-      .map(([stat, amount]) => ({ stat, label: BONUS_LABELS[stat] || stat, amount })),
-    t
-  );
-
   const hoveredBonusRows = hovered ? localizeBonusRows(bonusRows(hovered), t) : [];
 
   return (
@@ -181,16 +172,6 @@ export function InventoryModal({
             <span className="inv-lock-icon" />
           </span>
         </div>
-
-        {bonusSummary.length > 0 && (
-          <div className="inv-equip-bonus">
-            {bonusSummary.map((row) => (
-              <span key={row.stat} className="inv-equip-bonus-item">
-                {row.label} <b>+{row.amount}</b>
-              </span>
-            ))}
-          </div>
-        )}
 
         <div
           className="inv-grid"
