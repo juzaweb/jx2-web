@@ -38,14 +38,14 @@ const THIEU_LAM_SKILLS = [
     mp: 12,
     cooldown: 6000,
     target: "enemy",
-    range: 110,
-    radius: 110,
+    range: 6000,
+    radius: 0,
     mult: 1.3,
     effects: [{ kind: "stun", duration: 800 }],
     vfx: {
       sprite: "vfx-dai-tu-di-chuong",
       cast: "shockwave",
-      impact: "burst",
+      impact: null,
       color: 0xffb347,
       shake: 0.004
     }

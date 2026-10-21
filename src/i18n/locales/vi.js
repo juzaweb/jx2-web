@@ -206,7 +206,7 @@ export default {
     thieuLam: {
       daiTuDiChuong: {
         name: "Đại Tu Di Chưởng",
-        desc: "Chưởng pháp diện rộng, đánh choáng kẻ địch quanh thân."
+        desc: "Chưởng pháp tầm xa, đánh choáng mục tiêu từ xa."
       }
     }
   },

@@ -206,7 +206,7 @@ export default {
     thieuLam: {
       daiTuDiChuong: {
         name: "大须弥掌",
-        desc: "范围掌法，击晕周围敌人。"
+        desc: "远程掌法，击晕远处目标。"
       }
     }
   },

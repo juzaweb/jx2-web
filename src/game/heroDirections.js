@@ -32,3 +32,27 @@ export function directionFromVelocity(vx, vy) {
   if (Math.abs(vx) >= Math.abs(vy)) return vx >= 0 ? 2 : 6;
   return vy >= 0 ? 0 : 4;
 }
+
+/** Unit vectors for the eight facing directions, in world space. */
+const DIRECTION_VECTORS = [
+  [0, 1],
+  [1, 1],
+  [1, 0],
+  [1, -1],
+  [0, -1],
+  [-1, -1],
+  [-1, 0],
+  [-1, 1]
+];
+
+/**
+ * Unit vector pointing the way the hero faces.
+ * @param {number} direction facing direction index (0..7)
+ * @returns {{x:number,y:number}}
+ */
+export function directionVector(direction) {
+  const normalized = ((Math.round(direction) % HERO_DIRECTIONS) + HERO_DIRECTIONS) % HERO_DIRECTIONS;
+  const [x, y] = DIRECTION_VECTORS[normalized] || DIRECTION_VECTORS[0];
+  const length = Math.hypot(x, y) || 1;
+  return { x: x / length, y: y / length };
+}

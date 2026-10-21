@@ -29,7 +29,8 @@ describe("skill catalog", () => {
       unlockLevel: 1,
       mp: 12,
       cooldown: 6000,
-      radius: 110
+      range: 6000,
+      radius: 0
     });
   });
 

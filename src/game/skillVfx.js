@@ -8,6 +8,7 @@
  */
 
 import { toIso, isoDepth } from "./isoProjection.js";
+import { directionVector } from "./heroDirections.js";
 
 const DEPTH_BONUS = 12;
 
@@ -19,14 +20,50 @@ const DEPTH_BONUS = 12;
 const baseAt = (x, y) => ({ ...toIso(x, y), depth: isoDepth(x, y) });
 
 /**
- * Play a catalog skill's sprite-sheet animation at a world position.
+ * Distance from the player to the edge of their camera in the facing direction.
+ * @param {Phaser.Scene} scene
+ * @param {{x:number,y:number}} direction unit vector
+ * @param {number} maxDistance catalog range cap
+ * @returns {number}
+ */
+function cameraEdgeDistance(scene, player, direction, maxDistance) {
+  const camera = scene.cameras?.main;
+  if (!camera) return maxDistance;
+
+  const view = camera.worldView;
+  if (view && view.width > 0) {
+    const horizontal = direction.x > 1e-6
+      ? (view.right - player.x) / direction.x
+      : direction.x < -1e-6
+        ? (view.left - player.x) / direction.x
+        : Infinity;
+    const vertical = direction.y > 1e-6
+      ? (view.bottom - player.y) / direction.y
+      : direction.y < -1e-6
+        ? (view.top - player.y) / direction.y
+        : Infinity;
+    return Math.max(0, Math.min(maxDistance, horizontal, vertical));
+  }
+
+  const zoom = camera.zoom || 1;
+  const halfWidth = (camera.width || 0) / (2 * zoom);
+  const halfHeight = (camera.height || 0) / (2 * zoom);
+  if (!halfWidth || !halfHeight) return maxDistance;
+  const horizontal = Math.abs(direction.x) > 1e-6 ? halfWidth / Math.abs(direction.x) : Infinity;
+  const vertical = Math.abs(direction.y) > 1e-6 ? halfHeight / Math.abs(direction.y) : Infinity;
+  return Math.min(maxDistance, horizontal, vertical);
+}
+
+/**
+ * Play a catalog skill's sprite-sheet animation as a projectile that travels
+ * from the caster toward the target (or to the camera edge when there is none).
  * @param {Phaser.Scene} scene
  * @param {Object} skill
- * @param {number} x world X
- * @param {number} y world Y
+ * @param {import("./player.js").Player} player
+ * @param {Object|null} target
  * @returns {boolean} true when the sprite actually played
  */
-function playSpriteCastVfx(scene, skill, x, y) {
+function playSpriteCastVfx(scene, skill, player, target) {
   const key = skill.vfx?.sprite;
   if (!key || !scene.textures.exists(key)) return false;
 
@@ -34,30 +71,80 @@ function playSpriteCastVfx(scene, skill, x, y) {
   const firstFrame = texture.get(0);
   if (!firstFrame) return false;
 
-  const animKey = `${key}-play`;
-  if (!scene.anims.exists(animKey)) {
-    const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
-    const frames = scene.anims.generateFrameNumbers(key, { start: 0, end: frameCount - 1 });
+  const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
+  const travelFrameCount = Math.min(2, frameCount);
+  const impactFrameCount = frameCount - travelFrameCount;
+  const travelKey = `${key}-travel`;
+  const impactKey = `${key}-impact`;
+
+  if (!scene.anims.exists(travelKey)) {
+    const frames = scene.anims.generateFrameNumbers(key, { start: 0, end: travelFrameCount - 1 });
     if (!frames.length) return false;
     scene.anims.create({
-      key: animKey,
+      key: travelKey,
+      frames,
+      frameRate: 8,
+      repeat: -1,
+      yoyo: travelFrameCount > 1
+    });
+  }
+  if (impactFrameCount > 0 && !scene.anims.exists(impactKey)) {
+    const frames = scene.anims.generateFrameNumbers(key, {
+      start: travelFrameCount,
+      end: frameCount - 1
+    });
+    if (!frames.length) return false;
+    scene.anims.create({
+      key: impactKey,
       frames,
       frameRate: Number(skill.vfx?.fps) || 12,
       repeat: 0
     });
   }
 
-  const p = baseAt(x, y);
-  const radius = Number(skill.radius) || Number(skill.range) || 90;
-  const size = Math.max(120, radius * 1.8) * (Number(skill.vfx?.scale) || 1);
+  const maxRange = Number(skill.range) || Number(skill.radius) || 90;
+  const start = baseAt(player.x, player.y);
+  const aim = target
+    ? { x: target.x, y: target.y }
+    : (() => {
+        const direction = directionVector(player.facingDirection);
+        const distance = cameraEdgeDistance(scene, player, direction, maxRange);
+        return {
+          x: player.x + direction.x * distance,
+          y: player.y + direction.y * distance
+        };
+      })();
+  const end = baseAt(aim.x, aim.y);
+  const worldDistance = Math.hypot(aim.x - player.x, aim.y - player.y);
+  const travelDuration = Math.max(220, Math.min(1200, worldDistance / 3));
+
+  // Visual size is independent of travel range: a long-range strike must not
+  // render a giant palm. `vfx.size` overrides the radius-derived default.
+  const visualRadius = Number(skill.vfx?.size) || Number(skill.radius) || 90;
+  const size = Math.max(120, visualRadius * 1.8) * (Number(skill.vfx?.scale) || 1);
   const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
   const sprite = scene.add
-    .sprite(p.x, p.y - 26, key)
+    .sprite(start.x, start.y - 26, key)
     .setOrigin(0.5, 0.62)
-    .setDepth(p.depth + DEPTH_BONUS)
+    .setDepth(Math.max(start.depth, end.depth) + DEPTH_BONUS)
     .setScale(size / frameWidth);
-  sprite.play(animKey);
-  sprite.once("animationcomplete", () => sprite.destroy());
+
+  scene.tweens.add({
+    targets: sprite,
+    x: end.x,
+    y: end.y - 26,
+    duration: travelDuration,
+    ease: "Quad.easeOut",
+    onComplete: () => {
+      if (impactFrameCount <= 0) {
+        sprite.destroy();
+        return;
+      }
+      sprite.play(impactKey);
+      sprite.once("animationcomplete", () => sprite.destroy());
+    }
+  });
+  sprite.play(travelKey);
   return true;
 }
 
@@ -79,11 +166,7 @@ export function playSkillCastVfx(scene, player, skill, target = null) {
   const offsetX = angle === null ? (facingRight ? 16 : -16) : Math.cos(angle) * 26;
   const offsetY = angle === null ? 0 : Math.sin(angle) * 26;
 
-  if (skill.vfx.sprite) {
-    const spriteX = target ? target.x : player.x;
-    const spriteY = target ? target.y : player.y;
-    if (playSpriteCastVfx(scene, skill, spriteX, spriteY)) return;
-  }
+  if (skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
 
   // Baseline pulse so every cast is visibly telegraphed, whatever its type.
   const pulse = scene.add

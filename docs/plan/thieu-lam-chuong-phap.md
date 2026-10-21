@@ -44,7 +44,7 @@ from the entry move so new characters have a 1 MP-cheap opener.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | La Hán Chưởng | `la_han_chuong` | 1 | 5 | 1500 | enemy r85 | — | palm / spark | adapted from La Hán Quyền |
 | 1 | Vi Đà Chưởng | `vi_da_chuong` | 1 | 7 | 4000 | enemy r95 | slow 30% / 2s | palm / dust | VLTK2 (Vi Đà Chưởng) |
-| 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy, AoE r110 | stun 800ms (mult 1.3) | sprite row 1 (4 frames) / burst | VLTK2 |
+| 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
 | 3 | La Hán Trận | `la_han_tran` | 5 | 18 | 9000 | self | **buff** `attackPct` 0.15 + `critRate` 0.05, 8s | shockwave (formation) / — | VLTK2 |
 | 4 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 7 | 15 | 15000 | self | **buff** `defensePct` 0.25, 8s | aura / — | VLTK2 |
 | 5 | Như Lai Thần Thưởng | `nhu_lai_than_thuong` | 10 | 35 | 30000 | enemy, AoE r140 | stun 1200ms (mult 2.4) | shockwave / burst | VLTK2 |
@@ -53,6 +53,15 @@ Design rules:
 
 - `*` Đại Tu Di Chưởng currently ships with `unlockLevel: 1` because it is the
   only authored palm skill; restore it to 3 once slots 0–1 land.
+- Đại Tu Di Chưởng is a ranged single-target strike (`radius: 0`, `range: 6000`,
+  a max that comfortably covers the visible camera edge). The client caps the
+  effective range at the camera's half-diagonal (`screenCastRange`) so it never
+  auto-targets wolves outside the viewport; the server keeps 6000 as the hard
+  cap. With no target, the projectile flies to the camera edge in the facing
+  direction and its travel time scales with distance (220–1200 ms):
+  the palm flies to the target and stuns it. Do not add a caster-centred radius
+  or `skillReach` will drop back to the radius and the cast will require melee
+  distance.
 
 - All damaging palm skills use `target: "enemy"`, including AoE ones: a cast with
   `radius > 0` is resolved as an area centred on the caster by `resolveTargets()`.
@@ -93,14 +102,19 @@ Two VFX tracks are needed:
 
 - Preload the sheet in `JiangHuScene.preload()` as
   `this.load.spritesheet("vfx-dai-tu-di-chuong", "/skills/vfx/dai_tu_di_chuong/sheet.png", { frameWidth: 256, frameHeight: 256 })`.
-- In `playSkillCastVfx`, when `skill.vfx.sprite` is set, spawn a `Phaser.GameObjects.Sprite`
-  at the cast/target point, play all frames at `vfx.fps` (default 12, ≈330 ms for
-  four frames), scale it from the texture's frame width to the skill radius
-  (`vfx.scale` optional), and destroy it on complete. Keep the vector pulse as
-  the fallback if the texture or frames are missing.
+- In `playSkillCastVfx`, when `skill.vfx.sprite` is set, spawn the sprite at the
+  caster and tween it toward the target, or to the camera edge in the facing
+  direction when there is no target. Frames 0–1 loop as the travelling palm;
+  frames 2+ play once on arrival as the impact. The tween lasts
+  `clamp(distance/3, 220, 1200)` ms, and the impact frames use `vfx.fps`
+  (default 12). Scale it from the texture's frame width using
+  `vfx.size`/radius (not range, so long-range casts do not render huge), and
+  destroy it when the impact completes (`vfx.scale` optional). Keep the vector pulse as the fallback if the texture
+  or frames are missing.
 - Catalog entry sets `vfx: { sprite: "vfx-dai-tu-di-chuong", cast: "shockwave",
-  impact: "burst", color: 0xffb347, shake: 0.004 }`; `fps` and `scale` are
-  optional overrides.
+  impact: null, color: 0xffb347, shake: 0.004 }`; the sprite's own impact frames
+  provide the burst, so no second `burst` should fire at cast time. `fps` and
+  `scale` are optional overrides.
 - Start with normal alpha blending; if the glow looks flat, try
   `Phaser.BlendModes.ADD`. Verify the keyed edges do not show a grey box on the
   dark ground.

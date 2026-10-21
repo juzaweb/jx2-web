@@ -206,7 +206,7 @@ export default {
     thieuLam: {
       daiTuDiChuong: {
         name: "Great Sumeru Palm",
-        desc: "Wide palm strike that stuns nearby foes."
+        desc: "Ranged palm strike that stuns the target from afar."
       }
     }
   },
