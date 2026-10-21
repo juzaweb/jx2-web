@@ -317,45 +317,50 @@ describe("Player movement controls", () => {
       setOrigin: vi.fn().mockReturnThis(),
       setScale: vi.fn().mockReturnThis(),
       setVisible: vi.fn().mockReturnThis(),
-      play: vi.fn().mockReturnThis(),
-      stop: vi.fn().mockReturnThis(),
-      destroy: vi.fn(),
-      anims: { isPlaying: false, currentAnim: null }
+      setAngle: vi.fn().mockReturnThis(),
+      destroy: vi.fn()
     };
     mockScene.add.sprite = vi.fn(() => formationSprite);
     mockScene.textures = {
-      exists: vi.fn(() => true),
-      get: vi.fn(() => ({ frameTotal: 5 }))
+      exists: vi.fn(() => true)
     };
-    mockScene.anims = {
-      exists: vi.fn(() => false),
-      create: vi.fn(),
-      generateFrameNumbers: vi.fn(() => [0, 1, 2, 3])
+    const mockTween = {
+      isPaused: vi.fn(() => false),
+      resume: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn()
+    };
+    mockScene.tweens = {
+      add: vi.fn(() => mockTween)
     };
 
-    player.showFormation("vfx-la-han-tran");
+    player.showFormation("vfx-la-han-tran-frame4");
 
-    expect(mockScene.anims.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        key: "vfx-la-han-tran-loop",
-        frameRate: 8,
-        repeat: -1
-      })
-    );
-    expect(mockScene.add.sprite).toHaveBeenCalledWith(0, 41, "vfx-la-han-tran");
-    expect(formationSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.7285);
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(0, 41, "vfx-la-han-tran-frame4", undefined);
+    expect(formationSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.5);
     expect(formationSprite.setScale).toHaveBeenCalledWith(0.8);
     expect(formationSprite.setVisible).toHaveBeenCalledWith(true);
-    expect(formationSprite.play).toHaveBeenCalledWith("vfx-la-han-tran-loop", true);
+    expect(mockScene.tweens.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targets: formationSprite,
+        angle: 360,
+        duration: 8000,
+        repeat: -1,
+        ease: "Linear"
+      })
+    );
 
-    // hideFormation stops and hides
+    // hideFormation pauses tween and hides
     player.hideFormation();
     expect(formationSprite.setVisible).toHaveBeenCalledWith(false);
-    expect(formationSprite.stop).toHaveBeenCalled();
+    expect(formationSprite.setAngle).toHaveBeenCalledWith(0);
+    expect(mockTween.pause).toHaveBeenCalled();
 
-    // destroy tears down formationSprite
+    // destroy tears down formationSprite and tween
     player.destroy();
     expect(formationSprite.destroy).toHaveBeenCalled();
+    expect(mockTween.stop).toHaveBeenCalled();
     expect(player.formationSprite).toBeNull();
+    expect(player.formationTween).toBeNull();
   });
 });

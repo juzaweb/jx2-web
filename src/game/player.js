@@ -582,34 +582,31 @@ export class Player {
   }
 
   /**
-   * Display a looping animated formation circle under the character's feet.
+   * Display a continuously rotating formation circle (frame-4) under the character's feet.
    * Follows the character as they move and remains visible while the buff is active.
-   * @param {string} [key="vfx-la-han-tran"]
+   * @param {string} [key="vfx-la-han-tran-frame4"]
    */
-  showFormation(key = "vfx-la-han-tran") {
+  showFormation(key = "vfx-la-han-tran-frame4") {
     if (!this.visual || typeof this.scene?.add?.sprite !== "function") return;
-    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
-    const animKey = `${key}-loop`;
-    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
-      const texture = this.scene.textures?.get?.(key);
-      const frameTotal = texture?.frameTotal ?? 5;
-      const frameCount = Math.max(1, frameTotal - 1);
-      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
-      if (frames && frames.length > 0) {
-        this.scene.anims.create({
-          key: animKey,
-          frames,
-          frameRate: 8,
-          repeat: -1
-        });
+    let textureKey = key;
+    let frame = undefined;
+    if (this.scene.textures?.exists) {
+      if (this.scene.textures.exists(key)) {
+        textureKey = key;
+      } else if (this.scene.textures.exists("vfx-la-han-tran-frame4")) {
+        textureKey = "vfx-la-han-tran-frame4";
+      } else if (this.scene.textures.exists("vfx-la-han-tran")) {
+        textureKey = "vfx-la-han-tran";
+        frame = 3;
+      } else {
+        return;
       }
     }
 
     if (!this.formationSprite) {
-      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
-      // Origin at center of the ground ellipse (X = 128/256 = 0.5, Y = 186.5/256 ≈ 0.7285)
-      this.formationSprite.setOrigin(0.5, 0.7285);
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, textureKey, frame);
+      this.formationSprite.setOrigin(0.5, 0.5);
       this.formationSprite.setScale(0.8);
       // Place behind body rig so the character stands on top of the formation ring
       const bodyIndex = this.visual.getIndex ? this.visual.getIndex(this.body) : -1;
@@ -621,8 +618,17 @@ export class Player {
     }
 
     this.formationSprite.setVisible?.(true);
-    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
-      this.formationSprite.play(animKey, true);
+
+    if (!this.formationTween && this.scene?.tweens?.add) {
+      this.formationTween = this.scene.tweens.add({
+        targets: this.formationSprite,
+        angle: 360,
+        duration: 8000,
+        repeat: -1,
+        ease: "Linear"
+      });
+    } else if (this.formationTween?.isPaused?.()) {
+      this.formationTween.resume?.();
     }
   }
 
@@ -632,11 +638,18 @@ export class Player {
   hideFormation() {
     if (this.formationSprite) {
       this.formationSprite.setVisible?.(false);
-      this.formationSprite.stop?.();
+      this.formationSprite.setAngle?.(0);
+    }
+    if (this.formationTween) {
+      this.formationTween.pause?.();
     }
   }
 
   destroy() {
+    if (this.formationTween) {
+      this.formationTween.stop?.();
+      this.formationTween = null;
+    }
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;

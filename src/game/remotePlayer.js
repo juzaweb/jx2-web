@@ -253,32 +253,30 @@ export class RemotePlayer {
   }
 
   /**
-   * Display a looping animated formation circle under the peer's feet.
-   * @param {string} [key="vfx-la-han-tran"]
+   * Display a continuously rotating formation circle (frame-4) under the peer's feet.
+   * @param {string} [key="vfx-la-han-tran-frame4"]
    */
-  showFormation(key = "vfx-la-han-tran") {
+  showFormation(key = "vfx-la-han-tran-frame4") {
     if (!this.container || typeof this.scene?.add?.sprite !== "function") return;
-    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
-    const animKey = `${key}-loop`;
-    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
-      const texture = this.scene.textures?.get?.(key);
-      const frameTotal = texture?.frameTotal ?? 5;
-      const frameCount = Math.max(1, frameTotal - 1);
-      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
-      if (frames && frames.length > 0) {
-        this.scene.anims.create({
-          key: animKey,
-          frames,
-          frameRate: 8,
-          repeat: -1
-        });
+    let textureKey = key;
+    let frame = undefined;
+    if (this.scene.textures?.exists) {
+      if (this.scene.textures.exists(key)) {
+        textureKey = key;
+      } else if (this.scene.textures.exists("vfx-la-han-tran-frame4")) {
+        textureKey = "vfx-la-han-tran-frame4";
+      } else if (this.scene.textures.exists("vfx-la-han-tran")) {
+        textureKey = "vfx-la-han-tran";
+        frame = 3;
+      } else {
+        return;
       }
     }
 
     if (!this.formationSprite) {
-      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
-      this.formationSprite.setOrigin(0.5, 0.7285);
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, textureKey, frame);
+      this.formationSprite.setOrigin(0.5, 0.5);
       this.formationSprite.setScale(0.8);
       const bodyIndex = this.container.getIndex ? this.container.getIndex(this.body) : -1;
       if (bodyIndex >= 0 && this.container.addAt) {
@@ -289,8 +287,17 @@ export class RemotePlayer {
     }
 
     this.formationSprite.setVisible?.(true);
-    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
-      this.formationSprite.play(animKey, true);
+
+    if (!this.formationTween && this.scene?.tweens?.add) {
+      this.formationTween = this.scene.tweens.add({
+        targets: this.formationSprite,
+        angle: 360,
+        duration: 8000,
+        repeat: -1,
+        ease: "Linear"
+      });
+    } else if (this.formationTween?.isPaused?.()) {
+      this.formationTween.resume?.();
     }
   }
 
@@ -300,11 +307,18 @@ export class RemotePlayer {
   hideFormation() {
     if (this.formationSprite) {
       this.formationSprite.setVisible?.(false);
-      this.formationSprite.stop?.();
+      this.formationSprite.setAngle?.(0);
+    }
+    if (this.formationTween) {
+      this.formationTween.pause?.();
     }
   }
 
   destroy() {
+    if (this.formationTween) {
+      this.formationTween.stop?.();
+      this.formationTween = null;
+    }
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;
