@@ -1,23 +1,25 @@
 # Sect skills — remaining sects (Võ Đang, Nga My, Ngũ Độc)
 
-Status: **planned** (not started). Thiếu Lâm is the only authored kit today; this
-document plans the other three so each ships as its own reviewable change.
+Status: **planned** (not started). The old Thiếu Lâm Võ Tông (TLQ) fist/kick kit
+was removed and is being rebuilt as a palm-technique kit
+(see `thieu-lam-chuong-phap.md`); this document plans the other three sects so
+each ships as its own reviewable change.
 
 ## Goal & scope
 
-- Give each remaining sect a kit of six skills that matches the Thiếu Lâm depth:
+- Give each remaining sect a kit of six skills on the same six-slot model:
   slots `0..5`, unlock levels `1 / 1 / 3 / 5 / 7 / 10`, bound to the two mouse
   hands through `SkillPickerModal`.
 - Keep the existing model: server-authoritative MP, cooldown, range and damage;
   client-side VFX and animation.
 - Ship real icons plus VI/EN/ZH copy.
-- Do not regress the existing Thiếu Lâm kit or the current characters.
+- Do not regress the palm-technique Thiếu Lâm rebuild or the current characters.
 
 ## What already exists (reuse, do not rewrite)
 
 | Layer | Where | Notes |
 | --- | --- | --- |
-| Catalog | `src/game/skills.js` | `SKILLS_BY_SECT` already lists the 4 sects; the other 3 are empty arrays |
+| Catalog | `src/game/skills.js` | `SKILLS_BY_SECT` lists the 4 sects; all four are empty arrays until their kits are authored |
 | Effect kinds | `skills.js` + `combat.js` | `buff` (`attackPct`, `defensePct`, `critRate`), `heal` (`amount`, `pctMaxHp`), `slow`, `stun` |
 | Damage maths | `src/game/skillDamage.js` | Shared by client and server |
 | Targeting | `combat.js::resolveTargets` | AoE (`radius > 0`) is centred on the **caster**; otherwise nearest enemy within `range` |
@@ -46,8 +48,9 @@ broadcast). Client-only DoT would be overwritten by the next snapshot.
 
 ## Proposed kits
 
-All values are starting points for a balance pass; `mult` follows the Thiếu Lâm
-scale. AoE skills (`radius > 0`) are centred on the caster.
+All values are starting points for a balance pass; `mult` follows the six-slot
+scale used by the removed Thiếu Lâm kit. AoE skills (`radius > 0`) are centred on
+the caster.
 
 ### Võ Đang — sword dao (male)
 
@@ -87,7 +90,8 @@ strike; keep the same ids so saved loadouts stay valid.
 
 ## Icons
 
-Same approach as Thiếu Lâm: the VLTK2 CDN still serves the per-sect skill icons.
+The removed Thiếu Lâm icons were sourced from the VLTK2 CDN; the palm rebuild uses
+self-authored icons. For the other sects, the VLTK2 CDN still serves per-sect skill icons.
 
 - Ngũ Độc (URLs confirmed from the viet33 page):
   `http://img.zing.vn/volam2/images/danhsachbaiviet/monphai/ngudoc/ndkynangchieuthuc_clip_image0NN_0000.jpg`

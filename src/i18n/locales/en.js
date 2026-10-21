@@ -203,14 +203,6 @@ export default {
         "invalid-slot": "Invalid skill slot."
       }
     },
-    thieuLam: {
-      laHanQuyen: { name: "Arhat Fist", desc: "Entry fist art with fast melee strikes." },
-      caDiepThoai: { name: "Kasyapa Kick", desc: "Basic leg art that slows the target." },
-      viDaQuyen: { name: "Veda Fist", desc: "Mid-tier fist art with strong finishing power." },
-      daiTuDiChuong: { name: "Great Sumeru Palm", desc: "Wide palm strike that stuns nearby foes." },
-      hueNhanChu: { name: "Wisdom Eye", desc: "Secret mantra boosting crit and attack briefly." },
-      nhuLaiThanThuong: { name: "Tathagata Palm", desc: "Signature ultimate: wide damage and a long stun." }
-    }
   },
   character: {
     title: "Character",

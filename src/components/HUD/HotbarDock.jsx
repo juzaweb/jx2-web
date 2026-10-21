@@ -93,7 +93,7 @@ export function HotbarDock({
                   title={t(skill.nameKey, undefined, skill.nameKey)}
                 >
                   <span className="slot-key">{useSlot}</span>
-                  <img className="slot-skill-img" src={skill.icon} alt="" draggable={false} />
+                  <SkillIcon skill={skill} className="slot-skill-img" />
                 </div>
               );
             }
