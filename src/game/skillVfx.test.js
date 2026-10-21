@@ -7,6 +7,7 @@ const makeSprite = () => {
     setOrigin: vi.fn(() => sprite),
     setDepth: vi.fn(() => sprite),
     setScale: vi.fn(() => sprite),
+    setStrokeStyle: vi.fn(() => sprite),
     play: vi.fn(() => sprite),
     once: vi.fn(() => sprite),
     destroy: vi.fn()
@@ -135,5 +136,53 @@ describe("playSkillCastVfx sprite playback", () => {
     playSkillCastVfx(scene, makePlayer(), { range: 6000, radius: 0, vfx: { sprite: "palm" } }, null);
 
     expect(sprite.setScale).toHaveBeenCalledWith((90 * 1.8) / 256);
+  });
+
+  it("plays stationary sprite animation at caster position for self skills", () => {
+    const { scene, animConfigs, tweenConfig } = makeScene({ frameTotal: 5 });
+    const sprite = makeSprite();
+    scene.add.sprite = () => sprite;
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      { target: "self", vfx: { sprite: "vfx-la-han-tran", fps: 8 } },
+      null
+    );
+
+    expect(animConfigs).toHaveLength(1);
+    expect(animConfigs[0]).toMatchObject({
+      key: "vfx-la-han-tran-play",
+      repeat: 0,
+      frameRate: 8
+    });
+    expect(animConfigs[0].frames).toHaveLength(4);
+    expect(sprite.play).toHaveBeenCalledWith("vfx-la-han-tran-play");
+    expect(tweenConfig.value).toBeNull();
+    expect(sprite.once).toHaveBeenCalledWith("animationcomplete", expect.any(Function));
+    sprite.once.mock.calls[0][1]();
+    expect(sprite.destroy).toHaveBeenCalled();
+  });
+
+  it("bypasses one-shot sprite creation for formation type skills and renders cast burst", () => {
+    const { scene } = makeScene({ frameTotal: 5 });
+    const sprite = makeSprite();
+    scene.add.sprite = vi.fn(() => sprite);
+    const circle = makeSprite();
+    scene.add.circle = vi.fn(() => circle);
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      { target: "self", vfx: { sprite: "vfx-la-han-tran", type: "formation", cast: "shockwave" } },
+      null
+    );
+
+    // Sprite is not created in world space for formation type (handled by player.showFormation)
+    expect(scene.add.sprite).not.toHaveBeenCalled();
+    // Baseline circle pulse and shockwave circle were created
+    expect(scene.add.circle).toHaveBeenCalled();
   });
 });

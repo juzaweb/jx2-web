@@ -221,6 +221,20 @@ describe("Player movement controls", () => {
     expect(Math.abs(speed - cardinalSpeed)).toBeLessThan(0.001);
   });
 
+  it("scales movement speed when a speed buff is active", () => {
+    mockScene.keys.D.isDown = true;
+    player.updateMovement(16);
+    const normalSpeed = player.sprite.body.velocity.x;
+
+    mockScene.combat = {
+      getEffectiveStats: () => ({ speedPct: 0.2 })
+    };
+    player.updateMovement(16);
+    const buffedSpeed = player.sprite.body.velocity.x;
+
+    expect(buffedSpeed).toBeCloseTo(normalSpeed * 1.2);
+  });
+
   it("cancels opposing directions smoothly", () => {
     mockScene.keys.W.isDown = true;
     mockScene.keys.S.isDown = true;
@@ -296,5 +310,56 @@ describe("Player movement controls", () => {
     player.destroy();
     expect(mockScene.input.keyboard.removeKey).toHaveBeenCalledTimes(8);
     expect(player.keys).toBeNull();
+  });
+
+  it("shows looping formation ring at character feet and hides it on demand", () => {
+    const formationSprite = {
+      setOrigin: vi.fn().mockReturnThis(),
+      setScale: vi.fn().mockReturnThis(),
+      setVisible: vi.fn().mockReturnThis(),
+      play: vi.fn().mockReturnThis(),
+      stop: vi.fn().mockReturnThis(),
+      destroy: vi.fn(),
+      anims: { isPlaying: false, currentAnim: null }
+    };
+    mockScene.add.sprite = vi.fn(() => formationSprite);
+    mockScene.textures = {
+      exists: vi.fn(() => true),
+      get: vi.fn(() => ({ frameTotal: 16 }))
+    };
+    mockScene.anims = {
+      exists: vi.fn(() => false),
+      create: vi.fn(),
+      generateFrameNumbers: vi.fn(() => Array.from({ length: 16 }, (_, i) => i))
+    };
+
+    player.showFormation("vfx-la-han-tran");
+
+    expect(mockScene.anims.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "vfx-la-han-tran-spin",
+        frameRate: 12,
+        repeat: -1
+      })
+    );
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(0, 41, "vfx-la-han-tran");
+    expect(formationSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.5);
+    expect(formationSprite.setScale).toHaveBeenCalledWith(0.6);
+    expect(formationSprite.setVisible).toHaveBeenCalledWith(true);
+    expect(formationSprite.play).toHaveBeenCalledWith("vfx-la-han-tran-spin", true);
+
+    // Can adjust scale dynamically on subsequent showFormation calls
+    player.showFormation("vfx-la-han-tran", 0.5);
+    expect(formationSprite.setScale).toHaveBeenCalledWith(0.5);
+
+    // hideFormation stops and hides
+    player.hideFormation();
+    expect(formationSprite.setVisible).toHaveBeenCalledWith(false);
+    expect(formationSprite.stop).toHaveBeenCalled();
+
+    // destroy tears down formationSprite
+    player.destroy();
+    expect(formationSprite.destroy).toHaveBeenCalled();
+    expect(player.formationSprite).toBeNull();
   });
 });

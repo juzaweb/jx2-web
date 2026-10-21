@@ -209,6 +209,10 @@ export class CombatSystem {
       this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
       return false;
     }
+    if (hand === "left" && skill.target === "self") {
+      this.ui.addLog("Chiêu thức tự thân không thể gán vào chuột trái.");
+      return false;
+    }
     if (!skillUnlocked(skill, this.player.stats.level)) {
       this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
       return false;
@@ -327,12 +331,8 @@ export class CombatSystem {
    */
   castLeftSkill(target) {
     const skill = this.getLeftSkill();
-    if (!skill || !target) return false;
+    if (!skill || !target || skill.target === "self") return false;
     if (!this.canCast(skill)) return true;
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return true;
-    }
     this.approachAndCast(skill, target);
     return true;
   }
@@ -512,6 +512,9 @@ export class CombatSystem {
    * @param {number} time
    */
   update(time) {
+    const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
+    this.updateBuffs(now);
+
     const pending = this.pendingCast;
     if (!pending) return;
 
@@ -644,6 +647,9 @@ export class CombatSystem {
     for (const effect of skill.effects || []) {
       if (effect.kind === "buff") {
         this.buffs.push({
+          skillId: skill.id,
+          formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
+          formationScale: skill.vfx?.type === "formation" && typeof skill.vfx.scale === "number" ? skill.vfx.scale : undefined,
           stat: effect.stat,
           amount: effect.amount,
           until: now + effect.duration
@@ -659,6 +665,52 @@ export class CombatSystem {
         }
       }
     }
+    if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
+      if (typeof skill.vfx.scale === "number") {
+        this.player.showFormation?.(skill.vfx.sprite, skill.vfx.scale);
+      } else {
+        this.player.showFormation?.(skill.vfx.sprite);
+      }
+    }
+  }
+
+  /**
+   * Filter expired buffs and update active formation aura under player feet.
+   * Only prunes and updates when an active buff has reached its expiration timestamp,
+   * avoiding allocations and redundant render state calls in the per-frame game loop.
+   * @param {number} now
+   */
+  updateBuffs(now) {
+    if (this.buffs.length === 0) return;
+
+    let hasExpired = false;
+    for (let i = 0; i < this.buffs.length; i++) {
+      if (this.buffs[i].until <= now) {
+        hasExpired = true;
+        break;
+      }
+    }
+    if (!hasExpired) return;
+
+    this.buffs = this.buffs.filter((buff) => buff.until > now);
+    const activeFormation = this.buffs.find((buff) => buff.formationSprite);
+    if (activeFormation) {
+      if (typeof activeFormation.formationScale === "number") {
+        this.player.showFormation?.(activeFormation.formationSprite, activeFormation.formationScale);
+      } else {
+        this.player.showFormation?.(activeFormation.formationSprite);
+      }
+    } else {
+      this.player.hideFormation?.();
+    }
+  }
+
+  /**
+   * Clear all active buffs and hide any buff formation rings.
+   */
+  clearBuffs() {
+    this.buffs = [];
+    this.player.hideFormation?.();
   }
 
   /**

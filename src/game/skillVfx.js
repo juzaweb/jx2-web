@@ -79,6 +79,38 @@ function playSpriteCastVfx(scene, skill, player, target) {
   if (!firstFrame) return false;
 
   const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
+  const start = baseAt(player.x, player.y);
+
+  const isStationary =
+    skill.vfx?.type === "stationary" ||
+    (skill.target === "self" && skill.vfx?.type !== "formation");
+  if (isStationary) {
+    const playKey = `${key}-play`;
+    if (!scene.anims.exists(playKey)) {
+      const frames = scene.anims.generateFrameNumbers(key, { start: 0, end: frameCount - 1 });
+      if (!frames.length) return false;
+      scene.anims.create({
+        key: playKey,
+        frames,
+        frameRate: Number(skill.vfx?.fps) || 8,
+        repeat: 0
+      });
+    }
+
+    const visualRadius = Number(skill.vfx?.size) || Number(skill.radius) || 90;
+    const size = Math.max(120, visualRadius * 1.8) * (Number(skill.vfx?.scale) || 1);
+    const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
+    const sprite = scene.add
+      .sprite(start.x, start.y, key)
+      .setOrigin(0.5, 0.9)
+      .setDepth(start.depth + DEPTH_BONUS - 1)
+      .setScale(size / frameWidth);
+
+    sprite.play(playKey);
+    sprite.once("animationcomplete", () => sprite.destroy());
+    return true;
+  }
+
   const travelFrameCount = Math.min(2, frameCount);
   const impactFrameCount = frameCount - travelFrameCount;
   const travelKey = `${key}-travel`;
@@ -110,7 +142,6 @@ function playSpriteCastVfx(scene, skill, player, target) {
   }
 
   const maxRange = Number(skill.range) || Number(skill.radius) || 90;
-  const start = baseAt(player.x, player.y);
   const aim = target
     ? { x: target.x, y: target.y }
     : (() => {
@@ -173,7 +204,7 @@ export function playSkillCastVfx(scene, player, skill, target = null) {
   const offsetX = angle === null ? (facingRight ? 16 : -16) : Math.cos(angle) * 26;
   const offsetY = angle === null ? 0 : Math.sin(angle) * 26;
 
-  if (skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
+  if (skill.vfx.type !== "formation" && skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
 
   // Baseline pulse so every cast is visibly telegraphed, whatever its type.
   const pulse = scene.add

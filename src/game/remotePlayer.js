@@ -252,7 +252,76 @@ export class RemotePlayer {
     this.updateHealthBar(iso.x, iso.y + (this.body?.y || 0) * 0.35);
   }
 
+  /**
+   * Display a continuously rotating ground formation circle under the peer's feet.
+   * Stays flat on the ground and follows the character while the buff is active.
+   * @param {string} [key="vfx-la-han-tran"]
+   * @param {number} [scale=0.6]
+   */
+  showFormation(key = "vfx-la-han-tran", scale = 0.6) {
+    if (!this.container || typeof this.scene?.add?.sprite !== "function") return;
+    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
+
+    const animKey = `${key}-spin`;
+    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
+      const texture = this.scene.textures?.get?.(key);
+      const frameTotal = texture?.frameTotal ?? 16;
+      const frameCount = Math.max(1, frameTotal - 1);
+      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
+      if (frames && frames.length > 0) {
+        this.scene.anims.create({
+          key: animKey,
+          frames,
+          frameRate: 12,
+          repeat: -1
+        });
+      }
+    }
+
+    const targetScale = typeof scale === "number" ? scale : 0.6;
+    if (!this.formationSprite) {
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
+      this.formationSprite.setOrigin(0.5, 0.5);
+      this.formationSprite.setScale(targetScale);
+      const bodyIndex = this.container.getIndex ? this.container.getIndex(this.body) : -1;
+      if (bodyIndex >= 0 && this.container.addAt) {
+        this.container.addAt(this.formationSprite, bodyIndex);
+      } else if (this.container.add) {
+        this.container.add(this.formationSprite);
+      }
+    } else {
+      this.formationSprite.setScale?.(targetScale);
+    }
+
+    this.formationSprite.setVisible?.(true);
+    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
+      this.formationSprite.play(animKey, true);
+    }
+  }
+
+  /**
+   * Hide the formation circle when the buff expires or is cleared.
+   */
+  hideFormation() {
+    if (this.formationTimer) {
+      this.formationTimer.remove?.();
+      this.formationTimer = null;
+    }
+    if (this.formationSprite) {
+      this.formationSprite.setVisible?.(false);
+      this.formationSprite.stop?.();
+    }
+  }
+
   destroy() {
+    if (this.formationTimer) {
+      this.formationTimer.remove?.();
+      this.formationTimer = null;
+    }
+    if (this.formationSprite) {
+      this.formationSprite.destroy?.();
+      this.formationSprite = null;
+    }
     if (this.container) {
       this.container.destroy();
       this.container = null;

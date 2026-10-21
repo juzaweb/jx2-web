@@ -366,9 +366,10 @@ export class Player {
       if (keyUp) vy -= 1;
       if (keyDown) vy += 1;
 
+      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
-        vector.normalize().scale(175 * POS * WORLD_SPEED_SCALE);
+        vector.normalize().scale(speed);
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
@@ -379,7 +380,7 @@ export class Player {
     if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
       const dx = this.targetX - this.sprite.x;
       const dy = this.targetY - this.sprite.y;
-      const speed = 175 * POS * WORLD_SPEED_SCALE;
+      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const step = travelStep(speed, delta);
       const horizontal = Math.abs(dx) >= Math.abs(dy);
       // A long physics catch-up can move further than `step`; if the leg's
@@ -515,6 +516,7 @@ export class Player {
     this.stopMovement();
     this.setPosition(this.spawnX, this.spawnY);
     this.sprite.setVelocity(0, 0);
+    this.hideFormation();
   }
 
   setTouchDirection(direction) {
@@ -570,7 +572,80 @@ export class Player {
     return this.stats?.critDamage ?? 1.5;
   }
 
+  /**
+   * Current movement speed multiplier derived from active buffs.
+   * Clamped to a positive floor so debuffs never freeze or reverse movement.
+   * @returns {number}
+   */
+  getSpeedMultiplier() {
+    const effective = this.scene?.combat?.getEffectiveStats?.();
+    return Math.max(0.1, 1 + (Number(effective?.speedPct) || 0));
+  }
+
+  /**
+   * Display a continuously rotating ground formation circle under the character's feet.
+   * Stays flat on the ground and follows the character while the buff is active.
+   * @param {string} [key="vfx-la-han-tran"]
+   * @param {number} [scale=0.6]
+   */
+  showFormation(key = "vfx-la-han-tran", scale = 0.6) {
+    if (!this.visual || typeof this.scene?.add?.sprite !== "function") return;
+    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
+
+    const animKey = `${key}-spin`;
+    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
+      const texture = this.scene.textures?.get?.(key);
+      const frameTotal = texture?.frameTotal ?? 16;
+      const frameCount = Math.max(1, frameTotal - 1);
+      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
+      if (frames && frames.length > 0) {
+        this.scene.anims.create({
+          key: animKey,
+          frames,
+          frameRate: 12,
+          repeat: -1
+        });
+      }
+    }
+
+    const targetScale = typeof scale === "number" ? scale : 0.6;
+    if (!this.formationSprite) {
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
+      // Origin at center (128, 128) of 256x256 frame
+      this.formationSprite.setOrigin(0.5, 0.5);
+      this.formationSprite.setScale(targetScale);
+      // Place behind body rig so character stands on top of the formation ring
+      const bodyIndex = this.visual.getIndex ? this.visual.getIndex(this.body) : -1;
+      if (bodyIndex >= 0 && this.visual.addAt) {
+        this.visual.addAt(this.formationSprite, bodyIndex);
+      } else if (this.visual.add) {
+        this.visual.add(this.formationSprite);
+      }
+    } else {
+      this.formationSprite.setScale?.(targetScale);
+    }
+
+    this.formationSprite.setVisible?.(true);
+    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
+      this.formationSprite.play(animKey, true);
+    }
+  }
+
+  /**
+   * Hide the formation circle when the buff expires or is cleared.
+   */
+  hideFormation() {
+    if (this.formationSprite) {
+      this.formationSprite.setVisible?.(false);
+      this.formationSprite.stop?.();
+    }
+  }
+
   destroy() {
+    if (this.formationSprite) {
+      this.formationSprite.destroy?.();
+      this.formationSprite = null;
+    }
     if (this.keys && this.scene?.input?.keyboard?.removeKey) {
       Object.values(this.keys).forEach((key) => {
         try {

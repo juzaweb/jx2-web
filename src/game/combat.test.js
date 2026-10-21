@@ -535,3 +535,91 @@ describe("CombatSystem kill rewards", () => {
     expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
   });
 });
+
+describe("CombatSystem hand assignments and self-skill gating", () => {
+  const makeCombat = () => {
+    const player = {
+      sect: "thieu-lam",
+      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100 },
+      x: 100,
+      y: 100
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const scene = { time: { now: 1000 } };
+    const combat = Object.create(CombatSystem.prototype);
+    combat.player = player;
+    combat.ui = ui;
+    combat.scene = scene;
+    combat.cancelPendingCast = vi.fn();
+    return { combat, ui };
+  };
+
+  it("refuses to equip self skills to the left mouse button", () => {
+    const { combat, ui } = makeCombat();
+
+    // Slot 3 is La Hán Trận (target: "self")
+    const ok = combat.equipSkill("left", 3);
+    expect(ok).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith("Chiêu thức tự thân không thể gán vào chuột trái.");
+
+    // Slot 3 can be equipped to right hand
+    const okRight = combat.equipSkill("right", 3);
+    expect(okRight).toBe(true);
+
+    // Slot 2 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
+    const okLeft = combat.equipSkill("left", 2);
+    expect(okLeft).toBe(true);
+  });
+
+  it("refuses to cast self skills via castLeftSkill on a target", () => {
+    const { combat } = makeCombat();
+    combat.leftSkillSlot = 3; // La Hán Trận (self)
+    const target = { x: 120, y: 120, id: "wolf_1" };
+    expect(combat.castLeftSkill(target)).toBe(false);
+  });
+
+  it("activates persistent formation ring on cast and hides it on expire or clear", () => {
+    const { combat } = makeCombat();
+    combat.buffs = [];
+    combat.player.showFormation = vi.fn();
+    combat.player.hideFormation = vi.fn();
+
+    const laHanTran = {
+      id: "la_han_tran",
+      target: "self",
+      effects: [
+        { kind: "buff", stat: "attackPct", amount: 0.1, duration: 180000 },
+        { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 }
+      ],
+      vfx: { type: "formation", sprite: "vfx-la-han-tran" }
+    };
+
+    combat.applySelfEffects(laHanTran, 1000);
+    expect(combat.buffs).toHaveLength(2);
+    expect(combat.buffs[0]).toMatchObject({
+      skillId: "la_han_tran",
+      formationSprite: "vfx-la-han-tran",
+      until: 181000
+    });
+    expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
+
+    // Before expiration: formation remains active without redundant re-shows
+    combat.player.showFormation.mockClear();
+    combat.update(50000);
+    expect(combat.player.showFormation).not.toHaveBeenCalled();
+    expect(combat.player.hideFormation).not.toHaveBeenCalled();
+
+    // After expiration: hideFormation is called
+    combat.update(182000);
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+
+    // clearBuffs also hides formation
+    combat.applySelfEffects(laHanTran, 200000);
+    expect(combat.buffs).toHaveLength(2);
+    combat.player.hideFormation.mockClear();
+    combat.clearBuffs();
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+  });
+});

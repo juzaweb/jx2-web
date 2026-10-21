@@ -91,6 +91,12 @@ export class JiangHuScene extends Phaser.Scene {
         frameHeight: 256
       });
     }
+    if (!this.textures.exists("vfx-la-han-tran")) {
+      this.load.spritesheet("vfx-la-han-tran", "/skills/vfx/la_han_tran/sheet.png", {
+        frameWidth: 256,
+        frameHeight: 256
+      });
+    }
   }
 
   create() {
@@ -890,6 +896,7 @@ export class JiangHuScene extends Phaser.Scene {
       } else {
         this.player.respawn();
       }
+      this.combat?.clearBuffs?.();
       this.uiBridge.updateHud(this.player.stats);
       this.uiBridge.addLog("Bạn đã bị đánh bại và hồi sinh tại Biện Kinh.", "combat");
       // Persist the full-HP respawn state.
