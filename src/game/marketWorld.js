@@ -1,10 +1,11 @@
 import { toIso, isoDepth } from "./isoProjection.js";
 import { WORLD_SCALE } from "./worldConfig.js";
 import { createGate, createNoticeBoard, createShop, createStall } from "./marketBuildings.js";
-import { createBasket, createBarrel, createCrates, createJars, createPine, createSacks, createStoneLantern, createTree } from "./marketProps.js";
+import { createBasket, createBarrel, createCrates, createJars, createSacks, createStoneLantern, createVegetation } from "./marketProps.js";
 import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
+  MARKET_GRASS,
   MARKET_LANTERNS,
   MARKET_MEDALLIONS,
   MARKET_PROPS,
@@ -31,7 +32,7 @@ export class WorldManager {
     this.drawLanterns();
     this.drawBuildings();
     this.drawProps();
-    this.drawTrees();
+    this.drawVegetation();
     this.drawWorldBorder();
   }
 
@@ -184,9 +185,14 @@ export class WorldManager {
     });
   }
 
-  drawTrees() {
+  drawVegetation() {
     MARKET_TREES.forEach(([gx, gy, scale, kind]) => {
-      const obj = kind === "pine" ? createPine(this.scene) : createTree(this.scene);
+      const obj = createVegetation(this.scene, kind);
+      this.placeProp(obj, gx, gy);
+      obj.setScale(S * scale);
+    });
+    MARKET_GRASS.forEach(([gx, gy, scale]) => {
+      const obj = createVegetation(this.scene, "grass");
       this.placeProp(obj, gx, gy);
       obj.setScale(S * scale);
     });

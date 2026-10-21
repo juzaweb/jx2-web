@@ -129,39 +129,32 @@ export function createStoneLantern(scene) {
     return c;
   }
 
-export function createTree(scene) {
-    const c = scene.add.container(0, 0);
-    const g = scene.add.graphics();
-    g.fillStyle(0x10170e, 0.3);
-    g.fillEllipse(0, 6, 54, 16);
-    g.fillStyle(0x51361f, 1);
-    g.fillRect(-5, -34, 10, 38);
-    g.fillStyle(0x3f522f, 1);
-    g.fillCircle(0, -48, 23);
-    g.fillStyle(0x4e6a39, 1);
-    g.fillCircle(-15, -38, 17);
-    g.fillCircle(16, -39, 16);
-    g.fillStyle(0x62834a, 1);
-    g.fillCircle(-6, -58, 14);
-    g.fillCircle(9, -54, 12);
-    c.add(g);
-    return c;
-  }
+/**
+ * Vegetation art cropped from the reference sheet, sized in rig units (the
+ * caller applies the world scale on top). `height` is the rendered height, so
+ * every kind lands at the same scale the procedural trees used.
+ */
+export const VEGETATION_SPRITES = {
+  "tree-large": { key: "veg-tree-large", url: "/veg/tree-large.webp", height: 130 },
+  "tree-medium": { key: "veg-tree-medium", url: "/veg/tree-medium.webp", height: 100 },
+  "bush-large": { key: "veg-bush-large", url: "/veg/bush-large.webp", height: 58 },
+  "bush-medium": { key: "veg-bush-medium", url: "/veg/bush-medium.webp", height: 52 },
+  "bush-small": { key: "veg-bush-small", url: "/veg/bush-small.webp", height: 40 },
+  grass: { key: "veg-grass", url: "/veg/grass.webp", height: 30 }
+};
 
-export function createPine(scene) {
-    const c = scene.add.container(0, 0);
-    const g = scene.add.graphics();
-    g.fillStyle(0x10170e, 0.3);
-    g.fillEllipse(0, 6, 46, 14);
-    g.fillStyle(0x4a3120, 1);
-    g.fillRect(-5, -42, 10, 46);
-    g.fillStyle(0x2c4a33, 1);
-    g.fillTriangle(0, -86, -33, -40, 33, -40);
-    g.fillStyle(0x355c3d, 1);
-    g.fillTriangle(0, -104, -26, -62, 26, -62);
-    g.fillStyle(0x416f49, 1);
-    g.fillTriangle(0, -118, -19, -84, 19, -84);
-    c.add(g);
-    return c;
-  }
+/**
+ * Ground-anchored vegetation sprite. The container origin is the plant's base
+ * so it lines up with the shadow and depth sorting like the other props.
+ * @param {import("phaser").Scene} scene
+ * @param {keyof typeof VEGETATION_SPRITES} kind
+ */
+export function createVegetation(scene, kind) {
+  const def = VEGETATION_SPRITES[kind] || VEGETATION_SPRITES["bush-large"];
+  const c = scene.add.container(0, 0);
+  const img = scene.add.image(0, 0, def.key).setOrigin(0.5, 1);
+  img.setScale(def.height / img.height);
+  c.add(img);
+  return c;
+}
 

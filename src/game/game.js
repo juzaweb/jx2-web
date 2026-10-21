@@ -19,6 +19,7 @@ import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import { MARKET_BOUNDS, MARKET_SPAWN } from "./marketLayout.js";
+import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
@@ -60,6 +61,9 @@ export class JiangHuScene extends Phaser.Scene {
     }
     this.load.image("hero-portrait", "/hero_portrait.png");
     this.load.image("ground-bricks", "/gach-tile.webp");
+    for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
+      this.load.image(key, url);
+    }
   }
 
   create() {

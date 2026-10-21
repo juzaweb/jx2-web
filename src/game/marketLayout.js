@@ -101,29 +101,49 @@ export const MARKET_LANTERNS = [
   [7800, 4000]
 ];
 
-/** Trees, bushes and rocks ringing the paved square. */
+/** Trees and bushes ringing the paved square. */
 export const MARKET_TREES = [
-  [2850, 3450, 1.1, "pine"],
-  [3050, 4750, 0.95, "round"],
-  [9900, 4750, 1.0, "pine"],
-  [3100, 6250, 0.9, "round"],
-  [10050, 6200, 0.95, "round"],
-  [2950, 4700, 0.95, "round"],
-  [2750, 6100, 1.05, "round"],
-  [2800, 7600, 1.15, "pine"],
-  [3000, 8700, 0.95, "round"],
-  [4300, 8850, 1.05, "round"],
-  [5700, 8900, 0.9, "pine"],
-  [7450, 8850, 1.1, "round"],
-  [9000, 8850, 1.0, "pine"],
-  [10100, 8000, 0.95, "round"],
-  [10300, 6400, 1.05, "pine"],
-  [10200, 4700, 0.9, "round"],
-  [9800, 3400, 1.0, "round"],
-  [8300, 3150, 0.95, "pine"],
-  [6500, 3050, 1.05, "round"],
-  [5000, 3200, 0.9, "round"],
-  [3200, 3200, 0.9, "round"]
+  [2850, 3450, 1.1, "tree-large"],
+  [3050, 4750, 0.95, "bush-large"],
+  [9900, 4750, 1.0, "tree-medium"],
+  [3100, 6250, 0.9, "bush-medium"],
+  [10050, 6200, 0.95, "bush-large"],
+  [2950, 4700, 0.95, "bush-small"],
+  [2750, 6100, 1.05, "tree-large"],
+  [2800, 7600, 1.15, "tree-large"],
+  [3000, 8700, 0.95, "bush-medium"],
+  [4300, 8850, 1.05, "tree-medium"],
+  [5700, 8900, 0.9, "bush-large"],
+  [7450, 8850, 1.1, "tree-large"],
+  [9000, 8850, 1.0, "tree-medium"],
+  [10100, 8000, 0.95, "bush-large"],
+  [10300, 6400, 1.05, "tree-medium"],
+  [10200, 4700, 0.9, "bush-medium"],
+  [9800, 3400, 1.0, "tree-large"],
+  [8300, 3150, 0.95, "tree-medium"],
+  [6500, 3050, 1.05, "tree-large"],
+  [5000, 3200, 0.9, "bush-large"],
+  [3200, 3200, 0.9, "tree-medium"]
+];
+
+/** Grass tufts scattered along the brick apron outside the square. */
+export const MARKET_GRASS = [
+  [2300, 3000, 0.9],
+  [3800, 2800, 1.0],
+  [5200, 2800, 0.85],
+  [7800, 2750, 0.95],
+  [9600, 2900, 1.0],
+  [10600, 3600, 0.9],
+  [2440, 4400, 1.05],
+  [10650, 5200, 0.9],
+  [2380, 7800, 0.95],
+  [10600, 7600, 1.0],
+  [4700, 9400, 0.9],
+  [6800, 9350, 1.05],
+  [8600, 9400, 0.85],
+  [3500, 8000, 0.95],
+  [5600, 8600, 1.0],
+  [9800, 8700, 0.9]
 ];
 
 /** Loose props (crates, sacks, barrels, jars) scattered across the whole map. */

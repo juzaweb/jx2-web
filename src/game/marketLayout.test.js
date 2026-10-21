@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
+  MARKET_GRASS,
   MARKET_LANTERNS,
   MARKET_PLAZA,
   MARKET_PROPS,
   MARKET_SPAWN,
   MARKET_TREES
 } from "./marketLayout.js";
+import { VEGETATION_SPRITES } from "./marketProps.js";
 
 const overlaps = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
@@ -61,8 +63,14 @@ describe("market layout", () => {
     for (const [x, y] of MARKET_LANTERNS) expect(inside(x, y)).toBe(true);
   });
 
-  it("keeps trees outside the paved square", () => {
-    for (const [x, y] of MARKET_TREES) {
+  it("uses only known vegetation sprite kinds", () => {
+    for (const [, , , kind] of MARKET_TREES) {
+      expect(VEGETATION_SPRITES).toHaveProperty(kind);
+    }
+  });
+
+  it("keeps trees and grass outside the paved square", () => {
+    for (const [x, y] of [...MARKET_TREES, ...MARKET_GRASS]) {
       const inside =
         x > MARKET_PLAZA.x &&
         x < MARKET_PLAZA.x + MARKET_PLAZA.w &&
