@@ -68,6 +68,12 @@ export class Player {
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
+    this.createKeyboard();
+  }
+
+  createKeyboard() {
+    if (!this.scene?.input?.keyboard?.addKeys) return;
+    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false);
   }
 
   createPhysicsSprite(x, y) {
@@ -332,17 +338,26 @@ export class Player {
   }
 
   updateMovement(delta = 0) {
-    // Movement is click-to-move or the mobile virtual joystick; keyboard movement
-    // was removed so WASD/arrow keys are free for skill selection.
-    const keyLeft = this.touchDirection === "left";
-    const keyRight = this.touchDirection === "right";
-    const keyUp = this.touchDirection === "up";
-    const keyDown = this.touchDirection === "down";
+    const isTyping =
+      typeof this.scene?.isTyping === "function"
+        ? this.scene.isTyping()
+        : typeof document !== "undefined" &&
+          (document.activeElement?.tagName === "INPUT" ||
+            document.activeElement?.tagName === "TEXTAREA" ||
+            !!document.activeElement?.isContentEditable ||
+            document.activeElement?.getAttribute?.("contenteditable") === "true");
+
+    const k = this.keys;
+    const keyLeft = (!isTyping && (k?.A?.isDown || k?.LEFT?.isDown)) || this.touchDirection === "left";
+    const keyRight = (!isTyping && (k?.D?.isDown || k?.RIGHT?.isDown)) || this.touchDirection === "right";
+    const keyUp = (!isTyping && (k?.W?.isDown || k?.UP?.isDown)) || this.touchDirection === "up";
+    const keyDown = (!isTyping && (k?.S?.isDown || k?.DOWN?.isDown)) || this.touchDirection === "down";
 
     if (keyLeft || keyRight || keyUp || keyDown) {
       this.isMovingToTarget = false;
       this.targetX = null;
       this.targetY = null;
+      this.scene?.combat?.cancelPendingCast?.();
 
       let vx = 0;
       let vy = 0;
@@ -553,5 +568,38 @@ export class Player {
 
   get critDamage() {
     return this.stats?.critDamage ?? 1.5;
+  }
+
+  destroy() {
+    if (this.keys && this.scene?.input?.keyboard?.removeKey) {
+      Object.values(this.keys).forEach((key) => {
+        try {
+          this.scene.input.keyboard.removeKey(key);
+        } catch {
+          // Ignore teardown errors
+        }
+      });
+      this.keys = null;
+    }
+    if (this.visual) {
+      this.visual.destroy?.();
+      this.visual = null;
+    }
+    if (this.nameText) {
+      this.nameText.destroy?.();
+      this.nameText = null;
+    }
+    if (this.hpBack) {
+      this.hpBack.destroy?.();
+      this.hpBack = null;
+    }
+    if (this.hpFill) {
+      this.hpFill.destroy?.();
+      this.hpFill = null;
+    }
+    if (this.sprite) {
+      this.sprite.destroy?.();
+      this.sprite = null;
+    }
   }
 }
