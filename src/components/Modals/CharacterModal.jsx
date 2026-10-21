@@ -5,6 +5,7 @@ import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { setDragPayload, readDragPayload, canDropOnSlot, acceptDrop } from "./dragItem.js";
+import { useDraggablePanel } from "./useDraggablePanel.js";
 import { CharacterPreview } from "../CharacterPreview.jsx";
 
 /**
@@ -119,6 +120,7 @@ export function CharacterModal({
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
   const [dragOverKey, setDragOverKey] = useState(null);
+  const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   if (!isOpen) return null;
 
@@ -187,12 +189,14 @@ export function CharacterModal({
   return (
     <div className="char-modal-overlay" id="character-modal">
       <div
-        className="char-panel"
+        className={`char-panel${dragging ? " is-dragging" : ""}`}
+        ref={panelRef}
+        style={panelStyle}
         role="dialog"
         aria-modal="false"
         aria-label={t("character.title")}
       >
-        <div className="char-titlebar">
+        <div className="char-titlebar" {...dragHandlers}>
           <span className="char-title">{t("character.title")}</span>
           <div className="char-titlebar-actions">
             <button

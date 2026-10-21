@@ -15,6 +15,7 @@ import "./inventory.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
 import { setDragPayload, readDragPayload, dragKind, acceptDrop } from "./dragItem.js";
+import { useDraggablePanel } from "./useDraggablePanel.js";
 
 const GRID_COLUMNS = 5;
 const TOOLTIP_OFFSET = 16;
@@ -39,6 +40,7 @@ export function InventoryModal({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [showHint, setShowHint] = useState(false);
   const tooltipRef = useRef(null);
+  const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   if (!isOpen) return null;
 
@@ -117,7 +119,9 @@ export function InventoryModal({
   return (
     <div id="inventory-modal" className="inventory-dock">
       <div
-        className="wuxia-modal inventory-panel metal-card"
+        className={`wuxia-modal inventory-panel metal-card${dragging ? " is-dragging" : ""}`}
+        ref={panelRef}
+        style={panelStyle}
         role="dialog"
         aria-modal="false"
         aria-label={t("inventory.title")}
@@ -126,7 +130,7 @@ export function InventoryModal({
         onDragOver={handlePanelDragOver}
         onDrop={handlePanelDrop}
       >
-        <div className="inv-titlebar">
+        <div className="inv-titlebar" {...dragHandlers}>
           <span className="inv-title">{t("inventory.title")}</span>
           <div className="inv-titlebar-actions">
             <button
