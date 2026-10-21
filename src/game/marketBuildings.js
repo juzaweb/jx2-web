@@ -10,23 +10,45 @@ export const PHARMACY_BUILDING = {
   scale: 2.8
 };
 
+export const GROCERY_BUILDING = {
+  textureKey: "building-tap-hoa",
+  url: "/tap-hoa.png",
+  width: 727,
+  height: 432,
+  scale: 2.8
+};
+
+export const SHOP_BUILDINGS = [PHARMACY_BUILDING, GROCERY_BUILDING];
+
+const SHOP_SPRITE_REGISTRY = {
+  "duoc-diem": PHARMACY_BUILDING,
+  herb: PHARMACY_BUILDING,
+  "tap-hoa": GROCERY_BUILDING,
+  wood: GROCERY_BUILDING
+};
+
 /** Front-facing 2.5D shop, gate, notice board and stall painters. */
 
 export function createShop(scene, def) {
     const c = scene.add.container(0, 0);
 
-    // Sprite-based herb shop when runtime texture is available.
+    const spriteBuilding =
+      SHOP_SPRITE_REGISTRY[def?.id] ||
+      SHOP_SPRITE_REGISTRY[def?.palette] ||
+      null;
+
+    // Sprite-based shop when runtime texture is available.
     if (
-      def.palette === "herb" &&
+      spriteBuilding &&
       typeof scene.textures?.exists === "function" &&
-      scene.textures.exists(PHARMACY_BUILDING.textureKey)
+      scene.textures.exists(spriteBuilding.textureKey)
     ) {
       const g = scene.add.graphics();
       g.fillStyle(0x12170f, 0.32);
       g.fillEllipse(0, 4, 680, 36);
       c.add(g);
 
-      const img = scene.add.image(0, 0, PHARMACY_BUILDING.textureKey).setOrigin(0.5, 1);
+      const img = scene.add.image(0, 0, spriteBuilding.textureKey).setOrigin(0.5, 1);
       c.add(img);
       return c;
     }
