@@ -10,7 +10,6 @@ import {
   MARKET_BUILDINGS,
   MARKET_LANTERNS,
   MARKET_MEDALLIONS,
-  MARKET_PLAZA,
   MARKET_PROPS,
   MARKET_TREES
 } from "./marketLayout.js";
@@ -57,141 +56,82 @@ export class WorldManager {
     const B = MARKET_BOUNDS;
     const PAD = 320;
 
-    // Grass rim just outside the playable dirt, so camera bounds never show
+    // Grass rim just outside the playable area, so camera bounds never show
     // the page background.
     g.fillStyle(0x53603f, 1);
     g.fillRect(B.x0 - PAD, B.y0 - PAD, B.x1 - B.x0 + PAD * 2, B.y1 - B.y0 + PAD * 2);
 
-    // Dry dirt playable area: exactly the map bounds, no larger grass apron.
-    g.fillStyle(0x87765a, 1);
+    // Warm base under the brick so the repeated texture reads a little softer.
+    g.fillStyle(0x8a8272, 1);
     g.fillRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
-    g.fillStyle(0x948061, 1);
-    g.fillRect(B.x0 + 70, B.y0 + 70, B.x1 - B.x0 - 140, B.y1 - B.y0 - 140);
 
+    // Brick floor fills the whole playable map, exactly at the map bounds.
+    this.scene.add
+      .tileSprite(
+        B.x0 + (B.x1 - B.x0) / 2,
+        B.y0 + (B.y1 - B.y0) / 2,
+        B.x1 - B.x0,
+        B.y1 - B.y0,
+        "ground-bricks"
+      )
+      .setAlpha(0.94)
+      .setDepth(GROUND_DEPTH + 1);
+
+    this.drawGroundStains();
+
+    this.drawGroundDetails();
+  }
+
+  /** Broad dirt/lichen patches that break up the tiled brick pattern. */
+  drawGroundStains() {
+    const g = this.scene.add.graphics().setDepth(GROUND_DEPTH + 2);
+    const B = MARKET_BOUNDS;
     const rng = (seed) => {
       const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
       return v - Math.floor(v);
     };
 
-    // Dirt mottling and sparse grass inside the playable area.
-    for (let i = 0; i < 320; i++) {
-      const gx = B.x0 + rng(i * 3.7) * (B.x1 - B.x0);
-      const gy = B.y0 + rng(i * 7.1 + 2) * (B.y1 - B.y0);
-      if (this.isInsidePlaza(gx, gy, 90)) continue;
-      if (i % 4 === 0) {
-        g.fillStyle(0x66754a, 0.5);
-        g.fillEllipse(gx, gy, 34 + (i % 5) * 8, 16 + (i % 3) * 5);
-      } else {
-        g.fillStyle(i % 3 ? 0xa18c68 : 0x7c6a4e, 0.45);
-        g.fillEllipse(gx, gy, 30 + (i % 4) * 9, 12 + (i % 3) * 4);
-      }
+    for (let i = 0; i < 48; i++) {
+      const x = B.x0 + rng(i * 3.7) * (B.x1 - B.x0);
+      const y = B.y0 + rng(i * 7.1 + 2) * (B.y1 - B.y0);
+      const w = 260 + rng(i * 5.3) * 520;
+      const h = w * (0.35 + rng(i * 9.1) * 0.25);
+      g.fillStyle(i % 3 ? 0x6b6354 : 0x5f6b4a, 0.16);
+      g.fillEllipse(x, y, w, h);
     }
-
-    // A few stone chips / pebbles on the dirt.
-    for (let i = 0; i < 60; i++) {
-      const gx = B.x0 + rng(i * 5.3 + 9) * (B.x1 - B.x0);
-      const gy = B.y0 + rng(i * 9.1 + 3) * (B.y1 - B.y0);
-      if (this.isInsidePlaza(gx, gy, 60)) continue;
-      g.fillStyle(i % 2 ? 0x8e887b : 0x6f695e, 0.85);
-      g.fillEllipse(gx, gy, 14 + (i % 4) * 5, 7 + (i % 3) * 3);
-    }
-
-    this.drawStonePlaza();
   }
 
-  isInsidePlaza(gx, gy, pad = 0) {
-    return (
-      gx > MARKET_PLAZA.x - pad &&
-      gx < MARKET_PLAZA.x + MARKET_PLAZA.w + pad &&
-      gy > MARKET_PLAZA.y - pad &&
-      gy < MARKET_PLAZA.y + MARKET_PLAZA.d + pad
-    );
-  }
-
-  /**
-   * Screen-aligned stone paving exactly like the reference: large rectangular
-   * bricks in staggered courses, a dark grout base and a raised stone curb.
-   */
-  drawStonePlaza() {
-    const g = this.scene.add.graphics().setDepth(GROUND_DEPTH + 10);
-    const { x, y, w, d } = MARKET_PLAZA;
-
-    // Raised stone curb with a dark contact shadow.
-    g.fillStyle(0x4f4b41, 1);
-    g.fillRect(x - 118, y - 112, w + 236, d + 230);
-    g.fillStyle(0x6f695c, 1);
-    g.fillRect(x - 92, y - 92, w + 184, d + 184);
-    g.fillStyle(0x928b7c, 1);
-    g.fillRect(x - 58, y - 58, w + 116, d + 116);
-    g.fillStyle(0xa9a292, 1);
-    g.fillRect(x - 34, y - 34, w + 68, d + 68);
-
-    // Grout base.
-    g.fillStyle(0x928c7e, 1);
-    g.fillRect(x, y, w, d);
-
-    const BRICK_W = 140;
-    const BRICK_H = 70;
-    const palette = [0xc0baab, 0xc7c1b2, 0xb9b3a4, 0xccc6b7, 0xb4ae9f, 0xc2bcad];
+  /** Medallions and hairline cracks so the brick floor does not feel flat. */
+  drawGroundDetails() {
+    const g = this.scene.add.graphics().setDepth(GROUND_DEPTH + 3);
+    const B = MARKET_BOUNDS;
     const rng = (seed) => {
       const v = Math.sin(seed * 91.733) * 43758.5453;
       return v - Math.floor(v);
     };
 
-    const rows = Math.ceil(d / BRICK_H);
-    for (let row = 0; row <= rows; row++) {
-      const by = y + row * BRICK_H;
-      const offset = row % 2 ? -BRICK_W / 2 : 0;
-      for (let col = -1; col <= Math.ceil(w / BRICK_W); col++) {
-        const bx = x + offset + col * BRICK_W;
-        const v = rng(row * 71 + col * 131);
-        if (v < 0.08) continue;
-        // Clip the offset courses to the plaza so bricks never paint over the curb.
-        const left = Math.max(bx + 2, x);
-        const top = Math.max(by + 2, y);
-        const right = Math.min(bx + BRICK_W - 2, x + w);
-        const bottom = Math.min(by + BRICK_H - 2, y + d);
-        if (right <= left || bottom <= top) continue;
-        const bw = right - left;
-        const bh = bottom - top;
-        g.fillStyle(palette[Math.floor(v * 97) % palette.length], 1);
-        g.fillRect(left, top, bw, bh);
-        // Subtle bevel: lit top edge, shaded bottom edge.
-        g.fillStyle(0xffffff, 0.12);
-        g.fillRect(left, top, bw, Math.min(2, bh));
-        g.fillStyle(0x4f4b42, 0.13);
-        g.fillRect(left, bottom - 2, bw, 2);
-        if (v > 0.78) {
-          g.fillStyle(0x8e887b, 0.35);
-          g.fillRect(left + 8, top + 12, Math.min(24 + v * 30, bw - 10), 3);
-        }
-      }
-    }
-
-    // Large stone medallion / drain in the middle of the square.
     MARKET_MEDALLIONS.forEach(({ x: mx, y: my, r }, index) => {
-      g.lineStyle(5, 0x8f897b, 0.65);
+      g.lineStyle(5, 0x8f897b, 0.55);
       g.strokeCircle(mx, my, r);
-      g.lineStyle(3, 0x9f998b, 0.55);
+      g.lineStyle(3, 0x9f998b, 0.45);
       g.strokeCircle(mx, my, r * 0.72);
-      g.lineStyle(2, 0xb5af9f, 0.5);
+      g.lineStyle(2, 0xb5af9f, 0.4);
       g.strokeCircle(mx, my, r * 0.44);
       if (index === 0) {
         // Small stone grate at the centre.
-        g.fillStyle(0x6f6a5e, 1);
+        g.fillStyle(0x6f6a5e, 0.9);
         g.fillRect(mx - 38, my - 26, 76, 52);
-        g.fillStyle(0x413d35, 1);
+        g.fillStyle(0x413d35, 0.9);
         g.fillRect(mx - 30, my - 18, 60, 36);
-        g.fillStyle(0x8d8779, 1);
+        g.fillStyle(0x8d8779, 0.9);
         for (let i = 0; i < 4; i++) g.fillRect(mx - 26 + i * 16, my - 15, 5, 30);
       }
     });
 
-    // Occasional crack across a brick.
-    g.lineStyle(2, 0x777163, 0.35);
-    for (let i = 0; i < 34; i++) {
-      const cx = x + 120 + rng(i * 1.7) * (w - 240);
-      const cy = y + 120 + rng(i * 2.9 + 4) * (d - 240);
+    g.lineStyle(2, 0x777163, 0.28);
+    for (let i = 0; i < 60; i++) {
+      const cx = B.x0 + 120 + rng(i * 1.7) * (B.x1 - B.x0 - 240);
+      const cy = B.y0 + 120 + rng(i * 2.9 + 4) * (B.y1 - B.y0 - 240);
       g.lineBetween(cx, cy, cx + 18 + rng(i) * 38, cy + 4 + rng(i + 5) * 10);
     }
   }

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
+  MARKET_LANTERNS,
   MARKET_PLAZA,
+  MARKET_PROPS,
   MARKET_SPAWN,
   MARKET_TREES
 } from "./marketLayout.js";
+import { NPC_DATA } from "./npcData.js";
 
 const overlaps = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
@@ -42,6 +45,30 @@ describe("market layout", () => {
     const shops = MARKET_BUILDINGS.filter((building) => building.kind === "shop");
     expect(shops).toHaveLength(2);
     expect(overlaps(footprint(shops[0]), footprint(shops[1]))).toBe(false);
+  });
+
+  it("keeps every landmark, prop and lantern inside the playable bounds", () => {
+    const inside = (x, y) =>
+      x > MARKET_BOUNDS.x0 &&
+      x < MARKET_BOUNDS.x1 &&
+      y > MARKET_BOUNDS.y0 &&
+      y < MARKET_BOUNDS.y1;
+
+    for (const { x, y, w, d } of MARKET_BUILDINGS) {
+      expect(inside(x - w / 2, y - d / 2)).toBe(true);
+      expect(inside(x + w / 2, y + d / 2)).toBe(true);
+    }
+    for (const { x, y } of MARKET_PROPS) expect(inside(x, y)).toBe(true);
+    for (const [x, y] of MARKET_LANTERNS) expect(inside(x, y)).toBe(true);
+  });
+
+  it("keeps every NPC inside the playable bounds", () => {
+    for (const npc of NPC_DATA) {
+      expect(npc.x).toBeGreaterThan(MARKET_BOUNDS.x0);
+      expect(npc.x).toBeLessThan(MARKET_BOUNDS.x1);
+      expect(npc.y).toBeGreaterThan(MARKET_BOUNDS.y0);
+      expect(npc.y).toBeLessThan(MARKET_BOUNDS.y1);
+    }
   });
 
   it("keeps trees outside the paved square", () => {

@@ -48,9 +48,10 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   preload() {
-    // The hero is drawn procedurally (see heroRig.js); only the portrait art is
-    // still loaded from disk.
+    // The hero is drawn procedurally (see heroRig.js); only the portrait art and
+    // the map's brick floor are still loaded from disk.
     this.load.image("hero-portrait", "/hero_portrait.png");
+    this.load.image("ground-bricks", "/gach-tile.webp");
   }
 
   create() {
@@ -66,7 +67,7 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.destroy();
     }
 
-    // The playable map is exactly the yellow dirt area. Both the camera and the
+    // The playable map is exactly the brick-paved area. Both the camera and the
     // physics world are clamped to that rectangle so the player can never walk
     // out onto the empty grass backdrop.
     const mapW = MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0;

@@ -4,7 +4,6 @@ import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
   MARKET_LANTERNS,
-  MARKET_PLAZA,
   MARKET_TREES
 } from "./marketLayout.js";
 
@@ -184,12 +183,12 @@ export class UIBridgeAdapter {
     ctx.fillStyle = "#3f4d35";
     ctx.fillRect(0, 0, w, h);
 
-    // Yellow dirt map (same bounds as the physics world).
+    // Brick-paved map (same bounds as the physics world).
     const bx = mapX(MARKET_BOUNDS.x0);
     const by = mapY(MARKET_BOUNDS.y0);
     const bw = (MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0) * scaleX;
     const bh = (MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0) * scaleY;
-    ctx.fillStyle = "#8d7a59";
+    ctx.fillStyle = "#b3a992";
     ctx.fillRect(bx, by, bw, bh);
     ctx.strokeStyle = "#5f5340";
     ctx.lineWidth = Math.max(1, 0.7 * mark);
@@ -198,35 +197,6 @@ export class UIBridgeAdapter {
     ctx.lineTo(bx + bw, by);
     ctx.lineTo(bx + bw, by + bh);
     ctx.lineTo(bx, by + bh);
-    ctx.closePath();
-    ctx.stroke();
-
-    // Stone square with a brick grid.
-    const px = mapX(MARKET_PLAZA.x);
-    const py = mapY(MARKET_PLAZA.y);
-    const pw = MARKET_PLAZA.w * scaleX;
-    const ph = MARKET_PLAZA.d * scaleY;
-    ctx.fillStyle = "#c2bcaa";
-    ctx.fillRect(px, py, pw, ph);
-    ctx.strokeStyle = "rgba(110, 103, 90, 0.28)";
-    ctx.lineWidth = Math.max(0.5, 0.35 * mark);
-    ctx.beginPath();
-    for (let gx = MARKET_PLAZA.x; gx <= MARKET_PLAZA.x + MARKET_PLAZA.w; gx += 140) {
-      ctx.moveTo(mapX(gx), py);
-      ctx.lineTo(mapX(gx), py + ph);
-    }
-    for (let gy = MARKET_PLAZA.y; gy <= MARKET_PLAZA.y + MARKET_PLAZA.d; gy += 70) {
-      ctx.moveTo(px, mapY(gy));
-      ctx.lineTo(px + pw, mapY(gy));
-    }
-    ctx.stroke();
-    ctx.strokeStyle = "#746d5d";
-    ctx.lineWidth = Math.max(1.2, 0.6 * mark);
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(px + pw, py);
-    ctx.lineTo(px + pw, py + ph);
-    ctx.lineTo(px, py + ph);
     ctx.closePath();
     ctx.stroke();
 

@@ -8,7 +8,7 @@
  */
 
 /** Ground rectangle covered by the stone market square. */
-export const MARKET_PLAZA = { x: 4300, y: 4900, w: 4700, d: 2300 };
+export const MARKET_PLAZA = { x: 3400, y: 3500, w: 6000, d: 4000 };
 
 /** Walkable area including the dirt apron around the square. */
 export const MARKET_BOUNDS = { x0: 2100, y0: 2600, x1: 11000, y1: 9600 };
@@ -17,8 +17,9 @@ export const MARKET_BOUNDS = { x0: 2100, y0: 2600, x1: 11000, y1: 9600 };
 export const MARKET_SPAWN = { x: 6400, y: 6050 };
 
 /**
- * Landmark shops and structures. `x`/`y` are the screen-space anchor (the
- * building's ground contact point), `w`/`d` are collision footprint sizes.
+ * Landmark shops and structures spread across the square. `x`/`y` are the
+ * screen-space anchor (the building's ground contact point), `w`/`d` are
+ * collision footprint sizes.
  */
 export const MARKET_BUILDINGS = [
   {
@@ -26,8 +27,8 @@ export const MARKET_BUILDINGS = [
     kind: "shop",
     sign: "TẠP HÓA",
     subSign: "雜貨",
-    x: 4550,
-    y: 5750,
+    x: 4300,
+    y: 4400,
     w: 1700,
     d: 900,
     signColor: "red",
@@ -38,8 +39,8 @@ export const MARKET_BUILDINGS = [
     kind: "shop",
     sign: "DƯỢC ĐIỂM",
     subSign: "藥舖",
-    x: 4550,
-    y: 6800,
+    x: 4300,
+    y: 6900,
     w: 1700,
     d: 900,
     signColor: "green",
@@ -50,8 +51,8 @@ export const MARKET_BUILDINGS = [
     kind: "board",
     sign: "CAO THỊ",
     subSign: "告示",
-    x: 5150,
-    y: 6000,
+    x: 5600,
+    y: 4500,
     w: 500,
     d: 260
   },
@@ -60,8 +61,8 @@ export const MARKET_BUILDINGS = [
     kind: "gate",
     sign: "BÁ LÃNG",
     subSign: "霸陵",
-    x: 7000,
-    y: 6600,
+    x: 7600,
+    y: 4800,
     w: 900,
     d: 320
   },
@@ -69,8 +70,8 @@ export const MARKET_BUILDINGS = [
     id: "stall-red",
     kind: "stall",
     sign: "",
-    x: 7650,
-    y: 5450,
+    x: 8500,
+    y: 4500,
     w: 1000,
     d: 700,
     awning: "red"
@@ -79,8 +80,8 @@ export const MARKET_BUILDINGS = [
     id: "stall-blue",
     kind: "stall",
     sign: "",
-    x: 8350,
-    y: 7250,
+    x: 8400,
+    y: 6900,
     w: 1000,
     d: 700,
     awning: "blue"
@@ -89,16 +90,18 @@ export const MARKET_BUILDINGS = [
 
 /** Decorative stone lanterns around the square. */
 export const MARKET_LANTERNS = [
-  [4420, 5010],
-  [8520, 5010],
-  [4420, 7080],
-  [8520, 7080],
-  [6650, 5010],
-  [8520, 6100],
-  [5200, 7080]
+  [3900, 4000],
+  [8900, 4000],
+  [3900, 7000],
+  [8900, 7000],
+  [6400, 4000],
+  [8900, 5500],
+  [6400, 7000],
+  [5000, 4000],
+  [7800, 4000]
 ];
 
-/** Trees, bushes and rocks around the paved square. */
+/** Trees, bushes and rocks ringing the paved square. */
 export const MARKET_TREES = [
   [2850, 3450, 1.1, "pine"],
   [3050, 4750, 0.95, "round"],
@@ -123,26 +126,29 @@ export const MARKET_TREES = [
   [3200, 3200, 0.9, "round"]
 ];
 
-/** Loose props (crates, sacks, barrels, jars) placed around the shops. */
+/** Loose props (crates, sacks, barrels, jars) scattered across the whole map. */
 export const MARKET_PROPS = [
-  { kind: "crate-stack", x: 5100, y: 4650, s: 1 },
-  { kind: "crate-stack", x: 5450, y: 4550, s: 0.8 },
-  { kind: "sacks", x: 3150, y: 5300, s: 1 },
-  { kind: "barrel", x: 3150, y: 5700, s: 1 },
-  { kind: "jar-cluster", x: 5350, y: 6300, s: 1 },
-  { kind: "jar-cluster", x: 3150, y: 7000, s: 0.9 },
-  { kind: "basket", x: 5600, y: 4700, s: 0.9 },
-  { kind: "basket", x: 8400, y: 5050, s: 0.8 },
-  { kind: "crate-stack", x: 8800, y: 7900, s: 0.85 },
-  { kind: "sacks", x: 7700, y: 7900, s: 0.9 },
-  { kind: "barrel", x: 7600, y: 4350, s: 0.9 },
-  { kind: "jar-cluster", x: 9350, y: 6500, s: 0.8 },
-  { kind: "crate-stack", x: 6100, y: 4750, s: 0.9 }
+  { kind: "crate-stack", x: 3500, y: 3900, s: 1 },
+  { kind: "crate-stack", x: 9200, y: 3900, s: 0.85 },
+  { kind: "sacks", x: 3500, y: 4700, s: 1 },
+  { kind: "barrel", x: 3500, y: 7100, s: 1 },
+  { kind: "jar-cluster", x: 5200, y: 6500, s: 1 },
+  { kind: "jar-cluster", x: 9200, y: 7100, s: 0.9 },
+  { kind: "basket", x: 6400, y: 3900, s: 0.9 },
+  { kind: "basket", x: 9000, y: 5200, s: 0.8 },
+  { kind: "crate-stack", x: 7000, y: 7200, s: 0.85 },
+  { kind: "sacks", x: 8000, y: 3900, s: 0.9 },
+  { kind: "barrel", x: 9000, y: 6300, s: 0.9 },
+  { kind: "jar-cluster", x: 4200, y: 5400, s: 0.8 },
+  { kind: "crate-stack", x: 6000, y: 4700, s: 0.9 },
+  { kind: "crate-stack", x: 2450, y: 2950, s: 0.9 },
+  { kind: "barrel", x: 10500, y: 3250, s: 0.9 },
+  { kind: "sacks", x: 2500, y: 8750, s: 0.9 },
+  { kind: "jar-cluster", x: 10300, y: 8700, s: 0.8 }
 ];
 
 /** Stone emblems / drains painted on the square. */
 export const MARKET_MEDALLIONS = [
-  { x: 6900, y: 6500, r: 260 },
-  { x: 5000, y: 5300, r: 120 }
+  { x: 6600, y: 5900, r: 260 },
+  { x: 4700, y: 4700, r: 120 }
 ];
-
