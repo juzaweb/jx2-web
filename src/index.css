@@ -1513,4 +1513,55 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
 }
 
+/* ====================================================
+   Mobile Portrait Orientation Overlay Hint
+==================================================== */
+.mobile-orientation-hint {
+  display: none;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .mobile-orientation-hint {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(10, 15, 18, 0.96);
+    backdrop-filter: blur(8px);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: #f7e8c6;
+    pointer-events: auto;
+  }
+
+  .mobile-orientation-icon {
+    font-size: 52px;
+    margin-bottom: 16px;
+    animation: rotate-phone 2s infinite ease-in-out;
+  }
+
+  .mobile-orientation-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffd43b;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  .mobile-orientation-desc {
+    font-size: 13.5px;
+    color: #c9d0ca;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+
+  @keyframes rotate-phone {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+}
 

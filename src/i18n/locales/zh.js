@@ -6,6 +6,8 @@ export default {
     confirmReset: "确定要清除已保存的数据并重新开始吗？",
     confirmLogout: "确定要退出当前账号吗？",
     joinLog: "侠客 {name} 已加入 {server}！",
+    rotateDeviceTitle: "请横屏游玩",
+    rotateDeviceDesc: "为了获得最佳游戏体验，请将手机旋转至横屏模式。",
     log: {
       welcome: "欢迎侠客来到汴京。",
       near: "浪客：江湖险恶，请多保重！",

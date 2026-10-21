@@ -6,6 +6,8 @@ export default {
     confirmReset: "Are you sure you want to erase your saved progress and start over?",
     confirmLogout: "Are you sure you want to log out of your account?",
     joinLog: "{name} has joined {server}!",
+    rotateDeviceTitle: "Rotate Device Horizontally",
+    rotateDeviceDesc: "Please rotate your phone to landscape mode for the best gaming experience.",
     log: {
       welcome: "Welcome to Bianjing, honored warrior.",
       near: "Wanderer: The Jianghu is treacherous. Take care!",

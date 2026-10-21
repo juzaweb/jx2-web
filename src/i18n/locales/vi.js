@@ -6,6 +6,8 @@ export default {
     confirmReset: "Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?",
     confirmLogout: "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
     joinLog: 'Hiệp khách {name} đã gia nhập {server}!',
+    rotateDeviceTitle: "Xoay Ngang Màn Hình",
+    rotateDeviceDesc: "Vui lòng xoay ngang điện thoại để trải nghiệm game tốt nhất.",
     log: {
       welcome: "Chào mừng hiệp khách đến với Biện Kinh.",
       near: "Lãng Khách: Giang hồ hiểm ác, bảo trọng!",

@@ -3,6 +3,7 @@ import { apiClient } from "../../game/apiClient.js";
 import { writeSession } from "../../game/session.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { requestLandscapeFullscreen } from "../../game/orientation.js";
 import "../../styles/login.css";
 
 const SERVERS = [
@@ -161,6 +162,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         writeSession(session);
 
         setSuccessMsg(t("login.success.login"));
+        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -183,6 +185,7 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         writeSession(session);
 
         setSuccessMsg(t("login.success.register"));
+        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);

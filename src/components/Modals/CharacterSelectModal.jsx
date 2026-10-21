@@ -3,6 +3,7 @@ import { apiClient } from "../../game/apiClient.js";
 import "../../styles/character-select.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { requestLandscapeFullscreen } from "../../game/orientation.js";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
@@ -173,6 +174,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       setError(t("characterSelect.errors.selectToStart"));
       return;
     }
+    requestLandscapeFullscreen();
     onStart(selected);
   };
 
