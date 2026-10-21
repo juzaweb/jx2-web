@@ -19,6 +19,7 @@ import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import { MARKET_BOUNDS, MARKET_NPCS, MARKET_SPAWN } from "./marketLayout.js";
+import { PHARMACY_BUILDING } from "./marketBuildings.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
 import {
@@ -69,6 +70,9 @@ export class JiangHuScene extends Phaser.Scene {
     }
     this.load.image("hero-portrait", "/hero_portrait.png");
     this.load.image("ground-bricks", "/gach-tile.webp");
+    if (!this.textures.exists(PHARMACY_BUILDING.textureKey)) {
+      this.load.image(PHARMACY_BUILDING.textureKey, PHARMACY_BUILDING.url);
+    }
     if (!this.textures.exists(NPC_DUOC.textureKey)) {
       this.load.spritesheet(NPC_DUOC.textureKey, NPC_DUOC.url, {
         frameWidth: NPC_DUOC.frameWidth,

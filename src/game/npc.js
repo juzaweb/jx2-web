@@ -18,6 +18,8 @@ export const NPC_DUOC = {
   contentHeight: 480,
   /** Rendered height in rig units; close to the hero's 92.5. */
   heightUnits: 88,
+  /** Name tag floating offset in rig units so it clears the head. */
+  nameOffsetUnits: 102,
   /** Front-facing poses only; the back views stay unused in the sheet. */
   idleFrames: [0, 1, 2, 3, 2, 1],
   idleFrameRate: 2
@@ -101,8 +103,9 @@ export function createPharmacyNpc(scene, def) {
   sprite.setDepth(isoDepth(def.x, def.y));
   sprite.play(NPC_DUOC_ANIM);
 
+  const nameOffsetUnits = NPC_DUOC.nameOffsetUnits || 102;
   const nameText = scene.add
-    .text(iso.x, iso.y - 70 * S, def.name, {
+    .text(iso.x, iso.y - nameOffsetUnits * S, def.name, {
       fontFamily: "Arial, Tahoma, sans-serif",
       fontSize: "12px",
       color: "#ffd76b",

@@ -74,6 +74,16 @@ describe("market layout", () => {
     }
   });
 
+  it("centers the Dược Sư shopkeeper right at the pharmacy door", () => {
+    const npc = MARKET_NPCS.find((entry) => entry.id === "duoc-su");
+    const building = MARKET_BUILDINGS.find((entry) => entry.id === "duoc-diem");
+    expect(npc).toBeTruthy();
+    expect(building).toBeTruthy();
+    expect(npc.x).toBe(building.x);
+    expect(npc.y).toBeGreaterThan(building.y);
+    expect(npc.y - building.y).toBe(120);
+  });
+
   it("uses only known vegetation sprite kinds", () => {
     for (const [, , , kind] of MARKET_TREES) {
       expect(VEGETATION_SPRITES).toHaveProperty(kind);

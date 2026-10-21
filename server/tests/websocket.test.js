@@ -7,7 +7,7 @@ import path from "node:path";
 import { WebSocket } from "ws";
 import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { DROP_TABLE } from "../../src/game/items.js";
-import { MARKET_SPAWN } from "../../src/game/marketLayout.js";
+import { MARKET_NPCS, MARKET_SPAWN } from "../../src/game/marketLayout.js";
 import { skillById } from "../../src/game/skills.js";
 
 const THIEU_LAM_PALM_IDS = [
@@ -540,7 +540,11 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Walk up to the Dược Sư, then earn silver deterministically from the
     // one-off quest payout instead of killing shared enemies (that would
     // perturb the later enemy-state tests).
-    client.send({ type: "player_move", payload: { x: 4580, y: 7200, vx: 0, vy: 0 } });
+    const duocNpc = MARKET_NPCS.find((npc) => npc.shop === "pharmacy");
+    client.send({
+      type: "player_move",
+      payload: { x: duocNpc.x, y: duocNpc.y + 80, vx: 0, vy: 0 }
+    });
     client.send({ type: "quest_claim", payload: {} });
     const earned = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins > 0);
     assert.equal(earned.payload.coins, 20);

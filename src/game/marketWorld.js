@@ -152,7 +152,8 @@ export class WorldManager {
 
       // def.x / def.y is the ground contact point at the centre of the facade.
       this.placeProp(obj, def.x, def.y);
-      if (def.kind === "shop") obj.setScale(S * 0.68);
+      if (typeof def.scale === "number" && def.scale > 0) obj.setScale(def.scale);
+      else if (def.kind === "shop") obj.setScale(S * 0.68);
       else if (def.kind === "gate") obj.setScale(S * 0.66);
       else if (def.kind === "board") obj.setScale(S * 0.62);
 
