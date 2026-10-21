@@ -33,6 +33,7 @@ import {
   isSessionUser,
   clearSession
 } from "./game/session.js";
+import { requestLandscapeFullscreen, isMobileDevice } from "./game/orientation.js";
 
 const INITIAL_LOGS = [
   {
@@ -223,6 +224,23 @@ export function App() {
     };
     // Runs once on mount with the session cached at page load.
   }, []);
+
+  // Automatically attempt landscape fullscreen on mobile touch when active
+  useEffect(() => {
+    if (!activeCharacter || !isMobileDevice()) return;
+
+    const handleMobileTouch = () => {
+      requestLandscapeFullscreen();
+    };
+
+    window.addEventListener("touchstart", handleMobileTouch, { passive: true, once: true });
+    window.addEventListener("pointerdown", handleMobileTouch, { passive: true, once: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleMobileTouch);
+      window.removeEventListener("pointerdown", handleMobileTouch);
+    };
+  }, [activeCharacter]);
 
   useEffect(() => {
     const unsubStats = bridge.on(EVENTS.STATS_UPDATED, (newStats) => {
@@ -554,6 +572,8 @@ export function App() {
   }, []);
 
   const handleCharacterStart = useCallback((character) => {
+    requestLandscapeFullscreen();
+
     writeSession({
       ...(readSession() || {}),
       activeCharacter: character,
@@ -598,6 +618,13 @@ export function App() {
 
   return (
     <main id="game-shell">
+      {/* Mobile Portrait Orientation Prompt */}
+      <div className="mobile-orientation-hint">
+        <div className="mobile-orientation-icon">📱</div>
+        <div className="mobile-orientation-title">{t("app.rotateDeviceTitle")}</div>
+        <div className="mobile-orientation-desc">{t("app.rotateDeviceDesc")}</div>
+      </div>
+
       {/* Phaser Canvas Engine */}
       <GameCanvas />
 
