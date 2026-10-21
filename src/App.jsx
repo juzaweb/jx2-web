@@ -159,6 +159,14 @@ export function App() {
   // Switching characters loads that hero's skill layout and sect kit.
   useEffect(() => {
     const loadout = loadSkillLoadout(activeCharacter?.id);
+    // A partially authored kit may not include slots 0/1 yet; fall back to its
+    // first available slot so the hands never point at a missing skill.
+    const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
+    const firstSlot = kit[0]?.slot;
+    if (Number.isInteger(firstSlot)) {
+      if (!kit.some((skill) => skill.slot === loadout.left)) loadout.left = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.right)) loadout.right = firstSlot;
+    }
     setSelectedSkillSlot(loadout.right);
     setLeftSkillSlot(loadout.left);
     bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);

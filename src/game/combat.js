@@ -382,7 +382,35 @@ export class CombatSystem {
    * @returns {number}
    */
   skillReach(skill) {
-    return skill.radius > 0 ? skill.radius : skill.range;
+    if (skill.radius > 0) return skill.radius;
+    return Math.min(skill.range, this.screenCastRange());
+  }
+
+  /**
+   * Farthest world distance visible from the player, so a long-range skill
+   * cannot auto-target enemies that are off-screen. Uses the camera's actual
+   * world-view corners when available, which stays correct when the player is
+   * not centred (e.g. at the map edge).
+   * @returns {number}
+   */
+  screenCastRange() {
+    const camera = this.scene?.cameras?.main;
+    const zoom = camera?.zoom;
+    if (!camera || !zoom) return Infinity;
+
+    const view = camera.worldView;
+    if (view && view.width > 0 && Number.isFinite(view.right) && Number.isFinite(view.bottom)) {
+      const { x, y } = this.player;
+      const corners = [
+        [view.left, view.top],
+        [view.right, view.top],
+        [view.left, view.bottom],
+        [view.right, view.bottom]
+      ];
+      return Math.max(...corners.map(([cx, cy]) => Math.hypot(cx - x, cy - y)));
+    }
+
+    return Math.hypot(camera.width / (2 * zoom), camera.height / (2 * zoom));
   }
 
   /**
@@ -526,8 +554,9 @@ export class CombatSystem {
         .sort((a, b) => distanceTo(a) - distanceTo(b));
     }
 
+    const range = this.skillReach(skill);
     const nearest = alive
-      .filter((wolf) => distanceTo(wolf) <= skill.range)
+      .filter((wolf) => distanceTo(wolf) <= range)
       .sort((a, b) => distanceTo(a) - distanceTo(b))[0];
     return nearest ? [nearest] : [];
   }

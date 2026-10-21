@@ -10,7 +10,10 @@ import { SKILL_SLOTS } from "./skills.js";
 
 const STORAGE_PREFIX = "jx2_skill_loadout_";
 
-/** Default loadout: La Hán Quyền on the left, Ca Diệp Thoái on the right. */
+/**
+ * Default loadout: slots 0 and 1. When a sect has no authored kit yet those
+ * slots simply resolve to no skill, so the HUD shows empty hand slots.
+ */
 export const DEFAULT_SKILL_LOADOUT = { left: 0, right: 1 };
 
 const validSlot = (value, fallback) =>

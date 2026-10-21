@@ -204,12 +204,10 @@ export default {
       }
     },
     thieuLam: {
-      laHanQuyen: { name: "罗汉拳", desc: "入门拳法，快速近身攻击。" },
-      caDiepThoai: { name: "迦叶腿", desc: "基础腿法，击中后使敌人迟缓。" },
-      viDaQuyen: { name: "韦陀拳", desc: "中级拳法，终结威力强劲。" },
-      daiTuDiChuong: { name: "大须弥掌", desc: "范围掌法，击晕周围敌人。" },
-      hueNhanChu: { name: "慧眼咒", desc: "独门心法，短时间提升暴击与攻击。" },
-      nhuLaiThanThuong: { name: "如来神掌", desc: "镇派绝学，大范围伤害并长时间定身。" }
+      daiTuDiChuong: {
+        name: "大须弥掌",
+        desc: "远程掌法，击晕远处目标。"
+      }
     }
   },
   character: {

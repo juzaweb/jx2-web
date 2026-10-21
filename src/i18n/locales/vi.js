@@ -204,29 +204,9 @@ export default {
       }
     },
     thieuLam: {
-      laHanQuyen: {
-        name: "La Hán Quyền",
-        desc: "Quyền pháp nhập môn, công kích cận chiến nhanh."
-      },
-      caDiepThoai: {
-        name: "Ca Diệp Thoái",
-        desc: "Cước pháp cơ bản, đá trúng khiến đối phương chậm chạp."
-      },
-      viDaQuyen: {
-        name: "Vi Đà Quyền",
-        desc: "Quyền pháp trung cấp, uy lực kết liễu mạnh."
-      },
       daiTuDiChuong: {
         name: "Đại Tu Di Chưởng",
-        desc: "Chưởng pháp diện rộng, đánh choáng kẻ địch quanh thân."
-      },
-      hueNhanChu: {
-        name: "Huệ Nhãn Chú",
-        desc: "Tâm pháp độc môn, tăng chí mạng và công kích trong thời gian ngắn."
-      },
-      nhuLaiThanThuong: {
-        name: "Như Lai Thần Thưởng",
-        desc: "Tuyệt kỹ trấn phái, sát thương diện rộng và choáng dài lâu."
+        desc: "Chưởng pháp tầm xa, đánh choáng mục tiêu từ xa."
       }
     }
   },

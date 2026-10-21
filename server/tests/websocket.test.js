@@ -8,6 +8,18 @@ import { WebSocket } from "ws";
 import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { DROP_TABLE } from "../../src/game/items.js";
 import { MARKET_SPAWN } from "../../src/game/marketLayout.js";
+import { skillById } from "../../src/game/skills.js";
+
+const THIEU_LAM_PALM_IDS = [
+  "la_han_chuong",
+  "vi_da_chuong",
+  "dai_tu_di_chuong",
+  "la_han_tran",
+  "kim_cang_bat_hoai",
+  "nhu_lai_than_thuong"
+];
+const HAS_THIEU_LAM_PALM_KIT = THIEU_LAM_PALM_IDS.every((id) => Boolean(skillById(id)));
+const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -210,7 +222,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({
       type: "player_attack",
       payload: {
-        skill: "la_han_quyen",
+        skill: "normal",
         x: 5300,
         y: 5100,
         facingRight: true
@@ -219,7 +231,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     const attackBroadcast = await client2.waitFor((m) => m.type === "player_attacked");
     assert.equal(attackBroadcast.payload.id, "usr_hero1");
-    assert.equal(attackBroadcast.payload.skill, "la_han_quyen");
+    assert.equal(attackBroadcast.payload.skill, "normal");
 
     // Test chat broadcast: Client 2 chats -> Both receive player_chat
     client2.send({
@@ -371,7 +383,19 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.close();
   });
 
-  await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", async () => {
+  await t.test("Palm skill spends server-owned MP", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({ type: "player_join", payload: { id: "usr_palm_mp", token: "test-token", characterId: "char_mp_1", username: "PalmMp", x: 640, y: 620 } });
+    await client.waitFor((m) => m.type === "init_world");
+
+    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 640, y: 620, facingRight: true } });
+    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 48);
+    assert.equal(mp.payload.maxMp, 60);
+
+    await client.close();
+  });
+
+  await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", { skip: SKIP_NO_KIT }, async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     client.send({ type: "player_join", payload: { id: "usr_mp1", token: "test-token", characterId: "char_mp_1", username: "Mp1", x: 640, y: 620 } });
     await client.waitFor((m) => m.type === "init_world");
@@ -379,11 +403,11 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Each cast spends that skill's MP from the server-owned pool (level 1 -> maxMp 60).
     // Distinct skills are used so their individual cooldowns never block the next cast.
     const casts = [
-      { skill: "la_han_quyen", mp: 55 },
-      { skill: "ca_diep_thoai", mp: 48 },
-      { skill: "vi_da_quyen", mp: 36 },
-      { skill: "dai_tu_di_chuong", mp: 18 },
-      { skill: "hue_nhan_chu", mp: 3 }
+      { skill: "la_han_chuong", mp: 55 },
+      { skill: "vi_da_chuong", mp: 48 },
+      { skill: "dai_tu_di_chuong", mp: 36 },
+      { skill: "la_han_tran", mp: 18 },
+      { skill: "kim_cang_bat_hoai", mp: 3 }
     ];
     for (const step of casts) {
       client.send({ type: "player_attack", payload: { skill: step.skill, x: 640, y: 620, facingRight: true } });
@@ -406,7 +430,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client.close();
   });
 
-  await t.test("Skill hits are damage-authoritative (client damage is ignored)", async () => {
+  await t.test("Skill hits are damage-authoritative (client damage is ignored)", { skip: SKIP_NO_KIT }, async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     client.send({
       type: "player_join",
@@ -424,7 +448,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client.waitFor((m) => m.type === "init_world");
 
     // A hit without a preceding cast is ignored: damage cannot be minted freely.
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(
       client.messages.filter((m) => m.type === "enemy_hit" && m.payload.damage > 0).length,
@@ -433,8 +457,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     );
 
     // After a real cast the server recomputes the damage from the catalog.
-    client.send({ type: "player_attack", payload: { skill: "la_han_quyen", x: 8400, y: 6000, facingRight: true } });
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    client.send({ type: "player_attack", payload: { skill: "la_han_chuong", x: 8400, y: 6000, facingRight: true } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
     const hit = await client.waitFor(
       (m) => m.type === "enemy_hit" && m.payload.id === 0 && m.payload.damage > 0
     );

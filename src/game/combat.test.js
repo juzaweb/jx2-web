@@ -277,6 +277,7 @@ describe("CombatSystem kill rewards", () => {
     };
     const scene = {
       networkClient: { isConnected, sendRestoreMp: vi.fn() },
+      cameras: { main: { width: 5700, height: 3200, zoom: 1 } },
       time: { delayedCall: vi.fn() },
       add: { container: visualStub, circle: visualStub, polygon: visualStub }
     };
@@ -300,6 +301,29 @@ describe("CombatSystem kill rewards", () => {
     y: 590,
     drop: { id: DROP_TABLE[0].id, qty: DROP_TABLE[0].qty },
     ...overrides
+  });
+
+  it("caps a ranged skill at the visible camera diagonal", () => {
+    const { combat } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    expect(combat.skillReach({ radius: 0, range: 6000 })).toBeCloseTo(
+      Math.hypot(5700 / 2, 3200 / 2)
+    );
+    expect(combat.skillReach({ radius: 0, range: 100 })).toBe(100);
+    expect(combat.skillReach({ radius: 110, range: 0 })).toBe(110);
+  });
+
+  it("uses the farthest camera corner when the player is not centred", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    combat.scene.cameras.main.worldView = { left: 0, top: 0, right: 1000, bottom: 600, width: 1000 };
+
+    player.x = 500;
+    player.y = 300;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(500, 300));
+
+    player.x = 0;
+    player.y = 0;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(1000, 600));
   });
 
   it("renders the kill's drop for the attributed killer without minting stats", () => {
