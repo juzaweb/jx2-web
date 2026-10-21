@@ -19,7 +19,7 @@ const THIEU_LAM_PALM_IDS = [
   "nhu_lai_than_thuong"
 ];
 const HAS_THIEU_LAM_PALM_KIT = THIEU_LAM_PALM_IDS.every((id) => Boolean(skillById(id)));
-const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is not authored yet";
+const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -381,6 +381,18 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await spectator.close();
     await client2.close();
     await client1.close();
+  });
+
+  await t.test("Palm skill spends server-owned MP", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({ type: "player_join", payload: { id: "usr_palm_mp", token: "test-token", characterId: "char_mp_1", username: "PalmMp", x: 640, y: 620 } });
+    await client.waitFor((m) => m.type === "init_world");
+
+    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 640, y: 620, facingRight: true } });
+    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 48);
+    assert.equal(mp.payload.maxMp, 60);
+
+    await client.close();
   });
 
   await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", { skip: SKIP_NO_KIT }, async () => {

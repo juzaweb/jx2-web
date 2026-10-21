@@ -1,9 +1,10 @@
 /**
- * Vector skill VFX.
+ * Skill VFX.
  *
- * Every skill's `vfx` config names a small reusable primitive instead of a sprite
- * sheet, so the whole kit ships without image assets. Effects are tweened and
- * destroyed; nothing is kept alive between casts.
+ * A skill's `vfx` config either names a small reusable vector primitive or a
+ * preloaded sprite-sheet texture (`vfx.sprite`). Vector effects are tweened and
+ * destroyed; sprite effects play once and destroy themselves on completion, so
+ * nothing is kept alive between casts.
  */
 
 import { toIso, isoDepth } from "./isoProjection.js";
@@ -16,6 +17,49 @@ const DEPTH_BONUS = 12;
  * @param {number} y
  */
 const baseAt = (x, y) => ({ ...toIso(x, y), depth: isoDepth(x, y) });
+
+/**
+ * Play a catalog skill's sprite-sheet animation at a world position.
+ * @param {Phaser.Scene} scene
+ * @param {Object} skill
+ * @param {number} x world X
+ * @param {number} y world Y
+ * @returns {boolean} true when the sprite actually played
+ */
+function playSpriteCastVfx(scene, skill, x, y) {
+  const key = skill.vfx?.sprite;
+  if (!key || !scene.textures.exists(key)) return false;
+
+  const texture = scene.textures.get(key);
+  const firstFrame = texture.get(0);
+  if (!firstFrame) return false;
+
+  const animKey = `${key}-play`;
+  if (!scene.anims.exists(animKey)) {
+    const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
+    const frames = scene.anims.generateFrameNumbers(key, { start: 0, end: frameCount - 1 });
+    if (!frames.length) return false;
+    scene.anims.create({
+      key: animKey,
+      frames,
+      frameRate: Number(skill.vfx?.fps) || 12,
+      repeat: 0
+    });
+  }
+
+  const p = baseAt(x, y);
+  const radius = Number(skill.radius) || Number(skill.range) || 90;
+  const size = Math.max(120, radius * 1.8) * (Number(skill.vfx?.scale) || 1);
+  const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
+  const sprite = scene.add
+    .sprite(p.x, p.y - 26, key)
+    .setOrigin(0.5, 0.62)
+    .setDepth(p.depth + DEPTH_BONUS)
+    .setScale(size / frameWidth);
+  sprite.play(animKey);
+  sprite.once("animationcomplete", () => sprite.destroy());
+  return true;
+}
 
 /**
  * Cast animation played at the hero's feet.
@@ -34,6 +78,12 @@ export function playSkillCastVfx(scene, player, skill, target = null) {
   const degrees = angle === null ? (facingRight ? 0 : 180) : (angle * 180) / Math.PI;
   const offsetX = angle === null ? (facingRight ? 16 : -16) : Math.cos(angle) * 26;
   const offsetY = angle === null ? 0 : Math.sin(angle) * 26;
+
+  if (skill.vfx.sprite) {
+    const spriteX = target ? target.x : player.x;
+    const spriteY = target ? target.y : player.y;
+    if (playSpriteCastVfx(scene, skill, spriteX, spriteY)) return;
+  }
 
   // Baseline pulse so every cast is visibly telegraphed, whatever its type.
   const pulse = scene.add

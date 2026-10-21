@@ -78,6 +78,12 @@ export class JiangHuScene extends Phaser.Scene {
     for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
       this.load.image(key, url);
     }
+    if (!this.textures.exists("vfx-dai-tu-di-chuong")) {
+      this.load.spritesheet("vfx-dai-tu-di-chuong", "/skills/vfx/dai_tu_di_chuong/sheet.png", {
+        frameWidth: 256,
+        frameHeight: 256
+      });
+    }
   }
 
   create() {

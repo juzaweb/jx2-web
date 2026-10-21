@@ -203,6 +203,12 @@ export default {
         "invalid-slot": "Ô chiêu không hợp lệ."
       }
     },
+    thieuLam: {
+      daiTuDiChuong: {
+        name: "Đại Tu Di Chưởng",
+        desc: "Chưởng pháp diện rộng, đánh choáng kẻ địch quanh thân."
+      }
+    }
   },
   character: {
     title: "Nhân vật",

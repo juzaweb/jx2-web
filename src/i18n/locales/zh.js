@@ -203,6 +203,12 @@ export default {
         "invalid-slot": "招式槽无效。"
       }
     },
+    thieuLam: {
+      daiTuDiChuong: {
+        name: "大须弥掌",
+        desc: "范围掌法，击晕周围敌人。"
+      }
+    }
   },
   character: {
     title: "角色",

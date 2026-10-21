@@ -67,7 +67,9 @@ export function HotbarDock({
   const quickSlots = Array.from({ length: 12 }, (_, index) => {
     const useSlot = index + 1;
     const raw = items.find((entry) => entry.useSlot === useSlot);
-    const skill = useSlot >= 5 && useSlot <= 10 ? skills[useSlot - 5] : null;
+    const skill = useSlot >= 5 && useSlot <= 10
+      ? skills.find((entry) => entry.slot === useSlot - 5) || null
+      : null;
     return { useSlot, item: raw ? localizeItem(raw, t) : null, skill };
   });
 

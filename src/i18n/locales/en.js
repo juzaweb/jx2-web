@@ -203,6 +203,12 @@ export default {
         "invalid-slot": "Invalid skill slot."
       }
     },
+    thieuLam: {
+      daiTuDiChuong: {
+        name: "Great Sumeru Palm",
+        desc: "Wide palm strike that stuns nearby foes."
+      }
+    }
   },
   character: {
     title: "Character",

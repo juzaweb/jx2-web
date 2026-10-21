@@ -20,10 +20,37 @@ export const BASIC_ATTACK_ID = "normal";
 
 /**
  * Thiếu Lâm kit is being rebuilt as a palm-technique (chưởng pháp) kit. The old
- * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed; the sect
- * resolves to an empty list until the new kit lands.
+ * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed; this is the
+ * first palm skill, with the remaining slots landing in later phases.
  */
-const THIEU_LAM_SKILLS = [];
+const THIEU_LAM_SKILLS = [
+  {
+    id: "dai_tu_di_chuong",
+    sect: "thieu-lam",
+    slot: 2,
+    icon: "/skills/dai_tu_di_chuong.png",
+    glyph: "掌",
+    nameKey: "skills.thieuLam.daiTuDiChuong.name",
+    descKey: "skills.thieuLam.daiTuDiChuong.desc",
+    // Temporary: this is the only authored palm skill, so it unlocks at 1 for
+    // playtesting. Restore to 3 once slots 0-1 land.
+    unlockLevel: 1,
+    mp: 12,
+    cooldown: 6000,
+    target: "enemy",
+    range: 110,
+    radius: 110,
+    mult: 1.3,
+    effects: [{ kind: "stun", duration: 800 }],
+    vfx: {
+      sprite: "vfx-dai-tu-di-chuong",
+      cast: "shockwave",
+      impact: "burst",
+      color: 0xffb347,
+      shake: 0.004
+    }
+  }
+];
 
 const VO_DANG_SKILLS = [];
 const NGA_MY_SKILLS = [];
