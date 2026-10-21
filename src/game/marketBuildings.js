@@ -2,10 +2,35 @@ import { WORLD_SCALE } from "./worldConfig.js";
 
 const S = WORLD_SCALE;
 
+export const PHARMACY_BUILDING = {
+  textureKey: "building-duoc-diem",
+  url: "/duoc-diem.png",
+  width: 714,
+  height: 422,
+  scale: 2.8
+};
+
 /** Front-facing 2.5D shop, gate, notice board and stall painters. */
 
 export function createShop(scene, def) {
     const c = scene.add.container(0, 0);
+
+    // Sprite-based herb shop when runtime texture is available.
+    if (
+      def.palette === "herb" &&
+      typeof scene.textures?.exists === "function" &&
+      scene.textures.exists(PHARMACY_BUILDING.textureKey)
+    ) {
+      const g = scene.add.graphics();
+      g.fillStyle(0x12170f, 0.32);
+      g.fillEllipse(0, 4, 680, 36);
+      c.add(g);
+
+      const img = scene.add.image(0, 0, PHARMACY_BUILDING.textureKey).setOrigin(0.5, 1);
+      c.add(img);
+      return c;
+    }
+
     const herb = def.palette === "herb";
     const wall = herb ? 0x8a6741 : 0x91633d;
     const wallDark = herb ? 0x64482c : 0x6d472b;

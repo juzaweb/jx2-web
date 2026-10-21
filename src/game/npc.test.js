@@ -28,4 +28,8 @@ describe("herb-shop NPC", () => {
     expect(point.x).toBe(npc.gx);
     expect(point.y).toBeGreaterThan(npc.gy);
   });
+
+  it("floats the name tag above the head height", () => {
+    expect(NPC_DUOC.nameOffsetUnits).toBeGreaterThan(NPC_DUOC.heightUnits);
+  });
 });

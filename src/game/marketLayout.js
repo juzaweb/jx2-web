@@ -26,8 +26,8 @@ export const MARKET_NPCS = [
     name: "Dược Sư",
     shop: "pharmacy",
     building: "duoc-diem",
-    x: 4580,
-    y: 7120
+    x: 4300,
+    y: 7020
   }
 ];
 
@@ -56,8 +56,9 @@ export const MARKET_BUILDINGS = [
     subSign: "藥舖",
     x: 4300,
     y: 6900,
-    w: 1700,
+    w: 2000,
     d: 900,
+    scale: 2.8,
     signColor: "green",
     palette: "herb"
   },
@@ -167,7 +168,7 @@ export const MARKET_PROPS = [
   { kind: "crate-stack", x: 9200, y: 3900, s: 0.85 },
   { kind: "sacks", x: 3500, y: 4700, s: 1 },
   { kind: "barrel", x: 3500, y: 7100, s: 1 },
-  { kind: "jar-cluster", x: 5200, y: 6500, s: 1 },
+  { kind: "jar-cluster", x: 5450, y: 6500, s: 1 },
   { kind: "jar-cluster", x: 9200, y: 7100, s: 0.9 },
   { kind: "basket", x: 6400, y: 3900, s: 0.9 },
   { kind: "basket", x: 9000, y: 5200, s: 0.8 },
