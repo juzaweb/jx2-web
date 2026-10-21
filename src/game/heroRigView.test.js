@@ -95,11 +95,26 @@ function makeSpriteScene() {
           this.frame = frameIndex;
           this.frameSets += 1;
           return this;
+        },
+        setTexture(textureKey) {
+          this.texture = textureKey;
+          return this;
         }
       })
     },
+    tweens: {
+      add: (config) => {
+        if (config.onUpdate) config.onUpdate();
+        if (config.onComplete) config.onComplete();
+        return { stop: () => {} };
+      }
+    },
     textures: {
-      exists: (key) => key === "hero-body-male" || key === "hero-body-female"
+      exists: (key) =>
+        key === "hero-body-male" ||
+        key === "hero-body-female" ||
+        key === "hero-punch-male" ||
+        key === "hero-punch-female"
     },
     _container: container
   };
@@ -201,5 +216,18 @@ describe("HeroRigView baked body", () => {
 
     expect(scene._container.children.length).toBeGreaterThan(1);
     expect(view.key).toContain("cam-y-bao");
+  });
+
+  it("plays punch sprite sheet animation on attack", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene);
+    view.set(2, {}, "male"); // Facing right (row 2)
+
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+    view.attack("slash"); // "slash" triggers punch animation
+
+    // In our mock scene, tweens complete immediately, so texture is restored after animation
+    expect(view.acting).toBe(false);
+    expect(view.bodySprite.texture).toBe("hero-body-male");
   });
 });

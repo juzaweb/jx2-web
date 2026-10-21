@@ -2,6 +2,7 @@ import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
 import { HERO_BODY, bodyFrameForDirection, bodyTextureFor } from "./heroBody.js";
+import { HERO_PUNCH, punchFrameForDirection, punchTextureFor } from "./heroPunch.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
@@ -151,6 +152,40 @@ export class HeroRigView {
     this.acting = true;
 
     if (this.usingSprite) {
+      const punchTexture = punchTextureFor(this.gender);
+      const hasPunchTexture = Boolean(this.scene.textures?.exists?.(punchTexture));
+
+      if (hasPunchTexture && this.bodySprite) {
+        const bodyTexture = bodyTextureFor(this.gender);
+        const startFrame = bodyFrameForDirection(this.direction, 0);
+
+        this.bodySprite.setTexture(punchTexture);
+        this.bodySprite.setFrame(punchFrameForDirection(this.direction, 0));
+
+        const progress = { step: 0 };
+        this.actionTween = this.scene.tweens.add({
+          targets: progress,
+          step: 3,
+          duration: 160,
+          ease: "Linear",
+          onUpdate: () => {
+            const currentStep = Math.round(progress.step);
+            if (this.bodySprite) {
+              this.bodySprite.setFrame(punchFrameForDirection(this.direction, currentStep));
+            }
+          },
+          onComplete: () => {
+            this.actionTween = null;
+            this.acting = false;
+            if (this.bodySprite) {
+              this.bodySprite.setTexture(bodyTexture);
+              this.bodySprite.setFrame(this.frameIndex ?? startFrame);
+            }
+          }
+        });
+        return;
+      }
+
       this.actionTween = this.scene.tweens.add({
         targets: this.container,
         x: this.pose.side * 3.5,

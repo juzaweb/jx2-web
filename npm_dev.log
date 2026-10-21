@@ -1,0 +1,69 @@
+
+> jx2-web@1.0.0 dev
+> node scripts/dev.js
+
+[1m[32m====================================================[0m
+[1m[32m   Giang Hồ (jx2-web) — Dev Environment Launcher   [0m
+[1m[32m====================================================[0m
+[Config] Backend API Port  : [36m5000[0m
+[Config] Frontend Web Port : [33m3000[0m
+[Config] Client API Base   : [35mhttp://localhost:5000/api[0m
+----------------------------------------------------
+
+[36m[API 5000][0m node:internal/modules/package_json_reader:314
+[36m[API 5000][0m   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+[36m[API 5000][0m         ^
+[36m[API 5000][0m Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'express' imported from /app/server/src/app.js
+[36m[API 5000][0m     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:314:9)
+[36m[API 5000][0m     at packageResolve (node:internal/modules/esm/resolve:768:81)
+[36m[API 5000][0m     at moduleResolve (node:internal/modules/esm/resolve:855:18)
+[36m[API 5000][0m     at defaultResolve (node:internal/modules/esm/resolve:985:11)
+[36m[API 5000][0m     at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+[36m[API 5000][0m     at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+[36m[API 5000][0m     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+[36m[API 5000][0m     at ModuleJob._link (node:internal/modules/esm/module_job:182:49)
+[36m[API 5000][0m     at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+[36m[API 5000][0m   code: 'ERR_MODULE_NOT_FOUND'
+[36m[API 5000][0m }
+[36m[API 5000][0m Node.js v22.22.1
+[36m[API 5000][0m Failed running '/app/server/src/index.js'. Waiting for file changes before restarting...
+[33m[GAME 3000][0m   VITE v8.3.4  ready in 306 ms
+[33m[GAME 3000][0m   ➜  Local:   http://localhost:3000/
+[33m[GAME 3000][0m   ➜  Network: use --host to expose
+[33m[GAME 3000][0m 11:55:31 AM [vite] (client) [optimizer] bundling dependencies...
+[33m[GAME 3000][0m 11:56:36 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:56:41 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:56:45 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:56:49 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:56:53 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:56:57 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:57:00 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:57:04 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)
+[33m[GAME 3000][0m 11:57:25 AM [vite] ws proxy error:
+[33m[GAME 3000][0m AggregateError [ECONNREFUSED]:
+[33m[GAME 3000][0m     at internalConnectMultiple (node:net:1134:18)
+[33m[GAME 3000][0m     at afterConnectMultiple (node:net:1715:7)

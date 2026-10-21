@@ -22,6 +22,7 @@ import { MARKET_BOUNDS, MARKET_NPCS, MARKET_SPAWN } from "./marketLayout.js";
 import { SHOP_BUILDINGS } from "./marketBuildings.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
+import { HERO_PUNCH, HERO_PUNCH_TEXTURES } from "./heroPunch.js";
 import {
   NPC_DUOC,
   NPC_INTERACT_RANGE,
@@ -67,6 +68,13 @@ export class JiangHuScene extends Phaser.Scene {
       this.load.spritesheet(key, url, {
         frameWidth: HERO_BODY.frameWidth,
         frameHeight: HERO_BODY.frameHeight
+      });
+    }
+    for (const { key, url } of Object.values(HERO_PUNCH_TEXTURES)) {
+      if (this.textures.exists(key)) continue;
+      this.load.spritesheet(key, url, {
+        frameWidth: HERO_PUNCH.frameWidth,
+        frameHeight: HERO_PUNCH.frameHeight
       });
     }
     this.load.image("hero-portrait", "/hero_portrait.png");
