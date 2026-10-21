@@ -8,7 +8,7 @@ import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.j
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
-import { MARKET_SPAWN } from "../../../src/game/marketLayout.js";
+import { MARKET_NPCS, MARKET_SPAWN } from "../../../src/game/marketLayout.js";
 import {
   applyReward,
   normalizeProgress,
@@ -106,6 +106,9 @@ export const AOI_RADIUS = 800;
 
 /** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
 export const PLAYER_SPAWN = { ...MARKET_SPAWN };
+
+/** Max distance (ground px) between buyer and a shop NPC. */
+const SHOP_INTERACT_RANGE = 260;
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
@@ -655,6 +658,27 @@ export class GameSocketManager {
       this.send(ws, {
         type: "shop_result",
         payload: { ok: false, itemId: purchase.item.id, qty: purchase.qty, reason: "guest" }
+      });
+      return;
+    }
+
+    // A shop is a place in the world: refuse purchases made from across the map.
+    const nearShop = MARKET_NPCS.some(
+      (npc) =>
+        npc.shop === "pharmacy" &&
+        (player.x - npc.x) ** 2 + (player.y - npc.y) ** 2 <= SHOP_INTERACT_RANGE ** 2
+    );
+    if (!nearShop) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "range"
+        }
       });
       return;
     }

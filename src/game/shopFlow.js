@@ -17,6 +17,7 @@ const FAILURE_MESSAGES = {
   coins: "Không đủ bạc để mua dược phẩm này.",
   guest: "Cần đăng nhập và chọn nhân vật để giao dịch.",
   offline: "Cần kết nối máy chủ để giao dịch.",
+  range: "Hãy đến gần chủ tiệm để giao dịch.",
   error: "Máy chủ không thể hoàn tất giao dịch. Bạc chưa bị trừ.",
   unknown: "Tiệm không bán vật phẩm này."
 };

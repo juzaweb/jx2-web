@@ -505,8 +505,18 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     });
     await client.waitFor((m) => m.type === "init_world");
 
-    // Earn silver deterministically from the one-off quest payout instead of
-    // killing shared enemies (that would perturb the later enemy-state tests).
+    // Buying from across the map is refused even with silver.
+    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const farAway = await client.waitFor(
+      (m) => m.type === "shop_result" && m.payload.ok === false
+    );
+    assert.equal(farAway.payload.reason, "range");
+    assert.equal(farAway.payload.coins, 0, "a refused purchase spends nothing");
+
+    // Walk up to the Dược Sư, then earn silver deterministically from the
+    // one-off quest payout instead of killing shared enemies (that would
+    // perturb the later enemy-state tests).
+    client.send({ type: "player_move", payload: { x: 4580, y: 7200, vx: 0, vy: 0 } });
     client.send({ type: "quest_claim", payload: {} });
     const earned = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins > 0);
     assert.equal(earned.payload.coins, 20);

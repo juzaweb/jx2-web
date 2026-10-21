@@ -519,6 +519,7 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_MOVE, (direction) => {
         if (!this.isPaused) {
           this.combat.cancelPendingCast();
+          this.pendingNpc = null;
           this.player.setTouchDirection(direction);
         }
       }),

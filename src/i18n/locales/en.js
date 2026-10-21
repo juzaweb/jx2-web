@@ -266,6 +266,8 @@ export default {
       coins: "Not enough silver for this item.",
       guest: "Log in and choose a character to trade.",
       offline: "Connect to the server to trade.",
+      range: "Move closer to the shopkeeper to trade.",
+      error: "The server could not complete the trade. No silver was spent.",
       unknown: "This shop does not sell that item."
     }
   },

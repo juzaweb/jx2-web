@@ -62,7 +62,7 @@
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
 }
 
-.shop-icon {
+.shop-row .item-icon.shop-icon {
   flex: 0 0 auto;
   width: 38px;
   height: 38px;

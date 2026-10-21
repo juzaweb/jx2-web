@@ -5,6 +5,13 @@ import { localizeItem } from "../../i18n/localize.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import "./shop.css";
 
+/** Localised one-line verdict for a purchase result, or "" when idle. */
+const shopResultMessage = (result, t) => {
+  if (!result) return "";
+  if (result.ok) return t("shop.result.ok", { qty: result.qty ?? 1 });
+  return t(`shop.result.${result.reason || "unknown"}`, undefined, t("shop.result.unknown"));
+};
+
 /**
  * Counter panel for the Dược Sư (herb-shop) NPC. React renders the stock and
  * asks the scene to buy; the scene (online: the server) validates silver and
@@ -22,6 +29,13 @@ export function ShopModal({ isOpen, npcName, coins = 0, result = null, onBuy, on
     setPendingId(null);
   }, [result]);
 
+  // A dropped request must not leave the row disabled forever.
+  useEffect(() => {
+    if (!pendingId) return undefined;
+    const timer = setTimeout(() => setPendingId(null), 6000);
+    return () => clearTimeout(timer);
+  }, [pendingId]);
+
   if (!isOpen) return null;
 
   const rows = PHARMACY_STOCK.map((entry) => {
@@ -29,11 +43,7 @@ export function ShopModal({ isOpen, npcName, coins = 0, result = null, onBuy, on
     return { ...entry, item };
   });
 
-  const resultMessage = result
-    ? result.ok
-      ? t("shop.result.ok", { qty: result.qty ?? 1 })
-      : t(`shop.result.${result.reason || "unknown"}`, undefined, t("shop.result.unknown"))
-    : "";
+  const resultMessage = shopResultMessage(result, t);
 
   return (
     <div className="overlay shop-overlay" id="shop-modal" onClick={onClose}>

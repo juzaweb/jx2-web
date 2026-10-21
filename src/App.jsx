@@ -326,6 +326,16 @@ export function App() {
       if (isTypingTarget(e.target)) return;
       if (e.repeat) return;
 
+      // The shop is a focused modal: only Escape leaves it, so global panel
+      // shortcuts cannot open a hidden window underneath the counter.
+      if (shopNpc) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          handleCloseShop();
+        }
+        return;
+      }
+
       const key = e.key.toLowerCase();
       const hasOpenModal =
         isHelpOpen ||
@@ -382,11 +392,6 @@ export function App() {
       }
 
       if (e.key !== "Escape") return;
-
-      if (shopNpc) {
-        handleCloseShop();
-        return;
-      }
 
       if (isCityMapOpen) {
         setIsCityMapOpen(false);
