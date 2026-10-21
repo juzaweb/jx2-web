@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HeroRigView } from "./heroRigView.js";
+import { HERO_BODY } from "./heroBody.js";
 
 /** Minimal Phaser scene stub: enough shape factories for the rig view. */
 function makeShape() {
@@ -163,7 +164,7 @@ describe("HeroRigView baked body", () => {
     expect(view.bodySprite.texture).toBe("hero-body-male");
     expect(view.bodySprite.frame).toBe(8); // right row (2) * 4 columns
     expect(view.bodySprite.origin).toEqual([0.5, 1]);
-    expect(view.bodySprite.y).toBe(1.85);
+    expect(view.bodySprite.y).toBeCloseTo(HERO_BODY.footOffsetY);
   });
 
   it("switches sheets with gender and frames with direction", () => {

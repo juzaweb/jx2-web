@@ -67,7 +67,11 @@ export function CharacterPreview({ gender = "male", equipment = {}, direction = 
   const preview = buildCharacterPreview({ gender, equipment, direction });
 
   return (
-    <div className="char-model-preview" aria-hidden="true">
+    <div
+      className="char-model-preview"
+      aria-hidden="true"
+      style={{ aspectRatio: preview.aspectRatio }}
+    >
       <div
         className="char-model-body"
         style={{

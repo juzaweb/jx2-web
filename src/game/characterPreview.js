@@ -19,6 +19,7 @@ const toPercent = (index, count) => (count > 1 ? (index / (count - 1)) * 100 : 0
  *   textureUrl: string,
  *   backgroundSize: string,
  *   backgroundPosition: string,
+ *   aspectRatio: string,
  *   viewBox: string,
  *   parts: Array<Object>
  * }}
@@ -40,6 +41,7 @@ export function buildCharacterPreview({ gender = "male", direction = 0, equipmen
     textureUrl: HERO_BODY_TEXTURES[g].url,
     backgroundSize: `${columns * 100}% ${rows * 100}%`,
     backgroundPosition: `${toPercent(column, columns)}% ${toPercent(row, rows)}%`,
+    aspectRatio: `${frameWidth} / ${frameHeight}`,
     viewBox: `${viewX} ${viewY} ${viewWidth} ${viewHeight}`,
     parts: buildBodyEquipment({ direction, equipment })
   };

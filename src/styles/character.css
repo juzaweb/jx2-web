@@ -268,7 +268,6 @@
 .char-model-preview {
   position: relative;
   height: clamp(200px, 40vh, 390px);
-  aspect-ratio: 280 / 520;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.8));
 }
 .char-model-body,

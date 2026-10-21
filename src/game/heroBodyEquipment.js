@@ -5,6 +5,9 @@
  * do not fit. These primitives are drawn in the same rig space but sized for
  * the sheet: armor on the torso, helmet on the crown, and weapon/accessory on
  * the hands. They use the same slot order as heroRig.js.
+ *
+ * Body landmarks in rig units (feet at 0): head top -92.5, eyes ~-77, shoulders
+ * ~-60, waistband ~-42, hands ~-16. Keep these in mind when retuning anchors.
  */
 
 import { EQUIP_SLOT_ORDER, circ, line, poly, poseFor, rect, weaponKindFor } from "./heroRig.js";
@@ -26,9 +29,9 @@ const E = {
 
 /** Hand centres for the facing direction, in rig units. */
 function handCentres(pose) {
-  if (pose.side === 0) return { left: -19, right: 19 };
+  if (pose.side === 0) return { left: -15, right: 15 };
   const side = Math.sign(pose.side);
-  return { left: -side * 14, right: side * 14 };
+  return { left: -side * 8, right: side * 8 };
 }
 
 function armor(parts, pose) {
@@ -36,29 +39,29 @@ function armor(parts, pose) {
   parts.push(
     poly(
       [
-        [x - 15.5, -55],
-        [x + 15.5, -55],
-        [x + 16, -42],
-        [x + 14, -28],
-        [x - 14, -28],
-        [x - 16, -42]
+        [x - 14.5, -59],
+        [x + 14.5, -59],
+        [x + 15, -48],
+        [x + 13, -40],
+        [x - 13, -40],
+        [x - 15, -48]
       ],
       E.armor,
       { stroke: E.armorEdge, lineWidth: 1, slot: "armor" }
     )
   );
-  parts.push(circ(x - 16, -51, 4.2, E.armorDark, { stroke: E.armorEdge, lineWidth: 0.8, slot: "armor" }));
-  parts.push(circ(x + 16, -51, 4.2, E.armorDark, { stroke: E.armorEdge, lineWidth: 0.8, slot: "armor" }));
+  parts.push(circ(x - 14.5, -56, 3.8, E.armorDark, { stroke: E.armorEdge, lineWidth: 0.8, slot: "armor" }));
+  parts.push(circ(x + 14.5, -56, 3.8, E.armorDark, { stroke: E.armorEdge, lineWidth: 0.8, slot: "armor" }));
 
   if (pose.back < 0.6) {
-    parts.push(poly([[x - 6, -55], [x + 6, -55], [x, -46]], E.armorLight, { slot: "armor" }));
-    parts.push(circ(x, -45, 2.4, E.gold, { slot: "armor" }));
+    parts.push(poly([[x - 6, -59], [x + 6, -59], [x, -51]], E.armorLight, { slot: "armor" }));
+    parts.push(circ(x, -50, 2.4, E.gold, { slot: "armor" }));
   } else {
-    parts.push(line(x, -54, x, -29, E.armorEdge, { lineWidth: 1, slot: "armor" }));
+    parts.push(line(x, -58, x, -41, E.armorEdge, { lineWidth: 1, slot: "armor" }));
   }
 
-  parts.push(rect(x, -31, 29, 3, E.belt, { slot: "armor" }));
-  parts.push(rect(x, -31, 9, 2, E.gold, { slot: "armor" }));
+  parts.push(rect(x, -42, 27, 3, E.belt, { slot: "armor" }));
+  parts.push(rect(x, -42, 9, 2, E.gold, { slot: "armor" }));
 }
 
 function helmet(parts, pose) {
@@ -66,33 +69,33 @@ function helmet(parts, pose) {
   parts.push(
     poly(
       [
-        [x - 18, -77],
-        [x - 17, -86],
-        [x - 9, -93],
-        [x + 9, -93],
-        [x + 17, -86],
-        [x + 18, -77],
-        [x + 13, -75],
-        [x - 13, -75]
+        [x - 13, -84],
+        [x - 12.5, -89],
+        [x - 9, -95],
+        [x + 9, -95],
+        [x + 12.5, -89],
+        [x + 13, -84],
+        [x + 9, -83],
+        [x - 9, -83]
       ],
       E.helmet,
       { stroke: E.helmetEdge, lineWidth: 1.2, slot: "helmet" }
     )
   );
-  parts.push(rect(x, -76, 38, 3, E.gold, { stroke: E.helmetEdge, lineWidth: 0.6, slot: "helmet" }));
-  parts.push(poly([[x - 2, -93], [x + 2, -93], [x, -99]], E.gold, { slot: "helmet" }));
-  parts.push(circ(x, -84, 1.6, E.jade, { stroke: E.jadeEdge, lineWidth: 0.5, slot: "helmet" }));
+  parts.push(rect(x, -83, 28, 3, E.gold, { stroke: E.helmetEdge, lineWidth: 0.6, slot: "helmet" }));
+  parts.push(poly([[x - 2, -95], [x + 2, -95], [x, -101]], E.gold, { slot: "helmet" }));
+  parts.push(circ(x, -88, 1.6, E.jade, { stroke: E.jadeEdge, lineWidth: 0.5, slot: "helmet" }));
 }
 
 function accessory(parts, pose) {
   const x = handCentres(pose).left;
-  parts.push(circ(x, -24, 2.8, E.jade, { stroke: E.jadeEdge, lineWidth: 0.8, slot: "accessory" }));
-  parts.push(circ(x, -24, 1, E.gold, { slot: "accessory" }));
+  parts.push(circ(x, -16, 2.8, E.jade, { stroke: E.jadeEdge, lineWidth: 0.8, slot: "accessory" }));
+  parts.push(circ(x, -16, 1, E.gold, { slot: "accessory" }));
 }
 
 function weapon(parts, pose, weaponId) {
   const x = handCentres(pose).right;
-  const y = -24;
+  const y = -16;
   const kind = weaponKindFor(weaponId);
 
   if (kind === "claw") {

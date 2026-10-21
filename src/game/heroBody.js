@@ -9,20 +9,26 @@
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
+/** Bump this whenever the sheets are regenerated so browsers drop cached art. */
+const BODY_ASSET_VERSION = "2";
+
 export const HERO_BODY_TEXTURES = {
-  male: { key: "hero-body-male", url: "/hero-body-male.png" },
-  female: { key: "hero-body-female", url: "/hero-body-female.png" }
+  male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
+  female: { key: "hero-body-female", url: `/hero-body-female.png?v=${BODY_ASSET_VERSION}` }
 };
 
-/** Source content is 500px tall; rendered at ~92.5 rig units. */
-const CONTENT_HEIGHT_PX = 500;
+/**
+ * Frame geometry is written by scripts/build_hero_body.py; keep the two copies
+ * in sync. Source content is 140px tall; rendered at ~92.5 rig units.
+ */
+const CONTENT_HEIGHT_PX = 140;
 const BODY_HEIGHT_UNITS = 92.5;
 const BODY_SCALE = BODY_HEIGHT_UNITS / CONTENT_HEIGHT_PX;
-const FRAME_BOTTOM_MARGIN_PX = 10;
+const FRAME_BOTTOM_MARGIN_PX = 0;
 
 export const HERO_BODY = {
-  frameWidth: 280,
-  frameHeight: 520,
+  frameWidth: 128,
+  frameHeight: 160,
   columns: 4,
   rows: 4,
   scale: BODY_SCALE,
