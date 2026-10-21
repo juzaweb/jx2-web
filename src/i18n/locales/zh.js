@@ -255,6 +255,22 @@ export default {
     equipHint: "点击装备到{slot}",
     useHint: "点击使用"
   },
+  shop: {
+    eyebrow: "汴京药铺",
+    title: "药铺",
+    greeting: "老夫专卖恢复生命与内力的灵药，侠客尽管挑选。",
+    balance: "银两：",
+    buy: "购买",
+    result: {
+      ok: "交易成功——已将 {qty} 件药品放入行囊。",
+      coins: "银两不足，无法购买此药品。",
+      guest: "请先登录并选择角色再进行交易。",
+      offline: "请连接服务器后再进行交易。",
+      range: "请靠近店主后再进行交易。",
+      error: "服务器未能完成交易，未扣除银两。",
+      unknown: "本店不出售此物品。"
+    }
+  },
   slots: {
     armor: "战甲",
     helmet: "头盔",

@@ -273,6 +273,22 @@ export default {
     equipHint: "Nhấp để mặc vào ô {slot}",
     useHint: "Nhấp để sử dụng"
   },
+  shop: {
+    eyebrow: "DƯỢC ĐIỂM BIỆN KINH",
+    title: "Tiệm Dược",
+    greeting: "Lão phu chuyên bán linh dược hồi sinh lực và nội lực. Hiệp khách cứ chọn.",
+    balance: "Túi bạc:",
+    buy: "Mua",
+    result: {
+      ok: "Giao dịch thành công — đã thêm {qty} dược phẩm vào hành trang.",
+      coins: "Không đủ bạc để mua dược phẩm này.",
+      guest: "Cần đăng nhập và chọn nhân vật để giao dịch.",
+      offline: "Cần kết nối máy chủ để giao dịch.",
+      range: "Hãy đến gần chủ tiệm để giao dịch.",
+      error: "Máy chủ không thể hoàn tất giao dịch. Bạc chưa bị trừ.",
+      unknown: "Tiệm không bán vật phẩm này."
+    }
+  },
   slots: {
     armor: "Giáp",
     helmet: "Mũ",

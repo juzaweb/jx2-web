@@ -17,6 +17,21 @@ export const MARKET_BOUNDS = { x0: 2100, y0: 2600, x1: 11000, y1: 9600 };
 export const MARKET_SPAWN = { x: 6400, y: 6050 };
 
 /**
+ * Friendly NPCs. `x`/`y` are the ground contact point; each NPC stands in front
+ * of its shop and opens a service when the player interacts with it.
+ */
+export const MARKET_NPCS = [
+  {
+    id: "duoc-su",
+    name: "Dược Sư",
+    shop: "pharmacy",
+    building: "duoc-diem",
+    x: 4580,
+    y: 7120
+  }
+];
+
+/**
  * Landmark shops and structures spread across the square. `x`/`y` are the
  * screen-space anchor (the building's ground contact point), `w`/`d` are
  * collision footprint sizes.

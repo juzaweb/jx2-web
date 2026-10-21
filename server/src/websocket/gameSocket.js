@@ -8,7 +8,7 @@ import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.j
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
-import { MARKET_SPAWN } from "../../../src/game/marketLayout.js";
+import { MARKET_NPCS, MARKET_SPAWN } from "../../../src/game/marketLayout.js";
 import {
   applyReward,
   normalizeProgress,
@@ -17,6 +17,7 @@ import {
 } from "../../../src/game/progression.js";
 import { skillById, skillMpCost, skillCooldown } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
+import { shopPurchase } from "../../../src/game/shop.js";
 
 /**
  * Clean sanitization for player strings
@@ -105,6 +106,9 @@ export const AOI_RADIUS = 800;
 
 /** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
 export const PLAYER_SPAWN = { ...MARKET_SPAWN };
+
+/** Max distance (ground px) between buyer and a shop NPC. */
+const SHOP_INTERACT_RANGE = 260;
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
@@ -323,6 +327,10 @@ export class GameSocketManager {
 
       case "player_restore_mp":
         this.handlePlayerRestoreMp(ws, msg.payload);
+        break;
+
+      case "shop_buy":
+        this.handleShopBuy(ws, msg.payload);
         break;
 
       case "player_attack":
@@ -622,6 +630,115 @@ export class GameSocketManager {
 
     player.mp = Math.min(player.maxMp, player.mp + amount);
     this.broadcastMp(player);
+  }
+
+  /**
+   * Buy stock from a shop NPC. Silver and the catalog price are server-owned:
+   * the client only names the item and quantity, and is answered with the
+   * authoritative result. The purchased units are written to the character's
+   * stored bag before the reply, so a purchase survives a disconnect.
+   * @param {WebSocket} ws
+   * @param {{itemId?:string, qty?:number}} payload
+   */
+  handleShopBuy(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const purchase = shopPurchase(sanitizeStr(payload.itemId, 64), payload.qty);
+    if (!purchase) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: sanitizeStr(payload.itemId, 64), reason: "unknown" }
+      });
+      return;
+    }
+
+    // Guests and unverified characters have no ledger to debit.
+    if (!player.progress || !player.characterId) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: purchase.item.id, qty: purchase.qty, reason: "guest" }
+      });
+      return;
+    }
+
+    // A shop is a place in the world: refuse purchases made from across the map.
+    const nearShop = MARKET_NPCS.some(
+      (npc) =>
+        npc.shop === "pharmacy" &&
+        (player.x - npc.x) ** 2 + (player.y - npc.y) ** 2 <= SHOP_INTERACT_RANGE ** 2
+    );
+    if (!nearShop) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "range"
+        }
+      });
+      return;
+    }
+
+    if (player.progress.coins < purchase.total) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "coins"
+        }
+      });
+      return;
+    }
+
+    // Write the item first: if the bag cannot be persisted, no silver is spent.
+    try {
+      const bag = store.getInventory(player.characterId);
+      const stored = Math.max(0, Math.floor(Number(bag[purchase.item.id]) || 0));
+      bag[purchase.item.id] = stored + purchase.qty;
+      store.setInventory(player.characterId, bag);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to store purchase:", err.message);
+      }
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "error"
+        }
+      });
+      return;
+    }
+
+    player.progress = { ...player.progress, coins: player.progress.coins - purchase.total };
+    this.persistProgress(player);
+
+    this.send(ws, {
+      type: "player_progress",
+      payload: progressPayload(player.progress)
+    });
+    this.send(ws, {
+      type: "shop_result",
+      payload: {
+        ok: true,
+        itemId: purchase.item.id,
+        qty: purchase.qty,
+        total: purchase.total,
+        coins: player.progress.coins
+      }
+    });
   }
 
   /** Broadcast a player's authoritative MP pool to nearby players. */
