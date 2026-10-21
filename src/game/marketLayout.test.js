@@ -84,6 +84,17 @@ describe("market layout", () => {
     expect(npc.y - building.y).toBe(120);
   });
 
+  it("configures shop landmarks with matching collision footprint and scale", () => {
+    const tapHoa = MARKET_BUILDINGS.find((entry) => entry.id === "tap-hoa");
+    const duocDiem = MARKET_BUILDINGS.find((entry) => entry.id === "duoc-diem");
+    expect(tapHoa).toBeTruthy();
+    expect(duocDiem).toBeTruthy();
+    expect(tapHoa.scale).toBe(2.8);
+    expect(duocDiem.scale).toBe(2.8);
+    expect(tapHoa.w).toBe(2000);
+    expect(duocDiem.w).toBe(2000);
+  });
+
   it("uses only known vegetation sprite kinds", () => {
     for (const [, , , kind] of MARKET_TREES) {
       expect(VEGETATION_SPRITES).toHaveProperty(kind);

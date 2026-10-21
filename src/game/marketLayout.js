@@ -44,8 +44,9 @@ export const MARKET_BUILDINGS = [
     subSign: "雜貨",
     x: 4300,
     y: 4400,
-    w: 1700,
+    w: 2000,
     d: 900,
+    scale: 2.8,
     signColor: "red",
     palette: "wood"
   },
