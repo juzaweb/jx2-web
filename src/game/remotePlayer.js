@@ -271,7 +271,7 @@ export class RemotePlayer {
         this.scene.anims.create({
           key: animKey,
           frames,
-          frameRate: 10,
+          frameRate: 12,
           repeat: -1
         });
       }

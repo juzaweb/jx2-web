@@ -338,7 +338,7 @@ describe("Player movement controls", () => {
     expect(mockScene.anims.create).toHaveBeenCalledWith(
       expect.objectContaining({
         key: "vfx-la-han-tran-spin",
-        frameRate: 10,
+        frameRate: 12,
         repeat: -1
       })
     );

@@ -1,30 +1,18 @@
-"""Extract and build La Hán Trận VFX spritesheet and icon from Row 2 of the art sheet.
+"""Extract and build La Hán Trận VFX spritesheet and icon from the 16-frame formation sheet.
 
 Run: python3 scripts/build_skill_la_han_tran.py
 """
 
-from collections import deque
 from pathlib import Path
 import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_PATH = Path("/var/folders/zz/38wct_p13gz3pb0f2jmy1h140000gn/T/orca-paste-1792568787980-e88d15ab-99e4-4530-9330-5f1cf34ec4a0.png")
+SOURCE_PATH = Path("/var/folders/zz/38wct_p13gz3pb0f2jmy1h140000gn/T/orca-paste-1792575332575-fe827c2e-aadf-43ec-890a-0a8a4cc87122.png")
 VFX_DIR = ROOT / "public" / "skills" / "vfx" / "la_han_tran"
 ICON_PATH = ROOT / "public" / "skills" / "la_han_tran.png"
 
-ROW_Y0 = 258
-ROW_Y1 = 506
-BASE_Y = 505
-TARGET_BASE_Y = 230
-
-COL_BOUNDS = [
-    (0, 186),
-    (187, 380),
-    (381, 575),
-    (576, 765)
-]
-CENTERS_X = [92.5, 289.0, 481.0, 670.5]
+COL_BOUNDS = [(0, 189), (189, 380), (380, 572), (572, 765)]
 
 
 def key_cell(raw):
@@ -69,38 +57,46 @@ def build():
     sheet_src = Image.open(SOURCE_PATH).convert("RGB")
     src_arr = np.array(sheet_src)
 
-    sheet = Image.new("RGBA", (1024, 256), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
     frames = []
 
-    for i, (x0, x1) in enumerate(COL_BOUNDS):
-        cx = CENTERS_X[i]
-        raw = src_arr[ROW_Y0:ROW_Y1, x0:x1]
-        keyed = key_cell(raw)
+    for r in range(4):
+        y0 = r * 256
+        y1 = (r + 1) * 256
+        for c in range(4):
+            x0, x1 = COL_BOUNDS[c]
+            raw = src_arr[y0:y1, x0:x1]
+            keyed = key_cell(raw)
+            alpha = keyed[:, :, 3].copy()
+            de_fringe(alpha, keyed[:, :, :3].astype(int))
+            keyed[:, :, 3] = alpha
 
-        alpha = keyed[:, :, 3].copy()
-        de_fringe(alpha, keyed[:, :, :3].astype(int))
-        keyed[:, :, 3] = alpha
+            # Find exact centroid of this cell
+            y_idx, x_idx = np.where(alpha > 30)
+            cx_cell = x_idx.mean() if len(x_idx) > 0 else (x1 - x0) / 2
+            cy_cell = y_idx.mean() if len(y_idx) > 0 else 128
 
-        frame = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-        dst_x = int(round(128 - (cx - x0)))
-        dst_y = TARGET_BASE_Y - (BASE_Y - ROW_Y0)
-        frame.paste(Image.fromarray(keyed, "RGBA"), (dst_x, dst_y))
+            frame = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+            dst_x = int(round(128 - cx_cell))
+            dst_y = int(round(128 - cy_cell))
+            frame.paste(Image.fromarray(keyed, "RGBA"), (dst_x, dst_y))
 
-        frame_path = VFX_DIR / f"frame-{i + 1}.png"
-        frame.save(frame_path)
-        frames.append(frame)
-        sheet.paste(frame, (i * 256, 0))
+            frames.append(frame)
+            idx = r * 4 + c
+            col = idx % 4
+            row = idx // 4
+            sheet.paste(frame, (col * 256, row * 256))
+            frame.save(VFX_DIR / f"frame-{idx + 1}.png")
 
-    sheet_path = VFX_DIR / "sheet.png"
-    sheet.save(sheet_path)
+    sheet.save(VFX_DIR / "sheet.png")
+    sheet.save(VFX_DIR / "spin_sheet.png")
 
     # Save sheet.json metadata
-    json_path = VFX_DIR / "sheet.json"
-    json_path.write_text(
-        '{\n  "frameWidth": 256,\n  "frameHeight": 256,\n  "frameCount": 4,\n  "fps": 8,\n  "source": "Gemini sheet row 2 (background keyed)"\n}\n'
+    (VFX_DIR / "sheet.json").write_text(
+        '{\n  "frameWidth": 256,\n  "frameHeight": 256,\n  "frameCount": 16,\n  "fps": 12,\n  "source": "New formation sheet (16 rotation frames centered at 128,128)"\n}\n'
     )
 
-    # Build 64x64 icon from Frame 1 (clean golden formation + palm)
+    # Build 64x64 icon from Frame 1
     f1 = frames[0]
     bbox = f1.getbbox()
     crop1 = f1.crop(bbox)
@@ -111,7 +107,7 @@ def build():
     icon = sq.resize((64, 64), Image.Resampling.LANCZOS)
     icon.save(ICON_PATH)
 
-    print(f"Generated {sheet_path}")
+    print(f"Generated {VFX_DIR / 'sheet.png'}")
     print(f"Generated {ICON_PATH}")
 
 

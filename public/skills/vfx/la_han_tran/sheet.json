@@ -2,6 +2,6 @@
   "frameWidth": 256,
   "frameHeight": 256,
   "frameCount": 16,
-  "fps": 10,
-  "source": "Gemini sheet row 2 (frame 4 ground mandala rotated isometrically in 16 frames)"
+  "fps": 12,
+  "source": "New formation sheet (16 rotation frames centered at 128,128)"
 }

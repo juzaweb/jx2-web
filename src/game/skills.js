@@ -80,7 +80,7 @@ const THIEU_LAM_SKILLS = [
       color: 0xffd166,
       shake: 0,
       scale: 0.85,
-      fps: 10
+      fps: 12
     }
   }
 ];

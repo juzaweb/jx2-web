@@ -600,7 +600,7 @@ export class Player {
         this.scene.anims.create({
           key: animKey,
           frames,
-          frameRate: 10,
+          frameRate: 12,
           repeat: -1
         });
       }
