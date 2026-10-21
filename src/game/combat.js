@@ -676,12 +676,23 @@ export class CombatSystem {
 
   /**
    * Filter expired buffs and update active formation aura under player feet.
+   * Only prunes and updates when an active buff has reached its expiration timestamp,
+   * avoiding allocations and redundant render state calls in the per-frame game loop.
    * @param {number} now
    */
   updateBuffs(now) {
-    if (this.buffs.length > 0) {
-      this.buffs = this.buffs.filter((buff) => buff.until > now);
+    if (this.buffs.length === 0) return;
+
+    let hasExpired = false;
+    for (let i = 0; i < this.buffs.length; i++) {
+      if (this.buffs[i].until <= now) {
+        hasExpired = true;
+        break;
+      }
     }
+    if (!hasExpired) return;
+
+    this.buffs = this.buffs.filter((buff) => buff.until > now);
     const activeFormation = this.buffs.find((buff) => buff.formationSprite);
     if (activeFormation) {
       if (typeof activeFormation.formationScale === "number") {

@@ -89,7 +89,6 @@ def build():
             frame.save(VFX_DIR / f"frame-{idx + 1}.png")
 
     sheet.save(VFX_DIR / "sheet.png")
-    sheet.save(VFX_DIR / "spin_sheet.png")
 
     # Save sheet.json metadata
     (VFX_DIR / "sheet.json").write_text(

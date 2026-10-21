@@ -303,6 +303,10 @@ export class RemotePlayer {
    * Hide the formation circle when the buff expires or is cleared.
    */
   hideFormation() {
+    if (this.formationTimer) {
+      this.formationTimer.remove?.();
+      this.formationTimer = null;
+    }
     if (this.formationSprite) {
       this.formationSprite.setVisible?.(false);
       this.formationSprite.stop?.();
@@ -310,6 +314,10 @@ export class RemotePlayer {
   }
 
   destroy() {
+    if (this.formationTimer) {
+      this.formationTimer.remove?.();
+      this.formationTimer = null;
+    }
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;

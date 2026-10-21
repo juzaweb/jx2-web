@@ -97,9 +97,6 @@ export class JiangHuScene extends Phaser.Scene {
         frameHeight: 256
       });
     }
-    if (!this.textures.exists("vfx-la-han-tran-frame4")) {
-      this.load.image("vfx-la-han-tran-frame4", "/skills/vfx/la_han_tran/frame-4.png");
-    }
   }
 
   create() {

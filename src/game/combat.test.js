@@ -603,10 +603,10 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
     });
     expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
 
-    // Before expiration: showFormation is kept
+    // Before expiration: formation remains active without redundant re-shows
     combat.player.showFormation.mockClear();
     combat.update(50000);
-    expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
+    expect(combat.player.showFormation).not.toHaveBeenCalled();
     expect(combat.player.hideFormation).not.toHaveBeenCalled();
 
     // After expiration: hideFormation is called

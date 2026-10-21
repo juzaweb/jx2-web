@@ -516,6 +516,7 @@ export class Player {
     this.stopMovement();
     this.setPosition(this.spawnX, this.spawnY);
     this.sprite.setVelocity(0, 0);
+    this.hideFormation();
   }
 
   setTouchDirection(direction) {

@@ -127,9 +127,14 @@ export class RemotePlayerManager {
     const player = this.players.get(payload.id);
     if (player) {
       if (payload.skill === "la_han_tran") {
-        player.showFormation?.("vfx-la-han-tran");
-        this.scene?.time?.delayedCall?.(180000, () => {
+        player.showFormation?.("vfx-la-han-tran", 0.6);
+        if (player.formationTimer) {
+          player.formationTimer.remove?.();
+          player.formationTimer = null;
+        }
+        player.formationTimer = this.scene?.time?.delayedCall?.(180000, () => {
           player.hideFormation?.();
+          player.formationTimer = null;
         });
       } else if (payload.skill === "kiem_khi") {
         player.playSkill();
