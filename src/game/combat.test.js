@@ -501,4 +501,37 @@ describe("CombatSystem kill rewards", () => {
 
     expect(combat.drops.length).toBeLessThanOrEqual(32);
   });
+
+  it("updates skill loadout and provides fallback aliases", () => {
+    const { combat } = makeCombat();
+    combat.setSkillLoadout({ u: 2, i: 3, o: 4, p: 5 });
+    expect(combat.skillLoadout).toEqual({
+      u: 2,
+      i: 3,
+      o: 4,
+      p: 5,
+      left: 2,
+      right: 3
+    });
+    expect(combat.selectedSkillSlot).toBe(2);
+  });
+
+  it("casts a skill directly by key", () => {
+    const { combat, player } = makeCombat();
+    player.sect = "thieu-lam";
+    combat.setSkillLoadout({ u: 2, i: 1, o: 0, p: 3 });
+    combat.executeSkill = vi.fn();
+    const ok = combat.castSkillByKey("u");
+    expect(ok).toBe(true);
+    expect(combat.executeSkill).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles unknown or empty slot without crashing", () => {
+    const { combat, player, ui } = makeCombat();
+    player.sect = "thieu-lam";
+    combat.setSkillLoadout({ u: 99, i: 1, o: 0, p: 3 });
+    const ok = combat.castSkillByKey("u");
+    expect(ok).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
+  });
 });

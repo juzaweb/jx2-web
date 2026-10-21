@@ -31,6 +31,7 @@ describe("skill keybinds", () => {
 
   it("reserves UI-owned keys", () => {
     expect(isReservedKey("escape")).toBe(true);
+    expect(isReservedKey("f")).toBe(true);
     expect(isReservedKey("f4")).toBe(true);
     expect(isReservedKey("space")).toBe(false);
     expect(isReservedKey("p")).toBe(false);

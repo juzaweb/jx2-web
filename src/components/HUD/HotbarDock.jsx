@@ -19,6 +19,7 @@ export function HotbarDock({
   skills = [],
   selectedSkillSlot = 0,
   leftSkillSlot = 0,
+  skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
   onPickSkill,
   items = QUICK_ITEMS
 }) {
@@ -57,10 +58,12 @@ export function HotbarDock({
 
   const cooldownLeft = (skillId) =>
     skillId ? Math.max(0, (cooldownEnds[skillId] || 0) - clock) : 0;
-  const selectedSkill = skills.find((skill) => skill.slot === selectedSkillSlot) || null;
-  const leftSkill = skills.find((skill) => skill.slot === leftSkillSlot) || null;
-  const leftCooldown = cooldownLeft(leftSkill?.id);
-  const rightCooldown = cooldownLeft(selectedSkill?.id);
+  const skillSlots = [
+    { key: "u", slot: skillLoadout?.u ?? leftSkillSlot ?? 0 },
+    { key: "i", slot: skillLoadout?.i ?? selectedSkillSlot ?? 1 },
+    { key: "o", slot: skillLoadout?.o ?? 2 },
+    { key: "p", slot: skillLoadout?.p ?? 3 }
+  ];
 
   // The bottom bar mirrors the reference: consumables in 1-4, skill icons in
   // 5-10 and two spare slots at the end.
@@ -117,32 +120,31 @@ export function HotbarDock({
           })}
         </div>
 
-        {/* Middle: the left/right mouse skills and the sect skill bar */}
+        {/* Middle: 4 UIOP sect skill slots */}
         <div className="martial-center">
-          <button
-            type="button"
-            className="hand-slot"
-            id="left-hand-slot"
-            title={t("skills.leftHandTitle")}
-            onClick={() => onPickSkill?.("left")}
-          >
-            <SkillIcon skill={leftSkill} className="hand-glyph" />
-            {leftCooldown > 0 && <span className="hand-cd">{Math.ceil(leftCooldown / 1000)}</span>}
-            <span className="click-badge">{t("skills.handLeft")}</span>
-          </button>
-
-          <button
-            type="button"
-            className="hand-slot"
-            id="right-hand-slot"
-            title={t("skills.rightHandTitle")}
-            onClick={() => onPickSkill?.("right")}
-          >
-            <SkillIcon skill={selectedSkill} className="hand-glyph" />
-            {rightCooldown > 0 && <span className="hand-cd">{Math.ceil(rightCooldown / 1000)}</span>}
-            <span className="click-badge">{t("skills.handRight")}</span>
-          </button>
-
+          {skillSlots.map(({ key, slot }) => {
+            const assignedSkill = skills.find((entry) => entry.slot === slot) || null;
+            const cd = cooldownLeft(assignedSkill?.id);
+            const keyLabel = key.toUpperCase();
+            return (
+              <button
+                key={key}
+                type="button"
+                className="hand-slot skill-key-slot"
+                id={`skill-slot-${key}`}
+                title={
+                  assignedSkill
+                    ? `${keyLabel}: ${t(assignedSkill.nameKey, undefined, assignedSkill.id)}`
+                    : t("skills.assignKey", { key: keyLabel }, `Gán chiêu [${keyLabel}]`)
+                }
+                onClick={() => onPickSkill?.(key)}
+              >
+                <SkillIcon skill={assignedSkill} className="hand-glyph" />
+                {cd > 0 && <span className="hand-cd">{Math.ceil(cd / 1000)}</span>}
+                <span className="click-badge">{keyLabel}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Hero Portrait */}

@@ -43,6 +43,7 @@ const MARKET_WORLD_CONFIG = {
 };
 import { normalizeGender } from "./gender.js";
 import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
+import { loadSkillLoadout } from "./skillLoadout.js";
 import { normalizeSect } from "./skills.js";
 
 /** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
@@ -321,7 +322,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.isPointerMoving = false;
 
-    // Mouse input handlers (Left click: Move or Attack Enemy, Right click: Kiếm Khí)
+    // Mouse input handlers (Left click: Move to destination, Right click: disabled)
     this.input.on("pointerdown", (pointer) => {
       if (!this.started || this.isPaused) return;
 
@@ -331,10 +332,8 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Right-click casting is handled by the DOM mousedown listener so it can
-      // pass the clicked ground point for target selection; never treat it as a
-      // left-click move.
-      if (pointer.rightButtonDown()) return;
+      // Ignore right mouse button entirely
+      if (pointer.rightButtonDown() || pointer.button === 2) return;
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       const worldX = ground.x;
@@ -344,78 +343,17 @@ export class JiangHuScene extends Phaser.Scene {
       // unless this click selects one again below.
       this.pendingNpc = null;
 
-      // Check if clicking directly on a living enemy
-      const clickedEnemy = this.enemyManager
-        .getAlive()
-        .find((wolf) => Phaser.Math.Distance.Between(worldX, worldY, wolf.x, wolf.y) < 38);
-
-      if (clickedEnemy) {
-        // A left-hand skill takes priority: chase into range, then release it.
-        if (this.combat.getLeftSkill?.()) {
-          this.combat.castLeftSkill(clickedEnemy);
-          return;
-        }
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedEnemy.x, clickedEnemy.y);
-        if (dist <= 85) {
-          this.player.stopMovement();
-          this.combat.performAttack();
-        } else {
-          this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
-          this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
-        }
-        return;
-      }
-
-      // Check if clicking directly on an NPC (shop interaction). The clickable
-      // box covers the sprite's body above its feet, not just the ground anchor.
+      // Check if clicking directly on an NPC (walk towards NPC)
       const clickedNpc = (this.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
-
       if (clickedNpc) {
-        const dist = Phaser.Math.Distance.Between(
-          this.player.x,
-          this.player.y,
-          clickedNpc.gx,
-          clickedNpc.gy
-        );
-        if (dist <= NPC_INTERACT_RANGE) {
-          this.player.stopMovement();
-          this.shopFlow.open(clickedNpc);
-        } else {
-          const approach = npcApproachPoint(clickedNpc);
-          this.pendingNpc = clickedNpc;
-          this.player.moveTo(approach.x, approach.y);
-          this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
-        }
+        const approach = npcApproachPoint(clickedNpc);
+        this.pendingNpc = clickedNpc;
+        this.player.moveTo(approach.x, approach.y);
+        this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
         return;
       }
 
-      // Check if clicking directly on another player (PvP)
-      const clickedPlayer = this.remotePlayerManager
-        .getAll()
-        .find(
-          (rp) =>
-            rp.container?.active &&
-            Phaser.Math.Distance.Between(worldX, worldY, rp.x, rp.y) < 42
-        );
-
-      if (clickedPlayer) {
-        const dist = Phaser.Math.Distance.Between(
-          this.player.x,
-          this.player.y,
-          clickedPlayer.x,
-          clickedPlayer.y
-        );
-        if (dist <= PVP_ATTACK_RANGE) {
-          this.player.stopMovement();
-          this.combat.performPvpAttack(clickedPlayer);
-        } else {
-          this.player.moveTo(clickedPlayer.x, clickedPlayer.y);
-          this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xff5252);
-        }
-        return;
-      }
-
-      // Left click on terrain: Move to destination (and abandon a skill chase).
+      // Left click on terrain, enemies or other players: move to destination
       this.isPointerMoving = true;
       this.combat.cancelPendingCast();
       this.player.moveTo(worldX, worldY);
@@ -459,35 +397,17 @@ export class JiangHuScene extends Phaser.Scene {
     };
     this.isTyping = isTyping;
 
-    // Skill selection keys are player-configurable (see keybinds.js). Movement is
-    // click/joystick only, and normal attack / PK live on UI buttons, so no other
-    // action steals a key the player may want to bind.
-    this.skillBinds = loadSkillBinds(readSession()?.activeCharacter?.id);
+    // Skill hotkeys U, I, O, P trigger direct casting.
+    this.skillLoadout = loadSkillLoadout(readSession()?.activeCharacter?.id);
+    this.combat.setSkillLoadout(this.skillLoadout);
     this.bindSkillKeys();
 
-    // Right mouse button releases the skill assigned to the right hand.
-    // A DOM listener reliably reports the secondary button (Phaser's pointerdown
-    // can be flaky for right-click across browsers).
-    this.rightMouseHandler = (event) => {
-      if (event.button !== 2) return;
-      if (event.target !== this.game.canvas) return;
-      if (!this.started || this.isPaused) return;
-      // Derive the clicked ground point from the raw event instead of relying on
-      // Phaser having updated its pointer first.
-      const canvas = this.game.canvas;
-      const rect = canvas.getBoundingClientRect();
-      const sx = (event.clientX - rect.left) * (canvas.width / rect.width);
-      const sy = (event.clientY - rect.top) * (canvas.height / rect.height);
-      const world = this.cameras.main.getWorldPoint(sx, sy);
-      this.combat.castSelectedSkill(fromIso(world.x, world.y));
-    };
+    // Prevent default context menu on right click
     this.contextMenuHandler = (event) => {
       if (this.started) event.preventDefault();
     };
-    window.addEventListener("mousedown", this.rightMouseHandler);
     window.addEventListener("contextmenu", this.contextMenuHandler);
     this.events.once("shutdown", () => {
-      window.removeEventListener("mousedown", this.rightMouseHandler);
       window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
@@ -517,13 +437,22 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_SKILL, () => {
         if (this.started && !this.isPaused) this.combat.castSelectedSkill();
       }),
-      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, slot } = {}) => {
-        if (this.started) this.combat.equipSkill(hand, slot);
+      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, key, slot } = {}) => {
+        if (this.started) {
+          const slotKey = key || (hand === "left" ? "u" : hand === "right" ? "i" : hand);
+          if (["u", "i", "o", "p"].includes(slotKey)) {
+            this.skillLoadout = { ...this.skillLoadout, [slotKey]: slot };
+            this.combat.setSkillLoadout(this.skillLoadout);
+          } else {
+            this.combat.equipSkill(hand, slot);
+          }
+        }
       }),
-      bridge.on(EVENTS.SET_SKILL_LOADOUT, ({ left, right } = {}) => {
-        if (Number.isInteger(left)) this.combat.leftSkillSlot = left;
-        if (Number.isInteger(right)) this.combat.selectedSkillSlot = right;
-        this.combat?.cancelPendingCast?.();
+      bridge.on(EVENTS.SET_SKILL_LOADOUT, (loadout = {}) => {
+        if (this.started && loadout) {
+          this.skillLoadout = { ...this.skillLoadout, ...loadout };
+          this.combat.setSkillLoadout(this.skillLoadout);
+        }
       }),
       bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
         this.player?.setSect(normalizeSect(sect));
@@ -1024,18 +953,31 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * Rebuild the key -> slot lookup from the current player bindings.
+   * Interact with the closest NPC in range using key F.
    */
-  updateSkillKeyMap() {
-    this.skillKeyMap = keyToSlot(this.skillBinds);
+  interactWithNearbyNpc() {
+    if (!this.started || this.isPaused) return;
+    const candidates = (this.npcs || [])
+      .map((npc) => ({
+        npc,
+        dist: Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.gx, npc.gy)
+      }))
+      .filter((item) => item.dist <= NPC_INTERACT_RANGE)
+      .sort((a, b) => a.dist - b.dist);
+
+    if (candidates.length > 0) {
+      this.player.stopMovement();
+      this.pendingNpc = null;
+      this.shopFlow.open(candidates[0].npc);
+    } else {
+      this.uiBridge.addLog("Không có NPC ở gần để nói chuyện (nhấn [F] khi lại gần NPC).");
+    }
   }
 
   /**
-   * Bind the configurable skill-selection keys. Only one raw keydown listener is
-   * registered; rebinding just swaps the lookup map.
+   * Bind the configurable skill keys (U, I, O, P) and NPC interaction key (F).
    */
   bindSkillKeys() {
-    this.updateSkillKeyMap();
     if (this.skillKeyHandler) return;
     this.skillKeyHandler = (event) => {
       if (!this.started || this.isPaused) return;
@@ -1043,10 +985,22 @@ export class JiangHuScene extends Phaser.Scene {
       if (event.repeat) return;
       const key = normalizeKey(event);
       if (!key) return;
-      const slot = this.skillKeyMap?.get(key);
-      if (slot === undefined) return;
-      event.preventDefault();
-      this.combat.selectSkill(slot);
+
+      if (key === "f") {
+        event.preventDefault();
+        this.interactWithNearbyNpc();
+        return;
+      }
+
+      if (["u", "i", "o", "p"].includes(key)) {
+        event.preventDefault();
+        const pointer = this.input.activePointer;
+        let aim = null;
+        if (pointer) {
+          aim = fromIso(pointer.worldX, pointer.worldY);
+        }
+        this.combat.castSkillByKey(key, aim);
+      }
     };
     this.input.keyboard.on("keydown", this.skillKeyHandler);
   }
@@ -1123,10 +1077,9 @@ export class JiangHuScene extends Phaser.Scene {
         this.pendingNpc.gy
       );
       if (dist <= NPC_INTERACT_RANGE) {
-        const npc = this.pendingNpc;
         this.pendingNpc = null;
         this.player.stopMovement();
-        this.shopFlow.open(npc);
+        this.uiBridge.addLog("Đã đến gần NPC. Nhấn phím [F] để nói chuyện.");
       }
     }
 

@@ -83,7 +83,8 @@ export class CombatSystem {
 
     this.attackReady = true;
     this.drops = [];
-    /** Skill slots assigned to the left and right mouse buttons. */
+    /** Skill slots assigned to UIOP keys and mouse buttons. */
+    this.skillLoadout = { u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 };
     this.selectedSkillSlot = 0;
     this.leftSkillSlot = 0;
     /** id -> timestamp (ms) the skill becomes castable again. */
@@ -238,6 +239,80 @@ export class CombatSystem {
   }
 
   /**
+   * Update the active skill loadout.
+   * @param {Object} loadout
+   */
+  setSkillLoadout(loadout) {
+    if (!loadout) return;
+    this.skillLoadout = {
+      u: loadout.u ?? 0,
+      i: loadout.i ?? 1,
+      o: loadout.o ?? 2,
+      p: loadout.p ?? 3,
+      left: loadout.u ?? loadout.left ?? 0,
+      right: loadout.i ?? loadout.right ?? 1
+    };
+    this.selectedSkillSlot = this.skillLoadout.u;
+    this.leftSkillSlot = this.skillLoadout.i;
+    this.cancelPendingCast();
+  }
+
+  /**
+   * Cast the skill assigned to a specific key (u, i, o, p).
+   * @param {string} key
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkillByKey(key, aim = null) {
+    const slot = this.skillLoadout?.[key?.toLowerCase()];
+    if (slot === undefined) return false;
+    return this.castSkillBySlot(slot, aim);
+  }
+
+  /**
+   * Directly cast a skill assigned to a slot.
+   * @param {number} slot
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkillBySlot(slot, aim = null) {
+    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
+    if (!skill) {
+      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
+      return false;
+    }
+    return this.castSkill(skill, aim);
+  }
+
+  /**
+   * Direct casting execution logic.
+   * @param {Object} skill
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkill(skill, aim = null) {
+    if (!skill) return false;
+    if (!this.canCast(skill)) return false;
+
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
+      return true;
+    }
+
+    const target = this.findTarget(aim);
+    if (!target) {
+      if (aim && this.player) {
+        this.player.setFacingRight?.(aim.x >= this.player.x);
+      }
+      this.executeSkill(skill, null);
+      return true;
+    }
+
+    this.approachAndCast(skill, target);
+    return true;
+  }
+
+  /**
    * Right mouse button: cast on the clicked target, or release in place when the
    * click did not land on an enemy.
    * @param {{x:number,y:number}|null} [aim]
@@ -270,24 +345,10 @@ export class CombatSystem {
   performSkill(aim = null) {
     const skill = this.getSelectedSkill();
     if (!skill) {
-      this.ui.addLog("Chưa gán chiêu thức vào tay phải.");
+      this.ui.addLog("Chưa gán chiêu thức vào ô này.");
       return;
     }
-    if (!this.canCast(skill)) return;
-
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return;
-    }
-
-    const target = this.findTarget(aim);
-    if (!target) {
-      // Right-click on empty ground: release in place.
-      this.executeSkill(skill, null);
-      return;
-    }
-
-    this.approachAndCast(skill, target);
+    this.castSkill(skill, aim);
   }
 
   /**

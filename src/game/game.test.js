@@ -184,3 +184,48 @@ describe("JiangHuScene.useItem quantity", () => {
     expect(getQuantity("hoi-thanh-phu")).toBe(0);
   });
 });
+
+describe("JiangHuScene.interactWithNearbyNpc", () => {
+  it("opens the shop when an NPC is within range", () => {
+    const stopMovement = vi.fn();
+    const openShop = vi.fn();
+    const addLog = vi.fn();
+    const npc = { gx: 100, gy: 100, name: "Chủ Tiệm Dược" };
+    const scene = {
+      started: true,
+      isPaused: false,
+      player: { x: 105, y: 105, stopMovement },
+      npcs: [npc],
+      shopFlow: { open: openShop },
+      uiBridge: { addLog }
+    };
+
+    JiangHuScene.prototype.interactWithNearbyNpc.call(scene);
+
+    expect(stopMovement).toHaveBeenCalledTimes(1);
+    expect(openShop).toHaveBeenCalledWith(npc);
+  });
+
+  it("logs a message when no NPC is in range", () => {
+    const stopMovement = vi.fn();
+    const openShop = vi.fn();
+    const addLog = vi.fn();
+    const npc = { gx: 500, gy: 500, name: "Chủ Tiệm Dược" };
+    const scene = {
+      started: true,
+      isPaused: false,
+      player: { x: 100, y: 100, stopMovement },
+      npcs: [npc],
+      shopFlow: { open: openShop },
+      uiBridge: { addLog }
+    };
+
+    JiangHuScene.prototype.interactWithNearbyNpc.call(scene);
+
+    expect(stopMovement).not.toHaveBeenCalled();
+    expect(openShop).not.toHaveBeenCalled();
+    expect(addLog).toHaveBeenCalledWith(
+      expect.stringContaining("Không có NPC ở gần để nói chuyện")
+    );
+  });
+});

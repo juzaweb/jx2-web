@@ -10,7 +10,12 @@ export function SkillPickerModal({ isOpen, hand, skills = [], level = 1, selecte
   const { t } = useI18n();
   if (!isOpen) return null;
 
-  const handLabel = hand === "left" ? t("skills.handLeft") : t("skills.handRight");
+  const isKeySlot = ["u", "i", "o", "p"].includes(hand?.toLowerCase());
+  const handLabel = isKeySlot
+    ? `${t("skills.keySlotLabel", undefined, "Phím")} ${hand.toUpperCase()}`
+    : hand === "left"
+    ? t("skills.handLeft")
+    : t("skills.handRight");
 
   return (
     <div id="skill-picker-modal" className="overlay">

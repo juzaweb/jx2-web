@@ -17,6 +17,7 @@ export const RESERVED_KEYS = new Set([
   "2",
   "3",
   "4",
+  "f",
   "f3",
   "f4",
   "m",

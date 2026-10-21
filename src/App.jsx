@@ -110,6 +110,9 @@ export function App() {
   const [isMinimapOpen, setIsMinimapOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
+  const [skillLoadout, setSkillLoadout] = useState(() =>
+    loadSkillLoadout(readSession()?.activeCharacter?.id)
+  );
   const [selectedSkillSlot, setSelectedSkillSlot] = useState(
     () => loadSkillLoadout(readSession()?.activeCharacter?.id).right
   );
@@ -159,14 +162,17 @@ export function App() {
   // Switching characters loads that hero's skill layout and sect kit.
   useEffect(() => {
     const loadout = loadSkillLoadout(activeCharacter?.id);
-    // A partially authored kit may not include slots 0/1 yet; fall back to its
-    // first available slot so the hands never point at a missing skill.
     const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
     const firstSlot = kit[0]?.slot;
     if (Number.isInteger(firstSlot)) {
-      if (!kit.some((skill) => skill.slot === loadout.left)) loadout.left = firstSlot;
-      if (!kit.some((skill) => skill.slot === loadout.right)) loadout.right = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.u)) loadout.u = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.i)) loadout.i = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.o)) loadout.o = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.p)) loadout.p = firstSlot;
+      loadout.left = loadout.u;
+      loadout.right = loadout.i;
     }
+    setSkillLoadout(loadout);
     setSelectedSkillSlot(loadout.right);
     setLeftSkillSlot(loadout.left);
     bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
@@ -462,18 +468,24 @@ export function App() {
 
   const handleEquipSkill = useCallback(
     (hand, slot) => {
+      const isKey = ["u", "i", "o", "p"].includes(hand?.toLowerCase());
+      const key = isKey ? hand.toLowerCase() : hand === "left" ? "u" : "i";
       const next = {
-        left: hand === "left" ? slot : leftSkillSlot,
-        right: hand === "right" ? slot : selectedSkillSlot
+        ...skillLoadout,
+        [key]: slot,
+        left: key === "u" ? slot : skillLoadout.u,
+        right: key === "i" ? slot : skillLoadout.i
       };
-      if (hand === "left") setLeftSkillSlot(slot);
-      else setSelectedSkillSlot(slot);
+      setSkillLoadout(next);
+      if (key === "u") setLeftSkillSlot(slot);
+      if (key === "i") setSelectedSkillSlot(slot);
       saveSkillLoadout(activeCharacter?.id, next);
-      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, slot });
+      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, key, slot });
+      bridge.emit(EVENTS.SET_SKILL_LOADOUT, next);
       setSkillPickerHand(null);
       bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
     },
-    [activeCharacter?.id, leftSkillSlot, selectedSkillSlot]
+    [activeCharacter?.id, skillLoadout]
   );
 
   const handleUseItem = useCallback((slot) => {
@@ -648,6 +660,7 @@ export function App() {
           skills={skillsForSect(activeCharacter?.sect)}
           selectedSkillSlot={selectedSkillSlot}
           leftSkillSlot={leftSkillSlot}
+          skillLoadout={skillLoadout}
           onPickSkill={handleOpenSkillPicker}
         />
 
@@ -732,7 +745,13 @@ export function App() {
         hand={skillPickerHand}
         skills={skillsForSect(activeCharacter?.sect)}
         level={stats.level}
-        selectedSlot={skillPickerHand === "left" ? leftSkillSlot : selectedSkillSlot}
+        selectedSlot={
+          ["u", "i", "o", "p"].includes(skillPickerHand?.toLowerCase())
+            ? skillLoadout[skillPickerHand.toLowerCase()]
+            : skillPickerHand === "left"
+            ? leftSkillSlot
+            : selectedSkillSlot
+        }
         onSelect={handleEquipSkill}
         onClose={handleCloseSkillPicker}
       />
