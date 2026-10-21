@@ -2,7 +2,6 @@ export default {
   app: {
     title: "江湖 — 武侠 RPG",
     defaultPlayerName: "浪客",
-    serverFallback: "江湖",
     confirmReset: "确定要清除已保存的数据并重新开始吗？",
     confirmLogout: "确定要退出当前账号吗？",
     joinLog: "侠客 {name} 已加入 {server}！",
@@ -110,8 +109,6 @@ export default {
     brandTitle: "江湖",
     brandSubtitle: "行走江湖",
     serverLoggedIn: "江湖之门",
-    closeList: "关闭列表",
-    chooseServer: "重新选择服务器",
     loginTab: "登录",
     registerTab: "注册账号",
     usernameLabel: "账号：",
@@ -125,12 +122,6 @@ export default {
     clearKey: "清空",
     loginButton: "登录",
     registerButton: "注册",
-    tags: {
-      recommended: "推荐",
-      new: "新服",
-      crowded: "拥挤",
-      normal: "正常"
-    },
     errors: {
       required: "请填写账号和密码。",
       usernamePattern: "账号必须为 3-30 个字母、数字或下划线。",

@@ -2,7 +2,6 @@ export default {
   app: {
     title: "Jianghu — Wuxia RPG",
     defaultPlayerName: "Wanderer",
-    serverFallback: "Jianghu",
     confirmReset: "Are you sure you want to erase your saved progress and start over?",
     confirmLogout: "Are you sure you want to log out of your account?",
     joinLog: "{name} has joined {server}!",
@@ -110,8 +109,6 @@ export default {
     brandTitle: "Jianghu",
     brandSubtitle: "WANDER THE MARTIAL WORLD",
     serverLoggedIn: "Gateway to the Jianghu",
-    closeList: "Close list",
-    chooseServer: "Choose another server",
     loginTab: "Log in",
     registerTab: "Create account",
     usernameLabel: "Account:",
@@ -125,12 +122,6 @@ export default {
     clearKey: "Clear",
     loginButton: "Log in",
     registerButton: "Register",
-    tags: {
-      recommended: "Recommended",
-      new: "New",
-      crowded: "Busy",
-      normal: "Normal"
-    },
     errors: {
       required: "Please enter both your account and password.",
       usernamePattern: "Account must be 3-30 letters, digits, or underscores.",

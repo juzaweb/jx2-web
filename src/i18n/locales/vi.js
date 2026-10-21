@@ -2,7 +2,6 @@ export default {
   app: {
     title: "Giang Hồ — Nhập Vai Giang Hồ",
     defaultPlayerName: "Lãng Khách",
-    serverFallback: "Giang Hồ",
     confirmReset: "Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?",
     confirmLogout: "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
     joinLog: 'Hiệp khách {name} đã gia nhập {server}!',
@@ -110,8 +109,6 @@ export default {
     brandTitle: "Giang Hồ",
     brandSubtitle: "HÀNH TẨU GIANG HỒ",
     serverLoggedIn: "Cổng vào giang hồ",
-    closeList: "Đóng danh sách",
-    chooseServer: "Chọn lại máy chủ",
     loginTab: "Đăng nhập",
     registerTab: "Đăng ký tài khoản",
     usernameLabel: "Tài khoản:",
@@ -125,12 +122,6 @@ export default {
     clearKey: "Hết",
     loginButton: "Đăng nhập",
     registerButton: "Đăng ký",
-    tags: {
-      recommended: "Đề Cử",
-      new: "Mới",
-      crowded: "Đông",
-      normal: "Bình Thường"
-    },
     errors: {
       required: "Vui lòng điền đầy đủ tài khoản và mật khẩu.",
       usernamePattern: "Tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.",
