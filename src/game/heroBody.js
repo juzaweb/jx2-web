@@ -24,6 +24,7 @@ export const HERO_BODY = {
   frameWidth: 280,
   frameHeight: 520,
   columns: 4,
+  rows: 4,
   scale: BODY_SCALE,
   /** Rig-space Y of the sheet bottom so the content baseline sits at the feet. */
   footOffsetY: FRAME_BOTTOM_MARGIN_PX * BODY_SCALE
