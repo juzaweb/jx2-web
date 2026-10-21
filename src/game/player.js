@@ -585,8 +585,9 @@ export class Player {
    * Display a continuously rotating ground formation circle under the character's feet.
    * Stays flat on the ground and follows the character while the buff is active.
    * @param {string} [key="vfx-la-han-tran"]
+   * @param {number} [scale=0.6]
    */
-  showFormation(key = "vfx-la-han-tran") {
+  showFormation(key = "vfx-la-han-tran", scale = 0.6) {
     if (!this.visual || typeof this.scene?.add?.sprite !== "function") return;
     if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
@@ -606,11 +607,12 @@ export class Player {
       }
     }
 
+    const targetScale = typeof scale === "number" ? scale : 0.6;
     if (!this.formationSprite) {
       this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
       // Origin at center (128, 128) of 256x256 frame
       this.formationSprite.setOrigin(0.5, 0.5);
-      this.formationSprite.setScale(0.85);
+      this.formationSprite.setScale(targetScale);
       // Place behind body rig so character stands on top of the formation ring
       const bodyIndex = this.visual.getIndex ? this.visual.getIndex(this.body) : -1;
       if (bodyIndex >= 0 && this.visual.addAt) {
@@ -618,6 +620,8 @@ export class Player {
       } else if (this.visual.add) {
         this.visual.add(this.formationSprite);
       }
+    } else {
+      this.formationSprite.setScale?.(targetScale);
     }
 
     this.formationSprite.setVisible?.(true);

@@ -256,8 +256,9 @@ export class RemotePlayer {
    * Display a continuously rotating ground formation circle under the peer's feet.
    * Stays flat on the ground and follows the character while the buff is active.
    * @param {string} [key="vfx-la-han-tran"]
+   * @param {number} [scale=0.6]
    */
-  showFormation(key = "vfx-la-han-tran") {
+  showFormation(key = "vfx-la-han-tran", scale = 0.6) {
     if (!this.container || typeof this.scene?.add?.sprite !== "function") return;
     if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
@@ -277,16 +278,19 @@ export class RemotePlayer {
       }
     }
 
+    const targetScale = typeof scale === "number" ? scale : 0.6;
     if (!this.formationSprite) {
       this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
       this.formationSprite.setOrigin(0.5, 0.5);
-      this.formationSprite.setScale(0.85);
+      this.formationSprite.setScale(targetScale);
       const bodyIndex = this.container.getIndex ? this.container.getIndex(this.body) : -1;
       if (bodyIndex >= 0 && this.container.addAt) {
         this.container.addAt(this.formationSprite, bodyIndex);
       } else if (this.container.add) {
         this.container.add(this.formationSprite);
       }
+    } else {
+      this.formationSprite.setScale?.(targetScale);
     }
 
     this.formationSprite.setVisible?.(true);

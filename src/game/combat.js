@@ -649,6 +649,7 @@ export class CombatSystem {
         this.buffs.push({
           skillId: skill.id,
           formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
+          formationScale: skill.vfx?.type === "formation" && typeof skill.vfx.scale === "number" ? skill.vfx.scale : undefined,
           stat: effect.stat,
           amount: effect.amount,
           until: now + effect.duration
@@ -665,7 +666,11 @@ export class CombatSystem {
       }
     }
     if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
-      this.player.showFormation?.(skill.vfx.sprite);
+      if (typeof skill.vfx.scale === "number") {
+        this.player.showFormation?.(skill.vfx.sprite, skill.vfx.scale);
+      } else {
+        this.player.showFormation?.(skill.vfx.sprite);
+      }
     }
   }
 
@@ -679,7 +684,11 @@ export class CombatSystem {
     }
     const activeFormation = this.buffs.find((buff) => buff.formationSprite);
     if (activeFormation) {
-      this.player.showFormation?.(activeFormation.formationSprite);
+      if (typeof activeFormation.formationScale === "number") {
+        this.player.showFormation?.(activeFormation.formationSprite, activeFormation.formationScale);
+      } else {
+        this.player.showFormation?.(activeFormation.formationSprite);
+      }
     } else {
       this.player.hideFormation?.();
     }

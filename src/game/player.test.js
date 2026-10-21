@@ -344,9 +344,13 @@ describe("Player movement controls", () => {
     );
     expect(mockScene.add.sprite).toHaveBeenCalledWith(0, 41, "vfx-la-han-tran");
     expect(formationSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.5);
-    expect(formationSprite.setScale).toHaveBeenCalledWith(0.85);
+    expect(formationSprite.setScale).toHaveBeenCalledWith(0.6);
     expect(formationSprite.setVisible).toHaveBeenCalledWith(true);
     expect(formationSprite.play).toHaveBeenCalledWith("vfx-la-han-tran-spin", true);
+
+    // Can adjust scale dynamically on subsequent showFormation calls
+    player.showFormation("vfx-la-han-tran", 0.5);
+    expect(formationSprite.setScale).toHaveBeenCalledWith(0.5);
 
     // hideFormation stops and hides
     player.hideFormation();
