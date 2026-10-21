@@ -49,9 +49,6 @@ export const QUICK_ITEMS = [
 /** Number of slots the inventory grid renders (5 columns x 8 rows). */
 export const INVENTORY_GRID_SIZE = 40;
 
-/** Fallback icon for server-owned ids that are missing from the static catalog. */
-const UNKNOWN_ITEM_ICON = "icon-pouch";
-
 /**
  * Split a silver balance into the three display denominations.
  * The server keeps a single silver balance, so copper is always zero until a
@@ -367,22 +364,7 @@ export function rollKillReward(rng = Math.random) {
 }
 
 /**
- * Resolve a server-owned id that is not in the static catalog into a renderable
- * placeholder, so a bag can never hide items the server says the player owns.
- * @param {string} id
- * @returns {object}
- */
-function unknownItem(id) {
-  return {
-    id,
-    name: id,
-    icon: UNKNOWN_ITEM_ICON,
-    desc: ""
-  };
-}
-
-/**
- * Read a stack quantity from a normalised map, treating missing ids as empty.
+ * Resolve a stack quantity from a normalised map, treating missing ids as empty.
  * @param {Record<string, number>} quantities
  * @param {string} id
  * @returns {number}
@@ -396,9 +378,10 @@ function quantityOf(quantities, id) {
 
 /**
  * Resolve the catalog into render-ready arrays with persisted quantities applied.
- * The grid is driven by what the player actually owns: only stacks with a
- * positive quantity are returned, in catalog order, with any extra server ids
- * appended. Empty cells pad the grid to {@link INVENTORY_GRID_SIZE}.
+ * The grid is driven by what the player actually owns: only catalog stacks with a
+ * positive quantity are returned, in catalog order. Ids the server reports that
+ * are missing from the static catalog are ignored, so no placeholder item is ever
+ * rendered. Empty cells pad the grid to {@link INVENTORY_GRID_SIZE}.
  * @param {Record<string, number>} [quantities]
  * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null>,
  *   capacity: { used: number, total: number } }}
@@ -407,17 +390,9 @@ export function applyQuantities(quantities = defaultQuantities()) {
   const owned = sanitizeQuantities(quantities) || {};
 
   const inventoryItems = [];
-  const seen = new Set();
   INVENTORY_ITEMS.filter(Boolean).forEach((item) => {
-    seen.add(item.id);
     const qty = quantityOf(owned, item.id);
     if (qty > 0) inventoryItems.push({ ...item, qty });
-  });
-  Object.keys(owned).forEach((id) => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    const qty = quantityOf(owned, id);
-    if (qty > 0) inventoryItems.push({ ...unknownItem(id), qty });
   });
   const used = inventoryItems.length;
   while (inventoryItems.length < INVENTORY_GRID_SIZE) {

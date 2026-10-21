@@ -98,16 +98,13 @@ describe("inventory quantities", () => {
     expect(inventoryItems.slice(1).every((item) => item === null)).toBe(true);
   });
 
-  it("keeps unknown server-owned ids visible after the catalog", () => {
+  it("drops server-owned ids that are missing from the catalog", () => {
     const { inventoryItems, capacity } = applyQuantities({ "bi-kip-la": 3 });
-    const unknown = inventoryItems.find((item) => item?.id === "bi-kip-la");
 
-    expect(unknown).toMatchObject({
-      id: "bi-kip-la",
-      name: "bi-kip-la",
-      qty: 3
-    });
-    expect(capacity).toEqual({ used: 1, total: INVENTORY_GRID_SIZE });
+    expect(inventoryItems.find((item) => item?.id === "bi-kip-la")).toBeUndefined();
+    expect(inventoryItems.filter(Boolean)).toHaveLength(0);
+    expect(inventoryItems).toHaveLength(INVENTORY_GRID_SIZE);
+    expect(capacity).toEqual({ used: 0, total: INVENTORY_GRID_SIZE });
   });
 
   it("keeps the shared in-memory store merged over defaults", () => {
