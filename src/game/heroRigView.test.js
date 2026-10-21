@@ -42,6 +42,68 @@ function makeScene() {
   };
 }
 
+function makeSpriteScene() {
+  const container = {
+    x: 0,
+    y: 0,
+    children: [],
+    add(o) {
+      container.children.push(o);
+    },
+    removeAll() {},
+    destroy() {}
+  };
+  const shape = () => ({
+    x: 0,
+    y: 0,
+    setOrigin() {
+      return this;
+    },
+    setStrokeStyle() {
+      return this;
+    },
+    setLineWidth() {
+      return this;
+    }
+  });
+  return {
+    add: {
+      container: (x = 0, y = 0) => Object.assign(container, { x, y }),
+      polygon: () => shape(),
+      rectangle: (x, y) => Object.assign(shape(), { x, y }),
+      ellipse: (x, y) => Object.assign(shape(), { x, y }),
+      circle: (x, y) => Object.assign(shape(), { x, y }),
+      line: () => shape(),
+      sprite: (x, y, texture, frame) => ({
+        x,
+        y,
+        texture,
+        frame,
+        origin: null,
+        scale: 1,
+        frameSets: 0,
+        setOrigin(ox, oy) {
+          this.origin = [ox, oy];
+          return this;
+        },
+        setScale(scale) {
+          this.scale = scale;
+          return this;
+        },
+        setFrame(frameIndex) {
+          this.frame = frameIndex;
+          this.frameSets += 1;
+          return this;
+        }
+      })
+    },
+    textures: {
+      exists: (key) => key === "hero-body-male" || key === "hero-body-female"
+    },
+    _container: container
+  };
+}
+
 describe("HeroRigView", () => {
   it("builds limb groups when the rig is set", () => {
     const view = new HeroRigView(makeScene(), { footOffsetY: 41 });
@@ -87,5 +149,56 @@ describe("HeroRigView", () => {
     expect(view.gender).toBe("female");
     expect(scene._container.children.length).not.toBe(count);
     expect(view.groups.legR.length).toBeGreaterThan(0);
+  });
+});
+
+describe("HeroRigView baked body", () => {
+  it("renders the gender sheet and starts on the direction's idle frame", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene, { footOffsetY: 41 });
+
+    view.set(2, {}, "male");
+
+    expect(view.usingSprite).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+    expect(view.bodySprite.frame).toBe(8); // right row (2) * 4 columns
+    expect(view.bodySprite.origin).toEqual([0.5, 1]);
+    expect(view.bodySprite.y).toBe(1.85);
+  });
+
+  it("switches sheets with gender and frames with direction", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene);
+
+    view.set(2, {}, "male");
+    view.set(6, {}, "female");
+
+    expect(view.bodySprite.texture).toBe("hero-body-female");
+    expect(view.bodySprite.frame).toBe(4); // left row (1) * 4 columns
+  });
+
+  it("plays walk frames from the gait phase and returns to idle", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene);
+    view.set(2, {});
+
+    view.animate(Math.PI / 4);
+    expect(view.bodySprite.frameSets).toBe(0); // still in the first quarter
+    view.animate(Math.PI / 2);
+    expect(view.bodySprite.frame).toBe(9);
+    expect(view.bodySprite.frameSets).toBe(1);
+
+    view.animate(Math.PI * 2);
+    expect(view.bodySprite.frame).toBe(8);
+  });
+
+  it("draws equipment overlays on the baked body", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene);
+
+    view.set(2, { armor: "cam-y-bao", helmet: "tu-kim-quan" }, "male");
+
+    expect(scene._container.children.length).toBeGreaterThan(1);
+    expect(view.key).toContain("cam-y-bao");
   });
 });

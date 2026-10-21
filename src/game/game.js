@@ -19,6 +19,7 @@ import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import { MARKET_BOUNDS, MARKET_SPAWN } from "./marketLayout.js";
+import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
@@ -48,8 +49,15 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   preload() {
-    // The hero is drawn procedurally (see heroRig.js); only the portrait art and
-    // the map's brick floor are still loaded from disk.
+    // Baked body sheets: four direction rows x four walk frames. The procedural
+    // rig in heroRig.js remains the fallback when a sheet is unavailable.
+    for (const { key, url } of Object.values(HERO_BODY_TEXTURES)) {
+      if (this.textures.exists(key)) continue;
+      this.load.spritesheet(key, url, {
+        frameWidth: HERO_BODY.frameWidth,
+        frameHeight: HERO_BODY.frameHeight
+      });
+    }
     this.load.image("hero-portrait", "/hero_portrait.png");
     this.load.image("ground-bricks", "/gach-tile.webp");
   }

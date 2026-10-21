@@ -27,7 +27,7 @@ const EQUIP_COLORS = {
 };
 
 /** Draw order: body-hugging layers first, helmet last (it sits highest). */
-const EQUIP_SLOT_ORDER = ["armor", "accessory", "weapon", "helmet"];
+export const EQUIP_SLOT_ORDER = ["armor", "accessory", "weapon", "helmet"];
 
 const C = {
   tunic: 0x2f5fd0,
@@ -79,11 +79,11 @@ const F = {
  * Primitives
  * ------------------------------------------------------------------ */
 
-const poly = (points, fill, opts = {}) => ({ kind: "poly", points, fill, ...opts });
-const rect = (x, y, w, h, fill, opts = {}) => ({ kind: "rect", x, y, w, h, fill, ...opts });
+export const poly = (points, fill, opts = {}) => ({ kind: "poly", points, fill, ...opts });
+export const rect = (x, y, w, h, fill, opts = {}) => ({ kind: "rect", x, y, w, h, fill, ...opts });
 const ell = (x, y, w, h, fill, opts = {}) => ({ kind: "ellipse", x, y, w, h, fill, ...opts });
-const circ = (x, y, r, fill, opts = {}) => ({ kind: "circle", x, y, r, fill, ...opts });
-const line = (x1, y1, x2, y2, stroke, opts = {}) => ({ kind: "line", x1, y1, x2, y2, stroke, ...opts });
+export const circ = (x, y, r, fill, opts = {}) => ({ kind: "circle", x, y, r, fill, ...opts });
+export const line = (x1, y1, x2, y2, stroke, opts = {}) => ({ kind: "line", x1, y1, x2, y2, stroke, ...opts });
 
 /** A tapered bar from (x0,y0) width w0 to (x1,y1) width w1 (limbs, coat tails). */
 const taper = (x0, y0, w0, x1, y1, w1, fill, opts = {}) =>
