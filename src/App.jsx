@@ -662,6 +662,7 @@ export function App() {
         stats={stats}
         playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
         equipment={equipment}
+        gender={normalizeGender(activeCharacter?.gender)}
         onUnequipSlot={handleUnequipSlot}
         onEquipItem={handleEquipItem}
       />

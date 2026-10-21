@@ -46,7 +46,7 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
-    /** Worn items, slot -> item id. Rendered by the vector rig. */
+    /** Worn items, slot -> item id. Drawn as overlays on the body sheet. */
     this.equipment = defaultEquipment();
     // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
     this.pkFlag = false;

@@ -225,7 +225,6 @@ export default {
     potential: "潜能",
     points: "点数：",
     nextLevel: "升级：",
-    playerAlt: "角色",
     slots: {
       belt: "腰带",
       bracers: "护腕",

@@ -5,6 +5,7 @@ import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { setDragPayload, readDragPayload, canDropOnSlot, acceptDrop } from "./dragItem.js";
+import { CharacterPreview } from "../CharacterPreview.jsx";
 
 /**
  * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
@@ -111,6 +112,7 @@ export function CharacterModal({
   stats,
   playerName = "",
   equipment = {},
+  gender = "male",
   onUnequipSlot,
   onEquipItem
 }) {
@@ -277,7 +279,7 @@ export function CharacterModal({
               </div>
 
               <div className="char-model">
-                <img src="/hero_full.png" alt={playerName || t("character.playerAlt")} />
+                <CharacterPreview gender={gender} equipment={equipment} />
                 {playerName && <div className="char-model-name">{playerName}</div>}
               </div>
 

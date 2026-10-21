@@ -243,7 +243,6 @@ export default {
     potential: "Tiềm năng",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
-    playerAlt: "Nhân vật",
     slots: {
       belt: "Đai lưng",
       bracers: "Hộ uyển",

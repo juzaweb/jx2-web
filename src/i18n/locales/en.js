@@ -225,7 +225,6 @@ export default {
     potential: "Potential",
     points: "Points:",
     nextLevel: "Next level:",
-    playerAlt: "Character",
     slots: {
       belt: "Belt",
       bracers: "Bracers",

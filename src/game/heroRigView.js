@@ -1,6 +1,8 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
+import { HERO_BODY, bodyFrameForDirection, bodyTextureFor } from "./heroBody.js";
+import { buildBodyEquipment } from "./heroBodyEquipment.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
 export const HERO_FOOT_Y = 41;
@@ -15,12 +17,12 @@ const ARM_DEPTH_FLOOR = 0.35;
 const STEP_LIFT = 4;
 
 /**
- * Phaser adapter for the vector hero rig (see heroRig.js).
+ * Phaser adapter for the hero body.
  *
- * Builds the rig's primitives into a container of Phaser shapes and rebuilds it
- * only when the direction or equipped slots change. Walking is then applied each
- * frame by pivoting the tagged limb groups (`animate`), so per-frame motion
- * costs a handful of position writes instead of a rebuild.
+ * Uses the baked gender sheet (see heroBody.js) when it is loaded: four
+ * direction rows x four walk frames, played by swapping frames (`animate`).
+ * When the sheet is missing it falls back to the vector rig (see heroRig.js)
+ * and pivots its tagged limb groups instead.
  *
  * Rig space has its origin at the character's feet, so the container sits at
  * {@link HERO_FOOT_Y} — the same ground offset the shadow uses.
@@ -35,34 +37,60 @@ export class HeroRigView {
     this.container = scene.add.container(0, footOffsetY);
     this.key = null;
     this.gender = "male";
+    this.direction = 0;
     this.pose = poseFor(0);
-    /** group name -> [{ obj, baseX, baseY }] */
+    /** group name -> [{ obj, baseX, baseY }] (procedural fallback only) */
     this.groups = {};
+    /** Baked body sprite, used when the gender sheet is loaded. */
+    this.bodySprite = null;
+    this.usingSprite = false;
+    this.frameIndex = 0;
     /** While an attack pose is playing, the walk cycle must not overwrite it. */
     this.acting = false;
     this.actionTween = null;
   }
 
   /**
-   * Show the hero facing `direction` wearing `equipment`. Rebuilds only on
-   * change. Equipment is the slot -> item map used by the game (falsy = empty).
+   * Show the hero facing `direction` wearing `equipment`. Rebuilds only when
+   * the rendered appearance changes. Both the baked sheet and the fallback rig
+   * draw the worn slots.
    * @param {number} direction
    * @param {Record<string, string|null|undefined>} [equipment]
    * @param {"male"|"female"} [gender]
    */
   set(direction, equipment = {}, gender = "male") {
     const g = normalizeGender(gender);
-    const key = `${g}|${direction}|${slotSignature(equipment)}`;
+    const bodyTexture = bodyTextureFor(g);
+    const usesSprite = Boolean(this.scene.textures?.exists?.(bodyTexture));
+    const key = `${g}|${direction}|${usesSprite ? "sprite" : "rig"}|${slotSignature(equipment)}`;
     if (key === this.key) return;
     this.key = key;
     this.gender = g;
+    this.direction = direction;
     this.pose = poseFor(direction);
+    this.usingSprite = usesSprite;
+    this.bodySprite = null;
     this.actionTween?.stop();
     this.actionTween = null;
     this.acting = false;
 
     this.container.removeAll(true);
+    this.container.x = 0;
     this.groups = {};
+
+    if (this.usingSprite) {
+      this.frameIndex = bodyFrameForDirection(direction, 0);
+      this.bodySprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, bodyTexture, this.frameIndex);
+      this.bodySprite.setOrigin(0.5, 1);
+      this.bodySprite.setScale(HERO_BODY.scale);
+      this.container.add(this.bodySprite);
+      for (const primitive of buildBodyEquipment({ direction, equipment })) {
+        const child = createPrimitive(this.scene, primitive);
+        if (child) this.container.add(child);
+      }
+      return;
+    }
+
     for (const primitive of buildHero({ direction, equipment, gender: g })) {
       const child = createPrimitive(this.scene, primitive);
       if (!child) continue;
@@ -78,13 +106,21 @@ export class HeroRigView {
   }
 
   /**
-   * Apply the walk cycle for a phase (radians). Limbs pivot around their joints
-   * (hip / shoulder); the swing flattens out head-on, where the legs instead step
-   * in place. Arms counter-swing. Pass 0 to return to the neutral pose.
+   * Apply the walk cycle for a phase (radians). The baked sheet swaps walk
+   * frames; the fallback rig pivots its limbs around their joints. Pass 0 to
+   * return to the neutral pose.
    * @param {number} phase
    */
   animate(phase) {
     if (this.acting) return;
+    if (this.usingSprite) {
+      const frame = bodyFrameForDirection(this.direction, phase);
+      if (frame !== this.frameIndex) {
+        this.frameIndex = frame;
+        this.bodySprite?.setFrame(frame);
+      }
+      return;
+    }
     const swing = Math.sin(phase);
     const { depth } = this.pose;
     const pivots = limbPivots(this.pose, this.gender);
@@ -113,6 +149,23 @@ export class HeroRigView {
 
     this.actionTween?.stop();
     this.acting = true;
+
+    if (this.usingSprite) {
+      this.actionTween = this.scene.tweens.add({
+        targets: this.container,
+        x: this.pose.side * 3.5,
+        duration: 110,
+        yoyo: true,
+        ease: "Quad.easeOut",
+        onComplete: () => {
+          this.actionTween = null;
+          this.acting = false;
+          if (this.container) this.container.x = 0;
+        }
+      });
+      return;
+    }
+
     const counter = { t: 0 };
     this.actionTween = this.scene.tweens.add({
       targets: counter,
@@ -135,6 +188,7 @@ export class HeroRigView {
    * @param {number} t
    */
   applyActionPose(pose, t) {
+    if (this.usingSprite) return;
     const pivots = limbPivots(this.pose, this.gender);
     const k = Math.max(0, Math.min(1, t));
 
@@ -188,6 +242,8 @@ export class HeroRigView {
       this.container.destroy(true);
       this.container = null;
     }
+    this.bodySprite = null;
+    this.usingSprite = false;
   }
 }
 
