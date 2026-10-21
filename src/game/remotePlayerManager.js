@@ -126,7 +126,12 @@ export class RemotePlayerManager {
     if (!payload.id) return;
     const player = this.players.get(payload.id);
     if (player) {
-      if (payload.skill === "kiem_khi") {
+      if (payload.skill === "la_han_tran") {
+        player.showFormation?.("vfx-la-han-tran");
+        this.scene?.time?.delayedCall?.(180000, () => {
+          player.hideFormation?.();
+        });
+      } else if (payload.skill === "kiem_khi") {
         player.playSkill();
       } else {
         player.playAttack(payload.facingRight !== false);

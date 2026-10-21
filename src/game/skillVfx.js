@@ -81,7 +81,9 @@ function playSpriteCastVfx(scene, skill, player, target) {
   const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
   const start = baseAt(player.x, player.y);
 
-  const isStationary = skill.target === "self" || skill.vfx?.type === "stationary";
+  const isStationary =
+    skill.vfx?.type === "stationary" ||
+    (skill.target === "self" && skill.vfx?.type !== "formation");
   if (isStationary) {
     const playKey = `${key}-play`;
     if (!scene.anims.exists(playKey)) {
@@ -202,7 +204,7 @@ export function playSkillCastVfx(scene, player, skill, target = null) {
   const offsetX = angle === null ? (facingRight ? 16 : -16) : Math.cos(angle) * 26;
   const offsetY = angle === null ? 0 : Math.sin(angle) * 26;
 
-  if (skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
+  if (skill.vfx.type !== "formation" && skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
 
   // Baseline pulse so every cast is visibly telegraphed, whatever its type.
   const pulse = scene.add

@@ -311,4 +311,51 @@ describe("Player movement controls", () => {
     expect(mockScene.input.keyboard.removeKey).toHaveBeenCalledTimes(8);
     expect(player.keys).toBeNull();
   });
+
+  it("shows looping formation ring at character feet and hides it on demand", () => {
+    const formationSprite = {
+      setOrigin: vi.fn().mockReturnThis(),
+      setScale: vi.fn().mockReturnThis(),
+      setVisible: vi.fn().mockReturnThis(),
+      play: vi.fn().mockReturnThis(),
+      stop: vi.fn().mockReturnThis(),
+      destroy: vi.fn(),
+      anims: { isPlaying: false, currentAnim: null }
+    };
+    mockScene.add.sprite = vi.fn(() => formationSprite);
+    mockScene.textures = {
+      exists: vi.fn(() => true),
+      get: vi.fn(() => ({ frameTotal: 5 }))
+    };
+    mockScene.anims = {
+      exists: vi.fn(() => false),
+      create: vi.fn(),
+      generateFrameNumbers: vi.fn(() => [0, 1, 2, 3])
+    };
+
+    player.showFormation("vfx-la-han-tran");
+
+    expect(mockScene.anims.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "vfx-la-han-tran-loop",
+        frameRate: 8,
+        repeat: -1
+      })
+    );
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(0, 41, "vfx-la-han-tran");
+    expect(formationSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.7285);
+    expect(formationSprite.setScale).toHaveBeenCalledWith(0.8);
+    expect(formationSprite.setVisible).toHaveBeenCalledWith(true);
+    expect(formationSprite.play).toHaveBeenCalledWith("vfx-la-han-tran-loop", true);
+
+    // hideFormation stops and hides
+    player.hideFormation();
+    expect(formationSprite.setVisible).toHaveBeenCalledWith(false);
+    expect(formationSprite.stop).toHaveBeenCalled();
+
+    // destroy tears down formationSprite
+    player.destroy();
+    expect(formationSprite.destroy).toHaveBeenCalled();
+    expect(player.formationSprite).toBeNull();
+  });
 });

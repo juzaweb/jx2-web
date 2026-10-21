@@ -74,12 +74,13 @@ const THIEU_LAM_SKILLS = [
     ],
     vfx: {
       sprite: "vfx-la-han-tran",
-      type: "stationary",
+      type: "formation",
       cast: "shockwave",
       impact: null,
       color: 0xffd166,
       shake: 0,
-      fps: 8
+      fps: 8,
+      scale: 0.8
     }
   }
 ];

@@ -577,4 +577,49 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
     const target = { x: 120, y: 120, id: "wolf_1" };
     expect(combat.castLeftSkill(target)).toBe(false);
   });
+
+  it("activates persistent formation ring on cast and hides it on expire or clear", () => {
+    const { combat } = makeCombat();
+    combat.buffs = [];
+    combat.player.showFormation = vi.fn();
+    combat.player.hideFormation = vi.fn();
+
+    const laHanTran = {
+      id: "la_han_tran",
+      target: "self",
+      effects: [
+        { kind: "buff", stat: "attackPct", amount: 0.1, duration: 180000 },
+        { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 }
+      ],
+      vfx: { type: "formation", sprite: "vfx-la-han-tran" }
+    };
+
+    combat.applySelfEffects(laHanTran, 1000);
+    expect(combat.buffs).toHaveLength(2);
+    expect(combat.buffs[0]).toMatchObject({
+      skillId: "la_han_tran",
+      formationSprite: "vfx-la-han-tran",
+      until: 181000
+    });
+    expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
+
+    // Before expiration: showFormation is kept
+    combat.player.showFormation.mockClear();
+    combat.update(50000);
+    expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
+    expect(combat.player.hideFormation).not.toHaveBeenCalled();
+
+    // After expiration: hideFormation is called
+    combat.update(182000);
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+
+    // clearBuffs also hides formation
+    combat.applySelfEffects(laHanTran, 200000);
+    expect(combat.buffs).toHaveLength(2);
+    combat.player.hideFormation.mockClear();
+    combat.clearBuffs();
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+  });
 });

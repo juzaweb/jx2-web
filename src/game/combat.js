@@ -512,6 +512,9 @@ export class CombatSystem {
    * @param {number} time
    */
   update(time) {
+    const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
+    this.updateBuffs(now);
+
     const pending = this.pendingCast;
     if (!pending) return;
 
@@ -644,6 +647,8 @@ export class CombatSystem {
     for (const effect of skill.effects || []) {
       if (effect.kind === "buff") {
         this.buffs.push({
+          skillId: skill.id,
+          formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
           stat: effect.stat,
           amount: effect.amount,
           until: now + effect.duration
@@ -659,6 +664,33 @@ export class CombatSystem {
         }
       }
     }
+    if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
+      this.player.showFormation?.(skill.vfx.sprite);
+    }
+  }
+
+  /**
+   * Filter expired buffs and update active formation aura under player feet.
+   * @param {number} now
+   */
+  updateBuffs(now) {
+    if (this.buffs.length > 0) {
+      this.buffs = this.buffs.filter((buff) => buff.until > now);
+    }
+    const activeFormation = this.buffs.find((buff) => buff.formationSprite);
+    if (activeFormation) {
+      this.player.showFormation?.(activeFormation.formationSprite);
+    } else {
+      this.player.hideFormation?.();
+    }
+  }
+
+  /**
+   * Clear all active buffs and hide any buff formation rings.
+   */
+  clearBuffs() {
+    this.buffs = [];
+    this.player.hideFormation?.();
   }
 
   /**

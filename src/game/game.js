@@ -896,6 +896,7 @@ export class JiangHuScene extends Phaser.Scene {
       } else {
         this.player.respawn();
       }
+      this.combat?.clearBuffs?.();
       this.uiBridge.updateHud(this.player.stats);
       this.uiBridge.addLog("Bạn đã bị đánh bại và hồi sinh tại Biện Kinh.", "combat");
       // Persist the full-HP respawn state.

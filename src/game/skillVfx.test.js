@@ -7,6 +7,7 @@ const makeSprite = () => {
     setOrigin: vi.fn(() => sprite),
     setDepth: vi.fn(() => sprite),
     setScale: vi.fn(() => sprite),
+    setStrokeStyle: vi.fn(() => sprite),
     play: vi.fn(() => sprite),
     once: vi.fn(() => sprite),
     destroy: vi.fn()
@@ -162,5 +163,26 @@ describe("playSkillCastVfx sprite playback", () => {
     expect(sprite.once).toHaveBeenCalledWith("animationcomplete", expect.any(Function));
     sprite.once.mock.calls[0][1]();
     expect(sprite.destroy).toHaveBeenCalled();
+  });
+
+  it("bypasses one-shot sprite creation for formation type skills and renders cast burst", () => {
+    const { scene } = makeScene({ frameTotal: 5 });
+    const sprite = makeSprite();
+    scene.add.sprite = vi.fn(() => sprite);
+    const circle = makeSprite();
+    scene.add.circle = vi.fn(() => circle);
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      { target: "self", vfx: { sprite: "vfx-la-han-tran", type: "formation", cast: "shockwave" } },
+      null
+    );
+
+    // Sprite is not created in world space for formation type (handled by player.showFormation)
+    expect(scene.add.sprite).not.toHaveBeenCalled();
+    // Baseline circle pulse and shockwave circle were created
+    expect(scene.add.circle).toHaveBeenCalled();
   });
 });
