@@ -387,14 +387,29 @@ export class CombatSystem {
   }
 
   /**
-   * Farthest world distance visible from the camera centre (half-diagonal), so
-   * a long-range skill cannot auto-target enemies that are off-screen.
+   * Farthest world distance visible from the player, so a long-range skill
+   * cannot auto-target enemies that are off-screen. Uses the camera's actual
+   * world-view corners when available, which stays correct when the player is
+   * not centred (e.g. at the map edge).
    * @returns {number}
    */
   screenCastRange() {
     const camera = this.scene?.cameras?.main;
     const zoom = camera?.zoom;
     if (!camera || !zoom) return Infinity;
+
+    const view = camera.worldView;
+    if (view && view.width > 0 && Number.isFinite(view.right) && Number.isFinite(view.bottom)) {
+      const { x, y } = this.player;
+      const corners = [
+        [view.left, view.top],
+        [view.right, view.top],
+        [view.left, view.bottom],
+        [view.right, view.bottom]
+      ];
+      return Math.max(...corners.map(([cx, cy]) => Math.hypot(cx - x, cy - y)));
+    }
+
     return Math.hypot(camera.width / (2 * zoom), camera.height / (2 * zoom));
   }
 

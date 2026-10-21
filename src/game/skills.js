@@ -38,6 +38,7 @@ const THIEU_LAM_SKILLS = [
     mp: 12,
     cooldown: 6000,
     target: "enemy",
+    // The client caps this to the visible camera range; 6000 is the server cap.
     range: 6000,
     radius: 0,
     mult: 1.3,

@@ -53,6 +53,9 @@ Design rules:
 
 - `*` Đại Tu Di Chưởng currently ships with `unlockLevel: 1` because it is the
   only authored palm skill; restore it to 3 once slots 0–1 land.
+- Known limitation: damage/stun resolve at cast time, while the projectile can
+  arrive up to 1.2 s later. Delaying the authoritative hit needs a projectile
+  lifecycle/impact-time model; keep that as a separate change.
 - Đại Tu Di Chưởng is a ranged single-target strike (`radius: 0`, `range: 6000`,
   a max that comfortably covers the visible camera edge). The client caps the
   effective range at the camera's half-diagonal (`screenCastRange`) so it never

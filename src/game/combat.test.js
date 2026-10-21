@@ -313,6 +313,19 @@ describe("CombatSystem kill rewards", () => {
     expect(combat.skillReach({ radius: 110, range: 0 })).toBe(110);
   });
 
+  it("uses the farthest camera corner when the player is not centred", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    combat.scene.cameras.main.worldView = { left: 0, top: 0, right: 1000, bottom: 600, width: 1000 };
+
+    player.x = 500;
+    player.y = 300;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(500, 300));
+
+    player.x = 0;
+    player.y = 0;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(1000, 600));
+  });
+
   it("renders the kill's drop for the attributed killer without minting stats", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
 

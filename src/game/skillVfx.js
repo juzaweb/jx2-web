@@ -20,8 +20,23 @@ const DEPTH_BONUS = 12;
 const baseAt = (x, y) => ({ ...toIso(x, y), depth: isoDepth(x, y) });
 
 /**
+ * Distance along one axis until the direction hits the given bounds.
+ * @param {number} origin
+ * @param {number} direction
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+function axisEdgeDistance(origin, direction, min, max) {
+  if (direction > 1e-6) return (max - origin) / direction;
+  if (direction < -1e-6) return (min - origin) / direction;
+  return Infinity;
+}
+
+/**
  * Distance from the player to the edge of their camera in the facing direction.
  * @param {Phaser.Scene} scene
+ * @param {{x:number,y:number}} player
  * @param {{x:number,y:number}} direction unit vector
  * @param {number} maxDistance catalog range cap
  * @returns {number}
@@ -31,17 +46,9 @@ function cameraEdgeDistance(scene, player, direction, maxDistance) {
   if (!camera) return maxDistance;
 
   const view = camera.worldView;
-  if (view && view.width > 0) {
-    const horizontal = direction.x > 1e-6
-      ? (view.right - player.x) / direction.x
-      : direction.x < -1e-6
-        ? (view.left - player.x) / direction.x
-        : Infinity;
-    const vertical = direction.y > 1e-6
-      ? (view.bottom - player.y) / direction.y
-      : direction.y < -1e-6
-        ? (view.top - player.y) / direction.y
-        : Infinity;
+  if (view && view.width > 0 && Number.isFinite(view.right) && Number.isFinite(view.bottom)) {
+    const horizontal = axisEdgeDistance(player.x, direction.x, view.left, view.right);
+    const vertical = axisEdgeDistance(player.y, direction.y, view.top, view.bottom);
     return Math.max(0, Math.min(maxDistance, horizontal, vertical));
   }
 
