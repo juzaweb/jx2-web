@@ -42,7 +42,7 @@ const MARKET_WORLD_CONFIG = {
   cityBounds: MARKET_BOUNDS
 };
 import { normalizeGender } from "./gender.js";
-import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
+import { normalizeKey } from "./keybinds.js";
 import { loadSkillLoadout } from "./skillLoadout.js";
 import { normalizeSect } from "./skills.js";
 
@@ -362,7 +362,14 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Hold-to-move continuous cursor tracking
     this.input.on("pointermove", (pointer) => {
-      if (!this.started || this.isPaused || !this.isPointerMoving || !pointer.isDown || pointer.rightButtonDown()) {
+      if (
+        !this.started ||
+        this.isPaused ||
+        !this.isPointerMoving ||
+        !pointer.isDown ||
+        pointer.rightButtonDown() ||
+        pointer.button === 2
+      ) {
         return;
       }
 
@@ -1203,6 +1210,10 @@ export class JiangHuScene extends Phaser.Scene {
     }
     if (this.uiBridge) {
       this.uiBridge.destroy();
+    }
+    if (this.skillKeyHandler && this.input?.keyboard) {
+      this.input.keyboard.off("keydown", this.skillKeyHandler);
+      this.skillKeyHandler = null;
     }
   }
 }

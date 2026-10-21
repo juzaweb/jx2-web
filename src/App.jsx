@@ -113,12 +113,8 @@ export function App() {
   const [skillLoadout, setSkillLoadout] = useState(() =>
     loadSkillLoadout(readSession()?.activeCharacter?.id)
   );
-  const [selectedSkillSlot, setSelectedSkillSlot] = useState(
-    () => loadSkillLoadout(readSession()?.activeCharacter?.id).right
-  );
-  const [leftSkillSlot, setLeftSkillSlot] = useState(
-    () => loadSkillLoadout(readSession()?.activeCharacter?.id).left
-  );
+  const selectedSkillSlot = skillLoadout.i;
+  const leftSkillSlot = skillLoadout.u;
   const [skillPickerHand, setSkillPickerHand] = useState(null);
   const [shopNpc, setShopNpc] = useState(null);
   const [shopResult, setShopResult] = useState(null);
@@ -173,8 +169,6 @@ export function App() {
       loadout.right = loadout.i;
     }
     setSkillLoadout(loadout);
-    setSelectedSkillSlot(loadout.right);
-    setLeftSkillSlot(loadout.left);
     bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
     if (activeCharacter?.sect) {
       bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
@@ -477,8 +471,6 @@ export function App() {
         right: key === "i" ? slot : skillLoadout.i
       };
       setSkillLoadout(next);
-      if (key === "u") setLeftSkillSlot(slot);
-      if (key === "i") setSelectedSkillSlot(slot);
       saveSkillLoadout(activeCharacter?.id, next);
       bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, key, slot });
       bridge.emit(EVENTS.SET_SKILL_LOADOUT, next);
