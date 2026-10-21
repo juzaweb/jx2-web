@@ -3,6 +3,7 @@ import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { defaultEquipment } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
+import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { normalizeGender } from "./gender.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
@@ -55,6 +56,9 @@ export class Player {
     this.finalX = null;
     this.finalY = null;
     this.isMovingToTarget = false;
+    // Signed remaining distance on the active leg, used to detect overshoot.
+    this.lastLegDx = 0;
+    this.lastLegDy = 0;
 
     // Movement & wuxia animation states
     this.stepPhase = 0;
@@ -217,7 +221,7 @@ export class Player {
   update(time, delta) {
     if (!this.sprite || !this.sprite.body) return;
 
-    this.updateMovement();
+    this.updateMovement(delta);
 
     const vx = this.sprite.body.velocity.x;
     const vy = this.sprite.body.velocity.y;
@@ -327,7 +331,7 @@ export class Player {
     });
   }
 
-  updateMovement() {
+  updateMovement(delta = 0) {
     // Movement is click-to-move or the mobile virtual joystick; keyboard movement
     // was removed so WASD/arrow keys are free for skill selection.
     const keyLeft = this.touchDirection === "left";
@@ -361,9 +365,19 @@ export class Player {
       const dx = this.targetX - this.sprite.x;
       const dy = this.targetY - this.sprite.y;
       const speed = 175 * POS * WORLD_SPEED_SCALE;
+      const step = travelStep(speed, delta);
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
+      // A long physics catch-up can move further than `step`; if the leg's
+      // remaining distance flipped sign, the body crossed the target and must
+      // snap instead of reversing (otherwise it oscillates every frame).
+      const overshot = horizontal
+        ? crossedTarget(this.lastLegDx, dx)
+        : crossedTarget(this.lastLegDy, dy);
 
-      if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) {
-        // Snap the finished leg, then continue with the other axis.
+      if (overshot || (shouldSnap(dx, step) && shouldSnap(dy, step))) {
+        // Snap the finished leg, then continue with the other axis. Kill the
+        // velocity so a stale axis cannot overshoot before the next leg starts.
+        this.sprite.setVelocity(0, 0);
         this.sprite.setPosition(this.targetX, this.targetY);
         const isFinalLeg =
           this.finalX === null ||
@@ -380,14 +394,18 @@ export class Player {
           this.targetX = this.sprite.x;
           this.targetY = this.finalY;
         }
+        this.lastLegDx = this.targetX - this.sprite.x;
+        this.lastLegDy = this.targetY - this.sprite.y;
         return;
       }
 
-      if (Math.abs(dx) > Math.abs(dy)) {
+      if (horizontal) {
         this.sprite.setVelocity(Math.sign(dx) * speed, 0);
       } else {
         this.sprite.setVelocity(0, Math.sign(dy) * speed);
       }
+      this.lastLegDx = dx;
+      this.lastLegDy = dy;
       return;
     }
 
@@ -414,6 +432,10 @@ export class Player {
       this.targetX = this.sprite.x;
       this.targetY = y;
     }
+    // Start the overshoot tracker from the new leg, otherwise reversing
+    // direction mid-walk would look like crossing the old target and snap.
+    this.lastLegDx = this.targetX - this.sprite.x;
+    this.lastLegDy = this.targetY - this.sprite.y;
   }
 
   stopMovement() {
@@ -422,6 +444,8 @@ export class Player {
     this.targetY = null;
     this.finalX = null;
     this.finalY = null;
+    this.lastLegDx = 0;
+    this.lastLegDy = 0;
     if (this.sprite?.body) {
       this.sprite.setVelocity(0, 0);
     }
