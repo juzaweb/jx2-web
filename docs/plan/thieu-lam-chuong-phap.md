@@ -186,8 +186,7 @@ Each phase is independently shippable and keeps the other three sects untouched.
 
 ## 8. Open decisions
 
-1. La Hán Trận: confirm it stays a self-only offensive buff, or invest in an
-   ally-buff model so the formation also empowers nearby party members.
+1. La Hán Trận: **resolved** — stays self-only (buffs only the caster, no party-wide sharing, and restricted from Left Hand).
 2. Kim Cang Bất Hoại: keep it as pure `defensePct`, or add a small
    `heal`/`pctMaxHp` component so the defensive art also restores HP?
 3. Is the official spelling `Như Lai Thần Thưởng` (current VLTK2 copy) or

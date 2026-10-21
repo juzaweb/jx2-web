@@ -209,6 +209,10 @@ export class CombatSystem {
       this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
       return false;
     }
+    if (hand === "left" && skill.target === "self") {
+      this.ui.addLog("Chiêu thức tự thân không thể gán vào chuột trái.");
+      return false;
+    }
     if (!skillUnlocked(skill, this.player.stats.level)) {
       this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
       return false;
@@ -327,12 +331,8 @@ export class CombatSystem {
    */
   castLeftSkill(target) {
     const skill = this.getLeftSkill();
-    if (!skill || !target) return false;
+    if (!skill || !target || skill.target === "self") return false;
     if (!this.canCast(skill)) return true;
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return true;
-    }
     this.approachAndCast(skill, target);
     return true;
   }

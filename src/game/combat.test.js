@@ -535,3 +535,46 @@ describe("CombatSystem kill rewards", () => {
     expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
   });
 });
+
+describe("CombatSystem hand assignments and self-skill gating", () => {
+  const makeCombat = () => {
+    const player = {
+      sect: "thieu-lam",
+      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100 },
+      x: 100,
+      y: 100
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const scene = { time: { now: 1000 } };
+    const combat = Object.create(CombatSystem.prototype);
+    combat.player = player;
+    combat.ui = ui;
+    combat.scene = scene;
+    combat.cancelPendingCast = vi.fn();
+    return { combat, ui };
+  };
+
+  it("refuses to equip self skills to the left mouse button", () => {
+    const { combat, ui } = makeCombat();
+
+    // Slot 3 is La Hán Trận (target: "self")
+    const ok = combat.equipSkill("left", 3);
+    expect(ok).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith("Chiêu thức tự thân không thể gán vào chuột trái.");
+
+    // Slot 3 can be equipped to right hand
+    const okRight = combat.equipSkill("right", 3);
+    expect(okRight).toBe(true);
+
+    // Slot 2 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
+    const okLeft = combat.equipSkill("left", 2);
+    expect(okLeft).toBe(true);
+  });
+
+  it("refuses to cast self skills via castLeftSkill on a target", () => {
+    const { combat } = makeCombat();
+    combat.leftSkillSlot = 3; // La Hán Trận (self)
+    const target = { x: 120, y: 120, id: "wolf_1" };
+    expect(combat.castLeftSkill(target)).toBe(false);
+  });
+});
