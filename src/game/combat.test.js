@@ -623,3 +623,27 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
     expect(combat.player.hideFormation).toHaveBeenCalled();
   });
 });
+
+describe("attack speed coefficient", () => {
+  const makeCombat = (attackSpeed) => {
+    const player = { stats: { attackSpeed }, playAttackMotion: vi.fn() };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn(), updateInventory: vi.fn() };
+    const scene = {
+      time: { delayedCall: vi.fn(), now: 0 },
+      cameras: { main: { width: 100, height: 100, zoom: 1 } },
+      add: { arc: () => ({ destroy() {} }) }
+    };
+    return new CombatSystem(scene, player, { getAlive: () => [] }, ui, () => {});
+  };
+
+  it("turns the coefficient into a shorter interval", () => {
+    expect(makeCombat(1).attackIntervalMs()).toBe(330);
+    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(275);
+    expect(makeCombat(1.5).attackIntervalMs()).toBe(220);
+  });
+
+  it("falls back to the base cadence for a missing or invalid coefficient", () => {
+    expect(makeCombat(undefined).attackIntervalMs()).toBe(330);
+    expect(makeCombat(0).attackIntervalMs()).toBe(330);
+  });
+});

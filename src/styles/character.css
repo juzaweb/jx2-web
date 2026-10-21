@@ -345,30 +345,6 @@
   color: #ffd84d;
 }
 
-.stat-row.attr .stat-value {
-  color: #e4d7bc;
-}
-.attr-bonus {
-  color: #b9d9a0;
-}
-
-.char-potential {
-  margin-top: auto;
-  padding-top: 6px;
-  border-top: 1px solid #4a3520;
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-}
-.char-potential .stat-label {
-  color: #d9c27a;
-}
-.char-potential .stat-value {
-  font-family: monospace;
-  font-weight: 700;
-  color: #ffe9ad;
-}
-
 /* ---- Footer bar ---- */
 .char-footer {
   flex-shrink: 0;

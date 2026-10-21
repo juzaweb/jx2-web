@@ -1,15 +1,25 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { defaultEquipment } from "./equipment.js";
+import { defaultEquipment, deriveEquipmentBonuses } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { normalizeGender } from "./gender.js";
-import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE, BASE_WALK_SPEED } from "./worldConfig.js";
+import {
+  BASE_ATTACK,
+  BASE_ATTACK_SPEED,
+  BASE_CRIT_DAMAGE,
+  BASE_CRIT_RATE,
+  BASE_DEFENSE
+} from "./combatConfig.js";
 
 const S = WORLD_SCALE;
 const POS = WORLD_POSITION_SCALE;
+
+/** Stats that are always derived from base values + worn gear, never persisted. */
+const DERIVED_STATS = new Set(["attack", "defense", "attackSpeed", "critRate", "critDamage"]);
 
 export class Player {
   /**
@@ -35,10 +45,11 @@ export class Player {
       maxHp: 100,
       mp: 60,
       maxMp: 60,
-      attack: 24,
-      defense: 6,
-      critRate: 0.12,
-      critDamage: 1.5,
+      attack: BASE_ATTACK,
+      defense: BASE_DEFENSE,
+      attackSpeed: BASE_ATTACK_SPEED,
+      critRate: BASE_CRIT_RATE,
+      critDamage: BASE_CRIT_DAMAGE,
       exp: 0,
       nextExp: 100,
       coins: 0,
@@ -49,6 +60,8 @@ export class Player {
     this.invulnerable = false;
     /** Worn items, slot -> item id. Drawn as overlays on the body sheet. */
     this.equipment = defaultEquipment();
+    /** Bonus totals already folded into `stats`, so a swap only applies a delta. */
+    this.equipmentBonuses = {};
     // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
     this.pkFlag = false;
     this.targetX = null;
@@ -197,12 +210,30 @@ export class Player {
   }
 
   /**
-   * Wear the given items and redraw the rig.
+   * Wear the given items, redraw the rig and fold their bonuses into `stats`.
    * @param {Record<string, string|null>} [equipment]
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
     this.rig?.set(this.facingDirection, this.equipment, this.gender);
+    this.refreshEquipmentBonuses();
+  }
+
+  /**
+   * Re-apply the worn items' combat bonuses. Only the stats the server also
+   * accepts from the client (attack, defence, crit) are touched: HP/MP ceilings
+   * are server-owned (see progression.js), so gear never inflates them locally.
+   */
+  refreshEquipmentBonuses() {
+    const next = deriveEquipmentBonuses(this.equipment);
+    const previous = this.equipmentBonuses;
+    const delta = (key) => (next[key] || 0) - (previous[key] || 0);
+
+    this.stats.attack = Math.max(0, this.stats.attack + delta("attack"));
+    this.stats.defense = Math.max(0, this.stats.defense + delta("defense"));
+    const critRate = this.stats.critRate + delta("critRate");
+    this.stats.critRate = Math.min(1, Math.max(0, Number(critRate.toFixed(4))));
+    this.equipmentBonuses = next;
   }
 
   /**
@@ -366,7 +397,7 @@ export class Player {
       if (keyUp) vy -= 1;
       if (keyDown) vy += 1;
 
-      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
+      const speed = BASE_WALK_SPEED * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
         vector.normalize().scale(speed);
@@ -380,7 +411,7 @@ export class Player {
     if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
       const dx = this.targetX - this.sprite.x;
       const dy = this.targetY - this.sprite.y;
-      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
+      const speed = BASE_WALK_SPEED * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const step = travelStep(speed, delta);
       const horizontal = Math.abs(dx) >= Math.abs(dy);
       // A long physics catch-up can move further than `step`; if the leg's
@@ -523,11 +554,20 @@ export class Player {
     this.touchDirection = direction;
   }
 
+  /**
+   * Restore anything persisted about the character. Combat stats are derived
+   * (base + worn gear), so they are never restored from disk — otherwise the
+   * saved gear bonus would be applied a second time by `applyEquipment`.
+   * @param {object} [savedStats]
+   */
   loadStats(savedStats) {
     if (!savedStats || typeof savedStats !== "object") return;
+    const persisted = Object.fromEntries(
+      Object.entries(savedStats).filter(([key]) => !DERIVED_STATS.has(key))
+    );
     this.stats = {
       ...this.stats,
-      ...savedStats
+      ...persisted
     };
   }
 

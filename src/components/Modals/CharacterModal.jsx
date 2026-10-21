@@ -242,7 +242,7 @@ export function CharacterModal({
           <div className="char-side">
             <div className="char-stats">
               {sheet.vitals.map((row) => (
-                <div className="stat-row vital" key={row.key}>
+                <div className="stat-row vital" key={row.key} data-stat={row.key}>
                   <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
@@ -251,28 +251,11 @@ export function CharacterModal({
 
             <div className="char-stats">
               {sheet.combat.map((row) => (
-                <div className="stat-row" key={row.key}>
+                <div className="stat-row" key={row.key} data-stat={row.key}>
                   <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
               ))}
-            </div>
-
-            <div className="char-stats">
-              {sheet.attributes.map((row) => (
-                <div className="stat-row attr" key={row.key}>
-                  <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
-                  <span className="stat-value">
-                    {row.base}
-                    <span className="attr-bonus">+{row.bonus}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="char-potential">
-              <span className="stat-label">{t("character.potential")}</span>
-              <span className="stat-value">{sheet.footer.potential}</span>
             </div>
           </div>
 

@@ -213,13 +213,12 @@ export default {
     title: "角色",
     helpTitle: "帮助",
     closeTitle: "关闭（F3 / Esc）",
-    hint: "战斗属性由角色等级推算。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
+    hint: "战斗属性为实际交战使用的数值。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
     tabEquip: "装备",
     tabNews: "消息",
     locked: "{label}（未开放）",
     notEquipped: "{label}（未装备）",
     unequipTitle: "{name}（点击卸下）",
-    potential: "潜能",
     points: "点数：",
     nextLevel: "升级：",
     slots: {
@@ -284,26 +283,11 @@ export default {
   stats: {
     hp: "生命",
     mp: "内力",
-    strength: "力量",
-    agility: "身法",
-    internal: "内功",
-    bone: "筋骨",
-    flexibility: "灵活",
     physicalAtk: "外功",
-    chiAtk: "内击",
-    damage: "伤害",
-    accuracy: "命中",
     physicalDef: "外防",
-    magicDef: "内防",
-    dodge: "闪避",
     crit: "暴击",
-    burst: "爆点",
-    burstHard: "爆刚",
-    woundRate: "伤口率",
-    critResist: "克怒",
-    cast: "出招",
-    attackSpeed: "攻速",
-    moveSpeed: "移动速度"
+    critDamage: "暴击命中",
+    attackSpeed: "攻速"
   },
   item: {
     "kim-sang-duoc": {

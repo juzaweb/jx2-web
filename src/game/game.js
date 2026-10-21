@@ -670,6 +670,8 @@ export class JiangHuScene extends Phaser.Scene {
     });
     // Mirror to peers so their rigs show the same gear.
     this.networkClient?.sendEquipment?.(this.player.equipment);
+    // Gear now feeds attack/defence/crit, so refresh the sheet snapshot too.
+    this.uiBridge.updateHud(this.player.stats);
   }
 
   /**

@@ -16,6 +16,9 @@ export const WORLD_SPEED_SCALE = 0.6;
 /** World size of one ground tile (the paving grid cell). */
 export const WORLD_TILE = 76 * WORLD_SCALE;
 
+/** Hero walk speed in world units per second, before position/speed scaling. */
+export const BASE_WALK_SPEED = 175;
+
 /**
  * Protocol-level world bounds. The visible/playable market is smaller and is
  * defined in `marketLayout.js`; the server keeps these generous bounds so old

@@ -13,6 +13,7 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack } from "./pvp.js";
 import { computeDamage } from "./damage.js";
+import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { translate } from "../i18n/translator.js";
 
@@ -109,10 +110,20 @@ export class CombatSystem {
     return applyBuffsToStats(this.player.stats, this.buffs, now);
   }
 
+  /**
+   * Milliseconds until the next normal attack, shortened by the attack-speed
+   * multiplier (see combatConfig.js).
+   * @returns {number}
+   */
+  attackIntervalMs() {
+    const speed = Number(this.player?.stats?.attackSpeed);
+    return ATTACK_INTERVAL_MS / (Number.isFinite(speed) && speed > 0 ? speed : 1);
+  }
+
   performAttack() {
     if (!this.attackReady) return;
     this.attackReady = false;
-    this.scene.time.delayedCall(330, () => {
+    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
       this.attackReady = true;
     });
 
@@ -759,7 +770,7 @@ export class CombatSystem {
     }
 
     this.attackReady = false;
-    this.scene.time.delayedCall(330, () => {
+    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
       this.attackReady = true;
     });
 

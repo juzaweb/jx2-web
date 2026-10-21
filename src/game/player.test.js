@@ -35,6 +35,7 @@ vi.mock("phaser", () => {
 });
 
 import { Player } from "./player.js";
+import { deriveCharacterSheet } from "./characterStats.js";
 
 const createMockScene = () => {
   const node = () => ({
@@ -361,5 +362,62 @@ describe("Player movement controls", () => {
     player.destroy();
     expect(formationSprite.destroy).toHaveBeenCalled();
     expect(player.formationSprite).toBeNull();
+  });
+});
+
+describe("Player equipment bonuses", () => {
+  const makePlayer = () => new Player(createMockScene(), 100, 100);
+  it("adds worn weapon bonuses without stacking on swaps", () => {
+    const player = makePlayer();
+    const baseAttack = player.stats.attack;
+    const baseCrit = player.stats.critRate;
+
+    player.applyEquipment({ ...player.equipment, weapon: "hac-ung-kiem" }); // +10 attack, +2% crit
+    expect(player.stats.attack).toBe(baseAttack + 10);
+    expect(player.stats.critRate).toBeCloseTo(baseCrit + 0.02, 4);
+
+    player.applyEquipment({ ...player.equipment, weapon: "phach-dao" }); // +16 attack, +3% crit
+    expect(player.stats.attack).toBe(baseAttack + 16);
+    expect(player.stats.critRate).toBeCloseTo(baseCrit + 0.03, 4);
+
+    player.applyEquipment({ ...player.equipment, weapon: null });
+    expect(player.stats.attack).toBe(baseAttack);
+    expect(player.stats.critRate).toBeCloseTo(baseCrit, 4);
+  });
+
+  it("adds armour defence while leaving server-owned HP alone", () => {
+    const player = makePlayer();
+    const baseDefense = player.stats.defense;
+    const baseMaxHp = player.stats.maxHp;
+
+    player.applyEquipment({ ...player.equipment, armor: "cam-y-bao" }); // +8 defence, +40 HP
+
+    expect(player.stats.defense).toBe(baseDefense + 8);
+    expect(player.stats.maxHp).toBe(baseMaxHp);
+  });
+});
+
+describe("Character sheet + equipment", () => {
+  it("shows the equipped weapon bonus in the sheet", () => {
+    const player = new Player(createMockScene(), 100, 100);
+    player.applyEquipment({ ...player.equipment, weapon: "phach-dao" }); // +16 attack
+
+    const sheet = deriveCharacterSheet(player.stats);
+    const attack = sheet.combat.find((row) => row.key === "physicalAtk");
+    expect(attack.value).toBe("40");
+  });
+});
+
+describe("Player saved stats", () => {
+  it("never restores derived combat stats from disk", () => {
+    const player = new Player(createMockScene(), 100, 100);
+    player.loadStats({ level: 5, attack: 999, defense: 999, critRate: 1, critDamage: 9, coins: 12 });
+
+    expect(player.stats.level).toBe(5);
+    expect(player.stats.coins).toBe(12);
+    expect(player.stats.attack).toBe(24);
+    expect(player.stats.defense).toBe(6);
+    expect(player.stats.critRate).toBe(0.12);
+    expect(player.stats.critDamage).toBe(1.5);
   });
 });

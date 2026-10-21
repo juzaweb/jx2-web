@@ -213,13 +213,12 @@ export default {
     title: "Nhân vật",
     helpTitle: "Trợ giúp",
     closeTitle: "Đóng (F3 / Esc)",
-    hint: "Các chỉ số chiến đấu được suy ra từ đẳng cấp nhân vật. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
+    hint: "Các chỉ số chiến đấu là giá trị thực tế đang dùng khi giao chiến. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
     tabEquip: "Trang bị",
     tabNews: "Tin tức",
     locked: "{label} (chưa mở)",
     notEquipped: "{label} (chưa trang bị)",
     unequipTitle: "{name} (nhấp để tháo)",
-    potential: "Tiềm năng",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
     slots: {
@@ -284,26 +283,11 @@ export default {
   stats: {
     hp: "Sinh lực",
     mp: "Nội lực",
-    strength: "Sức mạnh",
-    agility: "Thân pháp",
-    internal: "Nội công",
-    bone: "Gân cốt",
-    flexibility: "Linh hoạt",
     physicalAtk: "Ngoại công",
-    chiAtk: "Nội kích",
-    damage: "Sát thương",
-    accuracy: "Chính xác",
     physicalDef: "Ngoại phòng",
-    magicDef: "Nội phòng",
-    dodge: "Né tránh",
     crit: "Chí mạng",
-    burst: "Điểm bạo",
-    burstHard: "Bạo cương",
-    woundRate: "Tỉ lệ thương",
-    critResist: "Khắc nộ",
-    cast: "Xuất chiêu",
-    attackSpeed: "Tốc độ đánh",
-    moveSpeed: "Tốc độ di chuyển"
+    critDamage: "Đòn chí mạng",
+    attackSpeed: "Tốc độ đánh"
   },
   item: {
     "kim-sang-duoc": {
