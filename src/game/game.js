@@ -8,7 +8,7 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantities, getQuantity, consumeQuantity, addQuantity, setQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { getQuantities, getQuantity, consumeQuantity, addQuantity, replaceQuantities, getItemById, QUICK_ITEMS } from "./items.js";
 import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
@@ -160,7 +160,7 @@ export class JiangHuScene extends Phaser.Scene {
       api: apiClient,
       getOwnerId: () => readSession()?.activeCharacter?.id || null,
       getQuantities,
-      setQuantities,
+      setQuantities: replaceQuantities,
       onAdopt: () => {
         this.uiBridge.updateInventory();
         this.uiBridge.addLog("Đã đồng bộ hành trang từ máy chủ.", "system");

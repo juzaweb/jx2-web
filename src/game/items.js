@@ -46,15 +46,30 @@ export const QUICK_ITEMS = [
   }
 ];
 
-/** Sức nặng hành trang hiển thị ở thanh dưới cùng. */
-export const INVENTORY_CAPACITY = { used: 992, total: 4176 };
+/** Number of slots the inventory grid renders (5 columns x 8 rows). */
+export const INVENTORY_GRID_SIZE = 40;
 
-/** Tiền tệ & tài nguyên hiển thị ở footer (bạc lấy động từ stats). */
-export const INVENTORY_TREASURY = {
-  kimNguyenBao: 13,
-  tienNgoc: 67,
-  kimPhieu: 2057
-};
+/** Fallback icon for server-owned ids that are missing from the static catalog. */
+const UNKNOWN_ITEM_ICON = "icon-pouch";
+
+/**
+ * Split a silver balance into the three display denominations.
+ * The server keeps a single silver balance, so copper is always zero until a
+ * copper ledger exists.
+ * @param {number} silver
+ * @returns {{ gold: number, silver: number, copper: number }}
+ */
+export function splitSilver(silver) {
+  const amount =
+    typeof silver === "number" && Number.isFinite(silver)
+      ? Math.max(0, Math.floor(silver))
+      : 0;
+  return {
+    gold: Math.floor(amount / 100),
+    silver: amount % 100,
+    copper: 0
+  };
+}
 
 /** Quick-slot consumables reused inside the inventory grid, destructured by their fixed order. */
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
@@ -65,14 +80,14 @@ const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
  * @type {Array<null | {id:string, name:string, icon:string, qty?:number, slot?:string, bonuses?:Record<string,number>, desc:string, useSlot?:number}>}
  */
 export const INVENTORY_ITEMS = [
-  { id: "ho-lo-tuu", name: "Hồ Lô Tửu", icon: "icon-gourd", desc: "Bầu rượu của hành khách, hương thơm nồng đượm." },
-  { id: "lenh-bai", name: "Lệnh Bài Môn Phái", icon: "icon-token", desc: "Tín vật Võ Đang, chứng minh thân phận đệ tử." },
+  { id: "ho-lo-tuu", name: "Hồ Lô Tửu", icon: "icon-gourd", qty: 1, desc: "Bầu rượu của hành khách, hương thơm nồng đượm." },
+  { id: "lenh-bai", name: "Lệnh Bài Môn Phái", icon: "icon-token", qty: 1, desc: "Tín vật Võ Đang, chứng minh thân phận đệ tử." },
   { id: "thiet-trao", name: "Thiết Trảo", icon: "icon-claw", qty: 1, slot: "weapon", bonuses: { attack: 6 }, desc: "Binh khí lợi hại, sử dụng trong cận chiến." },
   { id: "hac-ung-kiem", name: "Hắc Ưng Kiếm", icon: "icon-jian", qty: 1, slot: "weapon", bonuses: { attack: 10, critRate: 0.02 }, desc: "Thanh kiếm huyền thiết, sắc bén vô song." },
   kimSangDuoc,
 
   { id: "bi-kip-vo-cong", name: "Bí Kíp Võ Công", icon: "icon-book", qty: 1, desc: "Sách cổ ghi chép tâm pháp luyện công." },
-  { id: "thien-ha-mat-tich", name: "Thiên Hà Mật Tịch", icon: "icon-book-red", desc: "Mật tịch thượng thừa của phái Thiên Hà." },
+  { id: "thien-ha-mat-tich", name: "Thiên Hà Mật Tịch", icon: "icon-book-red", qty: 1, desc: "Mật tịch thượng thừa của phái Thiên Hà." },
   { id: "cam-y-bao", name: "Cẩm Y Bào", icon: "icon-armor", qty: 1, slot: "armor", bonuses: { defense: 8, maxHp: 40 }, desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự." },
   { id: "thanh-long-dao", name: "Thanh Long Đao", icon: "icon-blade", qty: 1, slot: "weapon", bonuses: { attack: 14 }, desc: "Đại đao khắc hình thanh long, uy lực trầm hùng." },
   { id: "ngoc-bo-dao", name: "Ngọc Bồi Dương Chi", icon: "icon-ring", qty: 1, slot: "accessory", bonuses: { maxMp: 30 }, desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ." },
@@ -159,6 +174,18 @@ export function setQuantities(quantities = {}) {
   });
   currentQuantities = merged;
   return merged;
+}
+
+/**
+ * Replace the in-memory quantities with exactly the given map, without merging
+ * catalog defaults. Used when the server bag is authoritative, so a consumed
+ * starter item is not silently refilled from the catalog.
+ * @param {Record<string, number>} [quantities]
+ * @returns {Record<string, number>} The sanitized map
+ */
+export function replaceQuantities(quantities = {}) {
+  currentQuantities = sanitizeQuantities(quantities) || {};
+  return { ...currentQuantities };
 }
 
 /**
@@ -340,21 +367,69 @@ export function rollKillReward(rng = Math.random) {
 }
 
 /**
+ * Resolve a server-owned id that is not in the static catalog into a renderable
+ * placeholder, so a bag can never hide items the server says the player owns.
+ * @param {string} id
+ * @returns {object}
+ */
+function unknownItem(id) {
+  return {
+    id,
+    name: id,
+    icon: UNKNOWN_ITEM_ICON,
+    desc: ""
+  };
+}
+
+/**
+ * Read a stack quantity from a normalised map, treating missing ids as empty.
+ * @param {Record<string, number>} quantities
+ * @param {string} id
+ * @returns {number}
+ */
+function quantityOf(quantities, id) {
+  const value = quantities[id];
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : 0;
+}
+
+/**
  * Resolve the catalog into render-ready arrays with persisted quantities applied.
- * Inventory items with no saved or default quantity are returned unchanged.
+ * The grid is driven by what the player actually owns: only stacks with a
+ * positive quantity are returned, in catalog order, with any extra server ids
+ * appended. Empty cells pad the grid to {@link INVENTORY_GRID_SIZE}.
  * @param {Record<string, number>} [quantities]
- * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
+ * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null>,
+ *   capacity: { used: number, total: number } }}
  */
 export function applyQuantities(quantities = defaultQuantities()) {
-  const withQty = (item) => {
-    const saved = quantities[item.id];
-    if (typeof saved === "number" && Number.isFinite(saved)) {
-      return { ...item, qty: saved };
-    }
-    return item;
-  };
+  const owned = sanitizeQuantities(quantities) || {};
+
+  const inventoryItems = [];
+  const seen = new Set();
+  INVENTORY_ITEMS.filter(Boolean).forEach((item) => {
+    seen.add(item.id);
+    const qty = quantityOf(owned, item.id);
+    if (qty > 0) inventoryItems.push({ ...item, qty });
+  });
+  Object.keys(owned).forEach((id) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const qty = quantityOf(owned, id);
+    if (qty > 0) inventoryItems.push({ ...unknownItem(id), qty });
+  });
+  const used = inventoryItems.length;
+  while (inventoryItems.length < INVENTORY_GRID_SIZE) {
+    inventoryItems.push(null);
+  }
+
   return {
-    quickItems: QUICK_ITEMS.map(withQty),
-    inventoryItems: INVENTORY_ITEMS.map((item) => (item ? withQty(item) : null))
+    quickItems: QUICK_ITEMS.map((item) => ({
+      ...item,
+      qty: quantityOf(owned, item.id)
+    })),
+    inventoryItems,
+    capacity: { used, total: Math.max(INVENTORY_GRID_SIZE, used) }
   };
 }

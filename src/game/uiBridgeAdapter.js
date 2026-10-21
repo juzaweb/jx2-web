@@ -77,8 +77,10 @@ export class UIBridgeAdapter {
    * @param {Record<string, number>} [quantities] - Defaults to the shared store
    */
   updateInventory(quantities) {
-    const { quickItems, inventoryItems } = applyQuantities(quantities || getQuantities());
-    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems });
+    const { quickItems, inventoryItems, capacity } = applyQuantities(
+      quantities || getQuantities()
+    );
+    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems, capacity });
   }
 
   updateQuest(stats, onQuestComplete) {

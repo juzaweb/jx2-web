@@ -2,8 +2,8 @@ import React, { useRef, useState } from "react";
 import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
-  INVENTORY_CAPACITY,
-  INVENTORY_TREASURY
+  INVENTORY_GRID_SIZE,
+  splitSilver
 } from "../../game/items.js";
 import {
   EQUIPMENT_SLOTS,
@@ -31,7 +31,8 @@ export function InventoryModal({
   equipment = {},
   coins = 0,
   quickItems = QUICK_ITEMS,
-  inventoryItems = INVENTORY_ITEMS
+  inventoryItems = INVENTORY_ITEMS,
+  capacity = null
 }) {
   const { t } = useI18n();
   const [hovered, setHovered] = useState(null);
@@ -41,10 +42,17 @@ export function InventoryModal({
 
   if (!isOpen) return null;
 
+  // The grid arrives already padded with empty cells, so the footer reflects real
+  // bag usage instead of a hard-coded carry weight.
+  const carry = capacity || {
+    used: inventoryItems.filter(Boolean).length,
+    total: Math.max(INVENTORY_GRID_SIZE, inventoryItems.length)
+  };
   const usedRatio = Math.min(
     100,
-    Math.round((INVENTORY_CAPACITY.used / INVENTORY_CAPACITY.total) * 100)
+    Math.round((carry.used / carry.total) * 100)
   );
+  const treasury = splitSilver(coins);
 
   const positionTooltip = (clientX, clientY, el) => {
     const width = el?.offsetWidth ?? 210;
@@ -244,32 +252,25 @@ export function InventoryModal({
               />
             </div>
             <span className="inv-weight-value">
-              {t("inventory.count", { used: INVENTORY_CAPACITY.used, total: INVENTORY_CAPACITY.total })}
+              {t("inventory.count", { used: carry.used, total: carry.total })}
             </span>
           </div>
 
           <div className="inv-currency-row">
-            <div className="inv-currency bac" title={t("inventory.silver")}>
-              <span className="inv-coin-icon" />
-              <span className="inv-currency-value">{coins}</span>
-            </div>
             <div className="inv-currency kim" title={t("inventory.gold")}>
               <span className="inv-coin-icon kim" />
-              <span className="inv-currency-value">
-                {INVENTORY_TREASURY.kimNguyenBao}
-              </span>
+              <span className="inv-currency-value">{treasury.gold}</span>
             </div>
-            <div className="inv-currency tien" title={t("inventory.jade")}>
-              <span className="inv-coin-icon tien" />
-              <span className="inv-currency-value">
-                {INVENTORY_TREASURY.tienNgoc}
-              </span>
+            <div className="inv-currency bac" title={t("inventory.silver")}>
+              <span className="inv-coin-icon" />
+              <span className="inv-currency-value">{treasury.silver}</span>
+            </div>
+            <div className="inv-currency dong" title={t("inventory.copper")}>
+              <span className="inv-coin-icon dong" />
+              <span className="inv-currency-value">{treasury.copper}</span>
             </div>
           </div>
 
-          <div className="inv-kim-phieu">
-            {t("inventory.kimPhieu")} <b>{INVENTORY_TREASURY.kimPhieu}</b>
-          </div>
           <div className="inv-tab-label">{t("inventory.ngucac")}</div>
         </div>
       </div>

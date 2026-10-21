@@ -711,6 +711,7 @@ export function App() {
         coins={stats.coins}
         quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}
+        capacity={inventory.capacity}
       />
 
       {/* Character Sheet ("Nhân vật") */}

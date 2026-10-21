@@ -2,11 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
-  INVENTORY_CAPACITY,
-  INVENTORY_TREASURY,
+  INVENTORY_GRID_SIZE,
+  splitSilver,
   defaultQuantities,
   applyQuantities,
   setQuantities,
+  replaceQuantities,
   getQuantities,
   getQuantity,
   addQuantity,
@@ -54,12 +55,19 @@ describe("item catalog", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("exposes numeric carry weight and treasury values", () => {
-    expect(INVENTORY_CAPACITY.used).toBeLessThanOrEqual(INVENTORY_CAPACITY.total);
-    expect(INVENTORY_CAPACITY.total).toBeGreaterThan(0);
-    Object.values(INVENTORY_TREASURY).forEach((value) => {
-      expect(typeof value).toBe("number");
-    });
+  it("derives carry capacity from the owned stacks", () => {
+    const { capacity } = applyQuantities({ "tui-bac": 2, "yeu-dan": 9 });
+    expect(capacity).toEqual({ used: 2, total: INVENTORY_GRID_SIZE });
+
+    const empty = applyQuantities({}).capacity;
+    expect(empty).toEqual({ used: 0, total: INVENTORY_GRID_SIZE });
+  });
+
+  it("splits a silver balance into gold, silver and copper", () => {
+    expect(splitSilver(0)).toEqual({ gold: 0, silver: 0, copper: 0 });
+    expect(splitSilver(250)).toEqual({ gold: 2, silver: 50, copper: 0 });
+    expect(splitSilver(-5)).toEqual({ gold: 0, silver: 0, copper: 0 });
+    expect(splitSilver(Number.NaN)).toEqual({ gold: 0, silver: 0, copper: 0 });
   });
 });
 
@@ -74,22 +82,32 @@ describe("inventory quantities", () => {
     });
   });
 
-  it("does not assign quantities to quantity-less items", () => {
-    const quantities = defaultQuantities();
-    const plain = INVENTORY_ITEMS.find((item) => item && item.id === "ho-lo-tuu");
-    expect(quantities[plain.id]).toBeUndefined();
-  });
-
-  it("applies persisted quantities over the catalog", () => {
+  it("only renders owned stacks and pads the grid with empty slots", () => {
     const { quickItems, inventoryItems } = applyQuantities({
       "kim-sang-duoc": 7,
       "tui-bac": 0
     });
 
     expect(quickItems.find((item) => item.id === "kim-sang-duoc").qty).toBe(7);
-    expect(inventoryItems.find((item) => item.id === "tui-bac").qty).toBe(0);
-    // Items with no saved or default quantity stay untouched.
-    expect(inventoryItems.find((item) => item.id === "ho-lo-tuu").qty).toBeUndefined();
+    // A depleted / missing quick item must show zero, never its catalog default.
+    expect(quickItems.find((item) => item.id === "dai-hoan-dan").qty).toBe(0);
+    expect(inventoryItems.find((item) => item?.id === "tui-bac")).toBeUndefined();
+    expect(inventoryItems.find((item) => item?.id === "kim-sang-duoc").qty).toBe(7);
+    expect(inventoryItems.filter(Boolean)).toHaveLength(1);
+    expect(inventoryItems).toHaveLength(INVENTORY_GRID_SIZE);
+    expect(inventoryItems.slice(1).every((item) => item === null)).toBe(true);
+  });
+
+  it("keeps unknown server-owned ids visible after the catalog", () => {
+    const { inventoryItems, capacity } = applyQuantities({ "bi-kip-la": 3 });
+    const unknown = inventoryItems.find((item) => item?.id === "bi-kip-la");
+
+    expect(unknown).toMatchObject({
+      id: "bi-kip-la",
+      name: "bi-kip-la",
+      qty: 3
+    });
+    expect(capacity).toEqual({ used: 1, total: INVENTORY_GRID_SIZE });
   });
 
   it("keeps the shared in-memory store merged over defaults", () => {
@@ -98,6 +116,13 @@ describe("inventory quantities", () => {
     expect(getQuantities()["kim-sang-duoc"]).toBe(1);
     // An untouched item keeps its catalog default.
     expect(getQuantities()["dai-hoan-dan"]).toBe(86);
+  });
+
+  it("replaces the store exactly when adopting the server bag", () => {
+    replaceQuantities({ "kim-sang-duoc": 0, "tui-bac": 2 });
+
+    expect(getQuantities()).toEqual({ "kim-sang-duoc": 0, "tui-bac": 2 });
+    expect(getQuantities()["dai-hoan-dan"]).toBeUndefined();
   });
 });
 
