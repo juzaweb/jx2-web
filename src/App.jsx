@@ -24,6 +24,7 @@ import {
 } from "./game/items.js";
 import { defaultEquipment } from "./game/equipment.js";
 import { StorageManager } from "./game/storage.js";
+import { SERVER_NAME } from "./game/serverConfig.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import { apiClient } from "./game/apiClient.js";
 import {
@@ -100,7 +101,6 @@ export function App() {
     }
     return null;
   });
-  const [serverName, setServerName] = useState(() => readSession()?.server || "");
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
@@ -569,7 +569,6 @@ export function App() {
   const handleLoginSuccess = useCallback((session) => {
     setCurrentUser(session.user);
     setActiveCharacter(null);
-    setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
     setEquipment(defaultEquipment());
@@ -600,17 +599,16 @@ export function App() {
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `character-${Date.now()}`,
       textKey: "app.joinLog",
-      textParams: { name: character.name, server: serverName || t("app.serverFallback") },
+      textParams: { name: character.name, server: SERVER_NAME },
       type: "system"
     });
-  }, [serverName, t]);
+  }, []);
 
   const handleLogout = useCallback(() => {
     if (window.confirm(t("app.confirmLogout"))) {
       clearSession();
       setCurrentUser(null);
       setActiveCharacter(null);
-      setServerName("");
       StorageManager.setUserId(null);
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
@@ -720,7 +718,6 @@ export function App() {
         <CharacterSelectModal
           isOpen={true}
           user={currentUser}
-          server={serverName}
           onStart={handleCharacterStart}
           onLogout={handleLogout}
         />
