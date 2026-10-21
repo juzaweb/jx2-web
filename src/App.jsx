@@ -475,6 +475,11 @@ export function App() {
     bridge.emit(EVENTS.ACTION_SKILL);
   }, []);
 
+  const handleCastKey = useCallback((key) => {
+    bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand: key, key });
+    bridge.emit(EVENTS.ACTION_SKILL);
+  }, []);
+
   const handleOpenSkillPicker = useCallback((hand) => {
     dismissHelp();
     setSkillPickerHand(hand);
@@ -695,6 +700,10 @@ export function App() {
           onMove={handleMove}
           onAttack={handleAttack}
           onSkill={handleSkill}
+          onCastKey={handleCastKey}
+          onUseItem={handleUseItem}
+          skills={skillsForSect(activeCharacter?.sect)}
+          skillLoadout={skillLoadout}
         />
       </div>
 
