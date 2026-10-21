@@ -25,32 +25,6 @@ export default {
     help: "Trợ giúp",
     level: "Cấp"
   },
-  npc: {
-    "duoc-diem": {
-      name: "Chủ Dược Điếm",
-      dialogue: 'Chủ Dược Điếm: "Hoan nghênh hiệp khách ghé Dược Điếm Biện Kinh! Bổn tiệm chuyên cung cấp Kim Sáng Dược, Đại Hoàn Đan thượng hạng trị thương hồi khí."'
-    },
-    "bach-tien-sinh": {
-      name: "Bạch Tiên Sinh",
-      dialogue: 'Bạch Tiên Sinh: "Giang hồ hiểm ác, lòng người khó lường. Thiếu hiệp hành tẩu Biện Kinh nhớ giữ gìn bản tâm, chăm chỉ tu luyện võ công!"'
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "Thương Nhân Bảo Rương",
-      dialogue: 'Thương Nhân Bảo Rương: "Khắp nơi trong thiên hạ đều có bảo rương ẩn giấu kỳ trân dị bảo. Thiếu hiệp nếu có chìa khóa hoàng kim, hãy mang đến đây đổi lấy tuyệt thế thần binh!"'
-    },
-    "dai-su-hoat-dong": {
-      name: "Đại Sứ Hoạt Động",
-      dialogue: 'Đại Sứ Hoạt Động: "Hoan nghênh chư vị anh hùng đến với Biện Kinh! Tham gia các hoạt động giang hồ mỗi ngày để nhận vinh dự và phần thưởng quý giá."'
-    },
-    "chan-tu-don": {
-      name: "Chân Tử Đơn",
-      dialogue: 'Chân Tử Đơn: "Võ học vô biên! Luyện tập quyền cước hàng ngày chính là căn cơ để xưng bá võ lâm."'
-    },
-    "van-su-thong": {
-      name: "Vạn Sự Thông",
-      dialogue: 'Vạn Sự Thông: "Thiên hạ sự tình, phong vân biến ảo, không điều gì mà lão phu không tường. Thiếu hiệp muốn dò hỏi tin tức chốn võ lâm chăng?"'
-    }
-  },
   hud: {
     levelTitle: "Đẳng cấp nhân vật",
     expTitle: "Kinh nghiệm tu luyện",

@@ -1,9 +1,6 @@
 import { toIso, isoDepth } from "./isoProjection.js";
-import { NPC_DATA, getNpcName, localizeNpc } from "./npcData.js";
-import { LANGUAGE_CHANGED_EVENT } from "../i18n/translator.js";
 import { WORLD_SCALE } from "./worldConfig.js";
 import { createGate, createNoticeBoard, createShop, createStall } from "./marketBuildings.js";
-import { createNpc } from "./marketNpcs.js";
 import { createBasket, createBarrel, createCrates, createJars, createPine, createSacks, createStoneLantern, createTree } from "./marketProps.js";
 import {
   MARKET_BOUNDS,
@@ -19,16 +16,13 @@ const GROUND_DEPTH = -100000;
 
 /**
  * Renders the compact Biện Kinh market square from the reference screenshot.
- * Same public surface as the previous WorldManager: create(), getObstacles(),
- * getNPCs(), plus the overhead-name language refresh hook.
+ * Public surface: create() and getObstacles().
  */
 export class WorldManager {
   /** @param {import("phaser").Scene} scene */
   constructor(scene) {
     this.scene = scene;
     this.obstacles = null;
-    this.npcs = NPC_DATA;
-    this.npcLabels = null;
   }
 
   create() {
@@ -38,7 +32,6 @@ export class WorldManager {
     this.drawBuildings();
     this.drawProps();
     this.drawTrees();
-    this.drawNPCs();
     this.drawWorldBorder();
   }
 
@@ -199,34 +192,6 @@ export class WorldManager {
     });
   }
 
-  drawNPCs() {
-    this.npcLabels = new Map();
-    this.npcs.forEach((npc) => {
-      const container = createNpc(this.scene, npc, this.obstacles);
-      const label = container?.getData?.("nameLabel");
-      if (label) this.npcLabels.set(npc.id, label);
-    });
-
-    if (typeof window !== "undefined" && !this.npcLanguageHandler) {
-      const handler = () => this.refreshNpcLabels();
-      this.npcLanguageHandler = handler;
-      window.addEventListener(LANGUAGE_CHANGED_EVENT, handler);
-      this.scene.events.once("shutdown", () => {
-        window.removeEventListener(LANGUAGE_CHANGED_EVENT, handler);
-        if (this.npcLanguageHandler === handler) this.npcLanguageHandler = null;
-        this.npcLabels = null;
-      });
-    }
-  }
-
-  refreshNpcLabels() {
-    if (!this.npcLabels) return;
-    this.npcs.forEach((npc) => {
-      const label = this.npcLabels.get(npc.id);
-      if (label?.setText) label.setText(getNpcName(npc));
-    });
-  }
-
   drawWorldBorder() {
     const g = this.scene.add.graphics().setDepth(GROUND_DEPTH + 5);
     g.lineStyle(4, 0x71805d, 0.35);
@@ -244,11 +209,6 @@ export class WorldManager {
 
   getObstacles() {
     return this.obstacles;
-  }
-
-  getNPCs() {
-    if (!this.npcs) return [];
-    return this.npcs.map(localizeNpc);
   }
 }
 

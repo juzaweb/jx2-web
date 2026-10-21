@@ -25,32 +25,6 @@ export default {
     help: "Help",
     level: "Level"
   },
-  npc: {
-    "duoc-diem": {
-      name: "Apothecary Owner",
-      dialogue: 'Apothecary Owner: "Welcome to the Bianjing Apothecary, warrior! My shop specializes in premium Golden Radiance Elixirs and Great Return Pills to heal wounds and restore qi."'
-    },
-    "bach-tien-sinh": {
-      name: "Mr. Bai",
-      dialogue: 'Mr. Bai: "The Jianghu is dangerous and the human heart is hard to read. While traveling through Bianjing, young hero, guard your true heart and diligently cultivate your martial arts!"'
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "Treasure Chest Merchant",
-      dialogue: 'Treasure Chest Merchant: "Treasure chests hiding rare wonders are scattered across the world. If you have a golden key, young hero, bring it here to trade for a peerless divine weapon!"'
-    },
-    "dai-su-hoat-dong": {
-      name: "Event Ambassador",
-      dialogue: 'Event Ambassador: "Welcome, heroes, to Bianjing! Join the daily Jianghu events to earn honor and precious rewards."'
-    },
-    "chan-tu-don": {
-      name: "Zhen Zidan",
-      dialogue: 'Zhen Zidan: "Martial learning knows no bounds! Practicing fists and kicks every day is the foundation for ruling the martial world."'
-    },
-    "van-su-thong": {
-      name: "Wanshi Tong",
-      dialogue: 'Wanshi Tong: "The affairs of the world shift like wind and clouds, and nothing escapes this old man\'s knowledge. Would you like to inquire about news from the martial world, young hero?"'
-    }
-  },
   hud: {
     levelTitle: "Character level",
     expTitle: "Cultivation experience",

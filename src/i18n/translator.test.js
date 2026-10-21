@@ -39,7 +39,6 @@ describe("translateFor", () => {
   });
 
   it("falls back to Vietnamese, then the supplied fallback, then the key", () => {
-    expect(translateFor("en", "npc.duoc-diem.name")).toBe("Apothecary Owner");
     expect(translateFor("en", "does.not.exist", undefined, "fallback")).toBe("fallback");
     expect(translateFor("en", "does.not.exist")).toBe("does.not.exist");
   });
@@ -64,18 +63,5 @@ describe("locale catalogs", () => {
         expect(dictionary.item[id]?.desc, `${id} description`).toBeTruthy();
       });
     });
-  });
-
-  it("defines names and dialogue for every NPC", () => {
-    ["duoc-diem", "bach-tien-sinh", "thuong-nhan-bao-ruong", "dai-su-hoat-dong", "chan-tu-don", "van-su-thong"].forEach(
-      (id) => {
-        expect(vi.npc[id].name).toBeTruthy();
-        expect(vi.npc[id].dialogue).toBeTruthy();
-        expect(en.npc[id].name).toBeTruthy();
-        expect(en.npc[id].dialogue).toBeTruthy();
-        expect(zh.npc[id].name).toBeTruthy();
-        expect(zh.npc[id].dialogue).toBeTruthy();
-      }
-    );
   });
 });

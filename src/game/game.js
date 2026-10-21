@@ -329,28 +329,6 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Check if clicking directly on an NPC
-      const npcs = this.worldManager?.getNPCs?.() || [];
-      const clickedNPC = npcs.find(
-        (npc) => Phaser.Math.Distance.Between(worldX, worldY, npc.x, npc.y) < 42
-      );
-
-      if (clickedNPC) {
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedNPC.x, clickedNPC.y);
-        if (dist > 75) {
-          const angle = Phaser.Math.Angle.Between(clickedNPC.x, clickedNPC.y, this.player.x, this.player.y);
-          const approachDist = 60;
-          const targetX = clickedNPC.x + Math.cos(angle) * approachDist;
-          const targetY = clickedNPC.y + Math.sin(angle) * approachDist;
-          this.player.moveTo(targetX, targetY);
-          this.showClickIndicator(targetX, targetY, 0x22c55e);
-        } else {
-          this.player.stopMovement();
-        }
-        this.uiBridge.addLog(clickedNPC.dialogue, "near");
-        return;
-      }
-
       // Left click on terrain: Move to destination (and abandon a skill chase).
       this.isPointerMoving = true;
       this.combat.cancelPendingCast();

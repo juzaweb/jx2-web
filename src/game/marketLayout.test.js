@@ -8,7 +8,6 @@ import {
   MARKET_SPAWN,
   MARKET_TREES
 } from "./marketLayout.js";
-import { NPC_DATA } from "./npcData.js";
 
 const overlaps = (a, b) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y;
@@ -60,15 +59,6 @@ describe("market layout", () => {
     }
     for (const { x, y } of MARKET_PROPS) expect(inside(x, y)).toBe(true);
     for (const [x, y] of MARKET_LANTERNS) expect(inside(x, y)).toBe(true);
-  });
-
-  it("keeps every NPC inside the playable bounds", () => {
-    for (const npc of NPC_DATA) {
-      expect(npc.x).toBeGreaterThan(MARKET_BOUNDS.x0);
-      expect(npc.x).toBeLessThan(MARKET_BOUNDS.x1);
-      expect(npc.y).toBeGreaterThan(MARKET_BOUNDS.y0);
-      expect(npc.y).toBeLessThan(MARKET_BOUNDS.y1);
-    }
   });
 
   it("keeps trees outside the paved square", () => {

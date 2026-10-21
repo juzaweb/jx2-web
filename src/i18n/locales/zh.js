@@ -25,32 +25,6 @@ export default {
     help: "帮助",
     level: "等级"
   },
-  npc: {
-    "duoc-diem": {
-      name: "药铺老板",
-      dialogue: "药铺老板：“欢迎侠客光临汴京药铺！本店专营上等金创药、大还丹，疗伤回气。”"
-    },
-    "bach-tien-sinh": {
-      name: "白先生",
-      dialogue: "白先生：“江湖险恶，人心难测。少侠行走汴京，切记守住本心，勤修武功！”"
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "宝箱商人",
-      dialogue: "宝箱商人：“天下各处都藏有奇珍异宝的宝箱。少侠若有黄金钥匙，不妨拿来换取绝世神兵！”"
-    },
-    "dai-su-hoat-dong": {
-      name: "活动大使",
-      dialogue: "活动大使：“欢迎诸位英雄来到汴京！每日参与江湖活动，可获得荣誉与珍贵奖励。”"
-    },
-    "chan-tu-don": {
-      name: "真子丹",
-      dialogue: "真子丹：“武学无边！每日练习拳脚，正是称霸武林的根基。”"
-    },
-    "van-su-thong": {
-      name: "万事通",
-      dialogue: "万事通：“天下之事风云变幻，没有老夫不知道的。少侠可要打听江湖消息？”"
-    }
-  },
   hud: {
     levelTitle: "角色等级",
     expTitle: "修炼经验",
