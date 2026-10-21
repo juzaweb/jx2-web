@@ -50,6 +50,37 @@ const THIEU_LAM_SKILLS = [
       color: 0xffb347,
       shake: 0.004
     }
+  },
+  {
+    id: "la_han_tran",
+    sect: "thieu-lam",
+    slot: 3,
+    icon: "/skills/la_han_tran.png",
+    glyph: "陣",
+    nameKey: "skills.thieuLam.laHanTran.name",
+    descKey: "skills.thieuLam.laHanTran.desc",
+    // Temporary: unlocks at 1 for playtesting until the full kit lands (canonical: 5).
+    unlockLevel: 1,
+    mp: 18,
+    cooldown: 9000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [
+      { kind: "buff", stat: "attackPct", amount: 0.1, duration: 180000 },
+      { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 },
+      { kind: "buff", stat: "critRate", amount: 0.05, duration: 180000 }
+    ],
+    vfx: {
+      sprite: "vfx-la-han-tran",
+      type: "stationary",
+      cast: "shockwave",
+      impact: null,
+      color: 0xffd166,
+      shake: 0,
+      fps: 8
+    }
   }
 ];
 

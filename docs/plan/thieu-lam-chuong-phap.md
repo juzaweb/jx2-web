@@ -2,7 +2,8 @@
 
 Status: **in progress**. The old Thiếu Lâm Võ Tông (TLQ) kit has been removed.
 Row 1 of the supplied palm sheet is wired as **Đại Tu Di Chưởng** (slot 2,
-icon + four-frame VFX); slots 0, 1, 3, 4 and 5 are still pending.
+icon + four-frame VFX); Row 2 is wired as **La Hán Trận** (slot 3,
+icon + four-frame stationary formation VFX); slots 0, 1, 4 and 5 are still pending.
 
 ## 1. What was removed (done)
 
@@ -45,7 +46,7 @@ from the entry move so new characters have a 1 MP-cheap opener.
 | 0 | La Hán Chưởng | `la_han_chuong` | 1 | 5 | 1500 | enemy r85 | — | palm / spark | adapted from La Hán Quyền |
 | 1 | Vi Đà Chưởng | `vi_da_chuong` | 1 | 7 | 4000 | enemy r95 | slow 30% / 2s | palm / dust | VLTK2 (Vi Đà Chưởng) |
 | 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
-| 3 | La Hán Trận | `la_han_tran` | 5 | 18 | 9000 | self | **buff** `attackPct` 0.15 + `critRate` 0.05, 8s | shockwave (formation) / — | VLTK2 |
+| 3 | La Hán Trận | `la_han_tran` | 5* | 18 | 9000 | self | **buff** `attackPct` 0.10 + `speedPct` 0.20 + `critRate` 0.05, 180s | sprite row 2 (formation) / — | VLTK2 |
 | 4 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 7 | 15 | 15000 | self | **buff** `defensePct` 0.25, 8s | aura / — | VLTK2 |
 | 5 | Như Lai Thần Thưởng | `nhu_lai_than_thuong` | 10 | 35 | 30000 | enemy, AoE r140 | stun 1200ms (mult 2.4) | shockwave / burst | VLTK2 |
 

@@ -209,6 +209,10 @@ export default {
       daiTuDiChuong: {
         name: "Great Sumeru Palm",
         desc: "Ranged palm strike that stuns the target from afar."
+      },
+      laHanTran: {
+        name: "Arhat Formation",
+        desc: "Protective Buddhist formation that boosts attack power by 10%, movement speed by 20%, and critical rate by 5% for 3 minutes."
       }
     }
   },

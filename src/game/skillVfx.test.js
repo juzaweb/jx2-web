@@ -136,4 +136,31 @@ describe("playSkillCastVfx sprite playback", () => {
 
     expect(sprite.setScale).toHaveBeenCalledWith((90 * 1.8) / 256);
   });
+
+  it("plays stationary sprite animation at caster position for self skills", () => {
+    const { scene, animConfigs, tweenConfig } = makeScene({ frameTotal: 5 });
+    const sprite = makeSprite();
+    scene.add.sprite = () => sprite;
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      { target: "self", vfx: { sprite: "vfx-la-han-tran", fps: 8 } },
+      null
+    );
+
+    expect(animConfigs).toHaveLength(1);
+    expect(animConfigs[0]).toMatchObject({
+      key: "vfx-la-han-tran-play",
+      repeat: 0,
+      frameRate: 8
+    });
+    expect(animConfigs[0].frames).toHaveLength(4);
+    expect(sprite.play).toHaveBeenCalledWith("vfx-la-han-tran-play");
+    expect(tweenConfig.value).toBeNull();
+    expect(sprite.once).toHaveBeenCalledWith("animationcomplete", expect.any(Function));
+    sprite.once.mock.calls[0][1]();
+    expect(sprite.destroy).toHaveBeenCalled();
+  });
 });

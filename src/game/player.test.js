@@ -221,6 +221,20 @@ describe("Player movement controls", () => {
     expect(Math.abs(speed - cardinalSpeed)).toBeLessThan(0.001);
   });
 
+  it("scales movement speed when a speed buff is active", () => {
+    mockScene.keys.D.isDown = true;
+    player.updateMovement(16);
+    const normalSpeed = player.sprite.body.velocity.x;
+
+    mockScene.combat = {
+      getEffectiveStats: () => ({ speedPct: 0.2 })
+    };
+    player.updateMovement(16);
+    const buffedSpeed = player.sprite.body.velocity.x;
+
+    expect(buffedSpeed).toBeCloseTo(normalSpeed * 1.2);
+  });
+
   it("cancels opposing directions smoothly", () => {
     mockScene.keys.W.isDown = true;
     mockScene.keys.S.isDown = true;

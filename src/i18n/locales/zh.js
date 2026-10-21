@@ -209,6 +209,10 @@ export default {
       daiTuDiChuong: {
         name: "大须弥掌",
         desc: "远程掌法，击晕远处目标。"
+      },
+      laHanTran: {
+        name: "罗汉阵",
+        desc: "罗汉护体法阵，提升 10% 攻击力、20% 移动速度与 5% 会心一击率，持续 3 分钟。"
       }
     }
   },

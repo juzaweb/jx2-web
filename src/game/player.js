@@ -366,9 +366,10 @@ export class Player {
       if (keyUp) vy -= 1;
       if (keyDown) vy += 1;
 
+      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
-        vector.normalize().scale(175 * POS * WORLD_SPEED_SCALE);
+        vector.normalize().scale(speed);
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
@@ -379,7 +380,7 @@ export class Player {
     if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
       const dx = this.targetX - this.sprite.x;
       const dy = this.targetY - this.sprite.y;
-      const speed = 175 * POS * WORLD_SPEED_SCALE;
+      const speed = 175 * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const step = travelStep(speed, delta);
       const horizontal = Math.abs(dx) >= Math.abs(dy);
       // A long physics catch-up can move further than `step`; if the leg's
@@ -568,6 +569,16 @@ export class Player {
 
   get critDamage() {
     return this.stats?.critDamage ?? 1.5;
+  }
+
+  /**
+   * Current movement speed multiplier derived from active buffs.
+   * Clamped to a positive floor so debuffs never freeze or reverse movement.
+   * @returns {number}
+   */
+  getSpeedMultiplier() {
+    const effective = this.scene?.combat?.getEffectiveStats?.();
+    return Math.max(0.1, 1 + (Number(effective?.speedPct) || 0));
   }
 
   destroy() {

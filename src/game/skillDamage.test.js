@@ -34,15 +34,17 @@ describe("applyBuffsToStats", () => {
   const now = 1_000;
   const base = { attack: 100, defense: 50, critRate: 0.1 };
 
-  it("applies percentage attack/defense and flat crit", () => {
+  it("applies percentage attack/defense, speed and flat crit", () => {
     const buffed = applyBuffsToStats(base, [
       { stat: "attackPct", amount: 0.1, until: now + 100 },
       { stat: "defensePct", amount: 0.2, until: now + 100 },
-      { stat: "critRate", amount: 0.15, until: now + 100 }
+      { stat: "critRate", amount: 0.15, until: now + 100 },
+      { stat: "speedPct", amount: 0.2, until: now + 100 }
     ], now);
     expect(buffed.attack).toBe(110);
     expect(buffed.defense).toBe(60);
     expect(buffed.critRate).toBeCloseTo(0.25);
+    expect(buffed.speedPct).toBeCloseTo(0.2);
   });
 
   it("ignores expired buffs and does not mutate the input", () => {
