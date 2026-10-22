@@ -43,7 +43,9 @@ export default {
     questTodo: "Thành thị phồn hoa",
     questSafe: "Khu an toàn • Không có quái",
     zoomTitle: "Tab: Phóng to minimap gấp 5 lần",
-    mapTitle: "M: Xem bản đồ toàn thành"
+    mapTitle: "M: Xem bản đồ toàn thành",
+    minimize: "Thu nhỏ bản đồ",
+    restore: "Mở bản đồ"
   },
   cityMap: {
     eyebrow: "TOÀN CẢNH THÀNH TRÌ",
@@ -70,7 +72,9 @@ export default {
     },
     placeholder: "Nhấn Enter để gửi lời vào giang hồ...",
     send: "GỬI",
-    channel: "[ Cận ] ▼"
+    channel: "[ Cận ] ▼",
+    minimize: "Thu nhỏ kênh chat",
+    restore: "Mở kênh chat"
   },
   hotbar: {
     slotTitle: "Phím [{key}]: {name}",

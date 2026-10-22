@@ -3,7 +3,7 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false, collapsed = false, onClose }) {
+export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false, collapsed = false, onClose, onOpen }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
@@ -28,7 +28,22 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
     return bridge.on(EVENTS.ACTION_REQUEST_MINIMAP, registerMinimap);
   }, [zoomed, collapsed]);
 
-  if (collapsed) return null;
+  // Minimized state keeps a small tab on screen so the map can be reopened.
+  if (collapsed) {
+    return (
+      <section className="top-right-panel" id="minimap-restore-panel">
+        <button
+          type="button"
+          id="minimap-restore-btn"
+          className="panel-restore-btn"
+          title={t("minimap.restore")}
+          onClick={onOpen}
+        >
+          🗺
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className={`top-right-panel${zoomed ? " is-zoomed" : ""}`} id="minimap-panel">
@@ -39,8 +54,13 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           </div>
           <div className="minimap-actions">
             <LanguageSwitcher variant="hud" />
-            <button id="map-close-btn" className="mini-btn" title="×" onClick={onClose}>
-              ×
+            <button
+              id="map-minimize-btn"
+              className="mini-btn"
+              title={t("minimap.minimize")}
+              onClick={onClose}
+            >
+              –
             </button>
             <button
               id="map-help-btn"

@@ -107,8 +107,10 @@ export function App() {
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isMinimapOpen, setIsMinimapOpen] = useState(false);
+  // Both side panels start open so a fresh entry into the world already shows
+  // the map and the chat channel without a manual click.
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isMinimapOpen, setIsMinimapOpen] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
   const [skillLoadout, setSkillLoadout] = useState(() =>
@@ -577,6 +579,10 @@ export function App() {
 
   const handleCharacterStart = useCallback((character) => {
     requestLandscapeFullscreen();
+    // Entering the world opens the map and the chat channel by default; the
+    // player can still close either one with its × button.
+    setIsMinimapOpen(true);
+    setIsChatOpen(true);
 
     writeSession({
       ...(readSession() || {}),
@@ -647,6 +653,7 @@ export function App() {
           zoomed={isMinimapZoomed}
           collapsed={!isMinimapOpen}
           onClose={() => setIsMinimapOpen(false)}
+          onOpen={() => setIsMinimapOpen(true)}
         />
 
         <ChatPanel
@@ -654,26 +661,8 @@ export function App() {
           onSendMessage={handleSendMessage}
           collapsed={!isChatOpen}
           onClose={() => setIsChatOpen(false)}
+          onOpen={() => setIsChatOpen(true)}
         />
-
-        <div className="hud-side-toggles" id="hud-side-toggles">
-          <button
-            type="button"
-            className="hud-toggle-btn"
-            title={t("minimap.mapTitle")}
-            onClick={() => setIsMinimapOpen((open) => !open)}
-          >
-            🗺
-          </button>
-          <button
-            type="button"
-            className="hud-toggle-btn"
-            title={t("chat.tabs.all")}
-            onClick={() => setIsChatOpen((open) => !open)}
-          >
-            💬
-          </button>
-        </div>
 
         <HotbarDock
           coins={stats.coins}

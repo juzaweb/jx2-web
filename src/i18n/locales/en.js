@@ -43,7 +43,9 @@ export default {
     questTodo: "A bustling city",
     questSafe: "Safe zone • No monsters",
     zoomTitle: "Tab: Enlarge the minimap 5x",
-    mapTitle: "M: Open the full city map"
+    mapTitle: "M: Open the full city map",
+    minimize: "Minimize map",
+    restore: "Open map"
   },
   cityMap: {
     eyebrow: "CITY OVERVIEW",
@@ -70,7 +72,9 @@ export default {
     },
     placeholder: "Press Enter to speak to the Jianghu...",
     send: "SEND",
-    channel: "[ Local ] ▼"
+    channel: "[ Local ] ▼",
+    minimize: "Minimize chat",
+    restore: "Open chat"
   },
   hotbar: {
     slotTitle: "Key [{key}]: {name}",

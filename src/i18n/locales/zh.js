@@ -43,7 +43,9 @@ export default {
     questTodo: "繁华都城",
     questSafe: "安全区 • 无怪物",
     zoomTitle: "Tab：小地图放大 5 倍",
-    mapTitle: "M：查看全城地图"
+    mapTitle: "M：查看全城地图",
+    minimize: "最小化地图",
+    restore: "打开地图"
   },
   cityMap: {
     eyebrow: "城池全貌",
@@ -70,7 +72,9 @@ export default {
     },
     placeholder: "按 Enter 向江湖发言……",
     send: "发送",
-    channel: "[ 附近 ] ▼"
+    channel: "[ 附近 ] ▼",
+    minimize: "最小化聊天",
+    restore: "打开聊天"
   },
   hotbar: {
     slotTitle: "按键 [{key}]：{name}",
