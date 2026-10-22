@@ -483,10 +483,8 @@ body {
   right: 0;
   bottom: 0;
   z-index: 20;
-  background: linear-gradient(180deg, #323d44 0%, #192025 35%, #0f1418 100%);
-  border-top: 2px solid #a88741;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  padding: 5px 12px;
+  /* No plate behind the slots: the game world stays visible. */
+  padding: 6px 12px 7px;
 }
 
 .dock-container {
@@ -1515,19 +1513,7 @@ body {
   font-size: 13px;
 }
 
-/* Brick-textured bottom action dock */
-.bottom-dock {
-  background:
-    linear-gradient(180deg, rgba(255, 226, 160, 0.06) 0%, rgba(0, 0, 0, 0.38) 100%),
-    url('/gach-seamless.webp');
-  background-size: auto, auto 100%;
-  background-repeat: repeat, repeat-x;
-  background-position: center, center bottom;
-  border-top: 3px solid #b8894b;
-  box-shadow: 0 -5px 22px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 231, 180, 0.25);
-  padding: 6px 12px 7px;
-}
-
+/* Slots and buttons only — the dock itself stays transparent. */
 .dock-container {
   max-width: 1180px;
   min-height: 58px;

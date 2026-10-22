@@ -3,7 +3,7 @@ import { WorldManager } from "./marketWorld.js";
 import { WORLD_CONFIG } from "./worldConfig.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
-import { EnemyManager, DEFAULT_ENEMY_SPAWNS } from "./enemy.js";
+import { EnemyManager } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
@@ -70,6 +70,8 @@ export class JiangHuScene extends Phaser.Scene {
       });
     }
     this.load.image("ground-bricks", "/gach-tile.webp");
+    // Second paving style, used for the walkway that threads the market square.
+    this.load.image("ground-walkway", "/gach-seamless.webp");
     for (const { textureKey, url } of SHOP_BUILDINGS) {
       if (!this.textures.exists(textureKey)) {
         this.load.image(textureKey, url);
@@ -152,7 +154,9 @@ export class JiangHuScene extends Phaser.Scene {
     );
     this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
     this.enemyManager = new EnemyManager(this);
-    this.enemyManager.create(DEFAULT_ENEMY_SPAWNS);
+    // Biện Kinh is a safe city, so the offline roster starts empty; the server
+    // populates enemies for maps that have them.
+    this.enemyManager.create();
 
     // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();

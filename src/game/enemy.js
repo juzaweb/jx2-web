@@ -270,21 +270,6 @@ export class Wolf {
   }
 }
 
-/**
- * Default wolf spawn points (ids are indices). Mirrors the server roster so the
- * client has targets offline and can reconcile by id when the server connects.
- */
-export const DEFAULT_ENEMY_SPAWNS = [
-  [8400, 6000],
-  [9500, 6700],
-  [11100, 5900],
-  [12600, 6500],
-  [13800, 5900],
-  [7600, 8000],
-  [10500, 8200],
-  [13200, 7900]
-];
-
 export class EnemyManager {
   /**
    * @param {Phaser.Scene} scene

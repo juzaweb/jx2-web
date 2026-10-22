@@ -109,8 +109,15 @@ export const MARKET_GRASS = [
   [9800, 8700, 0.9]
 ];
 
-/** Stone emblems / drains painted on the square. */
+/**
+ * Paved walkway. It enters the city through the gap between the grocery shop and
+ * the pharmacy, then runs east into the middle of the city, paved in a second
+ * brick style so the street stands out from the square it crosses.
+ */
+export const MARKET_WALKWAY = { x: 2100, y: 4900, w: 7300, d: 1200 };
+
+/** Stone emblems / drains painted on the walkway. */
 export const MARKET_MEDALLIONS = [
   { x: 6600, y: 5900, r: 260 },
-  { x: 4700, y: 4700, r: 120 }
+  { x: 4700, y: 5650, r: 120 }
 ];

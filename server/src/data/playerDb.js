@@ -45,6 +45,15 @@ const asCount = (value, fallback = 0) =>
 const asName = (value) => (typeof value === "string" ? value : "");
 
 /**
+ * Block the current thread for `ms` milliseconds.
+ * `node:sqlite` is synchronous, so retrying needs a synchronous sleep.
+ * @param {number} ms
+ */
+const sleepSync = (ms) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+/**
  * SQLite persistence for a character's progression ledger, inventory and the
  * leaderboard.
  *
@@ -69,8 +78,11 @@ export class PlayerDatabase {
 
     this.db = new DatabaseSync(this.dbPath);
 
+    // Wait instead of throwing SQLITE_BUSY when another connection is mid-write.
+    this.db.exec("PRAGMA busy_timeout = 5000;");
+
     if (this.dbPath !== ":memory:") {
-      this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+      this._enableWal();
     }
 
     this.db.exec(`
@@ -152,6 +164,43 @@ export class PlayerDatabase {
         inventory = excluded.inventory,
         updated_at = excluded.updated_at
     `);
+  }
+
+  /**
+   * Switch the connection to WAL mode.
+   *
+   * `PRAGMA journal_mode` briefly needs an exclusive lock, so `node --watch`
+   * restarting the API while the previous process is still closing its
+   * connection can throw SQLITE_BUSY ("database is locked") and take the whole
+   * server down. Retry a few times, then fall back to the rollback journal: WAL
+   * is a performance choice, not a correctness requirement.
+   */
+  _enableWal(attempts = 10) {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+        return;
+      } catch (error) {
+        if (attempt === attempts - 1) {
+          console.warn(
+            `[DB] Không bật được WAL (${error.message}); tiếp tục ở chế độ rollback journal.`
+          );
+          return;
+        }
+        sleepSync(100 * (attempt + 1));
+      }
+    }
+  }
+
+  /**
+   * Close the underlying SQLite connection so a restarting process releases the
+   * file lock immediately instead of waiting for the OS to reap it.
+   */
+  close() {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
   }
 
   /**

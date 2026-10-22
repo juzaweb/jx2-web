@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
@@ -131,29 +131,61 @@ const frontend = spawn(
 
 pipeOutput(frontend, `[GAME ${frontendPort}]`, "\x1b[33m");
 
+/**
+ * Terminate a child process together with its descendants.
+ *
+ * `node --watch` runs the real server as a grandchild, and Vite spawns esbuild,
+ * so killing only the direct child on Windows leaves the grandchild alive. That
+ * orphan keeps port 5000/3000 bound and the next `npm run dev` silently shifts
+ * to another port (or fails with EADDRINUSE). `taskkill /T` removes the tree.
+ * @param {import("node:child_process").ChildProcess|null} child
+ */
+const killTree = (child) => {
+  if (!child || child.pid === undefined || child.exitCode !== null || child.killed) return;
+
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    // The process already exited between the check and the signal.
+  }
+};
+
+let shuttingDown = false;
+
 // Graceful cleanup on exit
 const cleanup = () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log("\n\x1b[31m[Launcher] Shutting down services...\x1b[0m");
-  try {
-    backend.kill("SIGTERM");
-  } catch {}
-  try {
-    frontend.kill("SIGTERM");
-  } catch {}
+  killTree(backend);
+  killTree(frontend);
   process.exit(0);
 };
 
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
+process.on("exit", () => {
+  killTree(backend);
+  killTree(frontend);
+});
 
 backend.on("exit", (code) => {
   if (code !== null && code !== 0) {
     console.error(`\x1b[31m[API] Backend exited with code ${code}\x1b[0m`);
   }
+  // `node --watch` keeps the watcher alive across restarts, so a non-zero exit
+  // means the whole service is gone: never leave the other half orphaned.
+  if (!shuttingDown) cleanup();
 });
 
 frontend.on("exit", (code) => {
   if (code !== null && code !== 0) {
     console.error(`\x1b[31m[GAME] Frontend exited with code ${code}\x1b[0m`);
   }
+  if (!shuttingDown) cleanup();
 });

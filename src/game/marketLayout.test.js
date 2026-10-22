@@ -6,7 +6,8 @@ import {
   MARKET_NPCS,
   MARKET_PLAZA,
   MARKET_SPAWN,
-  MARKET_TREES
+  MARKET_TREES,
+  MARKET_WALKWAY
 } from "./marketLayout.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 
@@ -95,6 +96,27 @@ describe("market layout", () => {
     for (const [, , , kind] of MARKET_TREES) {
       expect(VEGETATION_SPRITES).toHaveProperty(kind);
     }
+  });
+
+  it("lays the walkway through the gap between the grocery and the pharmacy", () => {
+    const grocery = MARKET_BUILDINGS.find((entry) => entry.id === "tap-hoa");
+    const pharmacy = MARKET_BUILDINGS.find((entry) => entry.id === "duoc-diem");
+    const groceryBottom = grocery.y + grocery.d / 2;
+    const pharmacyTop = pharmacy.y - pharmacy.d / 2;
+
+    expect(MARKET_WALKWAY.w).toBeGreaterThan(0);
+    expect(MARKET_WALKWAY.d).toBeGreaterThan(0);
+    expect(MARKET_WALKWAY.y).toBeGreaterThanOrEqual(groceryBottom);
+    expect(MARKET_WALKWAY.y + MARKET_WALKWAY.d).toBeLessThanOrEqual(pharmacyTop);
+    expect(MARKET_WALKWAY.x).toBeGreaterThanOrEqual(MARKET_BOUNDS.x0);
+    expect(MARKET_WALKWAY.x + MARKET_WALKWAY.w).toBeLessThanOrEqual(MARKET_BOUNDS.x1);
+  });
+
+  it("leads the walkway from the shops into the middle of the city", () => {
+    expect(MARKET_SPAWN.x).toBeGreaterThan(MARKET_WALKWAY.x);
+    expect(MARKET_SPAWN.x).toBeLessThan(MARKET_WALKWAY.x + MARKET_WALKWAY.w);
+    expect(MARKET_SPAWN.y).toBeGreaterThan(MARKET_WALKWAY.y);
+    expect(MARKET_SPAWN.y).toBeLessThan(MARKET_WALKWAY.y + MARKET_WALKWAY.d);
   });
 
   it("keeps trees and grass outside the paved square", () => {
