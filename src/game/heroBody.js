@@ -3,14 +3,16 @@
  *
  * Four rows (front, left, right, back) x four walk frames. The runtime frames
  * are produced by scripts/build_hero_body.py, which re-anchors every frame to a
- * shared ground line and scaling so the body lines up with the old rig's feet.
+ * shared ground line and scaling so the body lines up with the old rig's feet,
+ * and rebuilds the left row as a mirror of the right row so each row holds one
+ * fixed facing.
  */
 
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "2";
+const BODY_ASSET_VERSION = "3";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -36,23 +38,8 @@ export const HERO_BODY = {
   footOffsetY: FRAME_BOTTOM_MARGIN_PX * BODY_SCALE
 };
 
-/**
- * Sheet row for each of the eight facing directions.
- *
- * Row 1 (the source art's "left" row) is inconsistent: its first two walk
- * frames are drawn facing right and its last two facing left, so playing it
- * spins the hero on the spot. Row 2 is a complete, consistent right-facing
- * walk cycle, so every side-facing direction uses it and left-facing
- * directions mirror the sprite (see bodyMirrorsForDirection).
- */
-const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 2, 2, 2];
-
-/**
- * The source art has no distinct left profile: the "left" row is drawn facing
- * right, same as the right row. Left-facing directions therefore draw the sheet
- * mirrored so the hero looks the way it walks.
- */
-const MIRRORED_DIRECTIONS = [5, 6, 7];
+/** Sheet row for each of the eight facing directions (see heroDirections.js). */
+const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 1, 1, 1];
 
 /**
  * @param {"male"|"female"} gender
@@ -70,17 +57,6 @@ export function bodyRowForDirection(direction = 0) {
   const value = Number.isFinite(direction) ? direction : 0;
   const d = ((Math.round(value) % HERO_DIRECTIONS) + HERO_DIRECTIONS) % HERO_DIRECTIONS;
   return ROW_BY_DIRECTION[d];
-}
-
-/**
- * Whether the body sheet must be flipped horizontally for this direction.
- * @param {number} direction 0..7 (see heroDirections.js)
- * @returns {boolean}
- */
-export function bodyMirrorsForDirection(direction = 0) {
-  const value = Number.isFinite(direction) ? direction : 0;
-  const d = ((Math.round(value) % HERO_DIRECTIONS) + HERO_DIRECTIONS) % HERO_DIRECTIONS;
-  return MIRRORED_DIRECTIONS.includes(d);
 }
 
 /**

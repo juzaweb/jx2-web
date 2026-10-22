@@ -1,15 +1,20 @@
 """Turn the 4x4 body sheets in docs/example into runtime spritesheets.
 
 The source art is laid out as four rows (front, left, right, back) with four
-walk frames per row. The generated sheets carry a checkerboard background and
-uneven margins, so this script:
+walk frames per row. The source's "left" row is unreliable: its first two
+frames face right and its last two face left, which makes the hero spin when
+the walk cycle plays, so the generated sheet rebuilds that row as a horizontal
+mirror of the consistent "right" row. The generated sheets also carry a
+checkerboard background and uneven margins, so this script:
 
 1. detects the four column/row bands from the foreground mask,
 2. keys the neutral-gray checkerboard out (with edge matting so no gray fringe
    survives),
 3. drops stray noise specks,
-4. re-anchors every frame to one ground line and normalises the row scale
-   before writing the public spritesheets consumed by heroBody.js.
+4. re-anchors every frame to one ground line and normalises the row scale,
+5. replaces the left row with a mirrored copy of the right row,
+
+before writing the public spritesheets consumed by heroBody.js.
 
 Run: python3 scripts/build_hero_body.py
 """
@@ -37,6 +42,10 @@ FRAME_H = 160
 CONTENT_H = 140
 CONTENT_BOTTOM = FRAME_H
 CONTENT_CENTER_X = FRAME_W // 2
+
+# Row order in the source art: front, left, right, back.
+LEFT_ROW = 1
+RIGHT_ROW = 2
 
 # Checkerboard cells are neutral gray; the art itself is warm-toned. Anything
 # this close to neutral (and this bright) is treated as background.
@@ -217,6 +226,14 @@ def _load_source(source):
     return rgba
 
 
+def _mirror_row(sheet, source_row, target_row):
+    """Replace `target_row` with a horizontally mirrored copy of `source_row`."""
+    for col in range(COLS):
+        box = (col * FRAME_W, source_row * FRAME_H, (col + 1) * FRAME_W, (source_row + 1) * FRAME_H)
+        frame = sheet.crop(box).transpose(Image.FLIP_LEFT_RIGHT)
+        sheet.paste(frame, (col * FRAME_W, target_row * FRAME_H))
+
+
 def build_sheet(source):
     rgba = _load_source(source)
     alpha = rgba[..., 3]
@@ -246,6 +263,9 @@ def build_sheet(source):
             paste_x = CONTENT_CENTER_X - scaled.width // 2
             paste_y = CONTENT_BOTTOM - lift - scaled.height
             out.alpha_composite(scaled, (col * FRAME_W + paste_x, row * FRAME_H + paste_y))
+
+    # The source left row mixes facings; derive it from the clean right row.
+    _mirror_row(out, RIGHT_ROW, LEFT_ROW)
 
     return out
 

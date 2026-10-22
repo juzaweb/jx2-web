@@ -180,15 +180,14 @@ describe("HeroRigView baked body", () => {
     view.set(6, {}, "female");
 
     expect(view.bodySprite.texture).toBe("hero-body-female");
-    expect(view.bodySprite.frame).toBe(8); // side row (2) * 4 columns
-    expect(view.bodySprite.flipX).toBe(true); // left-facing art is mirrored
+    expect(view.bodySprite.frame).toBe(4); // left row (1) * 4 columns
   });
 
-  it("does not mirror right-facing directions", () => {
+  it("does not flip the sprite; the sheet has a real left row", () => {
     const scene = makeSpriteScene();
     const view = new HeroRigView(scene);
 
-    view.set(2, {}, "male");
+    view.set(6, {}, "male");
     expect(view.bodySprite.flipX).toBe(false);
   });
 
