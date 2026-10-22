@@ -82,6 +82,7 @@ function makeSpriteScene() {
         frame,
         origin: null,
         scale: 1,
+        flipX: false,
         frameSets: 0,
         setOrigin(ox, oy) {
           this.origin = [ox, oy];
@@ -89,6 +90,10 @@ function makeSpriteScene() {
         },
         setScale(scale) {
           this.scale = scale;
+          return this;
+        },
+        setFlipX(flip) {
+          this.flipX = flip;
           return this;
         },
         setFrame(frameIndex) {
@@ -175,7 +180,16 @@ describe("HeroRigView baked body", () => {
     view.set(6, {}, "female");
 
     expect(view.bodySprite.texture).toBe("hero-body-female");
-    expect(view.bodySprite.frame).toBe(4); // left row (1) * 4 columns
+    expect(view.bodySprite.frame).toBe(8); // side row (2) * 4 columns
+    expect(view.bodySprite.flipX).toBe(true); // left-facing art is mirrored
+  });
+
+  it("does not mirror right-facing directions", () => {
+    const scene = makeSpriteScene();
+    const view = new HeroRigView(scene);
+
+    view.set(2, {}, "male");
+    expect(view.bodySprite.flipX).toBe(false);
   });
 
   it("plays walk frames from the gait phase and returns to idle", () => {

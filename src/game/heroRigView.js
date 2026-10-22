@@ -1,7 +1,12 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
-import { HERO_BODY, bodyFrameForDirection, bodyTextureFor } from "./heroBody.js";
+import {
+  HERO_BODY,
+  bodyFrameForDirection,
+  bodyMirrorsForDirection,
+  bodyTextureFor
+} from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
@@ -83,6 +88,7 @@ export class HeroRigView {
       this.bodySprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, bodyTexture, this.frameIndex);
       this.bodySprite.setOrigin(0.5, 1);
       this.bodySprite.setScale(HERO_BODY.scale);
+      this.bodySprite.setFlipX(bodyMirrorsForDirection(direction));
       this.container.add(this.bodySprite);
       for (const primitive of buildBodyEquipment({ direction, equipment })) {
         const child = createPrimitive(this.scene, primitive);
