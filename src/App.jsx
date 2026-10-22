@@ -641,7 +641,6 @@ export function App() {
       <div className="hud-overlay" id="hud-overlay">
         <PlayerVitals
           stats={stats}
-          playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
           onLogout={handleLogout}
         />
 

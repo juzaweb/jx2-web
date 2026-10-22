@@ -1,7 +1,7 @@
 import React from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
-export function PlayerVitals({ stats, playerName, onLogout }) {
+export function PlayerVitals({ stats, onLogout }) {
   const { t } = useI18n();
   const hpPercent = Math.max(0, Math.min(100, (stats.hp / stats.maxHp) * 100));
   const mpPercent = Math.max(0, Math.min(100, (stats.mp / stats.maxMp) * 100));
@@ -11,34 +11,6 @@ export function PlayerVitals({ stats, playerName, onLogout }) {
 
   return (
     <section className="top-left-panel" id="player-hud">
-      {playerName && (
-        <div
-          className="player-meta-info"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "4px",
-            background: "rgba(10, 20, 18, 0.75)",
-            padding: "2px 8px",
-            borderRadius: "3px",
-            border: "1px solid rgba(110, 231, 183, 0.25)",
-            width: "fit-content"
-          }}
-        >
-          <span
-            className="player-name"
-            style={{
-              color: "#ffd84d",
-              fontWeight: "700",
-              fontSize: "12px",
-              textShadow: "0 1px 2px #000"
-            }}
-          >
-            ⚔ {playerName}
-          </span>
-        </div>
-      )}
       <div className="status-bracket">
         <div className="level-box" id="level-badge" title={t("hud.levelTitle")}>
           {stats.level}
