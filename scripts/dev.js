@@ -15,16 +15,31 @@ const baseFrontendPort =
 const MAX_PORT_SCAN = 20;
 
 /**
- * Check whether a port is free on both IPv4 and IPv6 loopback.
+ * Check whether a port is free on the given loopback address.
  */
-const isPortFree = (port) =>
+const isAddressFree = (port, host) =>
   new Promise((resolve) => {
     const server = net.createServer();
 
     server.once("error", () => resolve(false));
     server.once("listening", () => server.close(() => resolve(true)));
-    server.listen(port, "0.0.0.0");
+    server.listen(port, host);
   });
+
+/**
+ * Check whether a port is free on both IPv4 and IPv6 loopback.
+ *
+ * We bind the loopback addresses explicitly instead of 0.0.0.0 because on
+ * Windows a wildcard bind succeeds even when another process already owns
+ * 127.0.0.1:<port> — that hides real conflicts (e.g. OrcaSlicer listening on
+ * 127.0.0.1:5000 swallowed every request to localhost:5000).
+ */
+const isPortFree = async (port) => {
+  for (const host of ["127.0.0.1", "::1"]) {
+    if (!(await isAddressFree(port, host))) return false;
+  }
+  return true;
+};
 
 /**
  * Find the first free port starting at `startPort`.

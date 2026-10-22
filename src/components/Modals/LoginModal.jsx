@@ -49,6 +49,9 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       return;
     }
 
+    // Clear any previous (now stale) feedback while the availability check runs.
+    setUsernameFeedback(null);
+
     let isMounted = true;
     const timer = setTimeout(async () => {
       try {
@@ -57,7 +60,11 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           setUsernameFeedback(res);
         }
       } catch {
-        // Silently skip real-time check when offline or server unreachable
+        // Silently skip real-time check when offline or server unreachable,
+        // so a stale error never blocks registration.
+        if (isMounted) {
+          setUsernameFeedback(null);
+        }
       }
     }, 350);
 
