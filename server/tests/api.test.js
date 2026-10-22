@@ -34,6 +34,7 @@ describe("Giang Ho Backend API Test Suite", () => {
   });
 
   after(async () => {
+    if (server && server.closeAllConnections) server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     try {
       await fs.rm(testDataDir, { recursive: true, force: true });
@@ -51,6 +52,67 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(typeof json.uptime, "number");
     // Verify X-Powered-By is omitted
     assert.equal(res.headers.get("x-powered-by"), null);
+  });
+
+  test("CORS: allows configured origins and handles wildcards safely", async () => {
+    const { config } = await import("../src/config.js");
+    const { createApp } = await import("../src/app.js");
+
+    const prevOrigin = config.clientOrigin;
+    const prevEnv = config.env;
+
+    let customServer;
+    let prodServer;
+
+    try {
+      // Test 1: Explicit allowed origin list
+      config.clientOrigin = "http://example.com, https://app.example.com";
+      const customApp = createApp();
+      await new Promise((resolve) => {
+        customServer = customApp.listen(0, "127.0.0.1", resolve);
+      });
+      const port = customServer.address().port;
+      const customUrl = `http://127.0.0.1:${port}/api/health`;
+
+      // Request from allowed origin
+      const allowedRes = await fetch(customUrl, {
+        headers: { Origin: "http://example.com" }
+      });
+      assert.equal(allowedRes.headers.get("access-control-allow-origin"), "http://example.com");
+      assert.equal(allowedRes.headers.get("access-control-allow-credentials"), "true");
+
+      // Request from disallowed origin
+      const disallowedRes = await fetch(customUrl, {
+        headers: { Origin: "http://untrusted-origin.com" }
+      });
+      assert.equal(disallowedRes.headers.get("access-control-allow-origin"), null);
+
+      // Test 2: Wildcard origin in production mode forbids arbitrary reflection
+      config.clientOrigin = "*";
+      config.env = "production";
+      const prodApp = createApp();
+      await new Promise((resolve) => {
+        prodServer = prodApp.listen(0, "127.0.0.1", resolve);
+      });
+      const prodPort = prodServer.address().port;
+      const prodUrl = `http://127.0.0.1:${prodPort}/api/health`;
+
+      const prodRes = await fetch(prodUrl, {
+        headers: { Origin: "http://untrusted-origin.com" }
+      });
+      assert.equal(prodRes.headers.get("access-control-allow-origin"), null);
+    } finally {
+      if (customServer) {
+        if (customServer.closeAllConnections) customServer.closeAllConnections();
+        await new Promise((resolve) => customServer.close(resolve));
+      }
+      if (prodServer) {
+        if (prodServer.closeAllConnections) prodServer.closeAllConnections();
+        await new Promise((resolve) => prodServer.close(resolve));
+      }
+      config.clientOrigin = prevOrigin;
+      config.env = prevEnv;
+    }
   });
 
   test("Inventory endpoints: GET and PUT", async () => {
