@@ -62,26 +62,19 @@ describe("buildHero", () => {
 });
 
 describe("held weapon", () => {
-  it("maps catalog weapons to the matching rig shape", () => {
+  it("falls back to the sword shape for any id, since the catalog holds no weapon", () => {
     expect(weaponKindFor("hac-ung-kiem")).toBe("jian");
-    expect(weaponKindFor("thanh-long-dao")).toBe("blade");
-    expect(weaponKindFor("phach-dao")).toBe("blade");
-    expect(weaponKindFor("thiet-trao")).toBe("claw");
     expect(weaponKindFor("unknown-item")).toBe("jian");
     expect(weaponKindFor(null)).toBeNull();
     expect(weaponKindFor(undefined)).toBeNull();
     expect(weaponKindFor("")).toBeNull();
   });
 
-  it("draws the equipped weapon instead of a default sword", () => {
+  it("draws a sword for any equipped weapon id", () => {
     const unarmed = buildHero({ direction: 0 });
-    const jian = buildHero({ direction: 0, equipment: { weapon: "hac-ung-kiem" } });
-    const blade = buildHero({ direction: 0, equipment: { weapon: "thanh-long-dao" } });
-    const claw = buildHero({ direction: 0, equipment: { weapon: "thiet-trao" } });
+    const sword = buildHero({ direction: 0, equipment: { weapon: "hac-ung-kiem" } });
 
-    expect(jian.length).toBeGreaterThan(unarmed.length);
-    expect(blade).not.toEqual(jian);
-    expect(claw).not.toEqual(jian);
-    expect(claw).not.toEqual(blade);
+    expect(sword.length).toBeGreaterThan(unarmed.length);
+    expect(buildHero({ direction: 0, equipment: { weapon: "khac" } })).toEqual(sword);
   });
 });

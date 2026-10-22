@@ -1,5 +1,4 @@
 import * as Phaser from "phaser";
-import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
 import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
 import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
@@ -54,15 +53,6 @@ export function playTone(frequency = 220, duration = 0.07, type = "sine", volume
   } catch (_) {}
 }
 
-/**
- * Ceiling on remembered drops. Every client renders every kill's loot, so swept-up
- * entries must not accumulate for the whole session.
- */
-const MAX_DROPS = 32;
-
-/** Lifetime (ms) of a drop this client is not allowed to collect. */
-const UNOWNED_DROP_TTL_MS = 8000;
-
 /** Coerce a server-sent stat to a finite number, keeping the current value otherwise. */
 const toStat = (value, fallback) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -83,7 +73,6 @@ export class CombatSystem {
     this.onStateChange = onStateChange;
 
     this.attackReady = true;
-    this.drops = [];
     /** Skill slots assigned to UIOP keys and mouse buttons. */
     this.skillLoadout = { u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 };
     this.selectedSkillSlot = 0;
@@ -864,13 +853,7 @@ export class CombatSystem {
     }
 
     // Offline (no server connection) progression is frozen: the kill plays out,
-    // but the client never mints coins/EXP of its own.
-    const reward = rollKillReward(Math.random);
-    this.spawnDrop(
-      wolf.x + Phaser.Math.Between(-20, 20),
-      wolf.y + Phaser.Math.Between(-10, 10),
-      reward.drop
-    );
+    // but the client never mints coins/EXP of its own and nothing is dropped.
     this.ui.addLog("Đánh bại Sói Xám! (ngoại tuyến — không nhận tiến trình)");
 
     // Schedule enemy revive (the server drives respawn while connected)
@@ -892,12 +875,6 @@ export class CombatSystem {
     const x = reward.x ?? this.player.x;
     const y = reward.y ?? this.player.y;
     const killedByMe = this.isLocalKiller(reward.attackerId);
-
-    if (reward.drop) {
-      // Every client renders the kill's loot, but only the attributed killer may
-      // pick it up, so bystanders cannot duplicate the reward
-      this.spawnDrop(x, y, reward.drop, { collectable: killedByMe });
-    }
 
     if (!killedByMe) return;
 
@@ -989,98 +966,6 @@ export class CombatSystem {
       this.scene.networkClient?.sendQuestClaim?.();
     }
     this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
-  }
-
-  /**
-   * Spawn a collectable drop. Without an explicit entry the loot is rolled
-   * locally (offline play); while connected the server supplies the entry so
-   * every client renders the same item.
-   * @param {number} x
-   * @param {number} y
-   * @param {?{id:string, qty:number}} [loot]
-   * @param {{collectable?:boolean}} [options] - `collectable: false` renders loot
-   *   owned by another player, which only shows up in the world
-   */
-  spawnDrop(x, y, loot = null, { collectable = true } = {}) {
-    const rolled = loot || rollDrop();
-    const dropEntry = DROP_TABLE.find((entry) => entry.id === rolled.id);
-
-    const drop = {
-      x,
-      y,
-      phase: Math.random() * 6,
-      active: true,
-      collectable,
-      itemId: rolled.id,
-      qty: rolled.qty ?? dropEntry?.qty ?? 1,
-      name: dropEntry ? dropEntry.name : rolled.id,
-      // Someone else's loot can never be picked up, so it fades instead of littering
-      expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
-    };
-
-    const dropIso = toIso(x, y);
-    drop.visual = this.scene.add.container(dropIso.x, dropIso.y).setDepth(isoDepth(x, y) + 5);
-    if (!collectable) {
-      drop.visual.setAlpha(0.55);
-    }
-    drop.visual.add(this.scene.add.circle(0, 0, 13, 0xe9bd59, 0.12));
-    drop.visual.add(
-      this.scene.add
-        .polygon(0, 0, [0, -8, 7, 0, 0, 8, -7, 0], 0x8fd7b2)
-        .setStrokeStyle(2, 0xe0f4c5)
-    );
-    drop.visual.add(this.scene.add.circle(0, 0, 2, 0xffffff));
-
-    this.drops.push(drop);
-  }
-
-  updateDrops(time) {
-    if (this.drops.length > MAX_DROPS) {
-      this.drops = this.drops.filter((drop) => drop.active).slice(-MAX_DROPS);
-    }
-
-    this.drops.forEach((drop) => {
-      if (!drop.active) return;
-
-      if (!drop.collectable && time >= drop.expiresAt) {
-        drop.active = false;
-        drop.visual.destroy();
-        return;
-      }
-
-      const dropIso = toIso(drop.x, drop.y + Math.sin(time / 180 + drop.phase) * 4);
-      drop.visual.setPosition(dropIso.x, dropIso.y);
-
-      if (
-        Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38
-      ) {
-        this.collectDrop(drop);
-      }
-    });
-  }
-
-  collectDrop(drop) {
-    if (!drop.active || !drop.collectable) return;
-    drop.active = false;
-    drop.visual.destroy();
-
-    // Coins are server-owned, so a pickup grants no bạc on the client. MP is
-    // server-owned too: predict locally and mirror the restore into the pool.
-    this.player.stats.mp = Math.min(
-      this.player.stats.maxMp,
-      this.player.stats.mp + 5
-    );
-    this.scene.networkClient?.sendRestoreMp?.({ amount: 5 });
-
-    addQuantity(drop.itemId, drop.qty);
-
-    const dropName = drop.name || drop.itemId;
-    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 nội lực.`);
-    this.ui.updateHud(this.player.stats);
-    this.ui.updateInventory();
-    if (typeof this.onStateChange === "function") {
-      this.onStateChange();
-    }
   }
 
   showFloatText(x, y, text, color) {

@@ -2,8 +2,14 @@ import { sanitizeQuantities } from "./items.js";
 import { sanitizeEquipment, defaultEquipment } from "./equipment.js";
 
 const STORAGE_KEY = "giang_ho_game_save_v1";
-const INVENTORY_KEY = "giang_ho_inventory_v1";
+const INVENTORY_KEY = "giang_ho_inventory_v2";
 const EQUIPMENT_KEY = "giang_ho_equipment_v1";
+
+/**
+ * Bags persisted before v2 were seeded with a hard-coded demo catalog. The prefix
+ * (not the full key) is matched so every account/character scoped copy is purged.
+ */
+const LEGACY_INVENTORY_KEY_PREFIX = "giang_ho_inventory_v1";
 
 /**
  * Coerce an arbitrary value into a safe id -> non-negative integer map, or `{}`
@@ -109,19 +115,38 @@ export class StorageManager {
   }
 
   /**
-   * Load the active character's persisted bag, merged over catalog defaults so
-   * newly added items keep their catalog quantity.
-   * @param {Record<string, number>} [defaults]
+   * One-off migration: drop bags saved before v2, so the removed demo stacks can
+   * never be restored from an old local save. Idempotent and safe to call on every
+   * boot, as it only touches keys under the legacy prefix.
+   * @returns {number} How many stale keys were removed
+   */
+  static purgeLegacyInventory() {
+    try {
+      const stale = [];
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith(LEGACY_INVENTORY_KEY_PREFIX)) stale.push(key);
+      }
+      stale.forEach((key) => localStorage.removeItem(key));
+      return stale.length;
+    } catch (error) {
+      console.warn("StorageManager: Failed to purge legacy inventories:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * Load the active character's persisted bag. Nothing is merged in: a character
+   * only owns the stacks saved under its own key.
    * @returns {Record<string, number>}
    */
-  static loadInventory(defaults = {}) {
+  static loadInventory() {
     try {
       const raw = localStorage.getItem(this.getInventoryKey());
-      const saved = raw ? sanitizeInventory(JSON.parse(raw)) : {};
-      return { ...defaults, ...saved };
+      return raw ? sanitizeInventory(JSON.parse(raw)) : {};
     } catch (error) {
       console.warn("StorageManager: Failed to parse saved inventory:", error);
-      return { ...defaults };
+      return {};
     }
   }
 

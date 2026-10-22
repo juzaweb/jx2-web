@@ -1158,9 +1158,6 @@ export class JiangHuScene extends Phaser.Scene {
     // resulting `player_hp` back (see server gameSocket.tickBites).
     this.enemyManager.update(time, delta, this.player);
 
-    // Update collectible loot drops
-    this.combat.updateDrops(time);
-
     // Update UI HUD & Minimap Radar
     this.uiBridge.updateHud(this.player.stats);
     this.uiBridge.drawMinimap(

@@ -26,12 +26,12 @@ describe("buildBodyEquipment", () => {
     ]);
   });
 
-  it("changes the weapon shape with the equipped item", () => {
-    const jian = buildBodyEquipment({ equipment: { weapon: "hac-ung-kiem" } });
-    const claw = buildBodyEquipment({ equipment: { weapon: "thiet-trao" } });
+  it("falls back to the sword shape for a weapon id the catalog does not define", () => {
+    const unknown = buildBodyEquipment({ equipment: { weapon: "khong-co-trong-catalog" } });
+    const another = buildBodyEquipment({ equipment: { weapon: "bat-ky" } });
 
-    expect(jian.some((part) => part.kind === "line" && part.slot === "weapon")).toBe(true);
-    expect(claw.filter((part) => part.kind === "line")).toHaveLength(3);
+    expect(unknown).toEqual(another);
+    expect(unknown.some((part) => part.kind === "line" && part.slot === "weapon")).toBe(true);
   });
 
   it("mirrors the hand overlays across side-facing directions", () => {

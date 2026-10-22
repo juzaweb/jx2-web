@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { QUICK_ITEMS } from "../../game/items.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
@@ -20,7 +19,7 @@ export function HotbarDock({
   leftSkillSlot = 0,
   skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
   onPickSkill,
-  items = QUICK_ITEMS
+  items = []
 }) {
   const { t } = useI18n();
   const [cooldownEnds, setCooldownEnds] = useState({});

@@ -35,7 +35,6 @@ vi.mock("phaser", () => {
 });
 
 import { Player } from "./player.js";
-import { deriveCharacterSheet } from "./characterStats.js";
 
 const createMockScene = () => {
   const node = () => ({
@@ -367,44 +366,25 @@ describe("Player movement controls", () => {
 
 describe("Player equipment bonuses", () => {
   const makePlayer = () => new Player(createMockScene(), 100, 100);
-  it("adds worn weapon bonuses without stacking on swaps", () => {
+  it("ignores a worn id the catalog does not define as equipment", () => {
     const player = makePlayer();
-    const baseAttack = player.stats.attack;
-    const baseCrit = player.stats.critRate;
+    const base = { ...player.stats };
 
-    player.applyEquipment({ ...player.equipment, weapon: "hac-ung-kiem" }); // +10 attack, +2% crit
-    expect(player.stats.attack).toBe(baseAttack + 10);
-    expect(player.stats.critRate).toBeCloseTo(baseCrit + 0.02, 4);
+    player.applyEquipment({ ...player.equipment, weapon: "khong-co-trong-catalog" });
 
-    player.applyEquipment({ ...player.equipment, weapon: "phach-dao" }); // +16 attack, +3% crit
-    expect(player.stats.attack).toBe(baseAttack + 16);
-    expect(player.stats.critRate).toBeCloseTo(baseCrit + 0.03, 4);
-
-    player.applyEquipment({ ...player.equipment, weapon: null });
-    expect(player.stats.attack).toBe(baseAttack);
-    expect(player.stats.critRate).toBeCloseTo(baseCrit, 4);
+    expect(player.stats.attack).toBe(base.attack);
+    expect(player.stats.critRate).toBeCloseTo(base.critRate, 4);
+    expect(player.stats.defense).toBe(base.defense);
+    expect(player.stats.maxHp).toBe(base.maxHp);
   });
 
-  it("adds armour defence while leaving server-owned HP alone", () => {
+  it("keeps the server-owned HP ceiling when equipment changes", () => {
     const player = makePlayer();
-    const baseDefense = player.stats.defense;
     const baseMaxHp = player.stats.maxHp;
 
-    player.applyEquipment({ ...player.equipment, armor: "cam-y-bao" }); // +8 defence, +40 HP
+    player.applyEquipment({ ...player.equipment, armor: "khong-co-trong-catalog" });
 
-    expect(player.stats.defense).toBe(baseDefense + 8);
     expect(player.stats.maxHp).toBe(baseMaxHp);
-  });
-});
-
-describe("Character sheet + equipment", () => {
-  it("shows the equipped weapon bonus in the sheet", () => {
-    const player = new Player(createMockScene(), 100, 100);
-    player.applyEquipment({ ...player.equipment, weapon: "phach-dao" }); // +16 attack
-
-    const sheet = deriveCharacterSheet(player.stats);
-    const attack = sheet.combat.find((row) => row.key === "physicalAtk");
-    expect(attack.value).toBe("40");
   });
 });
 

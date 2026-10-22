@@ -1,4 +1,5 @@
 import { characterDb, isValidUserId, MAX_CHARACTER_SLOTS } from "../data/characterDb.js";
+import { store } from "../data/playerDb.js";
 
 /**
  * List active characters owned by a user.
@@ -40,6 +41,11 @@ export const createCharacter = async (req, res, next) => {
 
     const { name, sect } = req.body || {};
     const character = characterDb.create(userId, name, sect);
+
+    // Every new character starts with the shared starter kit (health potions, mana
+    // potions and return-city talismans). Guarded by a per-row flag, so the kit is
+    // never granted twice.
+    store.grantStarterItems(character.id);
 
     return res.status(201).json({
       success: true,

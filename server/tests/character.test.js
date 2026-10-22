@@ -73,6 +73,48 @@ describe("Character API Test Suite", () => {
     assert.equal(list.data.characters[0].gender, "female");
   });
 
+  test("a new character starts with the shared starter kit", async () => {
+    const userId = nextUser();
+    const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Tân Thủ", sect: "thieu-lam" })
+    }).then((r) => r.json());
+
+    const bag = await fetch(
+      `${baseUrl}/inventory/${created.data.character.id}`
+    ).then((r) => r.json());
+
+    assert.deepEqual(bag.data.inventory, {
+      "kim-sang-duoc": 50,
+      "dai-hoan-dan": 50,
+      "hoi-thanh-phu": 50
+    });
+  });
+
+  test("the starter kit is never granted twice and never replaces a played bag", async () => {
+    const { store } = await import("../src/data/playerDb.js");
+    const userId = nextUser();
+    const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Lão Luyện", sect: "vo-dang" })
+    }).then((r) => r.json());
+    const characterId = created.data.character.id;
+
+    // Simulate a character that has spent most of the kit.
+    await fetch(`${baseUrl}/inventory/${characterId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inventory: { "kim-sang-duoc": 2 } })
+    });
+
+    store.grantStarterItems(characterId);
+
+    const bag = await fetch(`${baseUrl}/inventory/${characterId}`).then((r) => r.json());
+    assert.deepEqual(bag.data.inventory, { "kim-sang-duoc": 2 });
+  });
+
   test("POST defaults to Thiếu Lâm (male) when sect is omitted", async () => {
     const userId = nextUser();
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {

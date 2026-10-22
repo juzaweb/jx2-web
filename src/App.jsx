@@ -18,7 +18,6 @@ import { normalizeGender } from "./game/gender.js";
 import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
 import { skillsForSect } from "./game/skills.js";
 import {
-  defaultQuantities,
   applyQuantities,
   setQuantities as rememberQuantities
 } from "./game/items.js";
@@ -74,7 +73,7 @@ const isTypingTarget = (target) => {
 const loadCharacterInventory = (characterId) => {
   StorageManager.setCharacterId(characterId || null);
   return applyQuantities(
-    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+    rememberQuantities(StorageManager.loadInventory())
   );
 };
 
@@ -740,7 +739,6 @@ export function App() {
         onUnequipSlot={handleUnequipSlot}
         equipment={equipment}
         coins={stats.coins}
-        quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}
         capacity={inventory.capacity}
       />

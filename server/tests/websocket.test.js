@@ -6,7 +6,6 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
-import { DROP_TABLE } from "../../src/game/items.js";
 import { MARKET_NPCS, MARKET_SPAWN } from "../../src/game/marketLayout.js";
 import { skillById } from "../../src/game/skills.js";
 
@@ -690,10 +689,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(reward2.payload.attackerId, "usr_wolf2");
     assert.equal(reward1.payload.exp, 35);
     assert.ok(reward1.payload.coins >= 3 && reward1.payload.coins <= 9);
-    assert.ok(
-      DROP_TABLE.some((entry) => entry.id === reward1.payload.drop.id),
-      "The reward always carries a catalog-backed drop"
-    );
+    assert.equal(reward1.payload.drop, undefined, "Kills no longer grant items");
 
     // Hitting a corpse resyncs instead of dealing damage twice
     client1.send({ type: "enemy_hit", payload: { id: 0, damage: 25 } });

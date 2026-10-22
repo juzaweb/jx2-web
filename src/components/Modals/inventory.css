@@ -14,8 +14,12 @@
   top: clamp(140px, 24vh, 260px);
   right: 12px;
   pointer-events: auto;
-  width: clamp(300px, 31vw, 430px);
-  height: min(720px, calc(100vh - 24vh - 84px));
+  /* The panel hugs its 5x6 grid, so a tall viewport never leaves a dead band. */
+  width: fit-content;
+  min-width: 300px;
+  max-width: min(430px, calc(100vw - 40px));
+  height: auto;
+  max-height: min(720px, calc(100vh - 24vh - 84px));
   padding: 0;
   text-align: left;
   display: flex;
@@ -99,39 +103,15 @@
   border-bottom: 1px solid #4a3520;
 }
 
-.inv-quickrow {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  padding: 8px 10px;
-  background: linear-gradient(180deg, #2a1b0e 0%, #150d06 100%);
-  border-bottom: 1px solid #4a3520;
-  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, 0.45);
-}
-.inv-quickrow .inv-slot {
-  height: 58px;
-}
-
-/* Aggregate bonuses from all worn items */
-.inv-slot.locked {
-  background: radial-gradient(circle at 50% 35%, #3a2a18 0%, #120c06 100%);
-  border-color: #8c663a;
-  opacity: 0.85;
-}
-.inv-lock-icon {
-  width: 20px;
-  height: 20px;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="7" y="14" width="18" height="14" rx="2.5" fill="%23e0c46a" stroke="%236b5a2e" stroke-width="1.6"/><path d="M11 14 v-4 a5 5 0 0 1 10 0 v4" fill="none" stroke="%23d9cf9a" stroke-width="2.4"/><circle cx="16" cy="20" r="2.4" fill="%235a4a1e"/><rect x="15" y="20" width="2" height="4" fill="%235a4a1e"/></svg>');
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
 .inv-grid {
   display: grid;
   flex: 1;
-  grid-auto-rows: 1fr;
+  /* 5 slots per row, 6 rows: the largest square that still fits the panel
+     without a scrollbar. */
+  grid-template-columns: repeat(5, 52px);
+  grid-auto-rows: 52px;
+  justify-content: center;
+  align-content: center;
   gap: 4px;
   padding: 10px;
   min-height: 0;

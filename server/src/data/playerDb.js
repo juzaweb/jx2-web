@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
+import { STARTER_ITEMS } from "../../../src/game/items.js";
 
 /** Keys that would poison a plain object (and later SQL params) if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -13,6 +14,13 @@ const MAX_LIMIT = 50;
 
 /** A character's starting ledger. */
 const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
+
+/**
+ * Bumped when a stored inventory must be discarded or back-filled by a migration.
+ *  2 — clears the hard-coded demo bags that every character used to start with.
+ *  3 — hands the starter kit to characters left with an empty bag.
+ */
+const SCHEMA_VERSION = 3;
 
 /**
  * Recursively drop prototype-polluting keys from untrusted input.
@@ -75,6 +83,7 @@ export class PlayerDatabase {
         exp             INTEGER NOT NULL DEFAULT 0,
         quest_rewarded  INTEGER NOT NULL DEFAULT 0,
         inventory       TEXT NOT NULL DEFAULT '{}',
+        starter_granted INTEGER NOT NULL DEFAULT 0,
         updated_at      INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_saves_level ON saves(level DESC);
@@ -83,10 +92,29 @@ export class PlayerDatabase {
       CREATE INDEX IF NOT EXISTS idx_saves_exp   ON saves(exp DESC);
     `);
 
+    // Databases created before the flag existed need the column added, because
+    // `CREATE TABLE IF NOT EXISTS` never alters an existing table.
+    const saveColumns = this.db.prepare("PRAGMA table_info(saves)").all();
+    if (!saveColumns.some((column) => column.name === "starter_granted")) {
+      this.db.exec(
+        "ALTER TABLE saves ADD COLUMN starter_granted INTEGER NOT NULL DEFAULT 0"
+      );
+    }
+
+    this._migrate();
+
     this.stmtGet = this.db.prepare("SELECT * FROM saves WHERE player_id = ?");
     this.stmtCount = this.db.prepare("SELECT COUNT(*) AS count FROM saves");
     this.stmtUpdateInventory = this.db.prepare(
       "UPDATE saves SET inventory = ?, updated_at = ? WHERE player_id = ?"
+    );
+    this.stmtGrantStarter = this.db.prepare(
+      // The emptiness predicate is part of the guard, not the caller's discipline:
+      // a played bag can never be replaced by the starter kit, regardless of who
+      // calls grantStarterItems().
+      `UPDATE saves SET inventory = ?, starter_granted = 1, updated_at = ?
+       WHERE player_id = ? AND starter_granted = 0
+         AND (inventory IS NULL OR inventory = '' OR inventory = '{}')`
     );
     this.stmtUpdateLedger = this.db.prepare(
       `UPDATE saves SET level = ?, exp = ?, coins = ?, kills = ?, player_name = ?, updated_at = ?
@@ -124,6 +152,42 @@ export class PlayerDatabase {
         inventory = excluded.inventory,
         updated_at = excluded.updated_at
     `);
+  }
+
+  /**
+   * Apply pending schema migrations, tracked in SQLite's `user_version`.
+   *
+   * Version 2 wipes every stored bag: earlier builds seeded each character with a
+   * hard-coded demo inventory, and clearing it once is the only way an existing
+   * save cannot bring those stacks back.
+   *
+   * Version 3 back-fills those emptied bags with the starter kit, so characters
+   * created before the kit existed are not left empty-handed.
+   *
+   * Running once is enforced by the version check, so real items acquired later
+   * are never touched again.
+   */
+  _migrate() {
+    const row = this.db.prepare("PRAGMA user_version").get();
+    const currentVersion = Number(row?.user_version) || 0;
+    if (currentVersion >= SCHEMA_VERSION) return;
+
+    if (currentVersion < 2) {
+      this.db.exec("UPDATE saves SET inventory = '{}'");
+    }
+
+    if (currentVersion < 3) {
+      this.db
+        .prepare(
+          `UPDATE saves
+              SET inventory = ?, starter_granted = 1, updated_at = ?
+            WHERE starter_granted = 0
+              AND (inventory IS NULL OR inventory = '' OR inventory = '{}')`
+        )
+        .run(JSON.stringify(STARTER_ITEMS), Date.now());
+    }
+
+    this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 
   _parseInventory(raw) {
@@ -243,6 +307,32 @@ export class PlayerDatabase {
       });
     }
 
+    return this.getInventory(playerId);
+  }
+
+  /**
+   * Give an empty character the shared starter kit, at most once. Called when a
+   * character is created; the flag plus the empty-bag guard guarantee a character
+   * that already owns something (or later spends everything) is never overwritten
+   * nor re-granted free items.
+   * @param {string} playerId
+   * @returns {Record<string, number>} the stored bag
+   */
+  grantStarterItems(playerId) {
+    const now = Date.now();
+
+    if (!this.stmtGet.get(playerId)) {
+      this._writeRow({
+        playerId,
+        playerName: "",
+        ...DEFAULT_LEDGER,
+        questRewarded: 0,
+        inventory: {},
+        updatedAt: now
+      });
+    }
+
+    this.stmtGrantStarter.run(JSON.stringify(STARTER_ITEMS), now, playerId);
     return this.getInventory(playerId);
   }
 

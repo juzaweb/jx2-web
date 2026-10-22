@@ -1,7 +1,5 @@
 import React, { useRef, useState } from "react";
 import {
-  QUICK_ITEMS,
-  INVENTORY_ITEMS,
   INVENTORY_GRID_SIZE,
   splitSilver
 } from "../../game/items.js";
@@ -15,9 +13,11 @@ import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
 import { setDragPayload, readDragPayload, dragKind, acceptDrop } from "./dragItem.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 
-const GRID_COLUMNS = 5;
 const TOOLTIP_OFFSET = 16;
 const TOOLTIP_EDGE = 12;
+
+/** Fallback grid of empty cells, so the bag renders its full size without items. */
+const EMPTY_GRID = Array.from({ length: INVENTORY_GRID_SIZE }, () => null);
 
 const clamp = (value, max) => Math.max(4, Math.min(value, max));
 
@@ -29,8 +29,7 @@ export function InventoryModal({
   onUnequipSlot,
   equipment = {},
   coins = 0,
-  quickItems = QUICK_ITEMS,
-  inventoryItems = INVENTORY_ITEMS,
+  inventoryItems = EMPTY_GRID,
   capacity = null
 }) {
   const { t } = useI18n();
@@ -147,36 +146,7 @@ export function InventoryModal({
           </div>
         )}
 
-        {/* Top equip / quick-access belt */}
-        <div className="inv-quickrow">
-          {quickItems.map((rawItem) => {
-            const item = localizeItem(rawItem, t);
-            return (
-              <button
-                type="button"
-                key={item.id}
-                className="inv-slot usable"
-                title={item.name}
-                onMouseEnter={(event) => handleSlotEnter(item, event)}
-                onClick={() => handleSlotClick(item)}
-              >
-                <span className={`inv-icon ${item.icon}`} />
-                <span className="inv-qty">x{item.qty}</span>
-              </button>
-            );
-          })}
-          <span className="inv-slot locked" aria-hidden="true">
-            <span className="inv-lock-icon" />
-          </span>
-          <span className="inv-slot locked" aria-hidden="true">
-            <span className="inv-lock-icon" />
-          </span>
-        </div>
-
-        <div
-          className="inv-grid"
-          style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
-        >
+        <div className="inv-grid">
           {inventoryItems.map((rawItem, index) => {
             const item = rawItem ? localizeItem(rawItem, t) : null;
 
