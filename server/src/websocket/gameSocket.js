@@ -1062,19 +1062,30 @@ export class GameSocketManager {
    */
   tickBites(players) {
     const now = Date.now();
-    const wolves = Array.from(this.enemies.values()).filter((enemy) => !enemy.isDead);
-    if (!wolves.length) return;
+    let wolves = null;
+    const biteRange = BITE_TUNING.range;
+    const biteRangeSq = biteRange * biteRange;
 
     players.forEach((player) => {
       if (now < player.nextBiteAt || now < player.invulnerableUntil) return;
 
+      if (!wolves) {
+        wolves = Array.from(this.enemies.values()).filter((enemy) => !enemy.isDead);
+      }
+      if (!wolves.length) return;
+
       let nearest = null;
-      let nearestDistance = Infinity;
+      let nearestDistanceSq = Infinity;
       wolves.forEach((wolf) => {
-        const distance = Math.hypot(wolf.x - player.x, wolf.y - player.y);
-        if (distance < BITE_TUNING.range && distance < nearestDistance) {
+        const dx = wolf.x - player.x;
+        if (dx >= biteRange || dx <= -biteRange) return;
+        const dy = wolf.y - player.y;
+        if (dy >= biteRange || dy <= -biteRange) return;
+
+        const distSq = dx * dx + dy * dy;
+        if (distSq < biteRangeSq && distSq < nearestDistanceSq) {
           nearest = wolf;
-          nearestDistance = distance;
+          nearestDistanceSq = distSq;
         }
       });
       if (!nearest) return;
