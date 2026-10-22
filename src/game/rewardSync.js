@@ -5,7 +5,7 @@
  * object and rejects anything malformed before stats or inventory are touched.
  */
 
-import { DROP_TABLE } from "./items.js";
+import { DROP_TABLE_MAP } from "./items.js";
 
 /**
  * @typedef {Object} EnemyReward
@@ -43,7 +43,8 @@ export function parseEnemyReward(payload = {}) {
 
   // Only catalog loot may be granted, and the quantity comes from the shared
   // table rather than from the payload.
-  const entry = DROP_TABLE.find((item) => item.id === payload.drop?.id);
+  const dropId = payload.drop?.id;
+  const entry = dropId ? DROP_TABLE_MAP.get(dropId) : null;
 
   return {
     enemyId: payload.enemyId,

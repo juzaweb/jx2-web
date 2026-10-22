@@ -280,6 +280,14 @@ export const DROP_TABLE = [
 ];
 
 /**
+ * Fast O(1) lookup Map for DROP_TABLE entries by item id.
+ * @type {Map<string, {id:string, name:string, weight:number, qty:number}>}
+ */
+export const DROP_TABLE_MAP = new Map(
+  DROP_TABLE.map((item) => [item.id, item])
+);
+
+/**
  * Pick a loot entry from DROP_TABLE with a weighted roll. Pure and deterministic:
  * the same rng value always yields the same entry, and the final bucket is
  * clamped so floating-point drift or a roll of 1 can never return an unknown id.

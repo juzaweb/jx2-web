@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { addQuantity, rollDrop, DROP_TABLE, rollKillReward } from "./items.js";
+import { addQuantity, rollDrop, DROP_TABLE_MAP, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
 import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
 import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
@@ -850,7 +850,7 @@ export class CombatSystem {
    */
   spawnDrop(x, y, loot = null, { collectable = true } = {}) {
     const rolled = loot || rollDrop();
-    const dropEntry = DROP_TABLE.find((entry) => entry.id === rolled.id);
+    const dropEntry = DROP_TABLE_MAP.get(rolled.id);
 
     const drop = {
       x,
