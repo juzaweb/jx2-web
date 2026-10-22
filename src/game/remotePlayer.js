@@ -3,6 +3,7 @@ import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
 
@@ -52,8 +53,8 @@ export class RemotePlayer {
     this.container.setDepth(isoDepth(this.x, this.y));
     this.container.setScale(S);
 
-    // 1. Soft ground shadow under feet
-    this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
+    // 1. Soft contact shadow under the feet, matching the local hero.
+    this.shadow = createHeroShadow(this.scene, HERO_FOOT_Y);
 
     // 2. Body container for animations
     this.body = this.scene.add.container(0, 0);
@@ -63,7 +64,7 @@ export class RemotePlayer {
     this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
-    this.container.add([this.shadow, this.body]);
+    this.container.add([...this.shadow.layers.map((layer) => layer.obj), this.body]);
 
     // 4. Overhead name (authentic JX2 style)
     this.nameText = this.scene.add

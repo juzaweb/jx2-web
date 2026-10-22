@@ -5,6 +5,7 @@ import { defaultEquipment, deriveEquipmentBonuses } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE, BASE_WALK_SPEED } from "./worldConfig.js";
 import {
@@ -147,45 +148,9 @@ export class Player {
    * with the current gear (so the hero is never blank before the game starts).
    */
   drawHero(container) {
-    // Soft golden aura + ground shadow, matching the glowing hero in the
-    // reference market screenshot.
-    this.aura = this.scene.add.ellipse(0, HERO_FOOT_Y - 2, 96, 38, 0xffd36a, 0.2);
-    this.aura.setBlendMode(Phaser.BlendModes.ADD);
-    this.scene.tweens.add({
-      targets: this.aura,
-      alpha: { from: 0.14, to: 0.4 },
-      scaleX: { from: 0.92, to: 1.08 },
-      scaleY: { from: 0.92, to: 1.08 },
-      duration: 1400,
-      ease: "Sine.easeInOut",
-      yoyo: true,
-      repeat: -1
-    });
-    this.sparkles = this.scene.add.container(0, HERO_FOOT_Y);
-    for (let i = 0; i < 7; i++) {
-      const angle = (i / 7) * Math.PI * 2;
-      const dot = this.scene.add.circle(
-        Math.cos(angle) * (20 + (i % 3) * 8),
-        -8 - (i % 4) * 7,
-        2.0 + (i % 2) * 1.1,
-        0xffe9a6,
-        0.85
-      );
-      dot.setBlendMode(Phaser.BlendModes.ADD);
-      this.scene.tweens.add({
-        targets: dot,
-        alpha: { from: 0.15, to: 0.95 },
-        y: dot.y - 8,
-        duration: 900 + i * 140,
-        delay: i * 90,
-        ease: "Sine.easeInOut",
-        yoyo: true,
-        repeat: -1
-      });
-      this.sparkles.add(dot);
-    }
-
-    this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
+    // Soft contact shadow only (nested ellipses). No aura ring or sparkles:
+    // buff/skill formation rings are handled separately.
+    this.shadow = createHeroShadow(this.scene, HERO_FOOT_Y);
 
     // Body container carries the walk bob and attack recoil; the rig lives inside.
     this.body = this.scene.add.container(0, 0);
@@ -193,7 +158,7 @@ export class Player {
     this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
-    container.add([this.aura, this.sparkles, this.shadow, this.body]);
+    container.add([...this.shadow.layers.map((layer) => layer.obj), this.body]);
   }
 
   /**
@@ -276,8 +241,7 @@ export class Player {
       this.body.setScale(1, 1);
 
       const shadowFactor = 1 - (Math.abs(this.body.y) / 3.5) * 0.2;
-      this.shadow.setScale(shadowFactor, shadowFactor);
-      this.shadow.setAlpha(0.45 * shadowFactor);
+      this.shadow.setFactor(shadowFactor);
 
       // Footstep dust puff when foot strikes the road
       if (time - this.lastDustTime > 190) {
@@ -292,8 +256,7 @@ export class Player {
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.14);
       this.body.setScale(1 - breath * 0.012, 1 + breath * 0.018);
 
-      this.shadow.setScale(1 + breath * 0.02, 1 + breath * 0.02);
-      this.shadow.setAlpha(0.45);
+      this.shadow.setFactor(1 + breath * 0.02);
     }
 
     // Depth sorting based on the isometric position of the ground cell
