@@ -3,10 +3,8 @@ import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
   MARKET_GRASS,
-  MARKET_LANTERNS,
   MARKET_NPCS,
   MARKET_PLAZA,
-  MARKET_PROPS,
   MARKET_SPAWN,
   MARKET_TREES
 } from "./marketLayout.js";
@@ -49,7 +47,7 @@ describe("market layout", () => {
     expect(overlaps(footprint(shops[0]), footprint(shops[1]))).toBe(false);
   });
 
-  it("keeps every landmark, prop and lantern inside the playable bounds", () => {
+  it("keeps every landmark and NPC inside the playable bounds", () => {
     const inside = (x, y) =>
       x > MARKET_BOUNDS.x0 &&
       x < MARKET_BOUNDS.x1 &&
@@ -60,9 +58,7 @@ describe("market layout", () => {
       expect(inside(x - w / 2, y - d / 2)).toBe(true);
       expect(inside(x + w / 2, y + d / 2)).toBe(true);
     }
-    for (const { x, y } of MARKET_PROPS) expect(inside(x, y)).toBe(true);
     for (const { x, y } of MARKET_NPCS) expect(inside(x, y)).toBe(true);
-    for (const [x, y] of MARKET_LANTERNS) expect(inside(x, y)).toBe(true);
   });
 
   it("places every NPC in front of its shop", () => {

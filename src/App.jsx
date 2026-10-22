@@ -645,8 +645,6 @@ export function App() {
         />
 
         <MinimapPanel
-          audioEnabled={audioEnabled}
-          onToggleAudio={handleToggleAudio}
           onOpenHelp={handleOpenHelp}
           quest={quest}
           zoomed={isMinimapZoomed}

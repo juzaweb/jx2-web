@@ -32,9 +32,8 @@ export const MARKET_NPCS = [
 ];
 
 /**
- * Landmark shops and structures spread across the square. `x`/`y` are the
- * screen-space anchor (the building's ground contact point), `w`/`d` are
- * collision footprint sizes.
+ * Shop buildings across the square. `x`/`y` are the screen-space anchor (the
+ * building's ground contact point), `w`/`d` are collision footprint sizes.
  */
 export const MARKET_BUILDINGS = [
   {
@@ -62,60 +61,7 @@ export const MARKET_BUILDINGS = [
     scale: 2.8,
     signColor: "green",
     palette: "herb"
-  },
-  {
-    id: "cao-thi",
-    kind: "board",
-    sign: "CAO THỊ",
-    subSign: "告示",
-    x: 5600,
-    y: 4500,
-    w: 500,
-    d: 260
-  },
-  {
-    id: "ba-lang",
-    kind: "gate",
-    sign: "BÁ LÃNG",
-    subSign: "霸陵",
-    x: 7600,
-    y: 4800,
-    w: 900,
-    d: 320
-  },
-  {
-    id: "stall-red",
-    kind: "stall",
-    sign: "",
-    x: 8500,
-    y: 4500,
-    w: 1000,
-    d: 700,
-    awning: "red"
-  },
-  {
-    id: "stall-blue",
-    kind: "stall",
-    sign: "",
-    x: 8400,
-    y: 6900,
-    w: 1000,
-    d: 700,
-    awning: "blue"
   }
-];
-
-/** Decorative stone lanterns around the square. */
-export const MARKET_LANTERNS = [
-  [3900, 4000],
-  [8900, 4000],
-  [3900, 7000],
-  [8900, 7000],
-  [6400, 4000],
-  [8900, 5500],
-  [6400, 7000],
-  [5000, 4000],
-  [7800, 4000]
 ];
 
 /** Trees and bushes ringing the paved square. */
@@ -161,27 +107,6 @@ export const MARKET_GRASS = [
   [3500, 8000, 0.95],
   [5600, 8600, 1.0],
   [9800, 8700, 0.9]
-];
-
-/** Loose props (crates, sacks, barrels, jars) scattered across the whole map. */
-export const MARKET_PROPS = [
-  { kind: "crate-stack", x: 3500, y: 3900, s: 1 },
-  { kind: "crate-stack", x: 9200, y: 3900, s: 0.85 },
-  { kind: "sacks", x: 3500, y: 4700, s: 1 },
-  { kind: "barrel", x: 3500, y: 7100, s: 1 },
-  { kind: "jar-cluster", x: 5450, y: 6500, s: 1 },
-  { kind: "jar-cluster", x: 9200, y: 7100, s: 0.9 },
-  { kind: "basket", x: 6400, y: 3900, s: 0.9 },
-  { kind: "basket", x: 9000, y: 5200, s: 0.8 },
-  { kind: "crate-stack", x: 7000, y: 7200, s: 0.85 },
-  { kind: "sacks", x: 8000, y: 3900, s: 0.9 },
-  { kind: "barrel", x: 9000, y: 6300, s: 0.9 },
-  { kind: "jar-cluster", x: 4200, y: 5400, s: 0.8 },
-  { kind: "crate-stack", x: 6000, y: 4700, s: 0.9 },
-  { kind: "crate-stack", x: 2450, y: 2950, s: 0.9 },
-  { kind: "barrel", x: 10500, y: 3250, s: 0.9 },
-  { kind: "sacks", x: 2500, y: 8750, s: 0.9 },
-  { kind: "jar-cluster", x: 10300, y: 8700, s: 0.8 }
 ];
 
 /** Stone emblems / drains painted on the square. */

@@ -3,7 +3,6 @@ import { applyQuantities, getQuantities } from "./items.js";
 import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
-  MARKET_LANTERNS,
   MARKET_TREES
 } from "./marketLayout.js";
 
@@ -202,16 +201,9 @@ export class UIBridgeAdapter {
     ctx.closePath();
     ctx.stroke();
 
-    // Landmarks: shops, gate, notice board and market stalls.
+    // Landmarks: the two shop buildings.
     MARKET_BUILDINGS.forEach((def) => {
-      ctx.fillStyle =
-        def.kind === "gate"
-          ? "#a9362f"
-          : def.kind === "stall"
-            ? "#7f8b90"
-            : def.kind === "board"
-              ? "#8d2c26"
-              : "#4a3320";
+      ctx.fillStyle = "#4a3320";
       ctx.fillRect(
         mapX(def.x - def.w / 2),
         mapY(def.y - def.d / 2),
@@ -220,17 +212,11 @@ export class UIBridgeAdapter {
       );
     });
 
-    // Trees and stone lanterns.
+    // Trees.
     ctx.fillStyle = "#3c7347";
     MARKET_TREES.forEach(([x, y]) => {
       ctx.beginPath();
       ctx.arc(mapX(x), mapY(y), 1.8 * mark, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.fillStyle = "#d8c47a";
-    MARKET_LANTERNS.forEach(([x, y]) => {
-      ctx.beginPath();
-      ctx.arc(mapX(x), mapY(y), 1.2 * mark, 0, Math.PI * 2);
       ctx.fill();
     });
 

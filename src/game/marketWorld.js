@@ -1,14 +1,12 @@
 import { toIso, isoDepth } from "./isoProjection.js";
 import { WORLD_SCALE } from "./worldConfig.js";
-import { createGate, createNoticeBoard, createShop, createStall } from "./marketBuildings.js";
-import { createBasket, createBarrel, createCrates, createJars, createSacks, createStoneLantern, createVegetation } from "./marketProps.js";
+import { createShop } from "./marketBuildings.js";
+import { createVegetation } from "./marketProps.js";
 import {
   MARKET_BOUNDS,
   MARKET_BUILDINGS,
   MARKET_GRASS,
-  MARKET_LANTERNS,
   MARKET_MEDALLIONS,
-  MARKET_PROPS,
   MARKET_TREES
 } from "./marketLayout.js";
 
@@ -29,9 +27,7 @@ export class WorldManager {
   create() {
     this.obstacles = this.scene.physics.add.staticGroup();
     this.drawGround();
-    this.drawLanterns();
     this.drawBuildings();
-    this.drawProps();
     this.drawVegetation();
     this.drawWorldBorder();
   }
@@ -130,10 +126,6 @@ export class WorldManager {
     }
   }
 
-  drawLanterns() {
-    MARKET_LANTERNS.forEach(([gx, gy]) => this.placeProp(createStoneLantern(this.scene), gx, gy));
-  }
-
   placeProp(obj, gx, gy, depthBias = 0) {
     const p = toIso(gx, gy);
     obj.setPosition(p.x, p.y);
@@ -144,45 +136,14 @@ export class WorldManager {
 
   drawBuildings() {
     MARKET_BUILDINGS.forEach((def) => {
-      let obj;
-      if (def.kind === "shop") obj = createShop(this.scene, def);
-      else if (def.kind === "gate") obj = createGate(this.scene, def);
-      else if (def.kind === "board") obj = createNoticeBoard(this.scene, def);
-      else obj = createStall(this.scene, def);
+      const obj = createShop(this.scene, def);
 
       // def.x / def.y is the ground contact point at the centre of the facade.
       this.placeProp(obj, def.x, def.y);
       if (typeof def.scale === "number" && def.scale > 0) obj.setScale(def.scale);
-      else if (def.kind === "shop") obj.setScale(S * 0.68);
-      else if (def.kind === "gate") obj.setScale(S * 0.66);
-      else if (def.kind === "board") obj.setScale(S * 0.62);
+      else obj.setScale(S * 0.68);
 
-      if (def.kind === "shop") {
-        this.addBody(def.x, def.y - 110, def.w * 0.9, 220);
-      } else if (def.kind === "gate") {
-        this.addBody(def.x - 80, def.y - 40, 90, 160);
-        this.addBody(def.x + 80, def.y - 40, 90, 160);
-      } else if (def.kind === "board") {
-        this.addBody(def.x, def.y - 50, 120, 100);
-      } else {
-        this.addBody(def.x, def.y - 70, def.w * 0.7, 160);
-      }
-    });
-  }
-
-  drawProps() {
-    const factories = {
-      "crate-stack": createCrates,
-      sacks: createSacks,
-      barrel: createBarrel,
-      "jar-cluster": createJars,
-      basket: createBasket
-    };
-    MARKET_PROPS.forEach((prop) => {
-      const factory = factories[prop.kind] || createBasket;
-      const obj = factory(this.scene);
-      this.placeProp(obj, prop.x, prop.y);
-      obj.setScale(S * (prop.s || 1));
+      this.addBody(def.x, def.y - 110, def.w * 0.9, 220);
     });
   }
 

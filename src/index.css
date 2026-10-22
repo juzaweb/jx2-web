@@ -1533,11 +1533,11 @@ body {
 }
 
 .mini-btn,
-.chat-close {
+.chat-minimize {
   cursor: pointer;
 }
 
-.chat-close {
+.chat-minimize {
   margin-right: 4px;
   width: 18px;
   height: 18px;

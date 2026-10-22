@@ -3,7 +3,7 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false, collapsed = false, onClose, onOpen }) {
+export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = false, onClose, onOpen }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
@@ -37,6 +37,7 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           id="minimap-restore-btn"
           className="panel-restore-btn"
           title={t("minimap.restore")}
+          aria-label={t("minimap.restore")}
           onClick={onOpen}
         >
           🗺
@@ -58,6 +59,7 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
               id="map-minimize-btn"
               className="mini-btn"
               title={t("minimap.minimize")}
+              aria-label={t("minimap.minimize")}
               onClick={onClose}
             >
               –

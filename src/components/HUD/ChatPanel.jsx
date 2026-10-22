@@ -24,6 +24,7 @@ export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose, onO
           id="chat-restore-btn"
           className="panel-restore-btn"
           title={t("chat.restore")}
+          aria-label={t("chat.restore")}
           onClick={onOpen}
         >
           💬
@@ -61,9 +62,10 @@ export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose, onO
           <button
             type="button"
             id="chat-minimize-btn"
-            className="chat-close"
+            className="chat-minimize"
             onClick={onClose}
             title={t("chat.minimize")}
+            aria-label={t("chat.minimize")}
           >
             –
           </button>
