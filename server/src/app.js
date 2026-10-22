@@ -14,9 +14,34 @@ export const createApp = () => {
   // Security hardening: hide Express framework signature
   app.disable("x-powered-by");
 
-  // Basic CORS setup
+  // Secure CORS setup
   app.use(cors({
-    origin: config.clientOrigin === "*" ? true : config.clientOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, same-origin)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const rawOrigins = config.clientOrigin || "*";
+      const allowedOrigins = rawOrigins
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes("*")) {
+        // Wildcard origin: forbid dynamic origin reflection in production when credentials are enabled
+        if (config.env === "production") {
+          return callback(null, false);
+        }
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
     credentials: true,
   }));
 
