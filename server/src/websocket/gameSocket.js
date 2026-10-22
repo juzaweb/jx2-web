@@ -120,16 +120,29 @@ const ENEMY_SPAWNS = [
  * @returns {Array<Object>}
  */
 export const createEnemyState = (spawns = ENEMY_SPAWNS) =>
-  spawns.map(([x, y], id) => ({
-    id,
-    x,
-    y,
-    homeX: x,
-    homeY: y,
-    hp: ENEMY_MAX_HP,
-    maxHp: ENEMY_MAX_HP,
-    isDead: false
-  }));
+  spawns.map(([x, y], id) => {
+    const snapshot = {
+      id,
+      x,
+      y,
+      homeX: x,
+      homeY: y,
+      hp: ENEMY_MAX_HP,
+      maxHp: ENEMY_MAX_HP,
+      isDead: false
+    };
+    return {
+      id,
+      x,
+      y,
+      homeX: x,
+      homeY: y,
+      hp: ENEMY_MAX_HP,
+      maxHp: ENEMY_MAX_HP,
+      isDead: false,
+      snapshot
+    };
+  });
 
 export class GameSocketManager {
   /**
@@ -843,16 +856,19 @@ export class GameSocketManager {
    * @returns {Object}
    */
   enemySnapshot(enemy) {
-    return {
-      id: enemy.id,
-      x: enemy.x,
-      y: enemy.y,
-      homeX: enemy.homeX,
-      homeY: enemy.homeY,
-      hp: enemy.hp,
-      maxHp: enemy.maxHp,
-      isDead: enemy.isDead
-    };
+    if (!enemy) return null;
+    return (
+      enemy.snapshot || {
+        id: enemy.id,
+        x: enemy.x,
+        y: enemy.y,
+        homeX: enemy.homeX,
+        homeY: enemy.homeY,
+        hp: enemy.hp,
+        maxHp: enemy.maxHp,
+        isDead: enemy.isDead
+      }
+    );
   }
 
   /**
@@ -914,10 +930,16 @@ export class GameSocketManager {
     // Position stays server-owned: a hit only applies damage, so a client cannot
     // drag the monster around the map by reporting the spot it rendered
     enemy.hp = Math.max(0, enemy.hp - damage);
+    if (enemy.snapshot) {
+      enemy.snapshot.hp = enemy.hp;
+    }
 
     const killed = enemy.hp <= 0;
     if (killed) {
       enemy.isDead = true;
+      if (enemy.snapshot) {
+        enemy.snapshot.isDead = true;
+      }
       this.scheduleEnemyRespawn(enemy.id);
     }
 
@@ -1044,6 +1066,10 @@ export class GameSocketManager {
 
       enemy.x = x;
       enemy.y = y;
+      if (enemy.snapshot) {
+        enemy.snapshot.x = x;
+        enemy.snapshot.y = y;
+      }
       moved.push({ id: enemy.id, x, y });
     });
 
@@ -1113,6 +1139,12 @@ export class GameSocketManager {
     enemy.x = enemy.homeX;
     enemy.y = enemy.homeY;
     enemy.isDead = false;
+    if (enemy.snapshot) {
+      enemy.snapshot.hp = enemy.hp;
+      enemy.snapshot.x = enemy.x;
+      enemy.snapshot.y = enemy.y;
+      enemy.snapshot.isDead = false;
+    }
 
     this.broadcastNear(enemy.x, enemy.y, null, {
       type: "enemy_respawned",
@@ -1136,6 +1168,10 @@ export class GameSocketManager {
           if (!enemy.isDead) {
             enemy.x = enemy.homeX;
             enemy.y = enemy.homeY;
+            if (enemy.snapshot) {
+              enemy.snapshot.x = enemy.homeX;
+              enemy.snapshot.y = enemy.homeY;
+            }
           }
         });
       }
