@@ -85,9 +85,7 @@ export default {
     rightClickQ: "右键 [Q]",
     martialName: "鹤字锦",
     martialSub: "天河秘笈",
-    portraitTitle: "武当浪客",
-    portraitAlt: "浪客",
-    coins: "银两",
+
     character: "角色",
     inventory: "行囊",
     help: "秘笈",

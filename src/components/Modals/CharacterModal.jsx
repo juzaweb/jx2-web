@@ -266,7 +266,7 @@ export function CharacterModal({
               </div>
 
               <div className="char-model">
-                <CharacterPreview gender={gender} equipment={equipment} />
+                <CharacterPreview gender={gender} />
                 {playerName && <div className="char-model-name">{playerName}</div>}
               </div>
 

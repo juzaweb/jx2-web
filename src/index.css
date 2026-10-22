@@ -34,7 +34,9 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
+  /* `clip` (unlike `hidden`) forbids programmatic scrolling, so focus/scroll
+     calls can never shift the HUD sideways. */
+  overflow: clip;
   background: #111a15;
 }
 
@@ -551,11 +553,8 @@ body {
 }
 
 
-/* Middle: Martial Arts Display */
+/* Middle: Martial Arts Display (kept in the flex flow so the bar stays balanced) */
 .martial-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -631,8 +630,8 @@ body {
 /* Left/right mouse skill slots */
 .hand-slot {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -660,8 +659,8 @@ body {
 }
 
 .hand-glyph.skill-icon-img {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
@@ -881,36 +880,6 @@ body {
   font-size: 11px;
   color: #9fb8b2;
   white-space: nowrap;
-}
-
-/* Character Portrait */
-.hero-portrait {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.portrait-avatar {
-  width: 42px;
-  height: 42px;
-  background: radial-gradient(circle, #384852 0%, #151c20 100%);
-  border: 2px solid #d4af37;
-  display: grid;
-  place-items: center;
-  color: #ffe699;
-  font-family: serif;
-  font-size: 24px;
-  text-shadow: 0 0 6px #ffd700;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
-}
-
-.portrait-coins {
-  font-size: 9.5px;
-  font-weight: bold;
-  color: #ffd43b;
-  font-family: monospace;
-  text-shadow: 0 1px 2px #000;
 }
 
 /* System Tray Buttons */
@@ -1390,9 +1359,6 @@ body {
   .martial-text-label {
     display: none;
   }
-  .hero-portrait {
-    display: none;
-  }
 }
 
 @media (max-width: 720px) {
@@ -1577,8 +1543,8 @@ body {
 }
 
 .slot-item {
-  width: 39px;
-  height: 39px;
+  width: 42px;
+  height: 42px;
   background: radial-gradient(circle at 40% 30%, #6a4a2a 0%, #2c1c0e 75%);
   border: 2px solid #8c663a;
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 219, 155, 0.18);
@@ -1597,10 +1563,6 @@ body {
   background: linear-gradient(180deg, #5a3b21 0%, #2a190c 100%);
   border: 1px solid #b08145;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 230, 174, 0.2);
-}
-
-.hero-portrait .portrait-avatar {
-  border-color: #d8a94f;
 }
 
 .system-icons-tray .sys-btn {
@@ -1694,3 +1656,33 @@ body {
   }
 }
 
+
+/* Compact dock for narrow windows (VS Code side panes, small laptops) */
+@media (max-width: 1024px) {
+  .hotbar-slots {
+    gap: 2px;
+  }
+  .slot-item {
+    width: 34px;
+    height: 34px;
+  }
+  .hand-slot {
+    width: 36px;
+    height: 36px;
+  }
+  .hand-glyph.skill-icon-img {
+    width: 30px;
+    height: 30px;
+  }
+  .martial-center {
+    gap: 5px;
+    padding: 3px 6px;
+  }
+  .system-icons-tray .sys-btn {
+    min-width: 38px;
+    padding: 3px 5px;
+  }
+  .sys-lbl {
+    font-size: 7px;
+  }
+}

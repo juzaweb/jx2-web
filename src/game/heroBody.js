@@ -20,6 +20,17 @@ export const HERO_BODY_TEXTURES = {
 };
 
 /**
+ * Static paper-doll art used by the character sheet (F3). Both files are
+ * produced from `public/hero-body-new.png` by `scripts/build_preview_art.py`.
+ * These are single idle poses with realistic proportions, so they are not a
+ * drop-in replacement for the 4x4 walk sheets above.
+ */
+export const HERO_PREVIEW_ART = {
+  male: { url: "/hero-preview-male.png", width: 361, height: 947, version: "1" },
+  female: { url: "/hero-preview-female.png", width: 329, height: 941, version: "1" }
+};
+
+/**
  * Frame geometry is written by scripts/build_hero_body.py; keep the two copies
  * in sync. Source content is 140px tall; rendered at ~92.5 rig units.
  */

@@ -6,7 +6,6 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 
 export function HotbarDock({
-  coins = 0,
   audioEnabled,
   onUseItem,
   onInventory,
@@ -65,9 +64,8 @@ export function HotbarDock({
     { key: "p", slot: skillLoadout?.p ?? 3 }
   ];
 
-  // The bottom bar mirrors the reference: consumables in 1-4, skill icons in
-  // 5-10 and two spare slots at the end.
-  const quickSlots = Array.from({ length: 12 }, (_, index) => {
+  // The bottom bar puts consumables in 1-4 and sect skills in 5-9.
+  const quickSlots = Array.from({ length: 9 }, (_, index) => {
     const useSlot = index + 1;
     const raw = items.find((entry) => entry.useSlot === useSlot);
     const skill = useSlot >= 5 && useSlot <= 10
@@ -145,26 +143,6 @@ export function HotbarDock({
               </button>
             );
           })}
-        </div>
-
-        {/* Hero Portrait */}
-        <div className="hero-portrait" title={t("hotbar.portraitTitle")}>
-          <div className="portrait-avatar">
-            <img
-              src="/hero_portrait.png"
-              alt={t("hotbar.portraitAlt")}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                objectPosition: "center 15%",
-                display: "block"
-              }}
-            />
-          </div>
-          <div className="portrait-coins" id="coin-label">
-            {t("hotbar.coins")}: {coins}
-          </div>
         </div>
 
         {/* Right Utility: System Icons Tray */}

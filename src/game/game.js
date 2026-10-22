@@ -69,7 +69,6 @@ export class JiangHuScene extends Phaser.Scene {
         frameHeight: HERO_BODY.frameHeight
       });
     }
-    this.load.image("hero-portrait", "/hero_portrait.png");
     this.load.image("ground-bricks", "/gach-tile.webp");
     for (const { textureKey, url } of SHOP_BUILDINGS) {
       if (!this.textures.exists(textureKey)) {

@@ -662,7 +662,6 @@ export function App() {
         />
 
         <HotbarDock
-          coins={stats.coins}
           audioEnabled={audioEnabled}
           items={inventory.quickItems}
           onUseItem={handleUseItem}
