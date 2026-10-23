@@ -208,8 +208,9 @@ export default {
     bindToKey: "绑定到 [{key}]",
     bindLeft: "绑定左键",
     bindRight: "绑定右键",
-    equippedTag: "已绑定：{slots}",
     cooldownSec: "{sec}秒",
+    rangeTag: "距离: {range}",
+    dmgTag: "伤害: {pct}%",
     thieuLam: {
       laHanQuyen: {
         name: "罗汉拳",
@@ -241,7 +242,7 @@ export default {
         name: "三清剑法",
         desc: "连续施展三道剑气扫荡敌阵。"
       },
-      toat_hong_quan_khuyet: {
+      toatHongQuanKhuyet: {
         name: "紫霄罡气",
         desc: "武当护体气功，提升 15% 攻击力，持续 3 分钟。"
       }

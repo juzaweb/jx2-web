@@ -41,8 +41,8 @@ export function SkillsModal({
     if (skillLoadout.i === slot) bound.push("I");
     if (skillLoadout.o === slot) bound.push("O");
     if (skillLoadout.p === slot) bound.push("P");
-    if (skillLoadout.left === slot) bound.push(t("skills.handLeft"));
-    if (skillLoadout.right === slot) bound.push(t("skills.handRight"));
+    if (skillLoadout.left === slot) bound.push("L");
+    if (skillLoadout.right === slot) bound.push("R");
     return bound;
   };
 
@@ -125,10 +125,14 @@ export function SkillsModal({
                         </span>
                       )}
                       {skill.range > 0 && (
-                        <span className="skill-stat-tag">Range: {skill.range}</span>
+                        <span className="skill-stat-tag">
+                          {t("skills.rangeTag", { range: skill.range })}
+                        </span>
                       )}
                       {skill.mult > 0 && (
-                        <span className="skill-stat-tag">Dmg: {Math.round(skill.mult * 100)}%</span>
+                        <span className="skill-stat-tag">
+                          {t("skills.dmgTag", { pct: Math.round(skill.mult * 100) })}
+                        </span>
                       )}
                     </div>
 

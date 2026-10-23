@@ -52,16 +52,21 @@ describe("SkillsModal Component", () => {
       </I18nProvider>
     );
 
+    // Modal title
+    expect(markup).toContain('<span class="skills-title">Võ Công</span>');
+
     // Unlocked skill card
     expect(markup).toContain("skill-card-row unlocked");
     expect(markup).toContain("Đại Tu Di Chưởng");
+    expect(markup).toContain("Cự ly: 200");
+    expect(markup).toContain("ST: 120%");
 
     // Locked skill card
     expect(markup).toContain("skill-card-row locked");
     expect(markup).toContain("Cần cấp 5");
   });
 
-  it("renders shortcut binding buttons for unlocked skills", () => {
+  it("renders shortcut binding buttons and respects self-target constraints", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <SkillsModal
@@ -75,5 +80,23 @@ describe("SkillsModal Component", () => {
 
     expect(markup).toContain("key-btn active");
     expect(markup).toContain("mouse-btn active");
+    expect(markup).toContain('<span class="skill-bound-badge">U, L</span>');
+    expect(markup).toContain('<span class="skill-bound-badge">I, R</span>');
+  });
+
+  it("displays correct sect badge for different sects", () => {
+    for (const [sect, expectedLabel] of [
+      ["thieu-lam", "Thiếu Lâm"],
+      ["vo-dang", "Võ Đang"],
+      ["nga-my", "Nga My"],
+      ["ngu-doc", "Ngũ Độc"]
+    ]) {
+      const markup = renderToStaticMarkup(
+        <I18nProvider>
+          <SkillsModal isOpen={true} skills={[]} sect={sect} />
+        </I18nProvider>
+      );
+      expect(markup).toContain(`<span class="skills-sect-badge">${expectedLabel}</span>`);
+    }
   });
 });

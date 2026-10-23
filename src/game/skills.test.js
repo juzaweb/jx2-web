@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { translateFor } from "../i18n/translator.js";
 import {
   SKILL_SLOTS,
   SKILLS,
@@ -119,5 +120,18 @@ describe("skill catalog", () => {
     expect(skillUnlocked("la_han_tran", 1)).toBe(true);
     expect(skillUnlocked("la_han_tran", 0)).toBe(false);
     expect(skillUnlocked("bogus", 99)).toBe(false);
+  });
+
+  it("has valid name and description in all locales for every skill", () => {
+    for (const skill of SKILLS) {
+      for (const lang of ["vi", "en", "zh"]) {
+        const name = translateFor(lang, skill.nameKey, undefined, null);
+        const desc = translateFor(lang, skill.descKey, undefined, null);
+        expect(name, `Missing name for ${skill.id} in ${lang}`).toBeTruthy();
+        expect(desc, `Missing desc for ${skill.id} in ${lang}`).toBeTruthy();
+        expect(name).not.toBe(skill.id);
+        expect(name).not.toBe(skill.nameKey);
+      }
+    }
   });
 });

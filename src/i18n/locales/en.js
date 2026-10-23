@@ -207,8 +207,9 @@ export default {
     bindToKey: "Assign to [{key}]",
     bindLeft: "Assign Left Click",
     bindRight: "Assign Right Click",
-    equippedTag: "Assigned: {slots}",
     cooldownSec: "{sec}s",
+    rangeTag: "Range: {range}",
+    dmgTag: "Dmg: {pct}%",
     thieuLam: {
       laHanQuyen: {
         name: "Arhat Fist",
@@ -240,7 +241,7 @@ export default {
         name: "Three Pure Ones Sword",
         desc: "Triple sword qi strikes sweeping through enemy ranks."
       },
-      toat_hong_quan_khuyet: {
+      toatHongQuanKhuyet: {
         name: "Purple Cloud Guard",
         desc: "Wudang qi buff increasing attack power by 15% for 3 minutes."
       }

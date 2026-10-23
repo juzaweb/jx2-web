@@ -220,7 +220,7 @@ export function HotbarDock({
             title={`${t("skills.modalTitle")} (F5)`}
             onClick={onSkills}
           >
-            <span className="sys-ico">⚔️</span>
+            <span className="sys-ico">🥋</span>
             <span className="sys-lbl">{t("skills.modalTitle")}</span>
           </button>
           <button

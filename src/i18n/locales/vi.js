@@ -202,13 +202,14 @@ export default {
         "invalid-slot": "Ô chiêu không hợp lệ."
       }
     },
-    modalTitle: "Võ Học Bảng",
+    modalTitle: "Võ Công",
     modalHint: "Chiêu thức môn phái đã học. Nhấp vào ô gán phím hoặc gán nhanh phía dưới để gán chiêu thức.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
     bindRight: "Gán Chuột Phải",
-    equippedTag: "Đã gán: {slots}",
     cooldownSec: "{sec}s",
+    rangeTag: "Cự ly: {range}",
+    dmgTag: "ST: {pct}%",
     thieuLam: {
       laHanQuyen: {
         name: "La Hán Quyền",
@@ -240,7 +241,7 @@ export default {
         name: "Tam Thanh Kiếm Pháp",
         desc: "Tuyệt kỹ ba đường kiếm khí liên hoàn tấn công kẻ địch."
       },
-      toat_hong_quan_khuyet: {
+      toatHongQuanKhuyet: {
         name: "Toát Hồng Quân Khuyết",
         desc: "Khí công gia hộ Võ Đang, tăng 15% lực tấn công trong 3 phút."
       }
@@ -255,7 +256,7 @@ export default {
         desc: "Kiếm khí tựa bướm vờn, công kích thẳng vào tâm trí mục tiêu."
       },
       tuHangPhoDo: {
-        name: "Cừu Hàng Phổ Độ",
+        name: "Từ Hàng Phổ Độ",
         desc: "Phật quang phổ độ, lập tức hồi phục 50 HP cho bản thân."
       },
       luuThuyKhanhVan: {
