@@ -1359,10 +1359,13 @@ body {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 960px), (max-height: 500px), (pointer: coarse) {
   .mobile-controls {
     display: block;
   }
+}
+
+@media (max-width: 720px) {
   .bottom-left-panel {
     display: none;
   }
