@@ -81,7 +81,7 @@ export class SpatialGrid {
   }
 
   _key(cx, cy) {
-    return `${cx},${cy}`;
+    return (cx << 16) | (cy & 0xffff);
   }
 
   _cellCoords(x, y) {
@@ -242,6 +242,7 @@ export class GameSocketManager {
     this.wss = new WebSocketServer({ server: httpServer, path: this.path });
     this.players = new Map(); // key: socket, value: player object
     this.playerById = new Map(); // key: playerId, value: { socket, data }
+    this.playerGrid = new SpatialGrid(GRID_CELL_SIZE);
 
     // Server-owned enemy state: position, health, movement and respawn are shared
     const spawns = options.enemySpawns ?? (options.enemyRespawnMs ? ENEMY_SPAWNS : []);
@@ -362,17 +363,14 @@ export class GameSocketManager {
    */
   broadcastNear(sourceX, sourceY, senderWs, data) {
     const payload = JSON.stringify(data);
-    const radiusSquared = this.aoiRadius * this.aoiRadius;
-    this.wss.clients.forEach((client) => {
-      if (client === senderWs || client.readyState !== WebSocket.OPEN) return;
-      if (client.bufferedAmount >= this.maxBufferedBytes) return;
-      const receiver = this.players.get(client);
-      if (!receiver) return;
-      const dx = receiver.x - sourceX;
-      const dy = receiver.y - sourceY;
-      if (dx * dx + dy * dy > radiusSquared) return;
+    const nearby = this.playerGrid.getNear(sourceX, sourceY, this.aoiRadius);
+    for (let i = 0; i < nearby.length; i++) {
+      const receiver = nearby[i];
+      const client = receiver.ws;
+      if (!client || client === senderWs || client.readyState !== WebSocket.OPEN) continue;
+      if (client.bufferedAmount >= this.maxBufferedBytes) continue;
       client.send(payload);
-    });
+    }
   }
 
   /**
@@ -382,16 +380,19 @@ export class GameSocketManager {
   broadcastEnemiesMoved(moved) {
     if (!moved.length) return;
     const payload = JSON.stringify({ type: "enemy_moved", payload: { enemies: moved } });
-    const radiusSquared = this.aoiRadius * this.aoiRadius;
-    this.wss.clients.forEach((client) => {
-      if (client.readyState !== WebSocket.OPEN) return;
+    const recipients = new Set();
+    for (let i = 0; i < moved.length; i++) {
+      const enemy = moved[i];
+      const nearPlayers = this.playerGrid.getNear(enemy.x, enemy.y, this.aoiRadius);
+      for (let j = 0; j < nearPlayers.length; j++) {
+        recipients.add(nearPlayers[j]);
+      }
+    }
+    recipients.forEach((receiver) => {
+      const client = receiver.ws;
+      if (!client || client.readyState !== WebSocket.OPEN) return;
       if (client.bufferedAmount >= this.maxBufferedBytes) return;
-      const receiver = this.players.get(client);
-      if (!receiver) return;
-      const near = moved.some(
-        (enemy) => (receiver.x - enemy.x) ** 2 + (receiver.y - enemy.y) ** 2 <= radiusSquared
-      );
-      if (near) client.send(payload);
+      client.send(payload);
     });
   }
 
@@ -508,6 +509,10 @@ export class GameSocketManager {
         } catch {
           // ignore
         }
+        const oldPlayer = this.players.get(existing.ws);
+        if (oldPlayer) {
+          this.playerGrid.remove(oldPlayer);
+        }
         this.players.delete(existing.ws);
       }
     }
@@ -555,9 +560,11 @@ export class GameSocketManager {
 
     playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
     playerData.mp = clampNum(payload.mp, 0, playerData.maxMp, playerData.maxMp);
+    playerData.ws = ws;
 
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
+    this.playerGrid.add(playerData);
 
     // 1. Send all existing players on the map to the joining player
     const existingPlayers = [];
@@ -637,6 +644,7 @@ export class GameSocketManager {
     if (payload.stance) {
       player.stance = payload.stance === "side" ? "side" : "front";
     }
+    this.playerGrid.update(player);
 
     // Find newly visible enemies using spatial grid and send to the moving player
     const nearEnemies = this.getNearEnemies(player.x, player.y);
@@ -902,6 +910,7 @@ export class GameSocketManager {
     victim.x = PLAYER_SPAWN.x;
     victim.y = PLAYER_SPAWN.y;
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
+    this.playerGrid.update(victim);
 
     const defeatMessage = {
       type: "player_defeated",
@@ -1267,6 +1276,7 @@ export class GameSocketManager {
   handleDisconnect(ws) {
     const player = this.players.get(ws);
     if (player) {
+      this.playerGrid.remove(player);
       this.players.delete(ws);
       this.playerById.delete(player.id);
 
@@ -1311,6 +1321,7 @@ export class GameSocketManager {
     this.enemyRespawnTimers.clear();
     this.players.clear();
     this.playerById.clear();
+    this.playerGrid = new SpatialGrid(GRID_CELL_SIZE);
     if (this.wss) {
       this.wss.clients.forEach((client) => {
         try {
