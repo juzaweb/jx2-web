@@ -33,11 +33,7 @@ export const detectLanguage = () => {
     // Storage can be unavailable (private mode / SSR); fall through.
   }
 
-  try {
-    return normalizeLanguage(window.navigator.language) || FALLBACK_LANGUAGE;
-  } catch {
-    return FALLBACK_LANGUAGE;
-  }
+  return FALLBACK_LANGUAGE;
 };
 
 let runtimeLanguage = detectLanguage();
@@ -45,13 +41,13 @@ let runtimeLanguage = detectLanguage();
 export const setRuntimeLanguage = (next) => {
   const normalized = normalizeLanguage(next);
   if (!normalized) return runtimeLanguage;
-  if (normalized === runtimeLanguage) return runtimeLanguage;
-  runtimeLanguage = normalized;
   try {
     window.localStorage.setItem(STORAGE_KEY, normalized);
   } catch {
     // Ignore storage failures; the choice still applies for this session.
   }
+  if (normalized === runtimeLanguage) return runtimeLanguage;
+  runtimeLanguage = normalized;
   try {
     window.dispatchEvent(
       new CustomEvent(LANGUAGE_CHANGED_EVENT, { detail: { language: normalized } })
