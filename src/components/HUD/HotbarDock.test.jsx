@@ -43,4 +43,15 @@ describe("HotbarDock logic & props", () => {
     const element = <HotbarDock onRotateScreen={handleRotate} />;
     expect(element.props.onRotateScreen).toBe(handleRotate);
   });
+
+  it("renders skills button with 'Võ Công' label and hotkey title", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <HotbarDock skills={[]} />
+      </I18nProvider>
+    );
+    expect(markup).toContain('id="skills-btn"');
+    expect(markup).toContain('title="Võ Công (F5)"');
+    expect(markup).toContain('<span class="sys-lbl">Võ Công</span>');
+  });
 });
