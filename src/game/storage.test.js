@@ -42,6 +42,16 @@ describe("StorageManager", () => {
     expect(typeof loaded.savedAt).toBe("number");
   });
 
+  it("round-trips the map the hero was standing on", () => {
+    expect(StorageManager.save({ ...SAMPLE, mapId: "dong-mon-thanh" })).toBe(true);
+    expect(StorageManager.load().mapId).toBe("dong-mon-thanh");
+  });
+
+  it("leaves older saves without a map id untouched", () => {
+    expect(StorageManager.save(SAMPLE)).toBe(true);
+    expect(StorageManager.load().mapId).toBeUndefined();
+  });
+
   it("returns null when nothing is saved", () => {
     expect(StorageManager.load()).toBeNull();
   });

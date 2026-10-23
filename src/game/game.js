@@ -1,6 +1,5 @@
 import * as Phaser from "phaser";
-import { WorldManager } from "./marketWorld.js";
-import { WORLD_CONFIG } from "./worldConfig.js";
+import { MapStage } from "./mapStage.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
 import { EnemyManager } from "./enemy.js";
@@ -19,29 +18,23 @@ import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
-import { MARKET_BOUNDS, MARKET_NPCS, MARKET_SPAWN } from "./marketLayout.js";
+import {
+  DEFAULT_MAP_ID,
+  getMap,
+  isInsideMap,
+  isKnownMap,
+  mapWorldConfig
+} from "./maps/mapRegistry.js";
+import { createPortalState, portalAt, stepPortalTrigger } from "./maps/portals.js";
 import { SHOP_BUILDINGS } from "./marketBuildings.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
-import {
-  NPC_DUOC,
-  createPharmacyNpc,
-  isInTalkRange,
-  isPointOnNpc,
-  npcApproachPoint
-} from "./npc.js";
+import { NPC_DUOC, isInTalkRange, isPointOnNpc, npcApproachPoint } from "./npc.js";
 import { ShopFlow } from "./shopFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
 
-/** Map descriptor shared with the minimap / full-map canvas. */
-const MARKET_WORLD_CONFIG = {
-  ...WORLD_CONFIG,
-  width: MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0,
-  height: MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0,
-  cityBounds: MARKET_BOUNDS
-};
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
 import { loadSkillLoadout } from "./skillLoadout.js";
@@ -56,6 +49,26 @@ export class JiangHuScene extends Phaser.Scene {
     this.unsubscribers = [];
     /** Server sync for the active character's bag; built in create(). */
     this.inventorySync = null;
+    /** Active map; the save file decides the initial value in create(). */
+    this.currentMapId = DEFAULT_MAP_ID;
+    this.requestedMapId = null;
+    this.pendingSpawn = null;
+    this.map = getMap(DEFAULT_MAP_ID);
+    this.mapConfig = mapWorldConfig(this.map);
+    this.portalState = createPortalState();
+    /** Renderer + NPCs + colliders of the map currently loaded. */
+    this.stage = null;
+  }
+
+  /**
+   * Phaser calls this before create(). A restart can pass `{ mapId, spawn }`;
+   * otherwise the save file decides which map to boot into.
+   * @param {{mapId?:string, spawn?:{x:number,y:number}}} [data]
+   */
+  init(data = {}) {
+    this.requestedMapId = isKnownMap(data?.mapId) ? data.mapId : null;
+    this.pendingSpawn = data?.spawn || null;
+    this.currentMapId = this.requestedMapId || DEFAULT_MAP_ID;
   }
 
   preload() {
@@ -103,25 +116,18 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.destroy();
     }
 
-    // The playable map is exactly the brick-paved area. Both the camera and the
-    // physics world are clamped to that rectangle so the player can never walk
-    // out onto the empty grass backdrop.
-    const mapW = MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0;
-    const mapH = MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0;
-    this.cameras.main.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
-    this.physics.world.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
+    // Resolve the map before anything is drawn so bounds, world, NPCs and the
+    // hero all agree on which map is live.
+    this.savedData = StorageManager.load();
+    this.currentMapId = this.resolveInitialMapId(this.savedData);
+    this.map = getMap(this.currentMapId);
+    this.mapConfig = mapWorldConfig(this.map);
+    // Announce the boot map so the HUD can label the region before any travel.
+    bridge.emit(EVENTS.MAP_CHANGED, { mapId: this.map.id, name: this.map.name });
 
-    // Initialize subsystems
-    this.worldManager = new WorldManager(this);
-    this.worldManager.create();
-
-    // Friendly shopkeepers (currently the Dược Điểm herbalist). Their bodies are
-    // added to the same static group as the buildings so the hero cannot walk
-    // through them.
-    this.npcs = MARKET_NPCS.map((def) => createPharmacyNpc(this, def));
-    for (const npc of MARKET_NPCS) {
-      this.worldManager.addBody(npc.x, npc.y, 46, 34);
-    }
+    // Draw the map and clamp the camera/physics to it. The NPCs come with it.
+    this.stage = new MapStage(this);
+    this.stage.build(this.map);
     this.pendingNpc = null;
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
@@ -135,10 +141,11 @@ export class JiangHuScene extends Phaser.Scene {
       initialName;
     const initialGender = normalizeGender(session?.activeCharacter?.gender);
 
+    const spawnPoint = this.pendingSpawn || this.map.spawn;
     this.player = new Player(
       this,
-      MARKET_SPAWN.x,
-      MARKET_SPAWN.y,
+      spawnPoint.x,
+      spawnPoint.y,
       initialName,
       initialGender
     );
@@ -149,18 +156,12 @@ export class JiangHuScene extends Phaser.Scene {
       ensureSectVfx(this, skillsForSect(session.activeCharacter.sect));
     }
     this.enemyManager = new EnemyManager(this);
-    // Biện Kinh is a safe city, so the offline roster starts empty; the server
-    // populates enemies for maps that have them.
-    this.enemyManager.create();
+    // Offline, the client owns the roster from the map definition; online, the
+    // server streams its own roster (see handleInitWorld).
+    this.enemyManager.create(this.offlineSpawns(this.map));
 
-    // Static physics collisions between world obstacles and entities
-    const obstacles = this.worldManager.getObstacles();
-    if (obstacles) {
-      this.physics.add.collider(this.player.sprite, obstacles);
-      if (this.enemyManager?.group) {
-        this.physics.add.collider(this.enemyManager.group, obstacles);
-      }
-    }
+    // The roster exists now, so the monster collisions can be wired too.
+    this.stage.bindColliders();
 
     // UI Bridge Adapter to communicate with React components
     this.uiBridge = new UIBridgeAdapter();
@@ -190,17 +191,14 @@ export class JiangHuScene extends Phaser.Scene {
       () => this.saveGame(false)
     );
 
-    // Load saved game if exists
-    this.savedData = StorageManager.load();
+    // Restore the saved stats/position on the map resolved above.
     if (this.savedData) {
       if (this.savedData.stats) {
         this.player.loadStats(this.savedData.stats);
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
         const { x, y } = this.savedData.position;
-        const insideMarket =
-          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
-        if (insideMarket) this.player.setPosition(x, y);
+        if (isInsideMap(this.map, x, y)) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -229,8 +227,16 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.on("init_world", (payload) => {
-      this.remotePlayerManager.handleInitWorld(payload);
-      this.enemyManager.applyServerSnapshot(payload?.enemies);
+      this.handleInitWorld(payload);
+    });
+
+    // A portal move confirmed by the server: the roster and the peers change.
+    this.networkClient.on("map_changed", (payload) => {
+      this.handleMapChanged(payload);
+    });
+
+    this.networkClient.on("map_change_rejected", (payload) => {
+      this.handleMapChangeRejected(payload);
     });
 
     this.networkClient.on("player_joined", (payload) => {
@@ -347,7 +353,7 @@ export class JiangHuScene extends Phaser.Scene {
       this.pendingNpc = null;
 
       // Check if clicking directly on an NPC (walk towards NPC)
-      const clickedNpc = (this.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
+      const clickedNpc = (this.stage?.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
       if (clickedNpc) {
         const approach = npcApproachPoint(clickedNpc);
         this.pendingNpc = clickedNpc;
@@ -544,21 +550,189 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Initial Stats emit to React
     this.uiBridge.updateHud(this.player.stats);
-    this.uiBridge.drawMinimap(
-      this.player,
-      this.enemyManager.getAll(),
-      MARKET_WORLD_CONFIG,
-      this.remotePlayerManager?.getAll() || []
-    );
-    this.uiBridge.drawCityMap(
-      this.player,
-      this.enemyManager.getAll(),
-      MARKET_WORLD_CONFIG,
-      this.remotePlayerManager?.getAll() || []
-    );
+    this.drawMapPanels();
 
     // Auto-start game immediately without start modal
     this.startGame();
+  }
+
+  /**
+   * The map to boot into: an explicit `init({ mapId })` wins, then the saved map,
+   * then the default city.
+   * @param {object|null} saved
+   * @returns {string}
+   */
+  resolveInitialMapId(saved) {
+    if (this.requestedMapId) return this.requestedMapId;
+    if (isKnownMap(saved?.mapId)) return saved.mapId;
+    return DEFAULT_MAP_ID;
+  }
+
+  /**
+   * Roster the client may own: none while the server is connected (it streams
+   * its own), and none on `safe` maps.
+   * @param {object} map
+   */
+  offlineSpawns(map) {
+    if (!map || map.safe) return [];
+    if (this.networkClient?.isConnected) return [];
+    return map.enemySpawns || [];
+  }
+
+  /** Redraw the radar and the full city map for the active map. */
+  drawMapPanels() {
+    if (!this.player) return;
+    const enemies = this.enemyManager?.getAll() || [];
+    const remote = this.remotePlayerManager?.getAll() || [];
+    this.uiBridge.drawMinimap(this.player, enemies, this.mapConfig, remote);
+    this.uiBridge.drawCityMap(this.player, enemies, this.mapConfig, remote);
+  }
+
+  /** One frame of portal detection. */
+  updatePortals(time) {
+    if (!this.map?.portals?.length) return;
+
+    const portal = portalAt(this.map, this.player.x, this.player.y);
+    const step = stepPortalTrigger(this.portalState, portal, time);
+    this.portalState = step.state;
+    if (!step.portal) return;
+
+    this.loadMap(step.portal.targetMapId, step.portal.targetSpawn, {
+      notifyServer: true,
+      portalId: step.portal.id
+    });
+  }
+
+  /**
+   * Move the hero to another map: tear the world down, rebuild it, and (online)
+   * tell the server so its roster and AOI follow along.
+   * @param {string} mapId
+   * @param {{x:number,y:number}} [spawn]
+   * @param {{notifyServer?:boolean, portalId?:string|null}} [options]
+   */
+  loadMap(mapId, spawn, { notifyServer = false, portalId = null } = {}) {
+    if (!this.player) return;
+
+    const targetId = isKnownMap(mapId) ? mapId : DEFAULT_MAP_ID;
+    const target = getMap(targetId);
+    const arrival = spawn || target.spawn;
+
+    // Already standing there (e.g. the server refused a portal and we are back on
+    // the map we had locally): only correct the position, never rebuild.
+    if (targetId === this.currentMapId) {
+      this.player.setSpawn(arrival);
+      this.player.setPosition(arrival.x, arrival.y);
+      return;
+    }
+
+    this.combat?.cancelPendingCast?.();
+    this.player.stopMovement();
+    this.pendingNpc = null;
+    this.isPointerMoving = false;
+
+    this.stage?.destroy();
+    this.enemyManager?.clear();
+    this.remotePlayerManager?.destroy?.();
+
+    this.currentMapId = targetId;
+    this.map = target;
+    this.mapConfig = mapWorldConfig(target);
+
+    this.stage = new MapStage(this);
+    this.stage.build(target);
+
+    this.player.setSpawn(arrival);
+    this.player.setPosition(arrival.x, arrival.y);
+    // Re-centre at once so the new map does not scroll in from the old corner.
+    this.cameras.main.centerOn(arrival.x, arrival.y);
+
+    if (!this.networkClient?.isConnected) {
+      this.enemyManager.create(this.offlineSpawns(target));
+    }
+    // Wire the monsters to the new map's obstacles (the group may be new).
+    this.stage.bindColliders();
+
+    this.portalState = createPortalState();
+    this.drawMapPanels();
+    bridge.emit(EVENTS.MAP_CHANGED, { mapId: targetId, name: target.name });
+    this.uiBridge.addLog(`Đã đến ${target.name}.`, "system");
+
+    if (notifyServer && this.networkClient?.isConnected) {
+      this.networkClient.sendMapChange({ portalId });
+    }
+
+    // One save, after the move: it records the new map and position. (Saving
+    // before the teardown would be overwritten by this one.)
+    this.saveGame(false);
+  }
+
+  /**
+   * Adopt the server's view of the current map: its peer list and its roster.
+   * Shared by the reconnect (`init_world`) and travel (`map_changed`) paths.
+   * @param {object} payload
+   */
+  applyServerWorld(payload = {}) {
+    this.enemyManager.clear();
+    this.remotePlayerManager.destroy();
+
+    if (payload.yourId) {
+      this.remotePlayerManager.handleInitWorld(payload);
+    } else {
+      (payload.players || []).forEach((player) => this.remotePlayerManager.addPlayer(player));
+    }
+
+    this.enemyManager.applyServerSnapshot(payload.enemies);
+    this.stage?.bindColliders();
+    this.drawMapPanels();
+  }
+
+  /**
+   * Server world initialisation (and reconnect): the server is authoritative
+   * about the map, the roster and the peers standing on it.
+   * @param {object} payload
+   */
+  handleInitWorld(payload = {}) {
+    const serverMapId = isKnownMap(payload.mapId) ? payload.mapId : this.currentMapId;
+
+    if (serverMapId !== this.currentMapId) {
+      this.loadMap(serverMapId, payload.spawn, { notifyServer: false });
+    } else if (payload.spawn) {
+      this.player.setSpawn(payload.spawn);
+    }
+
+    this.applyServerWorld(payload);
+  }
+
+  /**
+   * The server confirmed a portal move: swap map (if it raced ahead of us) and
+   * adopt the authoritative roster and peer list.
+   * @param {object} payload
+   */
+  handleMapChanged(payload = {}) {
+    const targetId = isKnownMap(payload.mapId) ? payload.mapId : this.currentMapId;
+    const spawn = payload.spawn || getMap(targetId).spawn;
+
+    if (targetId !== this.currentMapId) {
+      this.loadMap(targetId, spawn, { notifyServer: false });
+    } else {
+      this.player.setSpawn(spawn);
+      this.player.setPosition(spawn.x, spawn.y);
+    }
+
+    this.applyServerWorld(payload);
+  }
+
+  /**
+   * The server refused the portal move (unknown portal, wrong map). Snap back to
+   * the authoritative position.
+   * @param {object} payload
+   */
+  handleMapChangeRejected(payload = {}) {
+    const mapId = isKnownMap(payload.mapId) ? payload.mapId : DEFAULT_MAP_ID;
+    const spawn = payload.spawn || getMap(mapId).spawn;
+    this.uiBridge.addLog("Không thể di chuyển qua cổng này.", "guide");
+    bridge.emit(EVENTS.MAP_CHANGE_REJECTED, payload);
+    this.loadMap(mapId, spawn, { notifyServer: false });
   }
 
   useItem(slot) {
@@ -659,11 +833,13 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     if (itemId === "hoi-thanh-phu") {
-      // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
-      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
+      // Hồi Thành Phù (Về điểm hồi sinh của bản đồ đang đứng)
+      const map = this.map || getMap(this.currentMapId || DEFAULT_MAP_ID);
+      const spawn = map.spawn;
+      this.player.setPosition(spawn.x, spawn.y);
+      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về ${map.name}`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
-      this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
+      this.uiBridge.addLog(`Đã dùng Hồi Thành Phù quay về trung tâm ${map.name}.`, "system");
       return true;
     }
 
@@ -764,6 +940,9 @@ export class JiangHuScene extends Phaser.Scene {
 
     const success = StorageManager.save({
       stats: this.player.stats,
+      // The map id travels with the position, so a reload restores the hero on
+      // the map they were standing on instead of the default city.
+      mapId: this.currentMapId,
       position: {
         x: Math.round(this.player.x),
         y: Math.round(this.player.y)
@@ -918,13 +1097,17 @@ export class JiangHuScene extends Phaser.Scene {
       this.player.invulnerable = false;
       this.player.visual.setAlpha(1);
       if (payload.respawn) {
-        this.player.setPosition(payload.respawn.x, payload.respawn.y);
+        if (payload.respawn.mapId && payload.respawn.mapId !== this.currentMapId) {
+          this.loadMap(payload.respawn.mapId, payload.respawn, { notifyServer: false });
+        } else {
+          this.player.setPosition(payload.respawn.x, payload.respawn.y);
+        }
       } else {
         this.player.respawn();
       }
       this.combat?.clearBuffs?.();
       this.uiBridge.updateHud(this.player.stats);
-      this.uiBridge.addLog("Bạn đã bị đánh bại và hồi sinh tại Biện Kinh.", "combat");
+      this.uiBridge.addLog(`Bạn đã bị đánh bại và hồi sinh tại ${this.map.name}.`, "combat");
       // Persist the full-HP respawn state.
       this.saveGame(false);
     }
@@ -974,6 +1157,8 @@ export class JiangHuScene extends Phaser.Scene {
       id: playerId,
       token: session?.token || null,
       characterId: session?.activeCharacter?.id || null,
+      // The server restores the hero on the map the client is standing on.
+      mapId: this.currentMapId,
       username,
       displayName,
       x: Math.round(this.player.x),
@@ -997,7 +1182,7 @@ export class JiangHuScene extends Phaser.Scene {
    */
   interactWithNearbyNpc() {
     if (!this.started || this.isPaused) return;
-    const candidates = (this.npcs || [])
+    const candidates = (this.stage?.npcs || [])
       .map((npc) => ({
         npc,
         dist: Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.gx, npc.gy)
@@ -1068,9 +1253,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
         const { x, y } = this.savedData.position;
-        const insideMarket =
-          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
-        if (insideMarket) this.player.setPosition(x, y);
+        if (isInsideMap(this.map, x, y)) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -1090,8 +1273,11 @@ export class JiangHuScene extends Phaser.Scene {
         "system"
       );
     } else {
-      this.uiBridge.addLog("Bạn đã đặt chân đến Biện Kinh. Chúc hiệp khách hành tẩu bình an.", "system");
-      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
+      this.uiBridge.addLog(
+        `Bạn đã đặt chân đến ${this.map.name}. Chúc hiệp khách hành tẩu bình an.`,
+        "system"
+      );
+      this.player.setPosition(this.map.spawn.x, this.map.spawn.y);
     }
 
     this.saveGame(false);
@@ -1108,6 +1294,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.player.update(time, delta);
     // Drive pending melee approaches (walk into range, then release the skill).
     this.combat.update?.(time);
+    // Walk into a portal and travel to the linked map.
+    this.updatePortals(time);
 
     // Open a shop once the hero has walked within talking distance.
     if (this.pendingNpc) {
@@ -1180,18 +1368,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Update UI HUD & Minimap Radar
     this.uiBridge.updateHud(this.player.stats);
-    this.uiBridge.drawMinimap(
-      this.player,
-      this.enemyManager.getAll(),
-      MARKET_WORLD_CONFIG,
-      this.remotePlayerManager?.getAll() || []
-    );
-    this.uiBridge.drawCityMap(
-      this.player,
-      this.enemyManager.getAll(),
-      MARKET_WORLD_CONFIG,
-      this.remotePlayerManager?.getAll() || []
-    );
+    this.drawMapPanels();
   }
 
   /**
@@ -1228,6 +1405,10 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.shopFlow) {
       this.shopFlow.destroy();
       this.shopFlow = null;
+    }
+    if (this.stage) {
+      this.stage.destroy();
+      this.stage = null;
     }
     if (this.player) {
       this.player.destroy?.();

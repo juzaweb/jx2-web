@@ -241,6 +241,15 @@ export class NetworkClient {
   }
 
   /**
+   * Ask the server to move us through a portal. The server validates that the
+   * portal belongs to the map we are standing on before accepting the move.
+   * @param {{portalId:string}} changeData
+   */
+  sendMapChange(changeData) {
+    this.send("map_change", changeData);
+  }
+
+  /**
    * Send chat message
    * @param {Object} chatData
    */

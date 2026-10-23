@@ -9,7 +9,7 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { Wolf } from "./enemy.js";
+import { EnemyManager, Wolf } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
 import { ENEMY_TUNING } from "./enemyAi.js";
 
@@ -89,6 +89,57 @@ const createWolf = ({ isConnected = true } = {}) => {
   const scene = createScene({ isConnected });
   return { scene, wolf: new Wolf(scene, 840, 600, 0) };
 };
+
+describe("Enemies are built from the shared catalog", () => {
+  it("defaults to the legacy market wolf", () => {
+    const { wolf } = createWolf();
+    expect(wolf.monsterId).toBe("soi-xam");
+    expect(wolf.name).toBe("Sói Xám");
+    expect(wolf.level).toBe(5);
+    expect(wolf.maxHp).toBe(45);
+    expect(wolf.isBoss).toBe(false);
+  });
+
+  it("takes name, level and health from the requested monster", () => {
+    const scene = createScene();
+    const boss = new Wolf(scene, 8100, 3500, 7, "dong-mon-tuong-quan");
+
+    expect(boss.monsterId).toBe("dong-mon-tuong-quan");
+    expect(boss.name).toBe("Đông Môn Tướng Quân");
+    expect(boss.level).toBe(30);
+    expect(boss.maxHp).toBe(1800);
+    expect(boss.isBoss).toBe(true);
+    // A boss must not pop back up on the regular respawn timer.
+    expect(boss.respawnMs).toBe(180000);
+  });
+
+  it("falls back to the wolf for an unknown monster id", () => {
+    const scene = createScene();
+    const enemy = new Wolf(scene, 100, 100, 1, "khong-ton-tai");
+    expect(enemy.monsterId).toBe("soi-xam");
+  });
+});
+
+describe("EnemyManager roster lifecycle", () => {
+  const managerScene = () => ({
+    ...createScene(),
+    physics: { add: { sprite: createScene().physics.add.sprite } }
+  });
+
+  it("clears every enemy when the map changes but keeps the collider group", () => {
+    const scene = managerScene();
+    const manager = new EnemyManager(scene);
+    const group = { add() {}, clear() {}, destroy() {} };
+    manager.group = group;
+    manager.enemies = [new Wolf(scene, 100, 100, 0), new Wolf(scene, 200, 200, 1)];
+
+    expect(manager.getAll()).toHaveLength(2);
+    manager.clear();
+    expect(manager.getAll()).toHaveLength(0);
+    // World colliders point at this group, so it must survive a roster swap.
+    expect(manager.group).toBe(group);
+  });
+});
 
 const player = (x, y) => ({ x, y, sprite: { x, y } });
 

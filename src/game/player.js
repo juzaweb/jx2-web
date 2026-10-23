@@ -514,6 +514,17 @@ export class Player {
     this.hideFormation();
   }
 
+  /**
+   * Move the respawn point, used when the hero travels to another map so a
+   * death (or the Hồi Thành Phù) returns them to the map they are on.
+   * @param {{x:number, y:number}} point
+   */
+  setSpawn(point) {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    this.spawnX = point.x;
+    this.spawnY = point.y;
+  }
+
   setTouchDirection(direction) {
     this.touchDirection = direction;
   }

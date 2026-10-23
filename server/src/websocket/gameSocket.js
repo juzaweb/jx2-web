@@ -4,11 +4,18 @@ import { store } from "../data/playerDb.js";
 import { characterDb } from "../data/characterDb.js";
 import { userDb } from "../data/userDb.js";
 import { verifySessionToken } from "../auth/session.js";
-import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.js";
+import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
-import { MARKET_NPCS, MARKET_SPAWN } from "../../../src/game/marketLayout.js";
+import { getMonster } from "../../../src/game/enemyCatalog.js";
+import {
+  DEFAULT_MAP_ID,
+  MAP_IDS,
+  findPortal,
+  getMap,
+  isKnownMap
+} from "../../../src/game/maps/mapRegistry.js";
 import {
   applyReward,
   normalizeProgress,
@@ -171,8 +178,12 @@ export class SpatialGrid {
   }
 }
 
-/** Enemy tuning mirroring the client's Wolf entity. */
-export const ENEMY_MAX_HP = 45;
+/**
+ * Legacy tuning mirror. Monster numbers now come from the shared catalog
+ * (`src/game/enemyCatalog.js`); the names stay exported because older helpers and
+ * tests still import them.
+ */
+export const ENEMY_MAX_HP = getMonster("soi-xam").maxHp;
 export const ENEMY_RESPAWN_MS = 10000;
 /** Server AI tick (10 Hz): fast enough to look continuous, cheap enough to share. */
 export const ENEMY_TICK_MS = 100;
@@ -205,40 +216,53 @@ const MAX_BUFFERED_BYTES = 1_000_000;
  */
 export const AOI_RADIUS = 800;
 
-/** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
-export const PLAYER_SPAWN = { ...MARKET_SPAWN };
+/** Respawn point of the default map, kept for older callers. */
+export const PLAYER_SPAWN = { ...getMap(DEFAULT_MAP_ID).spawn };
 
 /** Max distance (ground px) between buyer and a shop NPC. */
 const SHOP_INTERACT_RANGE = 260;
 
-/** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
-const ENEMY_SPAWNS = [
-  [8400, 6000],
-  [9500, 6700],
-  [11100, 5900],
-  [12600, 6500],
-  [13800, 5900],
-  [7600, 8000],
-  [10500, 8200],
-  [13200, 7900]
-];
-
 /**
- * Build the authoritative enemy roster.
- * @param {Array<[number, number]>} [spawns]
+ * Build one map's authoritative roster from its MapDefinition. Accepts catalog
+ * spawns (`{id, monsterId, x, y}`) and the legacy `[x, y]` pairs.
+ * @param {Array<object|[number, number]>} [spawns]
+ * @param {string} [mapId]
  * @returns {Array<Object>}
  */
-export const createEnemyState = (spawns = ENEMY_SPAWNS) =>
-  spawns.map(([x, y], id) => ({
-    id,
-    x,
-    y,
-    homeX: x,
-    homeY: y,
-    hp: ENEMY_MAX_HP,
-    maxHp: ENEMY_MAX_HP,
-    isDead: false
-  }));
+export const createEnemyState = (
+  spawns = getMap(DEFAULT_MAP_ID).enemySpawns,
+  mapId = DEFAULT_MAP_ID
+) =>
+  spawns.map((spawn, index) => {
+    const isPair = Array.isArray(spawn);
+    const x = isPair ? spawn[0] : spawn.x;
+    const y = isPair ? spawn[1] : spawn.y;
+    const monster = getMonster(isPair ? spawn[2] : spawn.monsterId);
+
+    return {
+      id: isPair ? index : spawn.id ?? index,
+      mapId,
+      monsterId: monster.id,
+      name: monster.name,
+      level: monster.level,
+      x,
+      y,
+      homeX: x,
+      homeY: y,
+      hp: monster.maxHp,
+      maxHp: monster.maxHp,
+      attack: monster.attack,
+      defense: monster.defense,
+      critRate: monster.critRate,
+      critDamage: monster.critDamage,
+      exp: monster.exp,
+      coinsMin: monster.coinsMin,
+      coinsMax: monster.coinsMax,
+      tuning: monster.ai || null,
+      respawnMs: Number.isFinite(monster.respawnMs) ? monster.respawnMs : null,
+      isDead: false
+    };
+  });
 
 export class GameSocketManager {
   /**
@@ -251,15 +275,32 @@ export class GameSocketManager {
     this.players = new Map(); // key: socket, value: player object
     this.playerById = new Map(); // key: playerId, value: { socket, data }
 
-    // Server-owned enemy state: position, health, movement and respawn are shared
-    const spawns = options.enemySpawns ?? (options.enemyRespawnMs ? ENEMY_SPAWNS : []);
-    this.enemies = new Map(createEnemyState(spawns).map((enemy) => [enemy.id, enemy]));
+    // Server-owned enemy state, one roster per map. `enemies` / `enemyGrid` keep
+    // pointing at the default map so older helpers and tests still work.
+    this.enemiesEnabled = options.enemies !== false;
+    this.enemyByMap = new Map();
+    this.enemyGridByMap = new Map();
+    this.enemies = new Map();
     this.enemyGrid = new SpatialGrid(GRID_CELL_SIZE);
-    this.enemies.forEach((enemy) => {
-      if (!enemy.isDead) {
-        this.enemyGrid.add(enemy);
-      }
-    });
+    this.enemyByMap.set(DEFAULT_MAP_ID, this.enemies);
+    this.enemyGridByMap.set(DEFAULT_MAP_ID, this.enemyGrid);
+
+    if (this.enemiesEnabled) {
+      // Biện Kinh is a safe city: its legacy roster only exists for harnesses that
+      // explicitly ask for it (`enemySpawns` / `enemyRespawnMs`). Every other map
+      // spawns its own hunting roster from its MapDefinition.
+      const marketSpawns =
+        options.enemySpawns ??
+        (options.enemyRespawnMs != null ? getMap(DEFAULT_MAP_ID).enemySpawns : []);
+      this.loadRoster(DEFAULT_MAP_ID, marketSpawns);
+
+      MAP_IDS.forEach((mapId) => {
+        if (mapId === DEFAULT_MAP_ID) return;
+        const map = getMap(mapId);
+        if (map.safe || !map.enemySpawns?.length) return;
+        this.loadRoster(mapId, map.enemySpawns);
+      });
+    }
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
     this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
@@ -277,6 +318,53 @@ export class GameSocketManager {
     this.setupServer();
     this.startHeartbeat();
     this.startEnemyTick();
+  }
+
+  /**
+   * Replace one map's roster and its spatial grid.
+   * @param {string} mapId
+   * @param {Array<object|[number, number]>} [spawns]
+   * @returns {Map<number, Object>}
+   */
+  loadRoster(mapId, spawns = []) {
+    const roster = new Map(createEnemyState(spawns, mapId).map((enemy) => [enemy.id, enemy]));
+    const grid = new SpatialGrid(GRID_CELL_SIZE);
+    roster.forEach((enemy) => {
+      if (!enemy.isDead) grid.add(enemy);
+    });
+
+    this.enemyByMap.set(mapId, roster);
+    this.enemyGridByMap.set(mapId, grid);
+
+    if (mapId === DEFAULT_MAP_ID) {
+      this.enemies = roster;
+      this.enemyGrid = grid;
+    }
+    return roster;
+  }
+
+  /**
+   * The roster of a map, built on first use.
+   * @param {string} mapId
+   * @returns {Map<number, Object>}
+   */
+  rosterFor(mapId) {
+    const id = isKnownMap(mapId) ? mapId : DEFAULT_MAP_ID;
+    if (!this.enemyByMap.has(id)) {
+      const map = getMap(id);
+      this.loadRoster(id, this.enemiesEnabled ? map.enemySpawns || [] : []);
+    }
+    return this.enemyByMap.get(id);
+  }
+
+  /**
+   * The spatial grid of a map, built alongside its roster.
+   * @param {string} mapId
+   * @returns {SpatialGrid}
+   */
+  gridFor(mapId) {
+    this.rosterFor(mapId);
+    return this.enemyGridByMap.get(isKnownMap(mapId) ? mapId : DEFAULT_MAP_ID);
   }
 
   setupServer() {
@@ -368,7 +456,7 @@ export class GameSocketManager {
    * @param {WebSocket|null} senderWs
    * @param {Object} data
    */
-  broadcastNear(sourceX, sourceY, senderWs, data) {
+  broadcastNear(sourceX, sourceY, senderWs, data, mapId = null) {
     const payload = JSON.stringify(data);
     const radiusSquared = this.aoiRadius * this.aoiRadius;
     this.wss.clients.forEach((client) => {
@@ -376,6 +464,8 @@ export class GameSocketManager {
       if (client.bufferedAmount >= this.maxBufferedBytes) return;
       const receiver = this.players.get(client);
       if (!receiver) return;
+      // Coordinates are per-map, so a distance check alone would leak between maps.
+      if (mapId && receiver.mapId !== mapId) return;
       const dx = receiver.x - sourceX;
       const dy = receiver.y - sourceY;
       if (dx * dx + dy * dy > radiusSquared) return;
@@ -384,10 +474,28 @@ export class GameSocketManager {
   }
 
   /**
-   * Fan a batch of enemy positions out to players near *any* of them.
-   * @param {Array<{id:number, x:number, y:number}>} moved
+   * Send an identity event (join/leave) to every player standing on one map.
+   * @param {string} mapId
+   * @param {Object} data
+   * @param {WebSocket|null} [excludeWs]
    */
-  broadcastEnemiesMoved(moved) {
+  broadcastToMap(mapId, data, excludeWs = null) {
+    const payload = JSON.stringify(data);
+    this.wss.clients.forEach((client) => {
+      if (client === excludeWs || client.readyState !== WebSocket.OPEN) return;
+      if (client.bufferedAmount >= this.maxBufferedBytes) return;
+      const receiver = this.players.get(client);
+      if (!receiver || receiver.mapId !== mapId) return;
+      client.send(payload);
+    });
+  }
+
+  /**
+   * Fan a batch of enemy positions out to players near *any* of them on the same map.
+   * @param {Array<{id:number, x:number, y:number}>} moved
+   * @param {string} [mapId]
+   */
+  broadcastEnemiesMoved(moved, mapId = DEFAULT_MAP_ID) {
     if (!moved.length) return;
     const payload = JSON.stringify({ type: "enemy_moved", payload: { enemies: moved } });
     const radiusSquared = this.aoiRadius * this.aoiRadius;
@@ -395,7 +503,7 @@ export class GameSocketManager {
       if (client.readyState !== WebSocket.OPEN) return;
       if (client.bufferedAmount >= this.maxBufferedBytes) return;
       const receiver = this.players.get(client);
-      if (!receiver) return;
+      if (!receiver || receiver.mapId !== mapId) return;
       const near = moved.some(
         (enemy) => (receiver.x - enemy.x) ** 2 + (receiver.y - enemy.y) ** 2 <= radiusSquared
       );
@@ -458,6 +566,10 @@ export class GameSocketManager {
 
       case "enemy_hit":
         this.handleEnemyHit(ws, msg.payload);
+        break;
+
+      case "map_change":
+        this.handleMapChange(ws, msg.payload);
         break;
 
       case "quest_claim":
@@ -524,12 +636,18 @@ export class GameSocketManager {
       }
     }
 
+    // Which map this hero is entering. Unknown ids fall back to the default city.
+    const requestedMapId = sanitizeStr(payload.mapId || "", 64);
+    const mapId = isKnownMap(requestedMapId) ? requestedMapId : DEFAULT_MAP_ID;
+    const entryMap = getMap(mapId);
+
     const playerData = {
       id: playerId,
       username,
       displayName,
-      x: clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, PLAYER_SPAWN.x),
-      y: clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, PLAYER_SPAWN.y),
+      mapId,
+      x: clampNum(payload.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x),
+      y: clampNum(payload.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y),
       vx: clampNum(payload.vx, -500, 500, 0),
       vy: clampNum(payload.vy, -500, 500, 0),
       direction: payload.direction === "left" ? "left" : "right",
@@ -571,10 +689,10 @@ export class GameSocketManager {
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
 
-    // 1. Send all existing players on the map to the joining player
+    // 1. Send all existing players *on this map* to the joining player
     const existingPlayers = [];
     this.players.forEach((p, clientWs) => {
-      if (clientWs !== ws) {
+      if (clientWs !== ws && p.mapId === mapId) {
         existingPlayers.push(this.playerSnapshot(p));
       }
     });
@@ -583,8 +701,10 @@ export class GameSocketManager {
       type: "init_world",
       payload: {
         yourId: playerId,
+        mapId,
+        spawn: { x: playerData.x, y: playerData.y },
         players: existingPlayers,
-        enemies: this.getEnemyState()
+        enemies: this.getEnemyState(mapId)
       }
     });
 
@@ -597,11 +717,72 @@ export class GameSocketManager {
       });
     }
 
-    // 2. Announce the new player to everyone else in the world
-    this.broadcast(ws, {
-      type: "player_joined",
-      payload: { player: this.playerSnapshot(playerData) }
+    // 2. Announce the new player to everyone else standing on the same map
+    this.broadcastToMap(
+      mapId,
+      { type: "player_joined", payload: { player: this.playerSnapshot(playerData) } },
+      ws
+    );
+  }
+
+  /**
+   * Move a player through a portal. The server owns the destination: the client
+   * only names the portal it walked into, and only portals of the map the player
+   * is currently standing on are accepted.
+   * @param {WebSocket} ws
+   * @param {{portalId?:string}} payload
+   */
+  handleMapChange(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const fromMapId = player.mapId || DEFAULT_MAP_ID;
+    const portal = findPortal(fromMapId, sanitizeStr(payload.portalId || "", 64));
+
+    if (!portal || !isKnownMap(portal.targetMapId)) {
+      this.send(ws, {
+        type: "map_change_rejected",
+        payload: { mapId: fromMapId, spawn: { x: player.x, y: player.y } }
+      });
+      return;
+    }
+
+    const target = getMap(portal.targetMapId);
+    const roster = this.rosterFor(target.id);
+
+    // Leaving: the old map stops seeing this player.
+    this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: player.id } }, ws);
+
+    player.mapId = target.id;
+    player.x = clampNum(portal.targetSpawn.x, target.bounds.x0, target.bounds.x1, target.spawn.x);
+    player.y = clampNum(portal.targetSpawn.y, target.bounds.y0, target.bounds.y1, target.spawn.y);
+    player.vx = 0;
+    player.vy = 0;
+    // A fresh map means fresh aggro; do not carry a bite cooldown across.
+    player.nextBiteAt = 0;
+
+    const peers = [];
+    this.players.forEach((other, clientWs) => {
+      if (clientWs !== ws && other.mapId === target.id) peers.push(this.playerSnapshot(other));
     });
+
+    this.send(ws, {
+      type: "map_changed",
+      payload: {
+        yourId: player.id,
+        mapId: target.id,
+        spawn: { x: player.x, y: player.y },
+        players: peers,
+        enemies: Array.from(roster.values()).map((enemy) => this.enemySnapshot(enemy))
+      }
+    });
+
+    // Arriving: the new map sees this player.
+    this.broadcastToMap(
+      target.id,
+      { type: "player_joined", payload: { player: this.playerSnapshot(player) } },
+      ws
+    );
   }
 
   /**
@@ -615,6 +796,7 @@ export class GameSocketManager {
       id: player.id,
       username: player.username,
       displayName: player.displayName,
+      mapId: player.mapId,
       x: player.x,
       y: player.y,
       vx: player.vx,
@@ -639,8 +821,11 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    player.x = clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, player.x);
-    player.y = clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, player.y);
+    // Movement is clamped to the map the player stands on, exactly like the join
+    // clamp, so the two can never disagree about where the hero may be.
+    const bounds = getMap(player.mapId).bounds;
+    player.x = clampNum(payload.x, bounds.x0, bounds.x1, player.x);
+    player.y = clampNum(payload.y, bounds.y0, bounds.y1, player.y);
     player.vx = clampNum(payload.vx, -500, 500, 0);
     player.vy = clampNum(payload.vy, -500, 500, 0);
     if (payload.direction) {
@@ -650,8 +835,9 @@ export class GameSocketManager {
       player.stance = payload.stance === "side" ? "side" : "front";
     }
 
-    // Find newly visible enemies using spatial grid and send to the moving player
-    const nearEnemies = this.getNearEnemies(player.x, player.y);
+    // Find newly visible enemies using the map's spatial grid and send them to
+    // the moving player only.
+    const nearEnemies = this.getNearEnemies(player.x, player.y, this.aoiRadius, player.mapId);
     if (nearEnemies.length > 0) {
       this.send(ws, {
         type: "near_enemies",
@@ -659,19 +845,25 @@ export class GameSocketManager {
       });
     }
 
-    // Broadcast the position to nearby players only (AOI)
-    this.broadcastNear(player.x, player.y, ws, {
-      type: "player_moved",
-      payload: {
-        id: player.id,
-        x: player.x,
-        y: player.y,
-        vx: player.vx,
-        vy: player.vy,
-        direction: player.direction,
-        stance: player.stance
-      }
-    });
+    // Broadcast the position to nearby players only (AOI, same map)
+    this.broadcastNear(
+      player.x,
+      player.y,
+      ws,
+      {
+        type: "player_moved",
+        payload: {
+          id: player.id,
+          x: player.x,
+          y: player.y,
+          vx: player.vx,
+          vy: player.vy,
+          direction: player.direction,
+          stance: player.stance
+        }
+      },
+      player.mapId
+    );
   }
 
   /**
@@ -687,10 +879,16 @@ export class GameSocketManager {
 
     player.equipment = sanitizeEquipment(payload.equipment);
 
-    this.broadcastNear(player.x, player.y, ws, {
-      type: "player_equipment",
-      payload: { id: player.id, equipment: player.equipment }
-    });
+    this.broadcastNear(
+      player.x,
+      player.y,
+      ws,
+      {
+        type: "player_equipment",
+        payload: { id: player.id, equipment: player.equipment }
+      },
+      player.mapId
+    );
   }
 
   /**
@@ -725,10 +923,16 @@ export class GameSocketManager {
 
     player.hp = Math.min(player.maxHp, player.hp + amount);
 
-    this.broadcastNear(player.x, player.y, null, {
-      type: "player_hp",
-      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
-    });
+    this.broadcastNear(
+      player.x,
+      player.y,
+      null,
+      {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      },
+      player.mapId
+    );
   }
 
   /**
@@ -779,7 +983,7 @@ export class GameSocketManager {
     }
 
     // A shop is a place in the world: refuse purchases made from across the map.
-    const nearShop = MARKET_NPCS.some(
+    const nearShop = (getMap(player.mapId).npcs || []).some(
       (npc) =>
         npc.shop === "pharmacy" &&
         (player.x - npc.x) ** 2 + (player.y - npc.y) ** 2 <= SHOP_INTERACT_RANGE ** 2
@@ -859,10 +1063,16 @@ export class GameSocketManager {
 
   /** Broadcast a player's authoritative MP pool to nearby players. */
   broadcastMp(player) {
-    this.broadcastNear(player.x, player.y, null, {
-      type: "player_mp",
-      payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
-    });
+    this.broadcastNear(
+      player.x,
+      player.y,
+      null,
+      {
+        type: "player_mp",
+        payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+      },
+      player.mapId
+    );
   }
 
   /**
@@ -907,20 +1117,27 @@ export class GameSocketManager {
     // a skill the player did not just cast, so damage cannot be minted freely.
     if (skill) player.lastCast = { skillId, at: now, hits: 0 };
 
-    const x = clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, player.x);
-    const y = clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, player.y);
+    const aimBounds = getMap(player.mapId).bounds;
+    const x = clampNum(payload.x, aimBounds.x0, aimBounds.x1, player.x);
+    const y = clampNum(payload.y, aimBounds.y0, aimBounds.y1, player.y);
     const facingRight = payload.facingRight !== false;
 
-    this.broadcastNear(x, y, ws, {
-      type: "player_attacked",
-      payload: {
-        id: player.id,
-        skill: skillId,
-        x,
-        y,
-        facingRight
-      }
-    });
+    this.broadcastNear(
+      x,
+      y,
+      ws,
+      {
+        type: "player_attacked",
+        payload: {
+          id: player.id,
+          skill: skillId,
+          x,
+          y,
+          facingRight
+        }
+      },
+      player.mapId
+    );
   }
 
   /**
@@ -979,9 +1196,10 @@ export class GameSocketManager {
    * @param {number} damage
    * @param {?Object} attacker - server player object that caused it
    * @param {"pvp"|"wolf"} source
+   * @param {string|null} [sourceName] Display name of the attacking monster
    * @returns {boolean} whether the hit landed
    */
-  applyPlayerDamage(target, damage, attacker = null, source = "wolf") {
+  applyPlayerDamage(target, damage, attacker = null, source = "wolf", sourceName = null) {
     const now = Date.now();
     if (now < target.invulnerableUntil) return false;
 
@@ -989,17 +1207,29 @@ export class GameSocketManager {
     target.invulnerableUntil = now + PLAYER_IFRAME_MS;
 
     // The victim always receives their own HP (distance 0); only nearby players do.
-    this.broadcastNear(target.x, target.y, null, {
-      type: "player_hp",
-      payload: {
-        id: target.id,
-        hp: target.hp,
-        maxHp: target.maxHp,
-        damage,
-        source,
-        sourceName: source === "wolf" ? "Sói Xám" : attacker ? attacker.displayName || attacker.username : "Đối thủ"
-      }
-    });
+    this.broadcastNear(
+      target.x,
+      target.y,
+      null,
+      {
+        type: "player_hp",
+        payload: {
+          id: target.id,
+          hp: target.hp,
+          maxHp: target.maxHp,
+          damage,
+          source,
+          sourceName:
+            sourceName ||
+            (source === "wolf"
+              ? "Sói Xám"
+              : attacker
+                ? attacker.displayName || attacker.username
+                : "Đối thủ")
+        }
+      },
+      target.mapId
+    );
 
     if (target.hp <= 0) {
       this.respawnPlayer(target, attacker, source);
@@ -1018,10 +1248,11 @@ export class GameSocketManager {
     // The defeat is announced where the fight happened, before the teleport.
     const defeatX = victim.x;
     const defeatY = victim.y;
+    const map = getMap(victim.mapId);
 
     victim.hp = victim.maxHp;
-    victim.x = PLAYER_SPAWN.x;
-    victim.y = PLAYER_SPAWN.y;
+    victim.x = map.spawn.x;
+    victim.y = map.spawn.y;
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
 
     const defeatMessage = {
@@ -1032,7 +1263,8 @@ export class GameSocketManager {
         attackerId: attacker?.id || null,
         attackerName: attacker ? attacker.displayName || attacker.username : null,
         source,
-        respawn: { ...PLAYER_SPAWN }
+        // Includes the map so the client can follow a respawn that crosses maps.
+        respawn: { mapId: map.id, x: map.spawn.x, y: map.spawn.y }
       }
     };
 
@@ -1040,12 +1272,18 @@ export class GameSocketManager {
     // Always deliver its own defeat; nearby players get it through the AOI.
     const victimWs = this.playerById.get(victim.id)?.ws || null;
     this.send(victimWs, defeatMessage);
-    this.broadcastNear(defeatX, defeatY, victimWs, defeatMessage);
+    this.broadcastNear(defeatX, defeatY, victimWs, defeatMessage, victim.mapId);
 
-    this.broadcastNear(victim.x, victim.y, null, {
-      type: "player_hp",
-      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
-    });
+    this.broadcastNear(
+      victim.x,
+      victim.y,
+      null,
+      {
+        type: "player_hp",
+        payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
+      },
+      victim.mapId
+    );
   }
 
   /**
@@ -1082,44 +1320,53 @@ export class GameSocketManager {
   enemySnapshot(enemy) {
     return {
       id: enemy.id,
+      mapId: enemy.mapId,
+      monsterId: enemy.monsterId,
+      name: enemy.name,
+      level: enemy.level,
       x: enemy.x,
       y: enemy.y,
       homeX: enemy.homeX,
       homeY: enemy.homeY,
       hp: enemy.hp,
       maxHp: enemy.maxHp,
+      attack: enemy.attack,
+      defense: enemy.defense,
       isDead: enemy.isDead
     };
   }
 
   /**
-   * Report the current enemy roster: position, health and dead flag.
+   * Report one map's enemy roster: position, health and dead flag.
+   * @param {string} [mapId]
    * @returns {Array<Object>}
    */
-  getEnemyState() {
-    return Array.from(this.enemies.values()).map((enemy) => this.enemySnapshot(enemy));
+  getEnemyState(mapId = DEFAULT_MAP_ID) {
+    return Array.from(this.rosterFor(mapId).values()).map((enemy) => this.enemySnapshot(enemy));
   }
 
   /**
-   * Find raw living enemy objects near a position using the spatial grid.
+   * Find raw living enemy objects near a position using the map's spatial grid.
    * @param {number} x
    * @param {number} y
    * @param {number} [radius]
+   * @param {string} [mapId]
    * @returns {Array<Object>}
    */
-  getNearLivingEnemies(x, y, radius = this.aoiRadius) {
-    return this.enemyGrid.getNear(x, y, radius).filter((enemy) => !enemy.isDead);
+  getNearLivingEnemies(x, y, radius = this.aoiRadius, mapId = DEFAULT_MAP_ID) {
+    return this.gridFor(mapId).getNear(x, y, radius).filter((enemy) => !enemy.isDead);
   }
 
   /**
-   * Find living enemy snapshots near a position using the spatial grid.
+   * Find living enemy snapshots near a position using the map's spatial grid.
    * @param {number} x
    * @param {number} y
    * @param {number} [radius]
+   * @param {string} [mapId]
    * @returns {Array<Object>}
    */
-  getNearEnemies(x, y, radius = this.aoiRadius) {
-    return this.getNearLivingEnemies(x, y, radius).map((enemy) => this.enemySnapshot(enemy));
+  getNearEnemies(x, y, radius = this.aoiRadius, mapId = DEFAULT_MAP_ID) {
+    return this.getNearLivingEnemies(x, y, radius, mapId).map((enemy) => this.enemySnapshot(enemy));
   }
 
   /**
@@ -1132,7 +1379,9 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    const enemy = this.enemies.get(payload.id);
+    // Enemy ids are per-map, so the roster of the map the attacker stands on is
+    // the only one a hit can name.
+    const enemy = this.rosterFor(player.mapId).get(payload.id);
     if (!enemy) return;
 
     let damage;
@@ -1154,7 +1403,7 @@ export class GameSocketManager {
       damage = computeSkillDamage(
         skill,
         { attack: player.attack, critRate: player.critRate, critDamage: 1.5 },
-        { defense: WOLF_COMBAT.defense },
+        { defense: enemy.defense },
         Math.random
       ).damage;
     } else {
@@ -1177,24 +1426,36 @@ export class GameSocketManager {
     const killed = enemy.hp <= 0;
     if (killed) {
       enemy.isDead = true;
-      this.enemyGrid.remove(enemy);
-      this.scheduleEnemyRespawn(enemy.id);
+      this.gridFor(enemy.mapId).remove(enemy);
+      this.scheduleEnemyRespawn(enemy);
     }
 
-    this.broadcastNear(enemy.x, enemy.y, null, {
-      type: "enemy_hit",
-      payload: {
-        ...this.enemySnapshot(enemy),
-        damage,
-        attackerId: player.id
-      }
-    });
+    this.broadcastNear(
+      enemy.x,
+      enemy.y,
+      null,
+      {
+        type: "enemy_hit",
+        payload: {
+          ...this.enemySnapshot(enemy),
+          damage,
+          attackerId: player.id
+        }
+      },
+      enemy.mapId
+    );
 
     if (killed) {
       // Rolled from the server's own health pool and attributed to the killing
       // blow, so the client that landed it cannot mint its own payout
       const reward = rollEnemyReward(player.id, enemy);
-      this.broadcastNear(enemy.x, enemy.y, null, { type: "enemy_reward", payload: reward });
+      this.broadcastNear(
+        enemy.x,
+        enemy.y,
+        null,
+        { type: "enemy_reward", payload: reward },
+        enemy.mapId
+      );
 
       // The credited killer's ledger is updated here, on the server. The reward
       // broadcast above is only for rendering (drop + float text).
@@ -1227,10 +1488,13 @@ export class GameSocketManager {
       // A level-up heals HP and refills MP, matching the client's expectation.
       player.hp = player.maxHp;
       player.mp = player.maxMp;
-      this.broadcastNear(player.x, player.y, null, {
-        type: "player_hp",
-        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
-      });
+      this.broadcastNear(
+        player.x,
+        player.y,
+        null,
+        { type: "player_hp", payload: { id: player.id, hp: player.hp, maxHp: player.maxHp } },
+        player.mapId
+      );
       this.broadcastMp(player);
     }
 
@@ -1277,7 +1541,8 @@ export class GameSocketManager {
    * monsters in the same place, whoever happens to be nearby.
    */
   startEnemyTick() {
-    if (!this.enemies.size) return;
+    const hasEnemies = Array.from(this.enemyByMap.values()).some((roster) => roster.size > 0);
+    if (!hasEnemies) return;
     this.enemyTickTimer = setInterval(() => this.tickEnemies(), this.enemyTickMs);
     if (this.enemyTickTimer.unref) this.enemyTickTimer.unref();
   }
@@ -1289,31 +1554,47 @@ export class GameSocketManager {
    * an idle map stays quiet.
    */
   tickEnemies() {
-    if (!this.wss.clients.size || !this.enemies.size) return;
+    if (!this.wss.clients.size) return;
 
     const players = Array.from(this.players.values());
-    const moved = [];
 
-    this.enemies.forEach((enemy) => {
-      if (enemy.isDead) return;
+    // Each map steps its own roster against its own players: a monster must never
+    // chase someone standing on another map.
+    this.enemyByMap.forEach((roster, mapId) => {
+      if (!roster.size) return;
 
-      const next = stepEnemy(enemy, players, this.enemyTickMs);
-      const x = clampNum(Math.round(next.x), WORLD_MIN_X, WORLD_MAX_X, enemy.x);
-      const y = clampNum(Math.round(next.y), WORLD_MIN_Y, WORLD_MAX_Y, enemy.y);
-      if (x === enemy.x && y === enemy.y) return;
+      const map = getMap(mapId);
+      const mapPlayers = players.filter((player) => player.mapId === mapId);
+      const grid = this.gridFor(mapId);
+      const moved = [];
+      // The market keeps a few legacy spawns outside its square; clamping those to
+      // the walkable rect would teleport them on the first tick. Maps that own
+      // their spawns are clamped to their own bounds.
+      const bounds = map.allowOutOfBoundsSpawns
+        ? { x0: WORLD_MIN_X, y0: WORLD_MIN_Y, x1: WORLD_MAX_X, y1: WORLD_MAX_Y }
+        : map.bounds;
 
-      enemy.x = x;
-      enemy.y = y;
-      this.enemyGrid.update(enemy);
-      moved.push({ id: enemy.id, x, y });
+      roster.forEach((enemy) => {
+        if (enemy.isDead) return;
+
+        const next = stepEnemy(enemy, mapPlayers, this.enemyTickMs);
+        const x = clampNum(Math.round(next.x), bounds.x0, bounds.x1, enemy.x);
+        const y = clampNum(Math.round(next.y), bounds.y0, bounds.y1, enemy.y);
+        if (x === enemy.x && y === enemy.y) return;
+
+        enemy.x = x;
+        enemy.y = y;
+        grid.update(enemy);
+        moved.push({ id: enemy.id, x, y });
+      });
+
+      if (moved.length) {
+        this.broadcastEnemiesMoved(moved, mapId);
+      }
+
+      // Player health is server-owned, so monsters bite on the server clock too.
+      if (mapPlayers.length) this.tickBites(mapPlayers, mapId);
     });
-
-    if (moved.length) {
-      this.broadcastEnemiesMoved(moved);
-    }
-
-    // Player health is server-owned, so the wolves bite on the server clock too.
-    this.tickBites(players);
   }
 
   /**
@@ -1321,19 +1602,22 @@ export class GameSocketManager {
    * cooldown (whichever wolf is closest), respecting the shared immunity window.
    * @param {Array<Object>} players
    */
-  tickBites(players) {
+  tickBites(players, mapId = DEFAULT_MAP_ID) {
     const now = Date.now();
+    const grid = this.gridFor(mapId);
 
     players.forEach((player) => {
       if (now < player.nextBiteAt || now < player.invulnerableUntil) return;
 
-      const candidates = this.getNearLivingEnemies(player.x, player.y, BITE_TUNING.range);
+      const candidates = grid
+        .getNear(player.x, player.y, BITE_TUNING.range)
+        .filter((enemy) => !enemy.isDead);
       let nearest = null;
       let nearestDistance = Infinity;
-      candidates.forEach((wolf) => {
-        const distance = Math.hypot(wolf.x - player.x, wolf.y - player.y);
+      candidates.forEach((enemy) => {
+        const distance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
         if (distance < nearestDistance) {
-          nearest = wolf;
+          nearest = enemy;
           nearestDistance = distance;
         }
       });
@@ -1341,8 +1625,19 @@ export class GameSocketManager {
 
       player.nextBiteAt = now + BITE_TUNING.cooldownMs;
 
-      const result = computeDamage(WOLF_COMBAT, { defense: player.defense }, Math.random);
-      this.applyPlayerDamage(player, result.damage, null, "wolf");
+      // Bites use the monster's own combat block, so a level-30 boss hits far
+      // harder than a level-3 stray dog.
+      const result = computeDamage(
+        {
+          attack: nearest.attack,
+          defense: nearest.defense,
+          critRate: nearest.critRate,
+          critDamage: nearest.critDamage
+        },
+        { defense: player.defense },
+        Math.random
+      );
+      this.applyPlayerDamage(player, result.damage, null, "wolf", nearest.name);
     });
   }
 
@@ -1350,35 +1645,41 @@ export class GameSocketManager {
    * Queue the authoritative respawn for a defeated enemy.
    * @param {number} enemyId
    */
-  scheduleEnemyRespawn(enemyId) {
-    const existing = this.enemyRespawnTimers.get(enemyId);
+  scheduleEnemyRespawn(enemy) {
+    const key = `${enemy.mapId}:${enemy.id}`;
+    const existing = this.enemyRespawnTimers.get(key);
     if (existing) clearTimeout(existing);
 
-    const timer = setTimeout(() => this.respawnEnemy(enemyId), this.enemyRespawnMs);
+    // A boss can override the global timer with its own (much longer) delay.
+    const delay = Number.isFinite(enemy.respawnMs) ? enemy.respawnMs : this.enemyRespawnMs;
+    const timer = setTimeout(() => this.respawnEnemy(enemy.mapId, enemy.id), delay);
     if (timer.unref) timer.unref();
-    this.enemyRespawnTimers.set(enemyId, timer);
+    this.enemyRespawnTimers.set(key, timer);
   }
 
   /**
    * Restore a defeated enemy and tell every client at once.
    * @param {number} enemyId
    */
-  respawnEnemy(enemyId) {
-    this.enemyRespawnTimers.delete(enemyId);
+  respawnEnemy(mapId, enemyId) {
+    this.enemyRespawnTimers.delete(`${mapId}:${enemyId}`);
 
-    const enemy = this.enemies.get(enemyId);
+    const enemy = this.rosterFor(mapId).get(enemyId);
     if (!enemy || !enemy.isDead) return;
 
     enemy.hp = enemy.maxHp;
     enemy.x = enemy.homeX;
     enemy.y = enemy.homeY;
     enemy.isDead = false;
-    this.enemyGrid.add(enemy);
+    this.gridFor(mapId).add(enemy);
 
-    this.broadcastNear(enemy.x, enemy.y, null, {
-      type: "enemy_respawned",
-      payload: this.enemySnapshot(enemy)
-    });
+    this.broadcastNear(
+      enemy.x,
+      enemy.y,
+      null,
+      { type: "enemy_respawned", payload: this.enemySnapshot(enemy) },
+      mapId
+    );
   }
 
   /**
@@ -1391,22 +1692,24 @@ export class GameSocketManager {
       this.players.delete(ws);
       this.playerById.delete(player.id);
 
-      // When all players have left the map, reset living enemies to their home positions
-      if (this.players.size === 0) {
-        this.enemies.forEach((enemy) => {
-          if (!enemy.isDead) {
-            enemy.x = enemy.homeX;
-            enemy.y = enemy.homeY;
-            this.enemyGrid.update(enemy);
-          }
+      const mapId = player.mapId || DEFAULT_MAP_ID;
+      const mapStillOccupied = Array.from(this.players.values()).some(
+        (other) => other.mapId === mapId
+      );
+
+      // When the last player leaves a map, walk its living monsters home.
+      if (!mapStillOccupied) {
+        const grid = this.gridFor(mapId);
+        this.rosterFor(mapId).forEach((enemy) => {
+          if (enemy.isDead) return;
+          enemy.x = enemy.homeX;
+          enemy.y = enemy.homeY;
+          grid.update(enemy);
         });
       }
 
-      // Notify other players that this player has left the map
-      this.broadcast(ws, {
-        type: "player_left",
-        payload: { id: player.id }
-      });
+      // Notify other players standing on the same map
+      this.broadcastToMap(mapId, { type: "player_left", payload: { id: player.id } });
     }
   }
 

@@ -33,9 +33,17 @@ test("Kill reward suite", async (t) => {
         "coins",
         "enemyId",
         "exp",
+        "level",
+        "monsterId",
+        "name",
         "x",
         "y"
       ]);
+      // An enemy without a monster id falls back to the legacy market wolf, so the
+      // historical reward numbers stay exactly what the rest of the suite expects.
+      assert.equal(reward.monsterId, "soi-xam");
+      assert.equal(reward.name, "Sói Xám");
+      assert.equal(reward.level, 5);
       assert.equal(reward.exp, KILL_REWARD.exp);
       assert.ok(reward.coins >= KILL_REWARD.coinsMin);
       assert.ok(reward.coins <= KILL_REWARD.coinsMax);

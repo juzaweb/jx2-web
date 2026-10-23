@@ -99,5 +99,9 @@ export const EVENTS = {
   ACTION_REQUEST_CITY_MAP: "ACTION_REQUEST_CITY_MAP",
   SET_PLAYER_NAME: "SET_PLAYER_NAME",
   SET_PLAYER_GENDER: "SET_PLAYER_GENDER",
-  ACTION_CHAT: "ACTION_CHAT"
+  ACTION_CHAT: "ACTION_CHAT",
+  /** Fired after the hero arrives on a new map (payload: {mapId, name}). */
+  MAP_CHANGED: "MAP_CHANGED",
+  /** Fired when the server refuses a portal move. */
+  MAP_CHANGE_REJECTED: "MAP_CHANGE_REJECTED"
 };
