@@ -1,11 +1,13 @@
 export default {
   app: {
-    title: "Giang Hồ — HTML5 RPG (VL2 Edition)",
+    title: "Giang Hồ — Nhập Vai Giang Hồ",
     defaultPlayerName: "Lãng Khách",
-    serverFallback: "Giang Hồ",
     confirmReset: "Bạn có chắc chắn muốn xóa dữ liệu đã lưu và chơi lại từ đầu không?",
     confirmLogout: "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
     joinLog: 'Hiệp khách {name} đã gia nhập {server}!',
+    rotateDeviceTitle: "Xoay Ngang Màn Hình",
+    rotateDeviceDesc: "Vui lòng xoay ngang điện thoại để trải nghiệm game tốt nhất.",
+    rotateDeviceButton: "Xoay Màn Hình",
     log: {
       welcome: "Chào mừng hiệp khách đến với Biện Kinh.",
       near: "Lãng Khách: Giang hồ hiểm ác, bảo trọng!",
@@ -25,32 +27,6 @@ export default {
     help: "Trợ giúp",
     level: "Cấp"
   },
-  npc: {
-    "duoc-diem": {
-      name: "Chủ Dược Điếm",
-      dialogue: 'Chủ Dược Điếm: "Hoan nghênh hiệp khách ghé Dược Điếm Biện Kinh! Bổn tiệm chuyên cung cấp Kim Sáng Dược, Đại Hoàn Đan thượng hạng trị thương hồi khí."'
-    },
-    "bach-tien-sinh": {
-      name: "Bạch Tiên Sinh",
-      dialogue: 'Bạch Tiên Sinh: "Giang hồ hiểm ác, lòng người khó lường. Thiếu hiệp hành tẩu Biện Kinh nhớ giữ gìn bản tâm, chăm chỉ tu luyện võ công!"'
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "Thương Nhân Bảo Rương",
-      dialogue: 'Thương Nhân Bảo Rương: "Khắp nơi trong thiên hạ đều có bảo rương ẩn giấu kỳ trân dị bảo. Thiếu hiệp nếu có chìa khóa hoàng kim, hãy mang đến đây đổi lấy tuyệt thế thần binh!"'
-    },
-    "dai-su-hoat-dong": {
-      name: "Đại Sứ Hoạt Động",
-      dialogue: 'Đại Sứ Hoạt Động: "Hoan nghênh chư vị anh hùng đến với Biện Kinh! Tham gia các hoạt động giang hồ mỗi ngày để nhận vinh dự và phần thưởng quý giá."'
-    },
-    "chan-tu-don": {
-      name: "Chân Tử Đơn",
-      dialogue: 'Chân Tử Đơn: "Võ học vô biên! Luyện tập quyền cước hàng ngày chính là căn cơ để xưng bá võ lâm."'
-    },
-    "van-su-thong": {
-      name: "Vạn Sự Thông",
-      dialogue: 'Vạn Sự Thông: "Thiên hạ sự tình, phong vân biến ảo, không điều gì mà lão phu không tường. Thiếu hiệp muốn dò hỏi tin tức chốn võ lâm chăng?"'
-    }
-  },
   hud: {
     levelTitle: "Đẳng cấp nhân vật",
     expTitle: "Kinh nghiệm tu luyện",
@@ -68,7 +44,9 @@ export default {
     questTodo: "Thành thị phồn hoa",
     questSafe: "Khu an toàn • Không có quái",
     zoomTitle: "Tab: Phóng to minimap gấp 5 lần",
-    mapTitle: "M: Xem bản đồ toàn thành"
+    mapTitle: "M: Xem bản đồ toàn thành",
+    minimize: "Thu nhỏ bản đồ",
+    restore: "Mở bản đồ"
   },
   cityMap: {
     eyebrow: "TOÀN CẢNH THÀNH TRÌ",
@@ -95,7 +73,9 @@ export default {
     },
     placeholder: "Nhấn Enter để gửi lời vào giang hồ...",
     send: "GỬI",
-    channel: "[ Cận ] ▼"
+    channel: "[ Cận ] ▼",
+    minimize: "Thu nhỏ kênh chat",
+    restore: "Mở kênh chat"
   },
   hotbar: {
     slotTitle: "Phím [{key}]: {name}",
@@ -106,22 +86,21 @@ export default {
     rightClickQ: "Chuột Phải [Q]",
     martialName: "Phần Cẩm Chữ Hạc",
     martialSub: "Thiên Hà Mật Tịch",
-    portraitTitle: "Lãng Khách Võ Đang",
-    portraitAlt: "Lãng Khách",
-    coins: "BẠC",
     character: "Nhân Vật",
     inventory: "Hành Trang",
     help: "Cẩm Nang",
     pkTitle: "Bật/tắt cờ PK",
     pkOn: "PK",
-    pkOff: "Hòa Bình"
+    pkOff: "Hòa Bình",
+    rotateTitle: "Xoay ngang màn hình",
+    rotate: "Xoay"
   },
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",
     title: "Hướng Dẫn Tân Thủ",
-    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), hoặc dùng cần gạt ảo trên mobile.",
-    combat: "Chiến đấu: Dùng nút Tấn công trên thanh dưới (hoặc nút tấn công trên mobile).",
-    skill: "Chiêu thức: Bấm ô Chuột trái / Chuột phải để chọn chiêu. Chuột trái vào quái: lao tới đánh. Chuột phải vào quái: lao tới đánh; chuột phải đất trống: xuất chiêu tại chỗ. Phím tắt gán chiêu vào tay phải.",
+    move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), dùng phím Mũi tên (↑ ↓ ← →) hoặc W/A/S/D, hoặc cần gạt ảo trên mobile.",
+    combat: "Chiến đấu & Tương tác: Nhấn [F] khi lại gần NPC để nói chuyện. Dùng nút Tấn công trên thanh dưới hoặc mobile.",
+    skill: "Chiêu thức: Nhấn các phím U, I, O, P để thi triển kỹ năng trực tiếp về phía con trỏ chuột hoặc mục tiêu gần nhất. Nhấp vào các ô U, I, O, P trên thanh Hotbar để gán chiêu thức môn phái.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
@@ -131,11 +110,9 @@ export default {
     reset: "LÀM LẠI TỪ ĐẦU (RESET TIẾN TRÌNH)"
   },
   login: {
-    brandTitle: "Võ Lâm Truyền Kỳ II",
-    brandSubtitle: "HẢO KIỆT LÔI TRANH",
-    serverLoggedIn: "Máy chủ đã đăng nhập",
-    closeList: "Đóng danh sách",
-    chooseServer: "Chọn lại máy chủ",
+    brandTitle: "Giang Hồ",
+    brandSubtitle: "HÀNH TẨU GIANG HỒ",
+    serverLoggedIn: "Cổng vào giang hồ",
     loginTab: "Đăng nhập",
     registerTab: "Đăng ký tài khoản",
     usernameLabel: "Tài khoản:",
@@ -149,12 +126,6 @@ export default {
     clearKey: "Hết",
     loginButton: "Đăng nhập",
     registerButton: "Đăng ký",
-    tags: {
-      recommended: "Đề Cử",
-      new: "Mới",
-      crowded: "Đông",
-      normal: "Bình Thường"
-    },
     errors: {
       required: "Vui lòng điền đầy đủ tài khoản và mật khẩu.",
       usernamePattern: "Tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.",
@@ -211,6 +182,8 @@ export default {
     handRight: "Chuột phải",
     leftHandTitle: "Chiêu chuột trái (bấm để chọn)",
     rightHandTitle: "Chiêu chuột phải (bấm để chọn)",
+    keySlotLabel: "Phím",
+    assignKey: "Gán chiêu [{key}]",
     picker: {
       eyebrow: "Gán chiêu",
       title: "Chọn chiêu cho {hand}",
@@ -229,30 +202,84 @@ export default {
         "invalid-slot": "Ô chiêu không hợp lệ."
       }
     },
+    modalTitle: "Võ Công",
+    modalHint: "Chiêu thức môn phái đã học. Nhấp vào ô gán phím hoặc gán nhanh phía dưới để gán chiêu thức.",
+    bindToKey: "Gán vào [{key}]",
+    bindLeft: "Gán Chuột Trái",
+    bindRight: "Gán Chuột Phải",
+    cooldownSec: "{sec}s",
+    rangeTag: "Cự ly: {range}",
+    dmgTag: "ST: {pct}%",
     thieuLam: {
       laHanQuyen: {
         name: "La Hán Quyền",
-        desc: "Quyền pháp nhập môn, công kích cận chiến nhanh."
+        desc: "Quyền pháp cơ bản Thiếu Lâm, áp sát tấn công mục tiêu."
       },
-      caDiepThoai: {
-        name: "Ca Diệp Thoái",
-        desc: "Cước pháp cơ bản, đá trúng khiến đối phương chậm chạp."
-      },
-      viDaQuyen: {
-        name: "Vi Đà Quyền",
-        desc: "Quyền pháp trung cấp, uy lực kết liễu mạnh."
+      thieuLamTruongPhap: {
+        name: "Thiếu Lâm Chưởng Pháp",
+        desc: "Chưởng pháp Thiếu Lâm uy lực, gây sát thương cận chiến tầm trung."
       },
       daiTuDiChuong: {
         name: "Đại Tu Di Chưởng",
-        desc: "Chưởng pháp diện rộng, đánh choáng kẻ địch quanh thân."
+        desc: "Chưởng pháp tầm xa, đánh choáng mục tiêu từ xa."
       },
-      hueNhanChu: {
-        name: "Huệ Nhãn Chú",
-        desc: "Tâm pháp độc môn, tăng chí mạng và công kích trong thời gian ngắn."
+      laHanTran: {
+        name: "La Hán Trận",
+        desc: "Trận pháp hộ thể La Hán, tăng 10% lực tấn công, 20% tốc độ di chuyển và 5% tỉ lệ chí mạng trong 3 phút."
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "Thiếu Dương Kiếm Pháp",
+        desc: "Kiếm pháp cơ bản Võ Đang, linh hoạt nhanh nhẹn."
       },
-      nhuLaiThanThuong: {
-        name: "Như Lai Thần Thưởng",
-        desc: "Tuyệt kỹ trấn phái, sát thương diện rộng và choáng dài lâu."
+      thaiCucQuyen: {
+        name: "Thái Cực Quyền",
+        desc: "Quyền pháp mượn lực đả lực, gây sát thương chấn động."
+      },
+      tamThanhKiemPhap: {
+        name: "Tam Thanh Kiếm Pháp",
+        desc: "Tuyệt kỹ ba đường kiếm khí liên hoàn tấn công kẻ địch."
+      },
+      toatHongQuanKhuyet: {
+        name: "Toát Hồng Quân Khuyết",
+        desc: "Khí công gia hộ Võ Đang, tăng 15% lực tấn công trong 3 phút."
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "Nga My Kiếm Pháp",
+        desc: "Kiếm pháp thanh thoát dịu dàng, uyển chuyển sát thương."
+      },
+      mongDiepThoiTam: {
+        name: "Mộng Điệp Thôi Tâm",
+        desc: "Kiếm khí tựa bướm vờn, công kích thẳng vào tâm trí mục tiêu."
+      },
+      tuHangPhoDo: {
+        name: "Từ Hàng Phổ Độ",
+        desc: "Phật quang phổ độ, lập tức hồi phục 50 HP cho bản thân."
+      },
+      luuThuyKhanhVan: {
+        name: "Lưu Thủy Khánh Vân",
+        desc: "Thân pháp như mây trôi nước chảy, tăng 25% tốc độ di chuyển."
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "Ngũ Độc Tâm Pháp",
+        desc: "Tâm pháp truyền đời Ngũ Độc, gây sát thương độc tố."
+      },
+      truyTamDoc: {
+        name: "Truy Tâm Độc",
+        desc: "Chưởng khí mang kịch độc xuyên thấu tâm can kẻ địch."
+      },
+      vanDocChieuHong: {
+        name: "Vạn Độc Triệu Cổ",
+        desc: "Triệu hồi vạn cổ độc trùng công kích mục tiêu diện rộng."
+      },
+      uHongPhietAnh: {
+        name: "U Hồn Phiệt Ảnh",
+        desc: "U linh xuất quỷ nhập thần, tăng 10% tỉ lệ chí mạng."
       }
     }
   },
@@ -260,16 +287,14 @@ export default {
     title: "Nhân vật",
     helpTitle: "Trợ giúp",
     closeTitle: "Đóng (F3 / Esc)",
-    hint: "Các chỉ số chiến đấu được suy ra từ đẳng cấp nhân vật. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
+    hint: "Các chỉ số chiến đấu là giá trị thực tế đang dùng khi giao chiến. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
     tabEquip: "Trang bị",
     tabNews: "Tin tức",
     locked: "{label} (chưa mở)",
     notEquipped: "{label} (chưa trang bị)",
     unequipTitle: "{name} (nhấp để tháo)",
-    potential: "Tiềm năng",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
-    playerAlt: "Nhân vật",
     slots: {
       belt: "Đai lưng",
       bracers: "Hộ uyển",
@@ -292,13 +317,28 @@ export default {
     weight: "Sức nặng",
     count: "{used}/{total}",
     silver: "Bạc",
-    gold: "Kim Nguyên Bảo",
-    jade: "Tiên Ngọc",
-    kimPhieu: "Kim phiếu:",
+    copper: "Đồng",
+    gold: "Vàng",
     ngucac: "[ Ngự các ]",
     quantity: "Số lượng: {qty}",
     equipHint: "Nhấp để mặc vào ô {slot}",
     useHint: "Nhấp để sử dụng"
+  },
+  shop: {
+    eyebrow: "DƯỢC ĐIỂM BIỆN KINH",
+    title: "Tiệm Dược",
+    greeting: "Lão phu chuyên bán linh dược hồi sinh lực và nội lực. Hiệp khách cứ chọn.",
+    balance: "Túi bạc:",
+    buy: "Mua",
+    result: {
+      ok: "Giao dịch thành công — đã thêm {qty} dược phẩm vào hành trang.",
+      coins: "Không đủ bạc để mua dược phẩm này.",
+      guest: "Cần đăng nhập và chọn nhân vật để giao dịch.",
+      offline: "Cần kết nối máy chủ để giao dịch.",
+      range: "Hãy đến gần chủ tiệm để giao dịch.",
+      error: "Máy chủ không thể hoàn tất giao dịch. Bạc chưa bị trừ.",
+      unknown: "Tiệm không bán vật phẩm này."
+    }
   },
   slots: {
     armor: "Giáp",
@@ -317,26 +357,11 @@ export default {
   stats: {
     hp: "Sinh lực",
     mp: "Nội lực",
-    strength: "Sức mạnh",
-    agility: "Thân pháp",
-    internal: "Nội công",
-    bone: "Gân cốt",
-    flexibility: "Linh hoạt",
     physicalAtk: "Ngoại công",
-    chiAtk: "Nội kích",
-    damage: "Sát thương",
-    accuracy: "Chính xác",
     physicalDef: "Ngoại phòng",
-    magicDef: "Nội phòng",
-    dodge: "Né tránh",
     crit: "Chí mạng",
-    burst: "Điểm bạo",
-    burstHard: "Bạo cương",
-    woundRate: "Tỉ lệ thương",
-    critResist: "Khắc nộ",
-    cast: "Xuất chiêu",
-    attackSpeed: "Tốc độ đánh",
-    moveSpeed: "Tốc độ di chuyển"
+    critDamage: "Đòn chí mạng",
+    attackSpeed: "Tốc độ đánh"
   },
   item: {
     "kim-sang-duoc": {
@@ -354,114 +379,6 @@ export default {
     "hoi-thanh-phu": {
       name: "Hồi Thành Phù",
       desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
-    },
-    "ho-lo-tuu": {
-      name: "Hồ Lô Tửu",
-      desc: "Bầu rượu của hành khách, hương thơm nồng đượm."
-    },
-    "lenh-bai": {
-      name: "Lệnh Bài Môn Phái",
-      desc: "Tín vật Võ Đang, chứng minh thân phận đệ tử."
-    },
-    "thiet-trao": {
-      name: "Thiết Trảo",
-      desc: "Binh khí lợi hại, sử dụng trong cận chiến."
-    },
-    "hac-ung-kiem": {
-      name: "Hắc Ưng Kiếm",
-      desc: "Thanh kiếm huyền thiết, sắc bén vô song."
-    },
-    "bi-kip-vo-cong": {
-      name: "Bí Kíp Võ Công",
-      desc: "Sách cổ ghi chép tâm pháp luyện công."
-    },
-    "thien-ha-mat-tich": {
-      name: "Thiên Hà Mật Tịch",
-      desc: "Mật tịch thượng thừa của phái Thiên Hà."
-    },
-    "cam-y-bao": {
-      name: "Cẩm Y Bào",
-      desc: "Áo gấm thêu chỉ vàng, gia tăng phòng ngự."
-    },
-    "thanh-long-dao": {
-      name: "Thanh Long Đao",
-      desc: "Đại đao khắc hình thanh long, uy lực trầm hùng."
-    },
-    "ngoc-bo-dao": {
-      name: "Ngọc Bồi Dương Chi",
-      desc: "Ngọc bội gia truyền, tỏa linh khí nhè nhẹ."
-    },
-    "huyen-kim-thach": {
-      name: "Huyễn Kim Thạch",
-      desc: "Khoáng thạch quý dùng để rèn đúc trang bị."
-    },
-    "tui-bac": {
-      name: "Túi Bạc",
-      desc: "Túi đựng bạc, nhặt được từ dã thú."
-    },
-    "duoc-vuong-lo": {
-      name: "Dược Vương Lộ",
-      desc: "Linh dịch chữa lành, chiết từ ngàn loại thảo dược."
-    },
-    "than-bi-hop": {
-      name: "Thần Bí Hộp",
-      desc: "Bảo hộp chưa mở, bên trong ẩn chứa kỳ vật."
-    },
-    "yeu-dan": {
-      name: "Yêu Đan",
-      desc: "Nội đan của yêu thú, tinh túy linh khí."
-    },
-    "huyet-chien-giap": {
-      name: "Huyết Chiến Giáp",
-      desc: "Chiến giáp nhuốm huyết, phòng ngự cực cao."
-    },
-    "bach-nien-linh-chi": {
-      name: "Bách Niên Linh Chi",
-      desc: "Linh chi trăm năm, đại bổ nguyên khí."
-    },
-    "tu-kim-ho-lo": {
-      name: "Tử Kim Hồ Lô",
-      desc: "Hồ lô tử kim, tích linh đan hồi phục."
-    },
-    "ngoc-tinh-binh": {
-      name: "Ngọc Tịnh Bình",
-      desc: "Bình ngọc tịnh khí, thanh lọc tâm thần."
-    },
-    "phuong-vu-bao": {
-      name: "Phượng Vũ Bào",
-      desc: "Bào phục thêu lông phượng, tôn quý phi thường."
-    },
-    "phach-dao": {
-      name: "Phách Đao",
-      desc: "Đao nhẹ, tốc độ xuất thủ cực nhanh."
-    },
-    "tu-tinh-nhan": {
-      name: "Tứ Tinh Nhẫn",
-      desc: "Nhẫn khảm bốn viên linh thạch."
-    },
-    "linh-duong": {
-      name: "Thịt Rừng",
-      desc: "Thịt thú tươi, dùng để nấu nướng hồi phục."
-    },
-    "tang-kinh-do": {
-      name: "Tàng Kinh Đồ",
-      desc: "Bản đồ địa đạo bí mật dẫn tới tàng kinh các."
-    },
-    "ngoc-nhan": {
-      name: "Ngọc Nhẫn",
-      desc: "Nhẫn ngọc đơn sơ nhưng ẩn chứa linh khí."
-    },
-    "hoang-kim-huyen-thiet": {
-      name: "Huyền Thiết Kim",
-      desc: "Kim loại huyền thiết, chế tạo binh khí thượng hạng."
-    },
-    "huyet-bo-dao": {
-      name: "Huyết Bồ Đào",
-      desc: "Linh dược huyết sắc, hồi phục thương thế."
-    },
-    "tu-kim-quan": {
-      name: "Tử Kim Quan",
-      desc: "Kim quan cài ngọc, gia tăng phòng ngự và chính xác."
     }
   }
 };

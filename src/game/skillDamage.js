@@ -31,7 +31,7 @@ export function computeSkillDamage(skill, attacker, defender, rng = Math.random)
 
 /**
  * Apply active timed buffs to a base stats object without mutating it.
- * Supported buff stats: `attackPct`, `defensePct`, `critRate` (flat added).
+ * Supported buff stats: `attackPct`, `defensePct`, `critRate` (flat added), `speedPct`.
  * Expired entries are ignored.
  *
  * @param {Object} stats
@@ -50,6 +50,8 @@ export function applyBuffsToStats(stats = {}, buffs = [], now = Date.now()) {
       result.defense = Math.round((result.defense || 0) * (1 + amount));
     } else if (buff.stat === "critRate") {
       result.critRate = Math.min(1, (result.critRate || 0) + amount);
+    } else if (buff.stat === "speedPct") {
+      result.speedPct = (result.speedPct || 0) + amount;
     }
   }
   return result;

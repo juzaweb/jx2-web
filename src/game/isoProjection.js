@@ -1,77 +1,52 @@
 /**
- * Isometric projection for the game world.
+ * Screen projection for the game world.
  *
- * Game logic (physics, collisions, network positions, distances) stays in the
- * flat "ground plane" coordinate system used everywhere in `src/game`. Only the
- * *rendering* of visible objects is projected through here, which is what turns
- * the top-down world into a VLTK2-style 2:1 isometric view.
+ * The reference market square is drawn as a top-down 2.5D scene: the ground is
+ * a screen-aligned grid of rectangular stone bricks and characters move on the
+ * flat plane, while buildings use front-facing pseudo-perspective art. Ground
+ * coordinates therefore map 1:1 to screen space (`x`, `y`), and depth sorting is
+ * simply the ground `y`.
  *
- * The mapping is a standard diamond projection:
- *   screenX = (x - y) / 2
- *   screenY = (x + y) / 4
- * so a square ground tile of size `t` renders as a `t` wide and `t / 2` tall
- * diamond (2:1).
+ * The function names are kept from the previous isometric implementation so
+ * gameplay code (physics, clicks, network positions, minimap) needs no changes.
  */
 
-/** Ratio of the diamond: 2 means width is twice the height. */
-export const ISO_RATIO = 2;
-
-const HALF = 1 / ISO_RATIO;
-const QUARTER = 1 / (ISO_RATIO * 2);
-
 /**
- * Project a ground-plane point to isometric screen space.
+ * Project a ground-plane point to screen space.
  * @param {number} x
  * @param {number} y
  * @returns {{x:number,y:number}}
  */
 export function toIso(x, y) {
-  return {
-    x: (x - y) * HALF,
-    y: (x + y) * QUARTER
-  };
+  return { x, y };
 }
 
 /**
- * Inverse of {@link toIso}: isometric screen space back to ground coordinates.
- * Used to turn mouse clicks on the tilted ground back into world positions.
+ * Inverse of {@link toIso}.
  * @param {number} sx
  * @param {number} sy
  * @returns {{x:number,y:number}}
  */
 export function fromIso(sx, sy) {
-  return {
-    x: sx + sy * 2,
-    y: sy * 2 - sx
-  };
+  return { x: sx, y: sy };
 }
 
 /**
- * Painter's-order depth for an isometric object: objects with a larger ground
- * (x + y) are nearer the camera and must draw on top.
+ * Painter's-order depth: objects lower on screen (larger ground `y`) draw on top.
  * @param {number} x
  * @param {number} y
  * @returns {number}
  */
 export function isoDepth(x, y) {
-  return (x + y) * QUARTER;
+  return y;
 }
 
 /**
- * Isometric bounding box (screen space) of a `width × height` ground rectangle
- * anchored at the origin. Useful for camera bounds.
+ * Bounding box (screen space) of a `width × height` ground rectangle.
  * @param {number} width
  * @param {number} height
  * @returns {{minX:number,minY:number,maxX:number,maxY:number}}
  */
 export function isoBounds(width, height) {
-  const corners = [toIso(0, 0), toIso(width, 0), toIso(width, height), toIso(0, height)];
-  const xs = corners.map((c) => c.x);
-  const ys = corners.map((c) => c.y);
-  return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys)
-  };
+  return { minX: 0, minY: 0, maxX: width, maxY: height };
 }

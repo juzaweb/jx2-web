@@ -86,6 +86,6 @@ src/
     ├── enemy.js          # Wolf entities (rendering + bite checks)
     ├── enemyAi.js        # Shared enemy AI: server tick + offline fallback
     ├── enemySync.js      # Pure rules for server-authoritative enemy state
-    ├── combat.js         # Combat system, sound synth, and drops
+    ├── combat.js         # Combat system and sound synth
     └── storage.js        # Progress persistence
 ```

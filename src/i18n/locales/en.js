@@ -1,11 +1,13 @@
 export default {
   app: {
-    title: "Jianghu — HTML5 RPG (VL2 Edition)",
+    title: "Jianghu — Wuxia RPG",
     defaultPlayerName: "Wanderer",
-    serverFallback: "Jianghu",
     confirmReset: "Are you sure you want to erase your saved progress and start over?",
     confirmLogout: "Are you sure you want to log out of your account?",
     joinLog: "{name} has joined {server}!",
+    rotateDeviceTitle: "Rotate Device Horizontally",
+    rotateDeviceDesc: "Please rotate your phone to landscape mode for the best gaming experience.",
+    rotateDeviceButton: "Rotate Screen",
     log: {
       welcome: "Welcome to Bianjing, honored warrior.",
       near: "Wanderer: The Jianghu is treacherous. Take care!",
@@ -25,32 +27,6 @@ export default {
     help: "Help",
     level: "Level"
   },
-  npc: {
-    "duoc-diem": {
-      name: "Apothecary Owner",
-      dialogue: 'Apothecary Owner: "Welcome to the Bianjing Apothecary, warrior! My shop specializes in premium Golden Radiance Elixirs and Great Return Pills to heal wounds and restore qi."'
-    },
-    "bach-tien-sinh": {
-      name: "Mr. Bai",
-      dialogue: 'Mr. Bai: "The Jianghu is dangerous and the human heart is hard to read. While traveling through Bianjing, young hero, guard your true heart and diligently cultivate your martial arts!"'
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "Treasure Chest Merchant",
-      dialogue: 'Treasure Chest Merchant: "Treasure chests hiding rare wonders are scattered across the world. If you have a golden key, young hero, bring it here to trade for a peerless divine weapon!"'
-    },
-    "dai-su-hoat-dong": {
-      name: "Event Ambassador",
-      dialogue: 'Event Ambassador: "Welcome, heroes, to Bianjing! Join the daily Jianghu events to earn honor and precious rewards."'
-    },
-    "chan-tu-don": {
-      name: "Zhen Zidan",
-      dialogue: 'Zhen Zidan: "Martial learning knows no bounds! Practicing fists and kicks every day is the foundation for ruling the martial world."'
-    },
-    "van-su-thong": {
-      name: "Wanshi Tong",
-      dialogue: 'Wanshi Tong: "The affairs of the world shift like wind and clouds, and nothing escapes this old man\'s knowledge. Would you like to inquire about news from the martial world, young hero?"'
-    }
-  },
   hud: {
     levelTitle: "Character level",
     expTitle: "Cultivation experience",
@@ -68,7 +44,9 @@ export default {
     questTodo: "A bustling city",
     questSafe: "Safe zone • No monsters",
     zoomTitle: "Tab: Enlarge the minimap 5x",
-    mapTitle: "M: Open the full city map"
+    mapTitle: "M: Open the full city map",
+    minimize: "Minimize map",
+    restore: "Open map"
   },
   cityMap: {
     eyebrow: "CITY OVERVIEW",
@@ -95,7 +73,9 @@ export default {
     },
     placeholder: "Press Enter to speak to the Jianghu...",
     send: "SEND",
-    channel: "[ Local ] ▼"
+    channel: "[ Local ] ▼",
+    minimize: "Minimize chat",
+    restore: "Open chat"
   },
   hotbar: {
     slotTitle: "Key [{key}]: {name}",
@@ -106,22 +86,21 @@ export default {
     rightClickQ: "Right Click [Q]",
     martialName: "Crane-Character Brocade",
     martialSub: "Milky Way Secret Tome",
-    portraitTitle: "Wudang Wanderer",
-    portraitAlt: "Wanderer",
-    coins: "SILVER",
     character: "Character",
     inventory: "Inventory",
     help: "Guide",
     pkTitle: "Toggle PK flag",
     pkOn: "PK",
-    pkOff: "Peace"
+    pkOff: "Peace",
+    rotateTitle: "Rotate screen horizontally",
+    rotate: "Rotate"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",
     title: "Beginner's Guide",
-    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), or use the mobile joystick.",
-    combat: "Combat: Use the Attack button on the bottom bar (or the attack button on mobile).",
-    skill: "Skills: click the Left click / Right click slot to choose a skill. Left-click an enemy to run in and strike. Right-click an enemy to run in; right-click empty ground to cast in place. Hotkeys assign skills to the right hand.",
+    move: "Movement: Left-click the map (or hold the mouse to follow the cursor), use Arrow keys (↑ ↓ ← →) or W/A/S/D, or the mobile joystick.",
+    combat: "Combat & Interaction: Press [F] near an NPC to talk. Use the Attack button on the dock or mobile.",
+    skill: "Skills: Press keys U, I, O, P to directly cast skills towards cursor or nearest enemy. Click the U, I, O, P slots on the hotbar to assign sect skills.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
@@ -131,11 +110,9 @@ export default {
     reset: "START OVER (RESET PROGRESS)"
   },
   login: {
-    brandTitle: "Legends of the Martial World II",
-    brandSubtitle: "HEROES RISE",
-    serverLoggedIn: "Logged-in server",
-    closeList: "Close list",
-    chooseServer: "Choose another server",
+    brandTitle: "Jianghu",
+    brandSubtitle: "WANDER THE MARTIAL WORLD",
+    serverLoggedIn: "Gateway to the Jianghu",
     loginTab: "Log in",
     registerTab: "Create account",
     usernameLabel: "Account:",
@@ -149,12 +126,6 @@ export default {
     clearKey: "Clear",
     loginButton: "Log in",
     registerButton: "Register",
-    tags: {
-      recommended: "Recommended",
-      new: "New",
-      crowded: "Busy",
-      normal: "Normal"
-    },
     errors: {
       required: "Please enter both your account and password.",
       usernamePattern: "Account must be 3-30 letters, digits, or underscores.",
@@ -211,6 +182,8 @@ export default {
     handRight: "Right click",
     leftHandTitle: "Left-click skill (click to choose)",
     rightHandTitle: "Right-click skill (click to choose)",
+    keySlotLabel: "Key",
+    assignKey: "Assign skill [{key}]",
     picker: {
       eyebrow: "Assign skill",
       title: "Choose a skill for {hand}",
@@ -229,29 +202,99 @@ export default {
         "invalid-slot": "Invalid skill slot."
       }
     },
+    modalTitle: "Martial Arts",
+    modalHint: "Sect skills learned. Click a shortcut key or button below to assign skills.",
+    bindToKey: "Assign to [{key}]",
+    bindLeft: "Assign Left Click",
+    bindRight: "Assign Right Click",
+    cooldownSec: "{sec}s",
+    rangeTag: "Range: {range}",
+    dmgTag: "Dmg: {pct}%",
     thieuLam: {
-      laHanQuyen: { name: "Arhat Fist", desc: "Entry fist art with fast melee strikes." },
-      caDiepThoai: { name: "Kasyapa Kick", desc: "Basic leg art that slows the target." },
-      viDaQuyen: { name: "Veda Fist", desc: "Mid-tier fist art with strong finishing power." },
-      daiTuDiChuong: { name: "Great Sumeru Palm", desc: "Wide palm strike that stuns nearby foes." },
-      hueNhanChu: { name: "Wisdom Eye", desc: "Secret mantra boosting crit and attack briefly." },
-      nhuLaiThanThuong: { name: "Tathagata Palm", desc: "Signature ultimate: wide damage and a long stun." }
+      laHanQuyen: {
+        name: "Arhat Fist",
+        desc: "Basic Shaolin fist strike to engage enemies in melee range."
+      },
+      thieuLamTruongPhap: {
+        name: "Shaolin Palm Technique",
+        desc: "Powerful Shaolin palm strike dealing medium melee damage."
+      },
+      daiTuDiChuong: {
+        name: "Great Sumeru Palm",
+        desc: "Ranged palm strike that stuns the target from afar."
+      },
+      laHanTran: {
+        name: "Arhat Formation",
+        desc: "Protective Buddhist formation that boosts attack power by 10%, movement speed by 20%, and critical rate by 5% for 3 minutes."
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "Shao Yang Sword Style",
+        desc: "Basic Wudang sword technique, agile and precise."
+      },
+      thaiCucQuyen: {
+        name: "Tai Chi Fist",
+        desc: "Defensive fist art redirecting force to deliver crushing impact."
+      },
+      tamThanhKiemPhap: {
+        name: "Three Pure Ones Sword",
+        desc: "Triple sword qi strikes sweeping through enemy ranks."
+      },
+      toatHongQuanKhuyet: {
+        name: "Purple Cloud Guard",
+        desc: "Wudang qi buff increasing attack power by 15% for 3 minutes."
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "Emei Sword Arts",
+        desc: "Graceful and elegant sword technique dealing continuous damage."
+      },
+      mongDiepThoiTam: {
+        name: "Butterfly Heart Strike",
+        desc: "Sword aura fluttering like butterflies directly invading the opponent's vitality."
+      },
+      tuHangPhoDo: {
+        name: "Merciful Salvation",
+        desc: "Buddhist light of compassion, instantly restoring 50 HP to self."
+      },
+      luuThuyKhanhVan: {
+        name: "Flowing Cloud Stride",
+        desc: "Agile footwork like drifting clouds, increasing movement speed by 25%."
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "Five Poisons Mind Method",
+        desc: "Heritage secret technique infusing attacks with deadly venom."
+      },
+      truyTamDoc: {
+        name: "Heart-Piercing Venom",
+        desc: "Toxic palm blast penetrating deep into the foe's core."
+      },
+      vanDocChieuHong: {
+        name: "Ten Thousand Poison Gu",
+        desc: "Summons a swarm of venomous insects over a wide area."
+      },
+      uHongPhietAnh: {
+        name: "Phantom Ghost Shadow",
+        desc: "Ethereal movement enhancing critical hit chance by 10%."
+      }
     }
   },
   character: {
     title: "Character",
     helpTitle: "Help",
     closeTitle: "Close (F3 / Esc)",
-    hint: "Combat stats are derived from the character level. Drag equipment from the Inventory (F4) onto a slot to wear it, or click/drag a worn slot to take it off.",
+    hint: "Combat stats are the values the game actually rolls. Drag equipment from the Inventory (F4) onto a slot to wear it, or click/drag a worn slot to take it off.",
     tabEquip: "Equipment",
     tabNews: "News",
     locked: "{label} (locked)",
     notEquipped: "{label} (not equipped)",
     unequipTitle: "{name} (click to remove)",
-    potential: "Potential",
     points: "Points:",
     nextLevel: "Next level:",
-    playerAlt: "Character",
     slots: {
       belt: "Belt",
       bracers: "Bracers",
@@ -274,13 +317,28 @@ export default {
     weight: "Weight",
     count: "{used}/{total}",
     silver: "Silver",
-    gold: "Gold Ingot",
-    jade: "Fairy Jade",
-    kimPhieu: "Gold notes:",
+    copper: "Copper",
+    gold: "Gold",
     ngucac: "[ Imperial Vault ]",
     quantity: "Quantity: {qty}",
     equipHint: "Click to equip in the {slot} slot",
     useHint: "Click to use"
+  },
+  shop: {
+    eyebrow: "BIANJING HERB SHOP",
+    title: "Herb Shop",
+    greeting: "This old man sells elixirs for health and inner force. Take your pick, traveler.",
+    balance: "Silver:",
+    buy: "Buy",
+    result: {
+      ok: "Purchase complete — {qty} item(s) added to your bag.",
+      coins: "Not enough silver for this item.",
+      guest: "Log in and choose a character to trade.",
+      offline: "Connect to the server to trade.",
+      range: "Move closer to the shopkeeper to trade.",
+      error: "The server could not complete the trade. No silver was spent.",
+      unknown: "This shop does not sell that item."
+    }
   },
   slots: {
     armor: "Armor",
@@ -299,26 +357,11 @@ export default {
   stats: {
     hp: "Health",
     mp: "Inner force",
-    strength: "Strength",
-    agility: "Agility",
-    internal: "Inner power",
-    bone: "Bone",
-    flexibility: "Flexibility",
     physicalAtk: "Physical attack",
-    chiAtk: "Chi strike",
-    damage: "Damage",
-    accuracy: "Accuracy",
     physicalDef: "Physical defense",
-    magicDef: "Inner defense",
-    dodge: "Dodge",
-    crit: "Critical",
-    burst: "Burst points",
-    burstHard: "Hard burst",
-    woundRate: "Wound rate",
-    critResist: "Crit resist",
-    cast: "Cast speed",
-    attackSpeed: "Attack speed",
-    moveSpeed: "Move speed"
+    crit: "Critical chance",
+    critDamage: "Critical hit",
+    attackSpeed: "Attack speed"
   },
   item: {
     "kim-sang-duoc": {
@@ -336,114 +379,6 @@ export default {
     "hoi-thanh-phu": {
       name: "Return City Talisman",
       desc: "A spatial talisman that returns the traveler to Bianjing."
-    },
-    "ho-lo-tuu": {
-      name: "Gourd Wine",
-      desc: "A traveler's wine gourd with a rich, lingering aroma."
-    },
-    "lenh-bai": {
-      name: "Sect Token",
-      desc: "A Wudang token proving the bearer is a disciple."
-    },
-    "thiet-trao": {
-      name: "Iron Claw",
-      desc: "A vicious close-combat weapon."
-    },
-    "hac-ung-kiem": {
-      name: "Black Eagle Sword",
-      desc: "A dark iron sword of unmatched sharpness."
-    },
-    "bi-kip-vo-cong": {
-      name: "Martial Arts Manual",
-      desc: "An ancient book recording cultivation methods."
-    },
-    "thien-ha-mat-tich": {
-      name: "Milky Way Secret Tome",
-      desc: "A supreme secret manual of the Milky Way sect."
-    },
-    "cam-y-bao": {
-      name: "Brocade Robe",
-      desc: "A silk robe embroidered with gold thread that boosts defense."
-    },
-    "thanh-long-dao": {
-      name: "Azure Dragon Blade",
-      desc: "A great saber carved with an azure dragon, mighty and imposing."
-    },
-    "ngoc-bo-dao": {
-      name: "Jade Pendant",
-      desc: "An heirloom jade pendant that radiates a faint spiritual aura."
-    },
-    "huyen-kim-thach": {
-      name: "Phantom Gold Ore",
-      desc: "A precious ore used to forge equipment."
-    },
-    "tui-bac": {
-      name: "Silver Pouch",
-      desc: "A pouch of silver taken from wild beasts."
-    },
-    "duoc-vuong-lo": {
-      name: "Healer's Dew",
-      desc: "A healing spirit liquid distilled from a thousand herbs."
-    },
-    "than-bi-hop": {
-      name: "Mysterious Box",
-      desc: "An unopened treasure box that hides wondrous relics."
-    },
-    "yeu-dan": {
-      name: "Beast Core",
-      desc: "The inner core of a demon beast, essence of spiritual qi."
-    },
-    "huyet-chien-giap": {
-      name: "Blood Battle Armor",
-      desc: "Battle armor stained with blood offering extreme defense."
-    },
-    "bach-nien-linh-chi": {
-      name: "Century Lingzhi",
-      desc: "A hundred-year lingzhi that greatly nourishes vital energy."
-    },
-    "tu-kim-ho-lo": {
-      name: "Purple Gold Gourd",
-      desc: "A purple-gold gourd that stores restorative elixirs."
-    },
-    "ngoc-tinh-binh": {
-      name: "Jade Cleansing Vase",
-      desc: "A jade vase that purifies qi and clears the mind."
-    },
-    "phuong-vu-bao": {
-      name: "Phoenix Feather Robe",
-      desc: "A robe embroidered with phoenix feathers, rare and noble."
-    },
-    "phach-dao": {
-      name: "Soul Saber",
-      desc: "A light saber with an extremely fast draw."
-    },
-    "tu-tinh-nhan": {
-      name: "Four-Star Ring",
-      desc: "A ring inlaid with four spirit stones."
-    },
-    "linh-duong": {
-      name: "Wild Meat",
-      desc: "Fresh beast meat used for restorative cooking."
-    },
-    "tang-kinh-do": {
-      name: "Scripture Vault Map",
-      desc: "A secret tunnel map leading to the scripture vault."
-    },
-    "ngoc-nhan": {
-      name: "Jade Ring",
-      desc: "A simple jade ring that still holds spiritual qi."
-    },
-    "hoang-kim-huyen-thiet": {
-      name: "Dark Iron Ingot",
-      desc: "Dark iron metal used to craft superior weapons."
-    },
-    "huyet-bo-dao": {
-      name: "Blood Peach Elixir",
-      desc: "A blood-red spirit medicine that heals wounds."
-    },
-    "tu-kim-quan": {
-      name: "Purple Gold Crown",
-      desc: "A jade-studded crown that boosts defense and accuracy."
     }
   }
 };

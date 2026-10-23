@@ -1,14 +1,27 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { defaultEquipment } from "./equipment.js";
+import { defaultEquipment, deriveEquipmentBonuses } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
+import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
+import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
-import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
+import { ensureVfxTexture } from "./lazyAssets.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE, BASE_WALK_SPEED } from "./worldConfig.js";
+import {
+  BASE_ATTACK,
+  BASE_ATTACK_SPEED,
+  BASE_CRIT_DAMAGE,
+  BASE_CRIT_RATE,
+  BASE_DEFENSE
+} from "./combatConfig.js";
 
 const S = WORLD_SCALE;
 const POS = WORLD_POSITION_SCALE;
+
+/** Stats that are always derived from base values + worn gear, never persisted. */
+const DERIVED_STATS = new Set(["attack", "defense", "attackSpeed", "critRate", "critDamage"]);
 
 export class Player {
   /**
@@ -34,10 +47,11 @@ export class Player {
       maxHp: 100,
       mp: 60,
       maxMp: 60,
-      attack: 24,
-      defense: 6,
-      critRate: 0.12,
-      critDamage: 1.5,
+      attack: BASE_ATTACK,
+      defense: BASE_DEFENSE,
+      attackSpeed: BASE_ATTACK_SPEED,
+      critRate: BASE_CRIT_RATE,
+      critDamage: BASE_CRIT_DAMAGE,
       exp: 0,
       nextExp: 100,
       coins: 0,
@@ -46,13 +60,20 @@ export class Player {
 
     this.touchDirection = null;
     this.invulnerable = false;
-    /** Worn items, slot -> item id. Rendered by the vector rig. */
+    /** Worn items, slot -> item id. Drawn as overlays on the body sheet. */
     this.equipment = defaultEquipment();
+    /** Bonus totals already folded into `stats`, so a swap only applies a delta. */
+    this.equipmentBonuses = {};
     // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
     this.pkFlag = false;
     this.targetX = null;
     this.targetY = null;
+    this.finalX = null;
+    this.finalY = null;
     this.isMovingToTarget = false;
+    // Signed remaining distance on the active leg, used to detect overshoot.
+    this.lastLegDx = 0;
+    this.lastLegDy = 0;
 
     // Movement & wuxia animation states
     this.stepPhase = 0;
@@ -62,6 +83,12 @@ export class Player {
 
     this.createPhysicsSprite(x, y);
     this.createVisuals(x, y);
+    this.createKeyboard();
+  }
+
+  createKeyboard() {
+    if (!this.scene?.input?.keyboard?.addKeys) return;
+    this.keys = this.scene.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false);
   }
 
   createPhysicsSprite(x, y) {
@@ -122,7 +149,9 @@ export class Player {
    * with the current gear (so the hero is never blank before the game starts).
    */
   drawHero(container) {
-    this.shadow = this.scene.add.ellipse(0, HERO_FOOT_Y, 42, 13, 0x090e0c, 0.45);
+    // Soft contact shadow only (nested ellipses). No aura ring or sparkles:
+    // buff/skill formation rings are handled separately.
+    this.shadow = createHeroShadow(this.scene, HERO_FOOT_Y);
 
     // Body container carries the walk bob and attack recoil; the rig lives inside.
     this.body = this.scene.add.container(0, 0);
@@ -130,7 +159,7 @@ export class Player {
     this.rig.set(this.facingDirection, this.equipment, this.gender);
     this.body.add(this.rig.container);
 
-    container.add([this.shadow, this.body]);
+    container.add([...this.shadow.layers.map((layer) => layer.obj), this.body]);
   }
 
   /**
@@ -147,12 +176,30 @@ export class Player {
   }
 
   /**
-   * Wear the given items and redraw the rig.
+   * Wear the given items, redraw the rig and fold their bonuses into `stats`.
    * @param {Record<string, string|null>} [equipment]
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
     this.rig?.set(this.facingDirection, this.equipment, this.gender);
+    this.refreshEquipmentBonuses();
+  }
+
+  /**
+   * Re-apply the worn items' combat bonuses. Only the stats the server also
+   * accepts from the client (attack, defence, crit) are touched: HP/MP ceilings
+   * are server-owned (see progression.js), so gear never inflates them locally.
+   */
+  refreshEquipmentBonuses() {
+    const next = deriveEquipmentBonuses(this.equipment);
+    const previous = this.equipmentBonuses;
+    const delta = (key) => (next[key] || 0) - (previous[key] || 0);
+
+    this.stats.attack = Math.max(0, this.stats.attack + delta("attack"));
+    this.stats.defense = Math.max(0, this.stats.defense + delta("defense"));
+    const critRate = this.stats.critRate + delta("critRate");
+    this.stats.critRate = Math.min(1, Math.max(0, Number(critRate.toFixed(4))));
+    this.equipmentBonuses = next;
   }
 
   /**
@@ -177,7 +224,7 @@ export class Player {
   update(time, delta) {
     if (!this.sprite || !this.sprite.body) return;
 
-    this.updateMovement();
+    this.updateMovement(delta);
 
     const vx = this.sprite.body.velocity.x;
     const vy = this.sprite.body.velocity.y;
@@ -195,8 +242,7 @@ export class Player {
       this.body.setScale(1, 1);
 
       const shadowFactor = 1 - (Math.abs(this.body.y) / 3.5) * 0.2;
-      this.shadow.setScale(shadowFactor, shadowFactor);
-      this.shadow.setAlpha(0.45 * shadowFactor);
+      this.shadow.setFactor(shadowFactor);
 
       // Footstep dust puff when foot strikes the road
       if (time - this.lastDustTime > 190) {
@@ -211,8 +257,7 @@ export class Player {
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.14);
       this.body.setScale(1 - breath * 0.012, 1 + breath * 0.018);
 
-      this.shadow.setScale(1 + breath * 0.02, 1 + breath * 0.02);
-      this.shadow.setAlpha(0.45);
+      this.shadow.setFactor(1 + breath * 0.02);
     }
 
     // Depth sorting based on the isometric position of the ground cell
@@ -287,18 +332,27 @@ export class Player {
     });
   }
 
-  updateMovement() {
-    // Movement is click-to-move or the mobile virtual joystick; keyboard movement
-    // was removed so WASD/arrow keys are free for skill selection.
-    const keyLeft = this.touchDirection === "left";
-    const keyRight = this.touchDirection === "right";
-    const keyUp = this.touchDirection === "up";
-    const keyDown = this.touchDirection === "down";
+  updateMovement(delta = 0) {
+    const isTyping =
+      typeof this.scene?.isTyping === "function"
+        ? this.scene.isTyping()
+        : typeof document !== "undefined" &&
+          (document.activeElement?.tagName === "INPUT" ||
+            document.activeElement?.tagName === "TEXTAREA" ||
+            !!document.activeElement?.isContentEditable ||
+            document.activeElement?.getAttribute?.("contenteditable") === "true");
+
+    const k = this.keys;
+    const keyLeft = (!isTyping && (k?.A?.isDown || k?.LEFT?.isDown)) || this.touchDirection === "left";
+    const keyRight = (!isTyping && (k?.D?.isDown || k?.RIGHT?.isDown)) || this.touchDirection === "right";
+    const keyUp = (!isTyping && (k?.W?.isDown || k?.UP?.isDown)) || this.touchDirection === "up";
+    const keyDown = (!isTyping && (k?.S?.isDown || k?.DOWN?.isDown)) || this.touchDirection === "down";
 
     if (keyLeft || keyRight || keyUp || keyDown) {
       this.isMovingToTarget = false;
       this.targetX = null;
       this.targetY = null;
+      this.scene?.combat?.cancelPendingCast?.();
 
       let vx = 0;
       let vy = 0;
@@ -307,45 +361,102 @@ export class Player {
       if (keyUp) vy -= 1;
       if (keyDown) vy += 1;
 
+      const speed = BASE_WALK_SPEED * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
       const vector = new Phaser.Math.Vector2(vx, vy);
       if (vector.length() > 0) {
-        vector.normalize().scale(175 * POS * WORLD_SPEED_SCALE);
+        vector.normalize().scale(speed);
       }
 
       this.sprite.setVelocity(vector.x, vector.y);
       return;
     }
 
-    // Click-to-move handling
+    // Click-to-move handling: travel one axis at a time (four-way movement).
     if (this.isMovingToTarget && this.targetX !== null && this.targetY !== null) {
-      const dist = Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
+      const dx = this.targetX - this.sprite.x;
+      const dy = this.targetY - this.sprite.y;
+      const speed = BASE_WALK_SPEED * POS * WORLD_SPEED_SCALE * this.getSpeedMultiplier();
+      const step = travelStep(speed, delta);
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
+      // A long physics catch-up can move further than `step`; if the leg's
+      // remaining distance flipped sign, the body crossed the target and must
+      // snap instead of reversing (otherwise it oscillates every frame).
+      const overshot = horizontal
+        ? crossedTarget(this.lastLegDx, dx)
+        : crossedTarget(this.lastLegDy, dy);
 
-      if (dist <= 8) {
-        this.stopMovement();
+      if (overshot || (shouldSnap(dx, step) && shouldSnap(dy, step))) {
+        // Snap the finished leg, then continue with the other axis. Kill the
+        // velocity so a stale axis cannot overshoot before the next leg starts.
+        this.sprite.setVelocity(0, 0);
+        this.sprite.setPosition(this.targetX, this.targetY);
+        const isFinalLeg =
+          this.finalX === null ||
+          this.finalY === null ||
+          (Math.abs(this.finalX - this.targetX) <= 8 && Math.abs(this.finalY - this.targetY) <= 8);
+        if (isFinalLeg) {
+          this.stopMovement();
+          return;
+        }
+        if (Math.abs(this.finalX - this.targetX) > 8) {
+          this.targetX = this.finalX;
+          this.targetY = this.sprite.y;
+        } else {
+          this.targetX = this.sprite.x;
+          this.targetY = this.finalY;
+        }
+        this.lastLegDx = this.targetX - this.sprite.x;
+        this.lastLegDy = this.targetY - this.sprite.y;
         return;
       }
 
-      const angle = Phaser.Math.Angle.Between(this.sprite.x, this.sprite.y, this.targetX, this.targetY);
-      const vx = Math.cos(angle) * 175 * POS * WORLD_SPEED_SCALE;
-      const vy = Math.sin(angle) * 175 * POS * WORLD_SPEED_SCALE;
-
-      this.sprite.setVelocity(vx, vy);
+      if (horizontal) {
+        this.sprite.setVelocity(Math.sign(dx) * speed, 0);
+      } else {
+        this.sprite.setVelocity(0, Math.sign(dy) * speed);
+      }
+      this.lastLegDx = dx;
+      this.lastLegDy = dy;
       return;
     }
 
     this.sprite.setVelocity(0, 0);
   }
 
+  /**
+   * Walk to a point using four-way movement. The longer axis is travelled
+   * first, then the shorter one, so the character never moves diagonally.
+   * @param {number} x
+   * @param {number} y
+   */
   moveTo(x, y) {
-    this.targetX = x;
-    this.targetY = y;
+    this.finalX = x;
+    this.finalY = y;
     this.isMovingToTarget = true;
+
+    const dx = x - this.sprite.x;
+    const dy = y - this.sprite.y;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      this.targetX = x;
+      this.targetY = this.sprite.y;
+    } else {
+      this.targetX = this.sprite.x;
+      this.targetY = y;
+    }
+    // Start the overshoot tracker from the new leg, otherwise reversing
+    // direction mid-walk would look like crossing the old target and snap.
+    this.lastLegDx = this.targetX - this.sprite.x;
+    this.lastLegDy = this.targetY - this.sprite.y;
   }
 
   stopMovement() {
     this.isMovingToTarget = false;
     this.targetX = null;
     this.targetY = null;
+    this.finalX = null;
+    this.finalY = null;
+    this.lastLegDx = 0;
+    this.lastLegDy = 0;
     if (this.sprite?.body) {
       this.sprite.setVelocity(0, 0);
     }
@@ -400,17 +511,27 @@ export class Player {
     this.stopMovement();
     this.setPosition(this.spawnX, this.spawnY);
     this.sprite.setVelocity(0, 0);
+    this.hideFormation();
   }
 
   setTouchDirection(direction) {
     this.touchDirection = direction;
   }
 
+  /**
+   * Restore anything persisted about the character. Combat stats are derived
+   * (base + worn gear), so they are never restored from disk — otherwise the
+   * saved gear bonus would be applied a second time by `applyEquipment`.
+   * @param {object} [savedStats]
+   */
   loadStats(savedStats) {
     if (!savedStats || typeof savedStats !== "object") return;
+    const persisted = Object.fromEntries(
+      Object.entries(savedStats).filter(([key]) => !DERIVED_STATS.has(key))
+    );
     this.stats = {
       ...this.stats,
-      ...savedStats
+      ...persisted
     };
   }
 
@@ -453,5 +574,114 @@ export class Player {
 
   get critDamage() {
     return this.stats?.critDamage ?? 1.5;
+  }
+
+  /**
+   * Current movement speed multiplier derived from active buffs.
+   * Clamped to a positive floor so debuffs never freeze or reverse movement.
+   * @returns {number}
+   */
+  getSpeedMultiplier() {
+    const effective = this.scene?.combat?.getEffectiveStats?.();
+    return Math.max(0.1, 1 + (Number(effective?.speedPct) || 0));
+  }
+
+  /**
+   * Display a continuously rotating ground formation circle under the character's feet.
+   * Stays flat on the ground and follows the character while the buff is active.
+   * @param {string} [key="vfx-la-han-tran"]
+   * @param {number} [scale=0.6]
+   */
+  showFormation(key = "vfx-la-han-tran", scale = 0.6) {
+    if (!this.visual || typeof this.scene?.add?.sprite !== "function") return;
+    // The formation sheet may not be loaded yet; queue it and bail out until the
+    // next update retries (the buff re-applies the ring every frame).
+    ensureVfxTexture(this.scene, key);
+    if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
+
+    const animKey = `${key}-spin`;
+    if (this.scene.anims && !this.scene.anims.exists(animKey)) {
+      const texture = this.scene.textures?.get?.(key);
+      const frameTotal = texture?.frameTotal ?? 16;
+      const frameCount = Math.max(1, frameTotal - 1);
+      const frames = this.scene.anims.generateFrameNumbers?.(key, { start: 0, end: frameCount - 1 });
+      if (frames && frames.length > 0) {
+        this.scene.anims.create({
+          key: animKey,
+          frames,
+          frameRate: 12,
+          repeat: -1
+        });
+      }
+    }
+
+    const targetScale = typeof scale === "number" ? scale : 0.6;
+    if (!this.formationSprite) {
+      this.formationSprite = this.scene.add.sprite(0, HERO_FOOT_Y, key);
+      // Origin at center (128, 128) of 256x256 frame
+      this.formationSprite.setOrigin(0.5, 0.5);
+      this.formationSprite.setScale(targetScale);
+      // Place behind body rig so character stands on top of the formation ring
+      const bodyIndex = this.visual.getIndex ? this.visual.getIndex(this.body) : -1;
+      if (bodyIndex >= 0 && this.visual.addAt) {
+        this.visual.addAt(this.formationSprite, bodyIndex);
+      } else if (this.visual.add) {
+        this.visual.add(this.formationSprite);
+      }
+    } else {
+      this.formationSprite.setScale?.(targetScale);
+    }
+
+    this.formationSprite.setVisible?.(true);
+    if (this.formationSprite.play && (!this.formationSprite.anims?.isPlaying || this.formationSprite.anims?.currentAnim?.key !== animKey)) {
+      this.formationSprite.play(animKey, true);
+    }
+  }
+
+  /**
+   * Hide the formation circle when the buff expires or is cleared.
+   */
+  hideFormation() {
+    if (this.formationSprite) {
+      this.formationSprite.setVisible?.(false);
+      this.formationSprite.stop?.();
+    }
+  }
+
+  destroy() {
+    if (this.formationSprite) {
+      this.formationSprite.destroy?.();
+      this.formationSprite = null;
+    }
+    if (this.keys && this.scene?.input?.keyboard?.removeKey) {
+      Object.values(this.keys).forEach((key) => {
+        try {
+          this.scene.input.keyboard.removeKey(key);
+        } catch {
+          // Ignore teardown errors
+        }
+      });
+      this.keys = null;
+    }
+    if (this.visual) {
+      this.visual.destroy?.();
+      this.visual = null;
+    }
+    if (this.nameText) {
+      this.nameText.destroy?.();
+      this.nameText = null;
+    }
+    if (this.hpBack) {
+      this.hpBack.destroy?.();
+      this.hpBack = null;
+    }
+    if (this.hpFill) {
+      this.hpFill.destroy?.();
+      this.hpFill = null;
+    }
+    if (this.sprite) {
+      this.sprite.destroy?.();
+      this.sprite = null;
+    }
   }
 }

@@ -1,13 +1,15 @@
 import * as Phaser from "phaser";
-import { WorldManager, WORLD_CONFIG } from "./world.js";
+import { WorldManager } from "./marketWorld.js";
+import { WORLD_CONFIG } from "./worldConfig.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
-import { EnemyManager, DEFAULT_ENEMY_SPAWNS } from "./enemy.js";
+import { EnemyManager } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantities, getQuantity, consumeQuantity, addQuantity, setQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { getQuantities, getQuantity, consumeQuantity, addQuantity, replaceQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { loadQuickSlots } from "./quickSlots.js";
 import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
@@ -15,17 +17,36 @@ import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
 import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
-import { toIso, fromIso, isoDepth, isoBounds } from "./isoProjection.js";
+import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { MARKET_BOUNDS, MARKET_NPCS, MARKET_SPAWN } from "./marketLayout.js";
+import { SHOP_BUILDINGS } from "./marketBuildings.js";
+import { VEGETATION_SPRITES } from "./marketProps.js";
+import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
+import {
+  NPC_DUOC,
+  NPC_INTERACT_RANGE,
+  createPharmacyNpc,
+  isPointOnNpc,
+  npcApproachPoint
+} from "./npc.js";
+import { ShopFlow } from "./shopFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
-const CAMERA_TILES = 10;
-import { normalizeGender } from "./gender.js";
-import { loadSkillBinds, keyToSlot, normalizeKey } from "./keybinds.js";
-import { normalizeSect } from "./skills.js";
+const CAMERA_TILES = 15;
 
-/** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
-const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
+/** Map descriptor shared with the minimap / full-map canvas. */
+const MARKET_WORLD_CONFIG = {
+  ...WORLD_CONFIG,
+  width: MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0,
+  height: MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0,
+  cityBounds: MARKET_BOUNDS
+};
+import { normalizeGender } from "./gender.js";
+import { normalizeKey } from "./keybinds.js";
+import { loadSkillLoadout } from "./skillLoadout.js";
+import { normalizeSect, skillsForSect } from "./skills.js";
+import { ensureHeroBodyTexture, ensureSectVfx } from "./lazyAssets.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -38,9 +59,35 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   preload() {
-    // The hero is drawn procedurally (see heroRig.js); only the portrait art is
-    // still loaded from disk.
-    this.load.image("hero-portrait", "/hero_portrait.png");
+    // Only the active character's walk sheet is needed at boot; the other gender
+    // is queued the first time the player switches (see ensureHeroBodyTexture).
+    const gender = normalizeGender(readSession()?.activeCharacter?.gender);
+    const bodySheet = HERO_BODY_TEXTURES[gender];
+    if (!this.textures.exists(bodySheet.key)) {
+      this.load.spritesheet(bodySheet.key, bodySheet.url, {
+        frameWidth: HERO_BODY.frameWidth,
+        frameHeight: HERO_BODY.frameHeight
+      });
+    }
+    this.load.image("ground-bricks", "/gach-tile.webp");
+    // Second paving style, used for the walkway that threads the market square.
+    this.load.image("ground-walkway", "/gach-seamless.webp");
+    for (const { textureKey, url } of SHOP_BUILDINGS) {
+      if (!this.textures.exists(textureKey)) {
+        this.load.image(textureKey, url);
+      }
+    }
+    if (!this.textures.exists(NPC_DUOC.textureKey)) {
+      this.load.spritesheet(NPC_DUOC.textureKey, NPC_DUOC.url, {
+        frameWidth: NPC_DUOC.frameWidth,
+        frameHeight: NPC_DUOC.frameHeight
+      });
+    }
+    for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
+      this.load.image(key, url);
+    }
+    // Skill VFX sheets are intentionally not loaded here: they are pulled in on
+    // demand once the hero's sect is known (see ensureSectVfx).
   }
 
   create() {
@@ -56,21 +103,26 @@ export class JiangHuScene extends Phaser.Scene {
       textureGraphics.destroy();
     }
 
-    // Configure world and camera bounds. Physics/collisions stay in the flat
-    // "ground" plane; the camera lives in isometric screen space, so its bounds
-    // come from the projected diamond that contains the whole ground rectangle.
-    const isoBox = isoBounds(WORLD_CONFIG.width, WORLD_CONFIG.height);
-    this.cameras.main.setBounds(
-      isoBox.minX - 400,
-      isoBox.minY - 400,
-      isoBox.maxX - isoBox.minX + 800,
-      isoBox.maxY - isoBox.minY + 800
-    );
-    this.physics.world.setBounds(0, 0, WORLD_CONFIG.width, WORLD_CONFIG.height);
+    // The playable map is exactly the brick-paved area. Both the camera and the
+    // physics world are clamped to that rectangle so the player can never walk
+    // out onto the empty grass backdrop.
+    const mapW = MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0;
+    const mapH = MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0;
+    this.cameras.main.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
+    this.physics.world.setBounds(MARKET_BOUNDS.x0, MARKET_BOUNDS.y0, mapW, mapH);
 
     // Initialize subsystems
     this.worldManager = new WorldManager(this);
     this.worldManager.create();
+
+    // Friendly shopkeepers (currently the Dược Điểm herbalist). Their bodies are
+    // added to the same static group as the buildings so the hero cannot walk
+    // through them.
+    this.npcs = MARKET_NPCS.map((def) => createPharmacyNpc(this, def));
+    for (const npc of MARKET_NPCS) {
+      this.worldManager.addBody(npc.x, npc.y, 46, 34);
+    }
+    this.pendingNpc = null;
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
@@ -85,14 +137,21 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.player = new Player(
       this,
-      640 * WORLD_POSITION_SCALE,
-      620 * WORLD_POSITION_SCALE,
+      MARKET_SPAWN.x,
+      MARKET_SPAWN.y,
       initialName,
       initialGender
     );
     this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
+    // Pull this sect's skill art in the background instead of every VFX sheet.
+    // Sessions without a chosen character (login screen, guests) download none.
+    if (session?.activeCharacter?.sect) {
+      ensureSectVfx(this, skillsForSect(session.activeCharacter.sect));
+    }
     this.enemyManager = new EnemyManager(this);
-    this.enemyManager.create(DEFAULT_ENEMY_SPAWNS);
+    // Biện Kinh is a safe city, so the offline roster starts empty; the server
+    // populates enemies for maps that have them.
+    this.enemyManager.create();
 
     // Static physics collisions between world obstacles and entities
     const obstacles = this.worldManager.getObstacles();
@@ -112,10 +171,9 @@ export class JiangHuScene extends Phaser.Scene {
       api: apiClient,
       getOwnerId: () => readSession()?.activeCharacter?.id || null,
       getQuantities,
-      setQuantities,
+      setQuantities: replaceQuantities,
       onAdopt: () => {
         this.uiBridge.updateInventory();
-        this.uiBridge.addLog("Đã đồng bộ hành trang từ máy chủ.", "system");
         this.saveGame(false);
       },
       onError: (error) => {
@@ -139,7 +197,10 @@ export class JiangHuScene extends Phaser.Scene {
         this.player.loadStats(this.savedData.stats);
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
-        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+        const { x, y } = this.savedData.position;
+        const insideMarket =
+          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
+        if (insideMarket) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -160,6 +221,12 @@ export class JiangHuScene extends Phaser.Scene {
     // Real-time Multiplayer: Remote Player Manager & WebSocket Network Client
     this.remotePlayerManager = new RemotePlayerManager(this, this.uiBridge);
     this.networkClient = new NetworkClient();
+    this.shopFlow = new ShopFlow({
+      player: this.player,
+      uiBridge: this.uiBridge,
+      networkClient: this.networkClient,
+      saveGame: (showFeedback) => this.saveGame(showFeedback)
+    });
 
     this.networkClient.on("init_world", (payload) => {
       this.remotePlayerManager.handleInitWorld(payload);
@@ -234,6 +301,12 @@ export class JiangHuScene extends Phaser.Scene {
       this.combat.applyServerProgress(payload);
     });
 
+    // A server-validated shop purchase. The server has already debited silver
+    // and written the item to this character's bag; mirror the item locally.
+    this.networkClient.on("shop_result", (payload) => {
+      this.shopFlow.handleResult(payload);
+    });
+
     this.networkClient.on("connected", () => {
       this.sendNetworkJoin();
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
@@ -252,7 +325,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.isPointerMoving = false;
 
-    // Mouse input handlers (Left click: Move or Attack Enemy, Right click: Kiếm Khí)
+    // Mouse input handlers (Left click: Move to destination, Right click: disabled)
     this.input.on("pointerdown", (pointer) => {
       if (!this.started || this.isPaused) return;
 
@@ -262,86 +335,28 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Right-click casting is handled by the DOM mousedown listener so it can
-      // pass the clicked ground point for target selection; never treat it as a
-      // left-click move.
-      if (pointer.rightButtonDown()) return;
+      // Ignore right mouse button entirely
+      if (pointer.rightButtonDown() || pointer.button === 2) return;
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       const worldX = ground.x;
       const worldY = ground.y;
 
-      // Check if clicking directly on a living enemy
-      const clickedEnemy = this.enemyManager
-        .getAlive()
-        .find((wolf) => Phaser.Math.Distance.Between(worldX, worldY, wolf.x, wolf.y) < 38);
+      // Any click re-targets the hero, so a pending NPC approach is cancelled
+      // unless this click selects one again below.
+      this.pendingNpc = null;
 
-      if (clickedEnemy) {
-        // A left-hand skill takes priority: chase into range, then release it.
-        if (this.combat.getLeftSkill?.()) {
-          this.combat.castLeftSkill(clickedEnemy);
-          return;
-        }
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedEnemy.x, clickedEnemy.y);
-        if (dist <= 85) {
-          this.player.stopMovement();
-          this.combat.performAttack();
-        } else {
-          this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
-          this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
-        }
+      // Check if clicking directly on an NPC (walk towards NPC)
+      const clickedNpc = (this.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
+      if (clickedNpc) {
+        const approach = npcApproachPoint(clickedNpc);
+        this.pendingNpc = clickedNpc;
+        this.player.moveTo(approach.x, approach.y);
+        this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
         return;
       }
 
-      // Check if clicking directly on another player (PvP)
-      const clickedPlayer = this.remotePlayerManager
-        .getAll()
-        .find(
-          (rp) =>
-            rp.container?.active &&
-            Phaser.Math.Distance.Between(worldX, worldY, rp.x, rp.y) < 42
-        );
-
-      if (clickedPlayer) {
-        const dist = Phaser.Math.Distance.Between(
-          this.player.x,
-          this.player.y,
-          clickedPlayer.x,
-          clickedPlayer.y
-        );
-        if (dist <= PVP_ATTACK_RANGE) {
-          this.player.stopMovement();
-          this.combat.performPvpAttack(clickedPlayer);
-        } else {
-          this.player.moveTo(clickedPlayer.x, clickedPlayer.y);
-          this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xff5252);
-        }
-        return;
-      }
-
-      // Check if clicking directly on an NPC
-      const npcs = this.worldManager?.getNPCs?.() || [];
-      const clickedNPC = npcs.find(
-        (npc) => Phaser.Math.Distance.Between(worldX, worldY, npc.x, npc.y) < 42
-      );
-
-      if (clickedNPC) {
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, clickedNPC.x, clickedNPC.y);
-        if (dist > 75) {
-          const angle = Phaser.Math.Angle.Between(clickedNPC.x, clickedNPC.y, this.player.x, this.player.y);
-          const approachDist = 60;
-          const targetX = clickedNPC.x + Math.cos(angle) * approachDist;
-          const targetY = clickedNPC.y + Math.sin(angle) * approachDist;
-          this.player.moveTo(targetX, targetY);
-          this.showClickIndicator(targetX, targetY, 0x22c55e);
-        } else {
-          this.player.stopMovement();
-        }
-        this.uiBridge.addLog(clickedNPC.dialogue, "near");
-        return;
-      }
-
-      // Left click on terrain: Move to destination (and abandon a skill chase).
+      // Left click on terrain, enemies or other players: move to destination
       this.isPointerMoving = true;
       this.combat.cancelPendingCast();
       this.player.moveTo(worldX, worldY);
@@ -350,7 +365,14 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Hold-to-move continuous cursor tracking
     this.input.on("pointermove", (pointer) => {
-      if (!this.started || this.isPaused || !this.isPointerMoving || !pointer.isDown || pointer.rightButtonDown()) {
+      if (
+        !this.started ||
+        this.isPaused ||
+        !this.isPointerMoving ||
+        !pointer.isDown ||
+        pointer.rightButtonDown() ||
+        pointer.button === 2
+      ) {
         return;
       }
 
@@ -361,6 +383,7 @@ export class JiangHuScene extends Phaser.Scene {
 
       const ground = fromIso(pointer.worldX, pointer.worldY);
       this.combat.cancelPendingCast();
+      this.pendingNpc = null;
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -371,58 +394,41 @@ export class JiangHuScene extends Phaser.Scene {
     // Allow standard typing in HTML form inputs (e.g. login form, chat)
     this.input.keyboard.preventDefault = false;
     const isTyping = () => {
-      const tag = typeof document !== "undefined" && document.activeElement?.tagName;
-      return tag === "INPUT" || tag === "TEXTAREA";
+      if (typeof document === "undefined") return false;
+      const active = document.activeElement;
+      if (!active) return false;
+      const tag = active.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        !!active.isContentEditable ||
+        active.getAttribute?.("contenteditable") === "true"
+      );
     };
     this.isTyping = isTyping;
 
-    // Skill selection keys are player-configurable (see keybinds.js). Movement is
-    // click/joystick only, and normal attack / PK live on UI buttons, so no other
-    // action steals a key the player may want to bind.
-    this.skillBinds = loadSkillBinds(readSession()?.activeCharacter?.id);
+    // Skill hotkeys U, I, O, P trigger direct casting.
+    this.skillLoadout = loadSkillLoadout(readSession()?.activeCharacter?.id);
+    this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
+    this.combat.setSkillLoadout(this.skillLoadout);
     this.bindSkillKeys();
 
-    // Right mouse button releases the skill assigned to the right hand.
-    // A DOM listener reliably reports the secondary button (Phaser's pointerdown
-    // can be flaky for right-click across browsers).
-    this.rightMouseHandler = (event) => {
-      if (event.button !== 2) return;
-      if (event.target !== this.game.canvas) return;
-      if (!this.started || this.isPaused) return;
-      // Derive the clicked ground point from the raw event instead of relying on
-      // Phaser having updated its pointer first.
-      const canvas = this.game.canvas;
-      const rect = canvas.getBoundingClientRect();
-      const sx = (event.clientX - rect.left) * (canvas.width / rect.width);
-      const sy = (event.clientY - rect.top) * (canvas.height / rect.height);
-      const world = this.cameras.main.getWorldPoint(sx, sy);
-      this.combat.castSelectedSkill(fromIso(world.x, world.y));
-    };
+    // Prevent default context menu on right click
     this.contextMenuHandler = (event) => {
       if (this.started) event.preventDefault();
     };
-    window.addEventListener("mousedown", this.rightMouseHandler);
     window.addEventListener("contextmenu", this.contextMenuHandler);
     this.events.once("shutdown", () => {
-      window.removeEventListener("mousedown", this.rightMouseHandler);
       window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
-    // Consumable hotkeys stay fixed on 1-4.
-    this.input.keyboard.on("keydown-ONE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
-    });
-
-    this.input.keyboard.on("keydown-TWO", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(2);
-    });
-
-    this.input.keyboard.on("keydown-THREE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(3);
-    });
-
-    this.input.keyboard.on("keydown-FOUR", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
+    // Number hotkeys 1-9 trigger quick slot items.
+    const numberKeyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"];
+    numberKeyNames.forEach((keyName, idx) => {
+      const slotNum = idx + 1;
+      this.input.keyboard.on(`keydown-${keyName}`, () => {
+        if (!isTyping() && this.started && !this.isPaused) this.useItem(slotNum);
+      });
     });
 
     // Listen to React UI Actions via Game Bridge
@@ -434,25 +440,44 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_SKILL, () => {
         if (this.started && !this.isPaused) this.combat.castSelectedSkill();
       }),
-      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, slot } = {}) => {
-        if (this.started) this.combat.equipSkill(hand, slot);
+      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, key, slot } = {}) => {
+        if (this.started) {
+          const slotKey = key || (hand === "left" ? "u" : hand === "right" ? "i" : hand);
+          if (["u", "i", "o", "p"].includes(slotKey)) {
+            this.skillLoadout = { ...this.skillLoadout, [slotKey]: slot };
+            this.combat.setSkillLoadout(this.skillLoadout);
+          } else {
+            this.combat.equipSkill(hand, slot);
+          }
+        }
       }),
-      bridge.on(EVENTS.SET_SKILL_LOADOUT, ({ left, right } = {}) => {
-        if (Number.isInteger(left)) this.combat.leftSkillSlot = left;
-        if (Number.isInteger(right)) this.combat.selectedSkillSlot = right;
-        this.combat?.cancelPendingCast?.();
+      bridge.on(EVENTS.SET_SKILL_LOADOUT, (loadout = {}) => {
+        if (this.started && loadout) {
+          this.skillLoadout = { ...this.skillLoadout, ...loadout };
+          this.combat.setSkillLoadout(this.skillLoadout);
+        }
+      }),
+      bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
+        if (this.started && quickSlots) {
+          this.quickSlots = { ...this.quickSlots, ...quickSlots };
+        }
       }),
       bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
         this.player?.setSect(normalizeSect(sect));
+        if (sect) ensureSectVfx(this, skillsForSect(sect));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
+      }),
+      bridge.on(EVENTS.ACTION_BUY_ITEM, ({ itemId, qty } = {}) => {
+        if (this.started) this.shopFlow.buy(itemId, qty);
       }),
       bridge.on(EVENTS.ACTION_EQUIP_ITEM, (itemId) => this.equipItem(itemId)),
       bridge.on(EVENTS.ACTION_UNEQUIP_SLOT, (slot) => this.unequipSlot(slot)),
       bridge.on(EVENTS.ACTION_MOVE, (direction) => {
         if (!this.isPaused) {
           this.combat.cancelPendingCast();
+          this.pendingNpc = null;
           this.player.setTouchDirection(direction);
         }
       }),
@@ -472,7 +497,13 @@ export class JiangHuScene extends Phaser.Scene {
         }
       }),
       bridge.on(EVENTS.SET_PLAYER_GENDER, (gender) => {
-        this.player?.setGender(gender);
+        const next = normalizeGender(gender);
+        if (ensureHeroBodyTexture(this, next)) {
+          this.player?.setGender(next);
+          return;
+        }
+        // Sheet still downloading: keep the current look, then swap it in.
+        this.load.once("complete", () => this.player?.setGender(next));
       }),
       bridge.on(EVENTS.ACTION_CHAT, (payload) => {
         if (this.networkClient?.isConnected) {
@@ -516,13 +547,13 @@ export class JiangHuScene extends Phaser.Scene {
     this.uiBridge.drawMinimap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
     this.uiBridge.drawCityMap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
 
@@ -533,33 +564,49 @@ export class JiangHuScene extends Phaser.Scene {
   useItem(slot) {
     if (!this.player || !this.started) return;
 
-    const item = CONSUMABLE_BY_SLOT.get(slot);
+    const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
+    const itemId = quickSlots?.[slot];
+    if (!itemId) return;
+
+    const item = getItemById(itemId);
     if (!item) return;
 
-    // Refuse an empty stack before any effect runs, so a depleted consumable can
-    // never heal for free.
-    if (getQuantity(item.id) <= 0) {
-      this.uiBridge.addLog(`Hành trang đã hết ${item.name}.`, "guide");
+    if (getQuantity(itemId) <= 0) {
+      this.uiBridge.addLog(`Hành trang đã hết ${item.name || itemId}.`, "guide");
       return;
     }
 
-    if (!this.applyItemEffect(slot)) return;
+    if (item.slot) {
+      this.equipItem(itemId);
+      return;
+    }
 
-    // Deduct only after a real use; an effect refused above (e.g. health full)
-    // returns false and leaves the stack intact. The live HUD shows the remainder.
-    const { ok } = consumeQuantity(item.id, 1);
+    if (!this.applyConsumableEffect(itemId)) return;
+
+    const { ok } = consumeQuantity(itemId, 1);
     if (!ok) return;
 
     this.onInventoryChanged();
   }
 
   /**
-   * Run the effect for a hotbar consumable slot.
-   * @param {number} slot
+   * Run the effect for a hotbar consumable slot or item id.
+   * @param {number|string} slotOrItemId
    * @returns {boolean} whether the item was actually consumed by the player
    */
-  applyItemEffect(slot) {
-    if (slot === 1) {
+  applyItemEffect(slotOrItemId) {
+    let itemId = slotOrItemId;
+    if (typeof slotOrItemId === "number") {
+      const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
+      itemId = quickSlots?.[slotOrItemId];
+    }
+    return this.applyConsumableEffect(itemId);
+  }
+
+  applyConsumableEffect(itemId) {
+    if (!itemId) return false;
+
+    if (itemId === "kim-sang-duoc") {
       // Kim Sáng Dược (+35 HP)
       if (this.player.stats.hp >= this.player.stats.maxHp) {
         this.uiBridge.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
@@ -575,7 +622,7 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 2) {
+    if (itemId === "dai-hoan-dan") {
       // Đại Hoàn Đan (+25 MP)
       if (this.player.stats.mp >= this.player.stats.maxMp) {
         this.uiBridge.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
@@ -591,8 +638,8 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 3) {
-      // Nữ Nhi Hồng (+50 HP & +30 MP) — pointless and now wasteful when both are full
+    if (itemId === "nu-nhi-hong") {
+      // Nữ Nhi Hồng (+50 HP & +30 MP)
       if (
         this.player.stats.hp >= this.player.stats.maxHp &&
         this.player.stats.mp >= this.player.stats.maxMp
@@ -611,12 +658,18 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 4) {
+    if (itemId === "hoi-thanh-phu") {
       // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
-      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
+      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
+      return true;
+    }
+
+    const item = getItemById(itemId);
+    if (item) {
+      this.uiBridge.addLog(`Đã sử dụng ${item.name}.`, "system");
       return true;
     }
 
@@ -641,6 +694,8 @@ export class JiangHuScene extends Phaser.Scene {
     });
     // Mirror to peers so their rigs show the same gear.
     this.networkClient?.sendEquipment?.(this.player.equipment);
+    // Gear now feeds attack/defence/crit, so refresh the sheet snapshot too.
+    this.uiBridge.updateHud(this.player.stats);
   }
 
   /**
@@ -867,6 +922,7 @@ export class JiangHuScene extends Phaser.Scene {
       } else {
         this.player.respawn();
       }
+      this.combat?.clearBuffs?.();
       this.uiBridge.updateHud(this.player.stats);
       this.uiBridge.addLog("Bạn đã bị đánh bại và hồi sinh tại Biện Kinh.", "combat");
       // Persist the full-HP respawn state.
@@ -937,18 +993,31 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * Rebuild the key -> slot lookup from the current player bindings.
+   * Interact with the closest NPC in range using key F.
    */
-  updateSkillKeyMap() {
-    this.skillKeyMap = keyToSlot(this.skillBinds);
+  interactWithNearbyNpc() {
+    if (!this.started || this.isPaused) return;
+    const candidates = (this.npcs || [])
+      .map((npc) => ({
+        npc,
+        dist: Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.gx, npc.gy)
+      }))
+      .filter((item) => item.dist <= NPC_INTERACT_RANGE)
+      .sort((a, b) => a.dist - b.dist);
+
+    if (candidates.length > 0) {
+      this.player.stopMovement();
+      this.pendingNpc = null;
+      this.shopFlow.open(candidates[0].npc);
+    } else {
+      this.uiBridge.addLog("Không có NPC ở gần để nói chuyện (nhấn [F] khi lại gần NPC).");
+    }
   }
 
   /**
-   * Bind the configurable skill-selection keys. Only one raw keydown listener is
-   * registered; rebinding just swaps the lookup map.
+   * Bind the configurable skill keys (U, I, O, P) and NPC interaction key (F).
    */
   bindSkillKeys() {
-    this.updateSkillKeyMap();
     if (this.skillKeyHandler) return;
     this.skillKeyHandler = (event) => {
       if (!this.started || this.isPaused) return;
@@ -956,10 +1025,22 @@ export class JiangHuScene extends Phaser.Scene {
       if (event.repeat) return;
       const key = normalizeKey(event);
       if (!key) return;
-      const slot = this.skillKeyMap?.get(key);
-      if (slot === undefined) return;
-      event.preventDefault();
-      this.combat.selectSkill(slot);
+
+      if (key === "f") {
+        event.preventDefault();
+        this.interactWithNearbyNpc();
+        return;
+      }
+
+      if (["u", "i", "o", "p"].includes(key)) {
+        event.preventDefault();
+        const pointer = this.input.activePointer;
+        let aim = null;
+        if (pointer) {
+          aim = fromIso(pointer.worldX, pointer.worldY);
+        }
+        this.combat.castSkillByKey(key, aim);
+      }
     };
     this.input.keyboard.on("keydown", this.skillKeyHandler);
   }
@@ -968,6 +1049,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.started = true;
     // Scope the bag to the active character before any load/save touches it.
     StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
+    this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
     // Re-entering (or switching characters) must re-read before any upload, so the
     // initial save below cannot clobber the new character's server bag.
     this.inventorySync?.reset();
@@ -985,7 +1067,10 @@ export class JiangHuScene extends Phaser.Scene {
         this.player.loadStats(this.savedData.stats);
       }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
-        this.player.setPosition(this.savedData.position.x, this.savedData.position.y);
+        const { x, y } = this.savedData.position;
+        const insideMarket =
+          x >= MARKET_BOUNDS.x0 && x <= MARKET_BOUNDS.x1 && y >= MARKET_BOUNDS.y0 && y <= MARKET_BOUNDS.y1;
+        if (insideMarket) this.player.setPosition(x, y);
       }
       if (this.savedData.questRewarded !== undefined) {
         this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
@@ -1006,7 +1091,7 @@ export class JiangHuScene extends Phaser.Scene {
       );
     } else {
       this.uiBridge.addLog("Bạn đã đặt chân đến Biện Kinh. Chúc hiệp khách hành tẩu bình an.", "system");
-      this.player.setPosition(640 * WORLD_POSITION_SCALE, 620 * WORLD_POSITION_SCALE);
+      this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
     }
 
     this.saveGame(false);
@@ -1023,6 +1108,21 @@ export class JiangHuScene extends Phaser.Scene {
     this.player.update(time, delta);
     // Drive pending melee approaches (walk into range, then release the skill).
     this.combat.update?.(time);
+
+    // Open a shop once the hero has walked within talking distance.
+    if (this.pendingNpc) {
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        this.pendingNpc.gx,
+        this.pendingNpc.gy
+      );
+      if (dist <= NPC_INTERACT_RANGE) {
+        this.pendingNpc = null;
+        this.player.stopMovement();
+        this.uiBridge.addLog("Đã đến gần NPC. Nhấn phím [F] để nói chuyện.");
+      }
+    }
 
     // Update remote players (interpolation and animations)
     if (this.remotePlayerManager) {
@@ -1084,21 +1184,18 @@ export class JiangHuScene extends Phaser.Scene {
     // resulting `player_hp` back (see server gameSocket.tickBites).
     this.enemyManager.update(time, delta, this.player);
 
-    // Update collectible loot drops
-    this.combat.updateDrops(time);
-
     // Update UI HUD & Minimap Radar
     this.uiBridge.updateHud(this.player.stats);
     this.uiBridge.drawMinimap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
     this.uiBridge.drawCityMap(
       this.player,
       this.enemyManager.getAll(),
-      WORLD_CONFIG,
+      MARKET_WORLD_CONFIG,
       this.remotePlayerManager?.getAll() || []
     );
   }
@@ -1134,8 +1231,20 @@ export class JiangHuScene extends Phaser.Scene {
       this.remotePlayerManager.destroy();
       this.remotePlayerManager = null;
     }
+    if (this.shopFlow) {
+      this.shopFlow.destroy();
+      this.shopFlow = null;
+    }
+    if (this.player) {
+      this.player.destroy?.();
+      this.player = null;
+    }
     if (this.uiBridge) {
       this.uiBridge.destroy();
+    }
+    if (this.skillKeyHandler && this.input?.keyboard) {
+      this.input.keyboard.off("keydown", this.skillKeyHandler);
+      this.skillKeyHandler = null;
     }
   }
 }

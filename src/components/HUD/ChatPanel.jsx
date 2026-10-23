@@ -3,7 +3,7 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 const TABS = ["all", "system", "near", "combat"];
 
-export function ChatPanel({ logs = [], onSendMessage }) {
+export function ChatPanel({ logs = [], onSendMessage, collapsed = false, onClose, onOpen }) {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
   const [inputText, setInputText] = useState("");
@@ -14,6 +14,24 @@ export function ChatPanel({ logs = [], onSendMessage }) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // Minimized state keeps a small tab on screen so the channel can be reopened.
+  if (collapsed) {
+    return (
+      <section className="bottom-left-panel" id="chat-restore-panel">
+        <button
+          type="button"
+          id="chat-restore-btn"
+          className="panel-restore-btn"
+          title={t("chat.restore")}
+          aria-label={t("chat.restore")}
+          onClick={onOpen}
+        >
+          💬
+        </button>
+      </section>
+    );
+  }
 
   const handleSend = () => {
     const text = inputText.trim();
@@ -44,6 +62,16 @@ export function ChatPanel({ logs = [], onSendMessage }) {
     <section className="bottom-left-panel" id="chat-panel">
       <div className="chat-box metal-card">
         <div className="chat-tabs">
+          <button
+            type="button"
+            id="chat-minimize-btn"
+            className="chat-minimize"
+            onClick={onClose}
+            title={t("chat.minimize")}
+            aria-label={t("chat.minimize")}
+          >
+            –
+          </button>
           {TABS.map((tab) => (
             <button
               key={tab}

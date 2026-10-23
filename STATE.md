@@ -1,6 +1,13 @@
 # Loop State — jx2-web (Giang Hồ · React + Phaser 3 Wuxia RPG)
 
-Last run: 2026-10-18 — feature pipeline cycle (L2, item C1)
+Last run: 2026-10-23 — merge main conflict resolution (verified)
+
+## Latest Conflict Resolution
+
+- Resolved merge conflicts from `main` across the loop instructions and the gameplay/client files affected by the branch merge.
+- Preserved both the HUD chat updates and the newer loot/reward logic while keeping the drop state lazy and compatibility-safe.
+- Verified with `npm run build && npm test`: build succeeded and the suite passed with 56 test files / 443 tests.
+
 
 ## Project Snapshot
 

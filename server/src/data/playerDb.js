@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
+import { STARTER_ITEMS } from "../../../src/game/items.js";
 
 /** Keys that would poison a plain object (and later SQL params) if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -13,6 +14,13 @@ const MAX_LIMIT = 50;
 
 /** A character's starting ledger. */
 const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
+
+/**
+ * Bumped when a stored inventory must be discarded or back-filled by a migration.
+ *  2 — clears the hard-coded demo bags that every character used to start with.
+ *  3 — hands the starter kit to characters left with an empty bag.
+ */
+const SCHEMA_VERSION = 3;
 
 /**
  * Recursively drop prototype-polluting keys from untrusted input.
@@ -35,6 +43,15 @@ const asCount = (value, fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
 
 const asName = (value) => (typeof value === "string" ? value : "");
+
+/**
+ * Block the current thread for `ms` milliseconds.
+ * `node:sqlite` is synchronous, so retrying needs a synchronous sleep.
+ * @param {number} ms
+ */
+const sleepSync = (ms) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
 
 /**
  * SQLite persistence for a character's progression ledger, inventory and the
@@ -61,8 +78,11 @@ export class PlayerDatabase {
 
     this.db = new DatabaseSync(this.dbPath);
 
+    // Wait instead of throwing SQLITE_BUSY when another connection is mid-write.
+    this.db.exec("PRAGMA busy_timeout = 5000;");
+
     if (this.dbPath !== ":memory:") {
-      this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+      this._enableWal();
     }
 
     this.db.exec(`
@@ -75,6 +95,7 @@ export class PlayerDatabase {
         exp             INTEGER NOT NULL DEFAULT 0,
         quest_rewarded  INTEGER NOT NULL DEFAULT 0,
         inventory       TEXT NOT NULL DEFAULT '{}',
+        starter_granted INTEGER NOT NULL DEFAULT 0,
         updated_at      INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_saves_level ON saves(level DESC);
@@ -83,10 +104,29 @@ export class PlayerDatabase {
       CREATE INDEX IF NOT EXISTS idx_saves_exp   ON saves(exp DESC);
     `);
 
+    // Databases created before the flag existed need the column added, because
+    // `CREATE TABLE IF NOT EXISTS` never alters an existing table.
+    const saveColumns = this.db.prepare("PRAGMA table_info(saves)").all();
+    if (!saveColumns.some((column) => column.name === "starter_granted")) {
+      this.db.exec(
+        "ALTER TABLE saves ADD COLUMN starter_granted INTEGER NOT NULL DEFAULT 0"
+      );
+    }
+
+    this._migrate();
+
     this.stmtGet = this.db.prepare("SELECT * FROM saves WHERE player_id = ?");
     this.stmtCount = this.db.prepare("SELECT COUNT(*) AS count FROM saves");
     this.stmtUpdateInventory = this.db.prepare(
       "UPDATE saves SET inventory = ?, updated_at = ? WHERE player_id = ?"
+    );
+    this.stmtGrantStarter = this.db.prepare(
+      // The emptiness predicate is part of the guard, not the caller's discipline:
+      // a played bag can never be replaced by the starter kit, regardless of who
+      // calls grantStarterItems().
+      `UPDATE saves SET inventory = ?, starter_granted = 1, updated_at = ?
+       WHERE player_id = ? AND starter_granted = 0
+         AND (inventory IS NULL OR inventory = '' OR inventory = '{}')`
     );
     this.stmtUpdateLedger = this.db.prepare(
       `UPDATE saves SET level = ?, exp = ?, coins = ?, kills = ?, player_name = ?, updated_at = ?
@@ -124,6 +164,79 @@ export class PlayerDatabase {
         inventory = excluded.inventory,
         updated_at = excluded.updated_at
     `);
+  }
+
+  /**
+   * Switch the connection to WAL mode.
+   *
+   * `PRAGMA journal_mode` briefly needs an exclusive lock, so `node --watch`
+   * restarting the API while the previous process is still closing its
+   * connection can throw SQLITE_BUSY ("database is locked") and take the whole
+   * server down. Retry a few times, then fall back to the rollback journal: WAL
+   * is a performance choice, not a correctness requirement.
+   */
+  _enableWal(attempts = 10) {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+        return;
+      } catch (error) {
+        if (attempt === attempts - 1) {
+          console.warn(
+            `[DB] Không bật được WAL (${error.message}); tiếp tục ở chế độ rollback journal.`
+          );
+          return;
+        }
+        sleepSync(100 * (attempt + 1));
+      }
+    }
+  }
+
+  /**
+   * Close the underlying SQLite connection so a restarting process releases the
+   * file lock immediately instead of waiting for the OS to reap it.
+   */
+  close() {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+
+  /**
+   * Apply pending schema migrations, tracked in SQLite's `user_version`.
+   *
+   * Version 2 wipes every stored bag: earlier builds seeded each character with a
+   * hard-coded demo inventory, and clearing it once is the only way an existing
+   * save cannot bring those stacks back.
+   *
+   * Version 3 back-fills those emptied bags with the starter kit, so characters
+   * created before the kit existed are not left empty-handed.
+   *
+   * Running once is enforced by the version check, so real items acquired later
+   * are never touched again.
+   */
+  _migrate() {
+    const row = this.db.prepare("PRAGMA user_version").get();
+    const currentVersion = Number(row?.user_version) || 0;
+    if (currentVersion >= SCHEMA_VERSION) return;
+
+    if (currentVersion < 2) {
+      this.db.exec("UPDATE saves SET inventory = '{}'");
+    }
+
+    if (currentVersion < 3) {
+      this.db
+        .prepare(
+          `UPDATE saves
+              SET inventory = ?, starter_granted = 1, updated_at = ?
+            WHERE starter_granted = 0
+              AND (inventory IS NULL OR inventory = '' OR inventory = '{}')`
+        )
+        .run(JSON.stringify(STARTER_ITEMS), Date.now());
+    }
+
+    this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 
   _parseInventory(raw) {
@@ -243,6 +356,32 @@ export class PlayerDatabase {
       });
     }
 
+    return this.getInventory(playerId);
+  }
+
+  /**
+   * Give an empty character the shared starter kit, at most once. Called when a
+   * character is created; the flag plus the empty-bag guard guarantee a character
+   * that already owns something (or later spends everything) is never overwritten
+   * nor re-granted free items.
+   * @param {string} playerId
+   * @returns {Record<string, number>} the stored bag
+   */
+  grantStarterItems(playerId) {
+    const now = Date.now();
+
+    if (!this.stmtGet.get(playerId)) {
+      this._writeRow({
+        playerId,
+        playerName: "",
+        ...DEFAULT_LEDGER,
+        questRewarded: 0,
+        inventory: {},
+        updatedAt: now
+      });
+    }
+
+    this.stmtGrantStarter.run(JSON.stringify(STARTER_ITEMS), now, playerId);
     return this.getInventory(playerId);
   }
 

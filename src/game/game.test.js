@@ -16,7 +16,7 @@ vi.mock("phaser", () => ({
 }));
 
 import { NetworkClient } from "./networkClient.js";
-import { WORLD_SCALE, WORLD_SPREAD } from "./worldConfig.js";
+import { MARKET_SPAWN } from "./marketLayout.js";
 import { JiangHuScene } from "./game.js";
 import { setQuantities, getQuantity } from "./items.js";
 
@@ -54,6 +54,7 @@ describe("JiangHuScene teardown", () => {
     const unsubscribers = [vi.fn(), vi.fn()];
     const disconnect = vi.fn();
     const destroyRemotePlayers = vi.fn();
+    const destroyPlayer = vi.fn();
     const destroyBridge = vi.fn();
     const removeEventListener = vi.spyOn(window, "removeEventListener");
     const scope = {
@@ -61,6 +62,7 @@ describe("JiangHuScene teardown", () => {
       unsubscribers,
       networkClient: { disconnect },
       remotePlayerManager: { destroy: destroyRemotePlayers },
+      player: { destroy: destroyPlayer },
       uiBridge: { destroy: destroyBridge }
     };
 
@@ -68,9 +70,11 @@ describe("JiangHuScene teardown", () => {
 
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(destroyRemotePlayers).toHaveBeenCalledTimes(1);
+    expect(destroyPlayer).toHaveBeenCalledTimes(1);
     expect(destroyBridge).toHaveBeenCalledTimes(1);
     expect(scope.networkClient).toBeNull();
     expect(scope.remotePlayerManager).toBeNull();
+    expect(scope.player).toBeNull();
     expect(removeEventListener).toHaveBeenCalledWith("beforeunload", scope.unloadHandler);
     expect(scope.unsubscribers).toEqual([]);
     unsubscribers.forEach((unsub) => expect(unsub).toHaveBeenCalledTimes(1));
@@ -128,10 +132,12 @@ const makeUseScene = ({ hp = 10, maxHp = 100, mp = 10, maxMp = 100 } = {}) => {
     player: { stats: { hp, maxHp, mp, maxMp }, heal, restoreMp, setPosition },
     combat: { showFloatText: vi.fn() },
     uiBridge: { addLog, updateHud: vi.fn(), updateInventory },
-    saveGame: vi.fn()
+    saveGame: vi.fn(),
+    quickSlots: { 1: "kim-sang-duoc", 2: "dai-hoan-dan", 3: "nu-nhi-hong", 4: "hoi-thanh-phu" }
   };
   // The stubbed scope still needs the sibling prototype methods useItem calls.
   scene.applyItemEffect = JiangHuScene.prototype.applyItemEffect;
+  scene.applyConsumableEffect = JiangHuScene.prototype.applyConsumableEffect;
   scene.onInventoryChanged = JiangHuScene.prototype.onInventoryChanged;
   return { scene, addLog, updateInventory, heal, restoreMp, setPosition };
 };
@@ -176,7 +182,52 @@ describe("JiangHuScene.useItem quantity", () => {
 
     JiangHuScene.prototype.useItem.call(scene, 4);
 
-    expect(setPosition).toHaveBeenCalledWith(640 * WORLD_SCALE * WORLD_SPREAD, 620 * WORLD_SCALE * WORLD_SPREAD);
+    expect(setPosition).toHaveBeenCalledWith(MARKET_SPAWN.x, MARKET_SPAWN.y);
     expect(getQuantity("hoi-thanh-phu")).toBe(0);
+  });
+});
+
+describe("JiangHuScene.interactWithNearbyNpc", () => {
+  it("opens the shop when an NPC is within range", () => {
+    const stopMovement = vi.fn();
+    const openShop = vi.fn();
+    const addLog = vi.fn();
+    const npc = { gx: 100, gy: 100, name: "Chủ Tiệm Dược" };
+    const scene = {
+      started: true,
+      isPaused: false,
+      player: { x: 105, y: 105, stopMovement },
+      npcs: [npc],
+      shopFlow: { open: openShop },
+      uiBridge: { addLog }
+    };
+
+    JiangHuScene.prototype.interactWithNearbyNpc.call(scene);
+
+    expect(stopMovement).toHaveBeenCalledTimes(1);
+    expect(openShop).toHaveBeenCalledWith(npc);
+  });
+
+  it("logs a message when no NPC is in range", () => {
+    const stopMovement = vi.fn();
+    const openShop = vi.fn();
+    const addLog = vi.fn();
+    const npc = { gx: 500, gy: 500, name: "Chủ Tiệm Dược" };
+    const scene = {
+      started: true,
+      isPaused: false,
+      player: { x: 100, y: 100, stopMovement },
+      npcs: [npc],
+      shopFlow: { open: openShop },
+      uiBridge: { addLog }
+    };
+
+    JiangHuScene.prototype.interactWithNearbyNpc.call(scene);
+
+    expect(stopMovement).not.toHaveBeenCalled();
+    expect(openShop).not.toHaveBeenCalled();
+    expect(addLog).toHaveBeenCalledWith(
+      expect.stringContaining("Không có NPC ở gần để nói chuyện")
+    );
   });
 });

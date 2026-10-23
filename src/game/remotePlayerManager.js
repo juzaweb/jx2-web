@@ -64,10 +64,6 @@ export class RemotePlayerManager {
     if (this.localPlayerId && p.id === this.localPlayerId) return;
 
     this.addPlayer(p);
-
-    if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
-      this.uiBridge.addLog(`Hiệp khách ${p.displayName || p.username} đã đặt chân đến Biện Kinh.`, "system");
-    }
   }
 
   /**
@@ -126,7 +122,17 @@ export class RemotePlayerManager {
     if (!payload.id) return;
     const player = this.players.get(payload.id);
     if (player) {
-      if (payload.skill === "kiem_khi") {
+      if (payload.skill === "la_han_tran") {
+        player.showFormation?.("vfx-la-han-tran", 0.6);
+        if (player.formationTimer) {
+          player.formationTimer.remove?.();
+          player.formationTimer = null;
+        }
+        player.formationTimer = this.scene?.time?.delayedCall?.(180000, () => {
+          player.hideFormation?.();
+          player.formationTimer = null;
+        });
+      } else if (payload.skill === "kiem_khi") {
         player.playSkill();
       } else {
         player.playAttack(payload.facingRight !== false);
@@ -142,9 +148,6 @@ export class RemotePlayerManager {
     if (!payload.id) return;
     const player = this.players.get(payload.id);
     if (player) {
-      if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
-        this.uiBridge.addLog(`Hiệp khách ${player.displayName} đã rời khỏi Biện Kinh.`, "system");
-      }
       player.destroy();
       this.players.delete(payload.id);
     }

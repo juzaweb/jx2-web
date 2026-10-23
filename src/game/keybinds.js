@@ -9,10 +9,34 @@
 import { SKILL_SLOTS } from "./skills.js";
 
 /** Default selection keys for the six skill slots. */
-export const DEFAULT_SKILL_BINDS = ["q", "w", "e", "r", "t", "y"];
+export const DEFAULT_SKILL_BINDS = ["q", "e", "r", "t", "y", "u"];
 
-/** Keys the player may not rebind because the UI already owns them. */
-export const RESERVED_KEYS = new Set(["1", "2", "3", "4", "f3", "f4", "m", "escape", "tab", "enter"]);
+/** Keys the player may not rebind because the UI/engine owns them (movement, hotbar, menus). */
+export const RESERVED_KEYS = new Set([
+  "1",
+  "2",
+  "3",
+  "4",
+  "f",
+  "f3",
+  "f4",
+  "m",
+  "escape",
+  "tab",
+  "enter",
+  "w",
+  "a",
+  "s",
+  "d",
+  "arrowup",
+  "arrowdown",
+  "arrowleft",
+  "arrowright",
+  "up",
+  "down",
+  "left",
+  "right"
+]);
 
 const STORAGE_PREFIX = "jx2_skill_binds_";
 
@@ -44,6 +68,30 @@ export const defaultSkillBinds = () => [...DEFAULT_SKILL_BINDS];
 const storageKey = (characterId) => `${STORAGE_PREFIX}${characterId || "guest"}`;
 
 /**
+ * Sanitize an array of bindings: reject empty, reserved, or duplicate keys,
+ * falling back to unused default keys.
+ * @param {any[]} [binds]
+ * @returns {string[]}
+ */
+export function sanitizeSkillBinds(binds) {
+  const defaults = defaultSkillBinds();
+  const used = new Set();
+  const safe = [];
+  for (let slot = 0; slot < defaults.length; slot++) {
+    const rawVal = typeof binds?.[slot] === "string" ? normalizeKey(binds[slot]) : "";
+    if (rawVal && !isReservedKey(rawVal) && !used.has(rawVal)) {
+      safe.push(rawVal);
+      used.add(rawVal);
+    } else {
+      const fallback = defaults.find((d) => !used.has(d)) || defaults[slot];
+      safe.push(fallback);
+      used.add(fallback);
+    }
+  }
+  return safe;
+}
+
+/**
  * Load a character's bindings, filling any missing slot with its default.
  * Corrupt stored data falls back to the defaults.
  * @param {string} [characterId]
@@ -56,10 +104,7 @@ export function loadSkillBinds(characterId) {
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return defaults;
-    return defaults.map((fallback, slot) => {
-      const value = typeof parsed[slot] === "string" ? normalizeKey(parsed[slot]) : "";
-      return value || fallback;
-    });
+    return sanitizeSkillBinds(parsed);
   } catch {
     return defaults;
   }
@@ -72,9 +117,7 @@ export function loadSkillBinds(characterId) {
  * @returns {string[]} the saved bindings
  */
 export function saveSkillBinds(characterId, binds) {
-  const safe = defaultSkillBinds().map((fallback, slot) =>
-    typeof binds?.[slot] === "string" && binds[slot] ? normalizeKey(binds[slot]) : fallback
-  );
+  const safe = sanitizeSkillBinds(binds);
   try {
     localStorage.setItem(storageKey(characterId), JSON.stringify(safe));
   } catch {
@@ -114,7 +157,7 @@ export function keyToSlot(binds) {
   const map = new Map();
   (binds || []).forEach((key, slot) => {
     const normalized = normalizeKey(key);
-    if (normalized) map.set(normalized, slot);
+    if (normalized && !isReservedKey(normalized)) map.set(normalized, slot);
   });
   return map;
 }

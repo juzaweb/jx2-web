@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { GameCanvas } from "./components/GameCanvas.jsx";
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from "react";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
@@ -12,17 +11,25 @@ import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
+import { SkillsModal } from "./components/Modals/SkillsModal.jsx";
+import { ShopModal } from "./components/Modals/ShopModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
 import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
+import {
+  loadQuickSlots,
+  assignQuickSlot,
+  clearQuickSlot,
+  moveQuickSlot
+} from "./game/quickSlots.js";
 import { skillsForSect } from "./game/skills.js";
 import {
-  defaultQuantities,
   applyQuantities,
   setQuantities as rememberQuantities
 } from "./game/items.js";
 import { defaultEquipment } from "./game/equipment.js";
 import { StorageManager } from "./game/storage.js";
+import { SERVER_NAME } from "./game/serverConfig.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import { apiClient } from "./game/apiClient.js";
 import {
@@ -32,6 +39,13 @@ import {
   isSessionUser,
   clearSession
 } from "./game/session.js";
+import { requestLandscapeFullscreen, isMobileDevice } from "./game/orientation.js";
+
+// Phaser + the whole game scene graph live behind this boundary so the login and
+// lobby UI never wait for the ~1.2 MB engine bundle to download and parse.
+const GameCanvas = lazy(() =>
+  import("./components/GameCanvas.jsx").then((module) => ({ default: module.GameCanvas }))
+);
 
 const INITIAL_LOGS = [
   {
@@ -71,7 +85,7 @@ const isTypingTarget = (target) => {
 const loadCharacterInventory = (characterId) => {
   StorageManager.setCharacterId(characterId || null);
   return applyQuantities(
-    rememberQuantities(StorageManager.loadInventory(defaultQuantities()))
+    rememberQuantities(StorageManager.loadInventory())
   );
 };
 
@@ -98,22 +112,30 @@ export function App() {
     }
     return null;
   });
-  const [serverName, setServerName] = useState(() => readSession()?.server || "");
   const [isStarted, setIsStarted] = useState(true);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
+  const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
+  // Both side panels start open so a fresh entry into the world already shows
+  // the map and the chat channel without a manual click.
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isMinimapOpen, setIsMinimapOpen] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
-  const [selectedSkillSlot, setSelectedSkillSlot] = useState(
-    () => loadSkillLoadout(readSession()?.activeCharacter?.id).right
+  const [skillLoadout, setSkillLoadout] = useState(() =>
+    loadSkillLoadout(readSession()?.activeCharacter?.id)
   );
-  const [leftSkillSlot, setLeftSkillSlot] = useState(
-    () => loadSkillLoadout(readSession()?.activeCharacter?.id).left
+  const [quickSlots, setQuickSlots] = useState(() =>
+    loadQuickSlots(readSession()?.activeCharacter?.id)
   );
+  const selectedSkillSlot = skillLoadout.i;
+  const leftSkillSlot = skillLoadout.u;
   const [skillPickerHand, setSkillPickerHand] = useState(null);
+  const [shopNpc, setShopNpc] = useState(null);
+  const [shopResult, setShopResult] = useState(null);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -151,16 +173,65 @@ export function App() {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  // Switching characters loads that hero's skill layout and sect kit.
+  // Switching characters loads that hero's skill layout and quick slots mapping.
   useEffect(() => {
     const loadout = loadSkillLoadout(activeCharacter?.id);
-    setSelectedSkillSlot(loadout.right);
-    setLeftSkillSlot(loadout.left);
+    const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
+    const validLeftSkills = kit.filter((skill) => skill.target !== "self");
+    const firstLeftSlot = validLeftSkills[0]?.slot;
+    const firstSlot = kit[0]?.slot;
+    if (Number.isInteger(firstSlot)) {
+      if (!kit.some((skill) => skill.slot === loadout.u)) loadout.u = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.i)) loadout.i = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.o)) loadout.o = firstSlot;
+      if (!kit.some((skill) => skill.slot === loadout.p)) loadout.p = firstSlot;
+      if (Number.isInteger(firstLeftSlot) && !validLeftSkills.some((skill) => skill.slot === loadout.left)) {
+        loadout.left = firstLeftSlot;
+      } else if (!Number.isInteger(loadout.left)) {
+        loadout.left = firstLeftSlot ?? loadout.u;
+      }
+      if (!kit.some((skill) => skill.slot === loadout.right)) {
+        loadout.right = loadout.i ?? firstSlot;
+      }
+    }
+    setSkillLoadout(loadout);
     bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
+
+    const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
+    setQuickSlots(loadedQuickSlots);
+    bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
+
     if (activeCharacter?.sect) {
       bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
     }
   }, [activeCharacter?.id, activeCharacter?.sect]);
+
+  const handleAssignQuickSlot = useCallback(
+    (targetSlot, itemId) => {
+      const next = assignQuickSlot(activeCharacter?.id, quickSlots, targetSlot, itemId);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
+
+  const handleClearQuickSlot = useCallback(
+    (slot) => {
+      const next = clearQuickSlot(activeCharacter?.id, quickSlots, slot);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
+
+  const handleMoveQuickSlot = useCallback(
+    (fromSlot, toSlot) => {
+      const next = moveQuickSlot(activeCharacter?.id, quickSlots, fromSlot, toSlot);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
   // rename in the users table reaches the HUD, the game scene and the network join.
@@ -202,6 +273,23 @@ export function App() {
     };
     // Runs once on mount with the session cached at page load.
   }, []);
+
+  // Automatically attempt landscape fullscreen on mobile touch when active
+  useEffect(() => {
+    if (!activeCharacter || !isMobileDevice()) return;
+
+    const handleMobileTouch = () => {
+      requestLandscapeFullscreen();
+    };
+
+    window.addEventListener("touchstart", handleMobileTouch, { passive: true, once: true });
+    window.addEventListener("pointerdown", handleMobileTouch, { passive: true, once: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleMobileTouch);
+      window.removeEventListener("pointerdown", handleMobileTouch);
+    };
+  }, [activeCharacter]);
 
   useEffect(() => {
     const unsubStats = bridge.on(EVENTS.STATS_UPDATED, (newStats) => {
@@ -253,6 +341,17 @@ export function App() {
       if (typeof slot === "number") setLeftSkillSlot(slot);
     });
 
+    const unsubShopOpened = bridge.on(EVENTS.SHOP_OPENED, (npc) => {
+      if (!npc?.npcId) return;
+      setShopNpc(npc);
+      setShopResult(null);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+    });
+
+    const unsubShopResult = bridge.on(EVENTS.SHOP_RESULT, (result) => {
+      setShopResult(result || null);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -264,6 +363,8 @@ export function App() {
       unsubStarted();
       unsubSkillSelected();
       unsubLeftSkillSelected();
+      unsubShopOpened();
+      unsubShopResult();
     };
   }, []);
 
@@ -292,17 +393,49 @@ export function App() {
     setIsInventoryOpen(false);
   }, []);
 
+  const handleOpenSkills = useCallback(() => {
+    dismissHelp();
+    setIsSkillsOpen(true);
+  }, [dismissHelp]);
+
+  const handleCloseSkills = useCallback(() => {
+    setIsSkillsOpen(false);
+  }, []);
+
+  const handleCloseShop = useCallback(() => {
+    setShopNpc(null);
+    setShopResult(null);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleBuyShopItem = useCallback((itemId) => {
+    setShopResult(null);
+    bridge.emit(EVENTS.ACTION_BUY_ITEM, { itemId, qty: 1 });
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isTypingTarget(e.target)) return;
       if (e.repeat) return;
+
+      // The shop is a focused modal: only Escape leaves it, so global panel
+      // shortcuts cannot open a hidden window underneath the counter.
+      if (shopNpc) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          handleCloseShop();
+        }
+        return;
+      }
 
       const key = e.key.toLowerCase();
       const hasOpenModal =
         isHelpOpen ||
         isInventoryOpen ||
         isCharacterOpen ||
+        isSkillsOpen ||
         isCityMapOpen ||
+        !!shopNpc ||
         isLoginOpen ||
         (!activeCharacter && !!currentUser);
 
@@ -326,7 +459,18 @@ export function App() {
           setIsHelpOpen(false);
           setIsInventoryOpen(false);
           setIsCharacterOpen(false);
+          setIsSkillsOpen(false);
           bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        }
+        return;
+      }
+
+      if (e.key === "F5") {
+        e.preventDefault();
+        if (isSkillsOpen) {
+          handleCloseSkills();
+        } else {
+          handleOpenSkills();
         }
         return;
       }
@@ -368,6 +512,11 @@ export function App() {
         return;
       }
 
+      if (isSkillsOpen) {
+        handleCloseSkills();
+        return;
+      }
+
       setIsHelpOpen((prev) => {
         const nextState = !prev;
         bridge.emit(EVENTS.ACTION_SET_PAUSED, nextState);
@@ -385,10 +534,12 @@ export function App() {
     isLoginOpen,
     activeCharacter,
     currentUser,
+    shopNpc,
     handleOpenCharacter,
     handleCloseCharacter,
     handleOpenInventory,
-    handleCloseInventory
+    handleCloseInventory,
+    handleCloseShop
   ]);
 
   const handleAttack = useCallback(() => {
@@ -396,6 +547,11 @@ export function App() {
   }, []);
 
   const handleSkill = useCallback(() => {
+    bridge.emit(EVENTS.ACTION_SKILL);
+  }, []);
+
+  const handleCastKey = useCallback((key) => {
+    bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand: key, key });
     bridge.emit(EVENTS.ACTION_SKILL);
   }, []);
 
@@ -412,18 +568,22 @@ export function App() {
 
   const handleEquipSkill = useCallback(
     (hand, slot) => {
+      const isKey = ["u", "i", "o", "p"].includes(hand?.toLowerCase());
+      const key = isKey ? hand.toLowerCase() : hand === "left" ? "u" : "i";
       const next = {
-        left: hand === "left" ? slot : leftSkillSlot,
-        right: hand === "right" ? slot : selectedSkillSlot
+        ...skillLoadout,
+        [key]: slot,
+        left: key === "u" ? slot : skillLoadout.u,
+        right: key === "i" ? slot : skillLoadout.i
       };
-      if (hand === "left") setLeftSkillSlot(slot);
-      else setSelectedSkillSlot(slot);
+      setSkillLoadout(next);
       saveSkillLoadout(activeCharacter?.id, next);
-      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, slot });
+      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, key, slot });
+      bridge.emit(EVENTS.SET_SKILL_LOADOUT, next);
       setSkillPickerHand(null);
       bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
     },
-    [activeCharacter?.id, leftSkillSlot, selectedSkillSlot]
+    [activeCharacter?.id, skillLoadout]
   );
 
   const handleUseItem = useCallback((slot) => {
@@ -463,6 +623,7 @@ export function App() {
   const handleOpenHelp = useCallback(() => {
     setIsInventoryOpen(false);
     setIsCharacterOpen(false);
+    setIsSkillsOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
   }, []);
@@ -484,7 +645,6 @@ export function App() {
   const handleLoginSuccess = useCallback((session) => {
     setCurrentUser(session.user);
     setActiveCharacter(null);
-    setServerName(session.server || "");
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
     setEquipment(defaultEquipment());
@@ -492,6 +652,12 @@ export function App() {
   }, []);
 
   const handleCharacterStart = useCallback((character) => {
+    requestLandscapeFullscreen();
+    // Entering the world opens the map and the chat channel by default; the
+    // player can still close either one with its × button.
+    setIsMinimapOpen(true);
+    setIsChatOpen(true);
+
     writeSession({
       ...(readSession() || {}),
       activeCharacter: character,
@@ -513,17 +679,16 @@ export function App() {
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `character-${Date.now()}`,
       textKey: "app.joinLog",
-      textParams: { name: character.name, server: serverName || t("app.serverFallback") },
+      textParams: { name: character.name, server: SERVER_NAME },
       type: "system"
     });
-  }, [serverName, t]);
+  }, []);
 
   const handleLogout = useCallback(() => {
     if (window.confirm(t("app.confirmLogout"))) {
       clearSession();
       setCurrentUser(null);
       setActiveCharacter(null);
-      setServerName("");
       StorageManager.setUserId(null);
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
@@ -536,34 +701,74 @@ export function App() {
 
   return (
     <main id="game-shell">
-      {/* Phaser Canvas Engine */}
-      <GameCanvas />
+      {/* Mobile Portrait Orientation Prompt */}
+      <div className="mobile-orientation-hint">
+        <div className="mobile-orientation-icon">📱</div>
+        <div className="mobile-orientation-title">{t("app.rotateDeviceTitle")}</div>
+        <div className="mobile-orientation-desc">{t("app.rotateDeviceDesc")}</div>
+        <button
+          type="button"
+          className="mobile-orientation-btn"
+          onClick={() => requestLandscapeFullscreen(true)}
+        >
+          {t("app.rotateDeviceButton")}
+        </button>
+      </div>
+
+      {/* Phaser Canvas Engine — engine chunk is loaded on demand */}
+      <Suspense
+        fallback={
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: "#0f0b08"
+            }}
+          />
+        }
+      >
+        <GameCanvas />
+      </Suspense>
 
       {/* React MMORPG Wuxia HUD */}
       <div className="hud-overlay" id="hud-overlay">
         <PlayerVitals
           stats={stats}
-          playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
           onLogout={handleLogout}
         />
 
         <MinimapPanel
-          audioEnabled={audioEnabled}
-          onToggleAudio={handleToggleAudio}
           onOpenHelp={handleOpenHelp}
           quest={quest}
           zoomed={isMinimapZoomed}
+          collapsed={!isMinimapOpen}
+          onClose={() => setIsMinimapOpen(false)}
+          onOpen={() => setIsMinimapOpen(true)}
         />
 
-        <ChatPanel logs={logs} onSendMessage={handleSendMessage} />
+        <ChatPanel
+          logs={logs}
+          onSendMessage={handleSendMessage}
+          collapsed={!isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          onOpen={() => setIsChatOpen(true)}
+        />
 
         <HotbarDock
-          coins={stats.coins}
           audioEnabled={audioEnabled}
           items={inventory.quickItems}
+          inventoryItems={inventory.inventoryItems}
+          quickSlotsMapping={quickSlots}
+          onAssignQuickSlot={handleAssignQuickSlot}
+          onClearQuickSlot={handleClearQuickSlot}
+          onMoveQuickSlot={handleMoveQuickSlot}
           onUseItem={handleUseItem}
           onInventory={handleOpenInventory}
           onCharacter={handleOpenCharacter}
+          onSkills={handleOpenSkills}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
           onLogout={handleLogout}
@@ -572,13 +777,19 @@ export function App() {
           skills={skillsForSect(activeCharacter?.sect)}
           selectedSkillSlot={selectedSkillSlot}
           leftSkillSlot={leftSkillSlot}
+          skillLoadout={skillLoadout}
           onPickSkill={handleOpenSkillPicker}
+          onRotateScreen={() => requestLandscapeFullscreen(true)}
         />
 
         <MobileControls
           onMove={handleMove}
           onAttack={handleAttack}
           onSkill={handleSkill}
+          onCastKey={handleCastKey}
+          onUseItem={handleUseItem}
+          skills={skillsForSect(activeCharacter?.sect)}
+          skillLoadout={skillLoadout}
         />
       </div>
 
@@ -595,7 +806,6 @@ export function App() {
         <CharacterSelectModal
           isOpen={true}
           user={currentUser}
-          server={serverName}
           onStart={handleCharacterStart}
           onLogout={handleLogout}
         />
@@ -614,6 +824,16 @@ export function App() {
         onClose={() => setIsCityMapOpen(false)}
       />
 
+      {/* Herb-shop counter (talk to the Dược Sư NPC) */}
+      <ShopModal
+        isOpen={!!shopNpc}
+        npcName={shopNpc?.name || ""}
+        coins={stats.coins}
+        result={shopResult}
+        onBuy={handleBuyShopItem}
+        onClose={handleCloseShop}
+      />
+
       {/* Character Inventory ("Hành trang") */}
       <InventoryModal
         isOpen={isInventoryOpen}
@@ -623,8 +843,8 @@ export function App() {
         onUnequipSlot={handleUnequipSlot}
         equipment={equipment}
         coins={stats.coins}
-        quickItems={inventory.quickItems}
         inventoryItems={inventory.inventoryItems}
+        capacity={inventory.capacity}
       />
 
       {/* Character Sheet ("Nhân vật") */}
@@ -634,8 +854,20 @@ export function App() {
         stats={stats}
         playerName={currentUser ? activeCharacter?.name || currentUser.username : ""}
         equipment={equipment}
+        gender={normalizeGender(activeCharacter?.gender)}
         onUnequipSlot={handleUnequipSlot}
         onEquipItem={handleEquipItem}
+      />
+
+      {/* Skills Panel Modal (F5) */}
+      <SkillsModal
+        isOpen={isSkillsOpen}
+        onClose={handleCloseSkills}
+        skills={skillsForSect(activeCharacter?.sect)}
+        sect={activeCharacter?.sect || "thieu-lam"}
+        level={stats.level}
+        skillLoadout={skillLoadout}
+        onEquipSkill={handleEquipSkill}
       />
 
       {/* Choose the skill bound to each mouse button */}
@@ -644,7 +876,13 @@ export function App() {
         hand={skillPickerHand}
         skills={skillsForSect(activeCharacter?.sect)}
         level={stats.level}
-        selectedSlot={skillPickerHand === "left" ? leftSkillSlot : selectedSkillSlot}
+        selectedSlot={
+          ["u", "i", "o", "p"].includes(skillPickerHand?.toLowerCase())
+            ? skillLoadout[skillPickerHand.toLowerCase()]
+            : skillPickerHand === "left"
+            ? leftSkillSlot
+            : selectedSkillSlot
+        }
         onSelect={handleEquipSkill}
         onClose={handleCloseSkillPicker}
       />

@@ -3,6 +3,9 @@ import { apiClient } from "../../game/apiClient.js";
 import "../../styles/character-select.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { LobbyScene } from "../LobbyScene.jsx";
+import { requestLandscapeFullscreen } from "../../game/orientation.js";
+import { SERVER_NAME } from "../../game/serverConfig.js";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
@@ -48,7 +51,7 @@ const formatDateTime = (ts, language = "vi") => {
   }
 };
 
-export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }) {
+export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   const { t, language } = useI18n();
   const tRef = useRef(t);
   const [characters, setCharacters] = useState([]);
@@ -173,6 +176,7 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
       setError(t("characterSelect.errors.selectToStart"));
       return;
     }
+    requestLandscapeFullscreen();
     onStart(selected);
   };
 
@@ -182,12 +186,13 @@ export function CharacterSelectModal({ isOpen, user, server, onStart, onLogout }
 
   return (
     <div className="jx2-login-overlay" id="jx2-character-overlay">
+      <LobbyScene />
       <LanguageSwitcher variant="character" />
 
       {/* Top status bar: account + server, mirroring the in-game header */}
       <div className="jx2-cs-topbar">
         <span className="jx2-cs-topbar-user">{t("characterSelect.account")}: {user?.username}</span>
-        <span className="jx2-cs-topbar-server">{t("characterSelect.server")}: {server || "Biện Kinh"}</span>
+        <span className="jx2-cs-topbar-server">{t("characterSelect.server")}: {SERVER_NAME}</span>
       </div>
 
       <div className="jx2-cs-box">

@@ -8,6 +8,7 @@ import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "../../../src/game/enemyAi.j
 import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
+import { MARKET_NPCS, MARKET_SPAWN } from "../../../src/game/marketLayout.js";
 import {
   applyReward,
   normalizeProgress,
@@ -16,6 +17,7 @@ import {
 } from "../../../src/game/progression.js";
 import { skillById, skillMpCost, skillCooldown } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
+import { shopPurchase } from "../../../src/game/shop.js";
 
 /**
  * Clean sanitization for player strings
@@ -61,9 +63,12 @@ const sanitizeEquipment = (val) => {
   return out;
 };
 
-/** World bounds shared with the client (see src/game/worldConfig.js). */
-const WORLD_WIDTH = WORLD_CONFIG.width;
-const WORLD_HEIGHT = WORLD_CONFIG.height;
+/** Protocol bounds. The client also clamps the camera/player to the smaller
+ *  market footprint in `src/game/marketLayout.js`. */
+const WORLD_MIN_X = 0;
+const WORLD_MIN_Y = 0;
+const WORLD_MAX_X = WORLD_CONFIG.width;
+const WORLD_MAX_Y = WORLD_CONFIG.height;
 
 /** Grid cell size for spatial indexing. */
 export const GRID_CELL_SIZE = 800;
@@ -201,7 +206,10 @@ const MAX_BUFFERED_BYTES = 1_000_000;
 export const AOI_RADIUS = 800;
 
 /** Respawn point, mirroring Player.respawn() / the client's Biện Kinh spawn. */
-export const PLAYER_SPAWN = { x: 6400, y: 6200 };
+export const PLAYER_SPAWN = { ...MARKET_SPAWN };
+
+/** Max distance (ground px) between buyer and a shop NPC. */
+const SHOP_INTERACT_RANGE = 260;
 
 /** Spawn points match EnemyManager.create() in src/game/enemy.js, ids are indices. */
 const ENEMY_SPAWNS = [
@@ -428,6 +436,10 @@ export class GameSocketManager {
         this.handlePlayerRestoreMp(ws, msg.payload);
         break;
 
+      case "shop_buy":
+        this.handleShopBuy(ws, msg.payload);
+        break;
+
       case "player_attack":
         this.handlePlayerAttack(ws, msg.payload);
         break;
@@ -516,8 +528,8 @@ export class GameSocketManager {
       id: playerId,
       username,
       displayName,
-      x: clampNum(payload.x, 0, WORLD_WIDTH, 640),
-      y: clampNum(payload.y, 0, WORLD_HEIGHT, 620),
+      x: clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, PLAYER_SPAWN.x),
+      y: clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, PLAYER_SPAWN.y),
       vx: clampNum(payload.vx, -500, 500, 0),
       vy: clampNum(payload.vy, -500, 500, 0),
       direction: payload.direction === "left" ? "left" : "right",
@@ -627,8 +639,8 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
-    player.x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
-    player.y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
+    player.x = clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, player.x);
+    player.y = clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, player.y);
     player.vx = clampNum(payload.vx, -500, 500, 0);
     player.vy = clampNum(payload.vy, -500, 500, 0);
     if (payload.direction) {
@@ -736,6 +748,115 @@ export class GameSocketManager {
     this.broadcastMp(player);
   }
 
+  /**
+   * Buy stock from a shop NPC. Silver and the catalog price are server-owned:
+   * the client only names the item and quantity, and is answered with the
+   * authoritative result. The purchased units are written to the character's
+   * stored bag before the reply, so a purchase survives a disconnect.
+   * @param {WebSocket} ws
+   * @param {{itemId?:string, qty?:number}} payload
+   */
+  handleShopBuy(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player) return;
+
+    const purchase = shopPurchase(sanitizeStr(payload.itemId, 64), payload.qty);
+    if (!purchase) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: sanitizeStr(payload.itemId, 64), reason: "unknown" }
+      });
+      return;
+    }
+
+    // Guests and unverified characters have no ledger to debit.
+    if (!player.progress || !player.characterId) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: { ok: false, itemId: purchase.item.id, qty: purchase.qty, reason: "guest" }
+      });
+      return;
+    }
+
+    // A shop is a place in the world: refuse purchases made from across the map.
+    const nearShop = MARKET_NPCS.some(
+      (npc) =>
+        npc.shop === "pharmacy" &&
+        (player.x - npc.x) ** 2 + (player.y - npc.y) ** 2 <= SHOP_INTERACT_RANGE ** 2
+    );
+    if (!nearShop) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "range"
+        }
+      });
+      return;
+    }
+
+    if (player.progress.coins < purchase.total) {
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "coins"
+        }
+      });
+      return;
+    }
+
+    // Write the item first: if the bag cannot be persisted, no silver is spent.
+    try {
+      const bag = store.getInventory(player.characterId);
+      const stored = Math.max(0, Math.floor(Number(bag[purchase.item.id]) || 0));
+      bag[purchase.item.id] = stored + purchase.qty;
+      store.setInventory(player.characterId, bag);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to store purchase:", err.message);
+      }
+      this.send(ws, {
+        type: "shop_result",
+        payload: {
+          ok: false,
+          itemId: purchase.item.id,
+          qty: purchase.qty,
+          total: purchase.total,
+          coins: player.progress.coins,
+          reason: "error"
+        }
+      });
+      return;
+    }
+
+    player.progress = { ...player.progress, coins: player.progress.coins - purchase.total };
+    this.persistProgress(player);
+
+    this.send(ws, {
+      type: "player_progress",
+      payload: progressPayload(player.progress)
+    });
+    this.send(ws, {
+      type: "shop_result",
+      payload: {
+        ok: true,
+        itemId: purchase.item.id,
+        qty: purchase.qty,
+        total: purchase.total,
+        coins: player.progress.coins
+      }
+    });
+  }
+
   /** Broadcast a player's authoritative MP pool to nearby players. */
   broadcastMp(player) {
     this.broadcastNear(player.x, player.y, null, {
@@ -786,8 +907,8 @@ export class GameSocketManager {
     // a skill the player did not just cast, so damage cannot be minted freely.
     if (skill) player.lastCast = { skillId, at: now, hits: 0 };
 
-    const x = clampNum(payload.x, 0, WORLD_WIDTH, player.x);
-    const y = clampNum(payload.y, 0, WORLD_HEIGHT, player.y);
+    const x = clampNum(payload.x, WORLD_MIN_X, WORLD_MAX_X, player.x);
+    const y = clampNum(payload.y, WORLD_MIN_Y, WORLD_MAX_Y, player.y);
     const facingRight = payload.facingRight !== false;
 
     this.broadcastNear(x, y, ws, {
@@ -1177,8 +1298,8 @@ export class GameSocketManager {
       if (enemy.isDead) return;
 
       const next = stepEnemy(enemy, players, this.enemyTickMs);
-      const x = clampNum(Math.round(next.x), 0, WORLD_WIDTH, enemy.x);
-      const y = clampNum(Math.round(next.y), 0, WORLD_HEIGHT, enemy.y);
+      const x = clampNum(Math.round(next.x), WORLD_MIN_X, WORLD_MAX_X, enemy.x);
+      const y = clampNum(Math.round(next.y), WORLD_MIN_Y, WORLD_MAX_Y, enemy.y);
       if (x === enemy.x && y === enemy.y) return;
 
       enemy.x = x;

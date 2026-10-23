@@ -44,31 +44,42 @@ describe("deriveCharacterSheet", () => {
     expect(findRow(sheet.vitals, "mp").value).toBe("60/60");
   });
 
-  it("grows attributes and combat values with level", () => {
-    const level1 = deriveCharacterSheet({ level: 1 });
-    const level10 = deriveCharacterSheet({ level: 10 });
-
-    expect(findRow(level1.attributes, "strength").bonus).toBe(0);
-    expect(findRow(level10.attributes, "strength").bonus).toBe(9);
-    expect(findRow(level10.attributes, "internal").bonus).toBe(18);
-
-    const atk1 = findRow(level1.combat, "physicalAtk").value;
-    const atk10 = findRow(level10.combat, "physicalAtk").value;
-    expect(atk1).toBe("240-280");
-    expect(atk10).toBe("276-388");
-  });
-
-  it("formats defence and movement as compound readouts", () => {
+  it("shows the base combat values the game actually rolls", () => {
     const sheet = deriveCharacterSheet({ level: 1 });
-    expect(findRow(sheet.combat, "physicalDef").value).toBe("0%+8");
-    expect(findRow(sheet.combat, "magicDef").value).toBe("0%+20");
-    expect(findRow(sheet.combat, "moveSpeed").value).toBe("5/14");
+    expect(findRow(sheet.combat, "physicalAtk").value).toBe("24");
+    expect(findRow(sheet.combat, "physicalDef").value).toBe("6");
+    expect(findRow(sheet.combat, "crit").value).toBe("12%");
+    expect(findRow(sheet.combat, "critDamage").value).toBe("×1.5");
+    expect(findRow(sheet.combat, "attackSpeed").value).toBe("×1");
   });
 
-  it("carries next-level exp and a level-scaled potential into the footer", () => {
+  it("does not scale combat values with level", () => {
+    const level1 = deriveCharacterSheet({ level: 1 });
+    const level30 = deriveCharacterSheet({ level: 30 });
+    expect(level30.combat).toEqual(level1.combat);
+  });
+
+  it("reads attack, defence and crit from the live stats snapshot", () => {
+    const sheet = deriveCharacterSheet({ attack: 34, defense: 11, critRate: 0.2, critDamage: 2 });
+    expect(findRow(sheet.combat, "physicalAtk").value).toBe("34");
+    expect(findRow(sheet.combat, "physicalDef").value).toBe("11");
+    expect(findRow(sheet.combat, "crit").value).toBe("20%");
+    expect(findRow(sheet.combat, "critDamage").value).toBe("×2");
+  });
+
+  it("shows attack speed as a coefficient", () => {
+    expect(findRow(deriveCharacterSheet({ attackSpeed: 1.2 }).combat, "attackSpeed").value).toBe("×1.2");
+    expect(findRow(deriveCharacterSheet({ attackSpeed: 1.5 }).combat, "attackSpeed").value).toBe("×1.5");
+  });
+
+  it("lists only the stats that have a backing model", () => {
+    const keys = deriveCharacterSheet({ level: 5 }).combat.map((row) => row.key);
+    expect(keys).toEqual(["physicalAtk", "physicalDef", "crit", "critDamage", "attackSpeed"]);
+  });
+
+  it("carries next-level exp into the footer", () => {
     const sheet = deriveCharacterSheet({ level: 4, nextExp: 760 });
     expect(sheet.footer.nextLevelExp).toBe(760);
-    expect(sheet.footer.potential).toBe(12);
     expect(sheet.footer.points).toBe(0);
   });
 });

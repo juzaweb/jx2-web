@@ -34,7 +34,9 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
+  /* `clip` (unlike `hidden`) forbids programmatic scrolling, so focus/scroll
+     calls can never shift the HUD sideways. */
+  overflow: clip;
   background: #111a15;
 }
 
@@ -481,10 +483,8 @@ body {
   right: 0;
   bottom: 0;
   z-index: 20;
-  background: linear-gradient(180deg, #323d44 0%, #192025 35%, #0f1418 100%);
-  border-top: 2px solid #a88741;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  padding: 5px 12px;
+  /* No plate behind the slots: the game world stays visible. */
+  padding: 6px 12px 7px;
 }
 
 .dock-container {
@@ -551,11 +551,8 @@ body {
 }
 
 
-/* Middle: Martial Arts Display */
+/* Middle: Martial Arts Display (kept in the flex flow so the bar stays balanced) */
 .martial-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -631,8 +628,8 @@ body {
 /* Left/right mouse skill slots */
 .hand-slot {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -660,8 +657,8 @@ body {
 }
 
 .hand-glyph.skill-icon-img {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
@@ -883,36 +880,6 @@ body {
   white-space: nowrap;
 }
 
-/* Character Portrait */
-.hero-portrait {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.portrait-avatar {
-  width: 42px;
-  height: 42px;
-  background: radial-gradient(circle, #384852 0%, #151c20 100%);
-  border: 2px solid #d4af37;
-  display: grid;
-  place-items: center;
-  color: #ffe699;
-  font-family: serif;
-  font-size: 24px;
-  text-shadow: 0 0 6px #ffd700;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
-}
-
-.portrait-coins {
-  font-size: 9.5px;
-  font-weight: bold;
-  color: #ffd43b;
-  font-family: monospace;
-  text-shadow: 0 1px 2px #000;
-}
-
 /* System Tray Buttons */
 .system-icons-tray {
   display: flex;
@@ -966,50 +933,191 @@ body {
 }
 
 /* ====================================================
-   Mobile Touch On-Screen Controls
+   Mobile Touch On-Screen Controls (Virtual Joystick & Arc Skills)
 ==================================================== */
 .mobile-controls {
   display: none;
   position: absolute;
-  bottom: 80px;
-  right: 14px;
+  inset: 0;
   z-index: 30;
+  pointer-events: none;
 }
 
-.mobile-controls button {
-  width: 42px;
-  height: 42px;
-  background: rgba(18, 25, 30, 0.88);
-  color: #ffd43b;
+/* --- Virtual Joystick (Bottom Left) --- */
+.virtual-joystick-base {
+  position: absolute;
+  bottom: 25px;
+  left: 25px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(29, 38, 44, 0.75) 0%, rgba(12, 18, 22, 0.88) 100%);
+  border: 2px solid #a88741;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(212, 175, 55, 0.2);
+  border-radius: 50%;
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.virtual-joystick-base.active {
+  border-color: #ffd43b;
+  box-shadow: 0 0 20px rgba(255, 212, 59, 0.4), inset 0 0 16px rgba(255, 212, 59, 0.3);
+}
+
+.virtual-joystick-stick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  margin-top: -24px;
+  margin-left: -24px;
+  background: radial-gradient(circle, #5a4224 0%, #1e1309 100%);
+  border: 2px solid #ffd43b;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  transition: transform 0.04s ease-out;
+}
+
+.joystick-dir-indicator {
+  position: absolute;
+  font-size: 10px;
+  color: rgba(255, 212, 59, 0.4);
+  pointer-events: none;
+}
+.joystick-dir-indicator.dir-up { top: 4px; left: 50%; transform: translateX(-50%); }
+.joystick-dir-indicator.dir-down { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.joystick-dir-indicator.dir-left { left: 6px; top: 50%; transform: translateY(-50%); }
+.joystick-dir-indicator.dir-right { right: 6px; top: 50%; transform: translateY(-50%); }
+
+/* --- Radial Arc Skill Cluster (Bottom Right) --- */
+.mobile-skill-arc {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  width: 210px;
+  height: 210px;
+  pointer-events: auto;
+}
+
+.arc-btn {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #2b363d, #141b20);
   border: 1.5px solid #a88741;
-  border-radius: 6px;
-  font-size: 18px;
-  margin: 2px;
+  border-radius: 50%;
+  color: #ffd43b;
   cursor: pointer;
-}
-.mobile-controls button:active {
-  background: #3e4a52;
-}
-
-.mobile-controls > div {
-  display: flex;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  touch-action: manipulation;
+  user-select: none;
+  padding: 0;
 }
 
-.mobile-combat-btns {
-  display: flex;
-  margin-top: 6px;
-  gap: 6px;
-  justify-content: flex-end;
+.arc-btn:active {
+  transform: scale(0.92);
+  filter: brightness(1.2);
 }
-.mobile-combat-btns .mobile-q {
-  background: #143547;
-  color: #70d7ff;
-  border-color: #4da5c7;
+
+/* Central Attack Button */
+.arc-btn-attack {
+  bottom: 10px;
+  right: 10px;
+  width: 66px;
+  height: 66px;
+  background: radial-gradient(circle, #5e1c1c 0%, #290808 100%);
+  border: 2px solid #ff6b6b;
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.4), inset 0 0 8px rgba(0, 0, 0, 0.8);
 }
-.mobile-combat-btns .mobile-atk {
-  background: #471a1a;
-  color: #ff9e9e;
-  border-color: #b84343;
+.arc-btn-attack .arc-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.arc-btn-attack .arc-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #ffc9c9;
+  margin-top: -2px;
+}
+
+/* Skill Buttons arranged in arc around Attack */
+.arc-btn-skill {
+  width: 48px;
+  height: 48px;
+  background: radial-gradient(circle, #382c1a 0%, #17110a 100%);
+  border: 1.5px solid #ffd166;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+/* Radial Positioning for Skills */
+/* Skill 0 (U) - Left of attack */
+.arc-skill-0 {
+  bottom: 18px;
+  right: 88px;
+}
+/* Skill 1 (I) - Top-Left of attack */
+.arc-skill-1 {
+  bottom: 72px;
+  right: 76px;
+}
+/* Skill 2 (O) - Top of attack */
+.arc-skill-2 {
+  bottom: 88px;
+  right: 18px;
+}
+/* Skill 3 (P) - Top-Right / Outer arc */
+.arc-skill-3 {
+  bottom: 140px;
+  right: 18px;
+}
+
+.arc-skill-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.arc-glyph {
+  font-family: 'Noto Serif SC', 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffe9a8;
+}
+
+.arc-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #141b20;
+  border: 1px solid #a88741;
+  color: #ffdd59;
+  font-size: 8px;
+  font-weight: bold;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+/* Quick Potions in outer arc */
+.arc-btn-potion {
+  width: 38px;
+  height: 38px;
+  background: radial-gradient(circle, #203328 0%, #0d1712 100%);
+  border: 1.5px solid #4da5c7;
+}
+.arc-potion-1 {
+  bottom: 125px;
+  right: 76px;
+}
+.arc-potion-2 {
+  bottom: 135px;
+  right: 128px;
+}
+.arc-btn-potion .arc-icon {
+  font-size: 16px;
 }
 
 /* ====================================================
@@ -1249,15 +1357,15 @@ body {
   .martial-text-label {
     display: none;
   }
-  .hero-portrait {
-    display: none;
+}
+
+@media (max-width: 960px), (max-height: 500px), (pointer: coarse) {
+  .mobile-controls {
+    display: block;
   }
 }
 
 @media (max-width: 720px) {
-  .mobile-controls {
-    display: block;
-  }
   .bottom-left-panel {
     display: none;
   }
@@ -1364,5 +1472,229 @@ body {
   .language-switcher--login {
     top: 10px;
     left: 10px;
+  }
+}
+
+/* ====================================================
+   MARKET REFRESH — wood dock, compact HUD, panel restore
+==================================================== */
+/* Small tab shown in place of a minimized map / chat panel. */
+.panel-restore-btn {
+  width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: #ffe6a6;
+  background: linear-gradient(180deg, #5a3f24 0%, #2c1d10 100%);
+  border: 1px solid #b98d4a;
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 236, 190, 0.2);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.panel-restore-btn:hover {
+  border-color: #ffd77a;
+  color: #fff3cd;
+}
+
+.mini-btn,
+.chat-minimize {
+  cursor: pointer;
+}
+
+.chat-minimize {
+  margin-right: 4px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  color: #f0d9a4;
+  background: #3a2614;
+  border: 1px solid #8a6336;
+  border-radius: 2px;
+  font-size: 13px;
+}
+
+/* Slots and buttons only — the dock itself stays transparent. */
+.dock-container {
+  max-width: 1180px;
+  min-height: 58px;
+  padding: 4px 10px;
+  background: linear-gradient(180deg, rgba(30, 17, 8, 0.35), rgba(12, 7, 3, 0.55));
+  border: 1px solid #7b5830;
+  border-radius: 3px;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.55);
+}
+
+.hotbar-slots {
+  gap: 3px;
+}
+
+.slot-item {
+  width: 42px;
+  height: 42px;
+  background: radial-gradient(circle at 40% 30%, #6a4a2a 0%, #2c1c0e 75%);
+  border: 2px solid #8c663a;
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 219, 155, 0.18);
+}
+
+.slot-item.empty {
+  opacity: 0.72;
+  background: radial-gradient(circle at 40% 30%, #4a3520 0%, #1d1209 75%);
+}
+
+.slot-key {
+  color: #ffe08d;
+}
+
+.martial-center {
+  background: linear-gradient(180deg, #5a3b21 0%, #2a190c 100%);
+  border: 1px solid #b08145;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 230, 174, 0.2);
+}
+
+.system-icons-tray .sys-btn {
+  background: linear-gradient(180deg, #6a4a2a 0%, #2b1b0d 100%);
+  border-color: #8c663a;
+}
+
+.sys-btn:hover {
+  background: linear-gradient(180deg, #87603a 0%, #3a2512 100%);
+  border-color: #ffd77a;
+}
+
+.sys-lbl {
+  color: #f2dfb6;
+}
+
+/* Slightly tighter top-left vitals to leave more of the scene visible */
+.top-left-panel {
+  top: 8px;
+  left: 10px;
+  transform: scale(0.94);
+  transform-origin: top left;
+}
+
+.bars-container {
+  width: 228px;
+}
+
+.slot-item.skill-slot {
+  cursor: default;
+}
+
+.slot-skill-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: auto;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+
+/* ====================================================
+   Mobile Portrait Orientation Overlay Hint
+==================================================== */
+.mobile-orientation-hint {
+  display: none;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  .mobile-orientation-hint {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(10, 15, 18, 0.96);
+    backdrop-filter: blur(8px);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: #f7e8c6;
+    pointer-events: auto;
+  }
+
+  .mobile-orientation-icon {
+    font-size: 52px;
+    margin-bottom: 16px;
+    animation: rotate-phone 2s infinite ease-in-out;
+  }
+
+  .mobile-orientation-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffd43b;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  }
+
+  .mobile-orientation-desc {
+    font-size: 13.5px;
+    color: #c9d0ca;
+    max-width: 280px;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .mobile-orientation-btn {
+    background: linear-gradient(180deg, #d4af37 0%, #9e7b26 100%);
+    border: 1px solid #ffeaa7;
+    color: #171712;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  }
+
+  .mobile-orientation-btn:hover {
+    filter: brightness(1.15);
+  }
+
+  .mobile-orientation-btn:active {
+    transform: scale(0.97);
+  }
+
+  @keyframes rotate-phone {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+}
+
+
+/* Compact dock for narrow windows (VS Code side panes, small laptops) */
+@media (max-width: 1024px) {
+  .hotbar-slots {
+    gap: 2px;
+  }
+  .slot-item {
+    width: 34px;
+    height: 34px;
+  }
+  .hand-slot {
+    width: 36px;
+    height: 36px;
+  }
+  .hand-glyph.skill-icon-img {
+    width: 30px;
+    height: 30px;
+  }
+  .martial-center {
+    gap: 5px;
+    padding: 3px 6px;
+  }
+  .system-icons-tray .sys-btn {
+    min-width: 38px;
+    padding: 3px 5px;
+  }
+  .sys-lbl {
+    font-size: 7px;
   }
 }

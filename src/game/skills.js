@@ -19,15 +19,15 @@ export const SKILL_SLOTS = 6;
 export const BASIC_ATTACK_ID = "normal";
 
 /**
- * Thiếu Lâm – Võ Tông kit. Only the first shipped sect has real skills today;
- * the other sects resolve to an empty list until their kits are authored.
+ * Thiếu Lâm kit is being rebuilt as a palm-technique (chưởng pháp) kit. The old
+ * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed; this is the
+ * first palm skill, with the remaining slots landing in later phases.
  */
 const THIEU_LAM_SKILLS = [
   {
     id: "la_han_quyen",
     sect: "thieu-lam",
     slot: 0,
-    icon: "/skills/la_han_quyen.png",
     glyph: "拳",
     nameKey: "skills.thieuLam.laHanQuyen.name",
     descKey: "skills.thieuLam.laHanQuyen.desc",
@@ -35,110 +35,274 @@ const THIEU_LAM_SKILLS = [
     mp: 5,
     cooldown: 1500,
     target: "enemy",
-    range: 85,
+    range: 150,
     radius: 0,
-    mult: 1.1,
-    effects: [],
-    vfx: { cast: "slash", impact: "spark", color: 0xe0a34a, shake: 0 }
+    mult: 1.2
   },
   {
-    id: "ca_diep_thoai",
+    id: "thieu_lam_truong_phap",
     sect: "thieu-lam",
     slot: 1,
-    icon: "/skills/ca_diep_thoai.png",
-    glyph: "腿",
-    nameKey: "skills.thieuLam.caDiepThoai.name",
-    descKey: "skills.thieuLam.caDiepThoai.desc",
+    glyph: "掌",
+    nameKey: "skills.thieuLam.thieuLamTruongPhap.name",
+    descKey: "skills.thieuLam.thieuLamTruongPhap.desc",
     unlockLevel: 1,
-    mp: 7,
-    cooldown: 4000,
+    mp: 8,
+    cooldown: 2500,
     target: "enemy",
-    range: 95,
+    range: 250,
     radius: 0,
-    mult: 1.0,
-    effects: [{ kind: "slow", pct: 0.3, duration: 2000 }],
-    vfx: { cast: "kick", impact: "dust", color: 0xe0a34a, shake: 0 }
-  },
-  {
-    id: "vi_da_quyen",
-    sect: "thieu-lam",
-    slot: 2,
-    icon: "/skills/vi_da_quyen.png",
-    glyph: "手",
-    nameKey: "skills.thieuLam.viDaQuyen.name",
-    descKey: "skills.thieuLam.viDaQuyen.desc",
-    unlockLevel: 3,
-    mp: 12,
-    cooldown: 6000,
-    target: "enemy",
-    range: 85,
-    radius: 0,
-    mult: 1.7,
-    effects: [],
-    vfx: { cast: "slash", impact: "burst", color: 0xffc766, shake: 0 }
+    mult: 1.25
   },
   {
     id: "dai_tu_di_chuong",
     sect: "thieu-lam",
-    slot: 3,
+    slot: 2,
     icon: "/skills/dai_tu_di_chuong.png",
     glyph: "掌",
     nameKey: "skills.thieuLam.daiTuDiChuong.name",
     descKey: "skills.thieuLam.daiTuDiChuong.desc",
-    unlockLevel: 5,
-    mp: 18,
-    cooldown: 9000,
+    unlockLevel: 1,
+    mp: 12,
+    cooldown: 6000,
     target: "enemy",
-    range: 120,
-    radius: 110,
+    range: 6000,
+    radius: 0,
     mult: 1.3,
     effects: [{ kind: "stun", duration: 800 }],
-    vfx: { cast: "shockwave", impact: "burst", color: 0xffb347, shake: 0.004 }
+    vfx: {
+      sprite: "vfx-dai-tu-di-chuong",
+      cast: "shockwave",
+      impact: null,
+      color: 0xffb347,
+      shake: 0.004
+    }
   },
   {
-    id: "hue_nhan_chu",
+    id: "la_han_tran",
     sect: "thieu-lam",
-    slot: 4,
-    icon: "/skills/hue_nhan_chu.png",
-    glyph: "眼",
-    nameKey: "skills.thieuLam.hueNhanChu.name",
-    descKey: "skills.thieuLam.hueNhanChu.desc",
-    unlockLevel: 7,
-    mp: 15,
-    cooldown: 15000,
+    slot: 3,
+    icon: "/skills/la_han_tran.png",
+    glyph: "陣",
+    nameKey: "skills.thieuLam.laHanTran.name",
+    descKey: "skills.thieuLam.laHanTran.desc",
+    unlockLevel: 1,
+    mp: 18,
+    cooldown: 9000,
     target: "self",
     range: 0,
     radius: 0,
     mult: 0,
     effects: [
-      { kind: "buff", stat: "critRate", amount: 0.15, duration: 8000 },
-      { kind: "buff", stat: "attackPct", amount: 0.1, duration: 8000 }
+      { kind: "buff", stat: "attackPct", amount: 0.1, duration: 180000 },
+      { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 },
+      { kind: "buff", stat: "critRate", amount: 0.05, duration: 180000 }
     ],
-    vfx: { cast: "aura", impact: null, color: 0xffd166, shake: 0 }
-  },
-  {
-    id: "nhu_lai_than_thuong",
-    sect: "thieu-lam",
-    slot: 5,
-    icon: "/skills/nhu_lai_than_thuong.png",
-    glyph: "如",
-    nameKey: "skills.thieuLam.nhuLaiThanThuong.name",
-    descKey: "skills.thieuLam.nhuLaiThanThuong.desc",
-    unlockLevel: 10,
-    mp: 35,
-    cooldown: 30000,
-    target: "enemy",
-    range: 140,
-    radius: 140,
-    mult: 2.4,
-    effects: [{ kind: "stun", duration: 1200 }],
-    vfx: { cast: "shockwave", impact: "burst", color: 0xffe08a, shake: 0.008 }
+    vfx: {
+      sprite: "vfx-la-han-tran",
+      type: "formation",
+      cast: "shockwave",
+      impact: null,
+      color: 0xffd166,
+      shake: 0,
+      scale: 0.6,
+      fps: 12
+    }
   }
 ];
 
-const VO_DANG_SKILLS = [];
-const NGA_MY_SKILLS = [];
-const NGU_DOC_SKILLS = [];
+const VO_DANG_SKILLS = [
+  {
+    id: "thieu_duong_kiem_phap",
+    sect: "vo-dang",
+    slot: 0,
+    glyph: "剑",
+    nameKey: "skills.voDang.thieuDuongKiemPhap.name",
+    descKey: "skills.voDang.thieuDuongKiemPhap.desc",
+    unlockLevel: 1,
+    mp: 6,
+    cooldown: 1500,
+    target: "enemy",
+    range: 200,
+    radius: 0,
+    mult: 1.2
+  },
+  {
+    id: "thai_cuc_quyen",
+    sect: "vo-dang",
+    slot: 1,
+    glyph: "太",
+    nameKey: "skills.voDang.thaiCucQuyen.name",
+    descKey: "skills.voDang.thaiCucQuyen.desc",
+    unlockLevel: 1,
+    mp: 10,
+    cooldown: 3500,
+    target: "enemy",
+    range: 180,
+    radius: 0,
+    mult: 1.35
+  },
+  {
+    id: "tam_thanh_kiem_phap",
+    sect: "vo-dang",
+    slot: 2,
+    glyph: "三",
+    nameKey: "skills.voDang.tamThanhKiemPhap.name",
+    descKey: "skills.voDang.tamThanhKiemPhap.desc",
+    unlockLevel: 2,
+    mp: 15,
+    cooldown: 5000,
+    target: "enemy",
+    range: 400,
+    radius: 0,
+    mult: 1.5
+  },
+  {
+    id: "toat_hong_quan_khuyet",
+    sect: "vo-dang",
+    slot: 3,
+    glyph: "罡",
+    nameKey: "skills.voDang.toatHongQuanKhuyet.name",
+    descKey: "skills.voDang.toatHongQuanKhuyet.desc",
+    unlockLevel: 3,
+    mp: 20,
+    cooldown: 8000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [{ kind: "buff", stat: "attackPct", amount: 0.15, duration: 180000 }]
+  }
+];
+
+const NGA_MY_SKILLS = [
+  {
+    id: "nga_my_kiem_phap",
+    sect: "nga-my",
+    slot: 0,
+    glyph: "剑",
+    nameKey: "skills.ngaMy.ngaMyKiemPhap.name",
+    descKey: "skills.ngaMy.ngaMyKiemPhap.desc",
+    unlockLevel: 1,
+    mp: 6,
+    cooldown: 1500,
+    target: "enemy",
+    range: 200,
+    radius: 0,
+    mult: 1.15
+  },
+  {
+    id: "mong_diep_thoi_tam",
+    sect: "nga-my",
+    slot: 1,
+    glyph: "蝶",
+    nameKey: "skills.ngaMy.mongDiepThoiTam.name",
+    descKey: "skills.ngaMy.mongDiepThoiTam.desc",
+    unlockLevel: 1,
+    mp: 12,
+    cooldown: 4000,
+    target: "enemy",
+    range: 350,
+    radius: 0,
+    mult: 1.3
+  },
+  {
+    id: "tu_hang_pho_do",
+    sect: "nga-my",
+    slot: 2,
+    glyph: "医",
+    nameKey: "skills.ngaMy.tuHangPhoDo.name",
+    descKey: "skills.ngaMy.tuHangPhoDo.desc",
+    unlockLevel: 2,
+    mp: 20,
+    cooldown: 6000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [{ kind: "heal", amount: 50 }]
+  },
+  {
+    id: "luu_thuy_khanh_van",
+    sect: "nga-my",
+    slot: 3,
+    glyph: "云",
+    nameKey: "skills.ngaMy.luuThuyKhanhVan.name",
+    descKey: "skills.ngaMy.luuThuyKhanhVan.desc",
+    unlockLevel: 3,
+    mp: 18,
+    cooldown: 10000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [{ kind: "buff", stat: "speedPct", amount: 0.25, duration: 120000 }]
+  }
+];
+
+const NGU_DOC_SKILLS = [
+  {
+    id: "ngu_doc_tam_phap",
+    sect: "ngu-doc",
+    slot: 0,
+    glyph: "毒",
+    nameKey: "skills.nguDoc.nguDocTamPhap.name",
+    descKey: "skills.nguDoc.nguDocTamPhap.desc",
+    unlockLevel: 1,
+    mp: 6,
+    cooldown: 1500,
+    target: "enemy",
+    range: 250,
+    radius: 0,
+    mult: 1.1
+  },
+  {
+    id: "truy_tam_doc",
+    sect: "ngu-doc",
+    slot: 1,
+    glyph: "心",
+    nameKey: "skills.nguDoc.truyTamDoc.name",
+    descKey: "skills.nguDoc.truyTamDoc.desc",
+    unlockLevel: 1,
+    mp: 10,
+    cooldown: 3000,
+    target: "enemy",
+    range: 300,
+    radius: 0,
+    mult: 1.25
+  },
+  {
+    id: "van_doc_chieu_hong",
+    sect: "ngu-doc",
+    slot: 2,
+    glyph: "蛊",
+    nameKey: "skills.nguDoc.vanDocChieuHong.name",
+    descKey: "skills.nguDoc.vanDocChieuHong.desc",
+    unlockLevel: 2,
+    mp: 16,
+    cooldown: 6000,
+    target: "enemy",
+    range: 400,
+    radius: 0,
+    mult: 1.4
+  },
+  {
+    id: "u_hong_phiet_anh",
+    sect: "ngu-doc",
+    slot: 3,
+    glyph: "影",
+    nameKey: "skills.nguDoc.uHongPhietAnh.name",
+    descKey: "skills.nguDoc.uHongPhietAnh.desc",
+    unlockLevel: 3,
+    mp: 22,
+    cooldown: 8000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [{ kind: "buff", stat: "critRate", amount: 0.1, duration: 120000 }]
+  }
+];
 
 /** All authored skills, in catalog order. */
 export const SKILLS = [...THIEU_LAM_SKILLS, ...VO_DANG_SKILLS, ...NGA_MY_SKILLS, ...NGU_DOC_SKILLS];

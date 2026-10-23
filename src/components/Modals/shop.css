@@ -1,0 +1,159 @@
+/* ====================================================
+   Herb-shop counter ("Dược Sư")
+==================================================== */
+.shop-overlay {
+  z-index: 60;
+}
+
+.shop-box {
+  width: min(540px, calc(100% - 32px));
+  text-align: left;
+  padding: 26px 24px 22px;
+}
+
+.shop-box h2 {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-size: 24px;
+  letter-spacing: 2px;
+  color: #f7e8c6;
+  margin-bottom: 4px;
+}
+
+.shop-greeting {
+  font-size: 11.5px;
+  font-style: italic;
+  line-height: 1.6;
+  color: #c9d0ca;
+  margin-bottom: 12px;
+}
+
+.shop-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 10px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #d7dcce;
+  background: rgba(8, 12, 15, 0.8);
+  border: 1px solid #443725;
+}
+
+.shop-balance b {
+  font-size: 16px;
+  color: #ffd43b;
+}
+
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #1c262d 0%, #10171b 100%);
+  border: 1px solid #52442e;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.shop-row .item-icon.shop-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.8));
+}
+
+.shop-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shop-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f3e7c8;
+}
+
+.shop-desc {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #aeb8b0;
+}
+
+.shop-action {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.shop-price {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd43b;
+}
+
+.shop-price.insufficient {
+  color: #e57373;
+}
+
+.shop-buy-btn {
+  min-width: 74px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  color: #171712;
+  background: linear-gradient(180deg, #d4af37 0%, #9e7b26 100%);
+  border: 1px solid #ffeaa7;
+}
+
+.shop-buy-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.shop-buy-btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.7);
+}
+
+.shop-result {
+  padding: 7px 10px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.shop-result.ok {
+  color: #8fe0a8;
+  background: rgba(34, 90, 58, 0.35);
+  border-color: #3f7a4b;
+}
+
+.shop-result.error {
+  color: #ff9e9e;
+  background: rgba(120, 40, 40, 0.3);
+  border-color: #a04a4a;
+}
+
+@media (max-width: 520px) {
+  .shop-desc {
+    display: none;
+  }
+
+  .shop-buy-btn {
+    min-width: 58px;
+  }
+}

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bridge, EVENTS } from "./bridge.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
-import { WORLD_TILE } from "./worldConfig.js";
 
 const makeCtx = () => ({
   fillRect: vi.fn(),
@@ -107,7 +106,7 @@ describe("UIBridgeAdapter minimap registration", () => {
     ).not.toThrow();
   });
 
-  it("centers the local radar on the player and spans a fixed number of tiles", () => {
+  it("shows the whole market map and places blips at its edges", () => {
     const ctx = makeCtx();
     const canvas = makeCanvas(ctx);
     const adapter = new UIBridgeAdapter();
@@ -115,12 +114,9 @@ describe("UIBridgeAdapter minimap registration", () => {
 
     const city = { x0: 0, y0: 0, x1: 2200, y1: 1250 };
     const player = { x: 1100, y: 625 };
-    // Default radar width is 20 ground tiles.
-    const spanX = 20 * WORLD_TILE;
-    // A blip on the east edge of the radar view.
-    const edge = { x: player.x + spanX / 2, y: player.y, active: true, isDead: false };
+    const edge = { x: 2200, y: 625, active: true, isDead: false };
 
-    adapter.drawMinimap(player, [edge], { width: 4400, height: 2500, cityBounds: city });
+    adapter.drawMinimap(player, [edge], { width: 2200, height: 1250, cityBounds: city });
 
     const hasArcAt = (ax, ay) =>
       ctx.arc.mock.calls.some(
@@ -128,7 +124,7 @@ describe("UIBridgeAdapter minimap registration", () => {
       );
 
     expect(hasArcAt(canvas.width / 2, canvas.height / 2)).toBe(true); // player centred
-    expect(hasArcAt(canvas.width, canvas.height / 2)).toBe(true); // 1/10 span edge
+    expect(hasArcAt(canvas.width, canvas.height / 2)).toBe(true); // east map edge
   });
 });
 

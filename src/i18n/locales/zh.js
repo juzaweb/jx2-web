@@ -1,11 +1,13 @@
 export default {
   app: {
-    title: "江湖 — HTML5 RPG（武林群侠传II版）",
+    title: "江湖 — 武侠 RPG",
     defaultPlayerName: "浪客",
-    serverFallback: "江湖",
     confirmReset: "确定要清除已保存的数据并重新开始吗？",
     confirmLogout: "确定要退出当前账号吗？",
     joinLog: "侠客 {name} 已加入 {server}！",
+    rotateDeviceTitle: "请横屏游玩",
+    rotateDeviceDesc: "为了获得最佳游戏体验，请将手机旋转至横屏模式。",
+    rotateDeviceButton: "旋转屏幕",
     log: {
       welcome: "欢迎侠客来到汴京。",
       near: "浪客：江湖险恶，请多保重！",
@@ -25,32 +27,6 @@ export default {
     help: "帮助",
     level: "等级"
   },
-  npc: {
-    "duoc-diem": {
-      name: "药铺老板",
-      dialogue: "药铺老板：“欢迎侠客光临汴京药铺！本店专营上等金创药、大还丹，疗伤回气。”"
-    },
-    "bach-tien-sinh": {
-      name: "白先生",
-      dialogue: "白先生：“江湖险恶，人心难测。少侠行走汴京，切记守住本心，勤修武功！”"
-    },
-    "thuong-nhan-bao-ruong": {
-      name: "宝箱商人",
-      dialogue: "宝箱商人：“天下各处都藏有奇珍异宝的宝箱。少侠若有黄金钥匙，不妨拿来换取绝世神兵！”"
-    },
-    "dai-su-hoat-dong": {
-      name: "活动大使",
-      dialogue: "活动大使：“欢迎诸位英雄来到汴京！每日参与江湖活动，可获得荣誉与珍贵奖励。”"
-    },
-    "chan-tu-don": {
-      name: "真子丹",
-      dialogue: "真子丹：“武学无边！每日练习拳脚，正是称霸武林的根基。”"
-    },
-    "van-su-thong": {
-      name: "万事通",
-      dialogue: "万事通：“天下之事风云变幻，没有老夫不知道的。少侠可要打听江湖消息？”"
-    }
-  },
   hud: {
     levelTitle: "角色等级",
     expTitle: "修炼经验",
@@ -68,7 +44,9 @@ export default {
     questTodo: "繁华都城",
     questSafe: "安全区 • 无怪物",
     zoomTitle: "Tab：小地图放大 5 倍",
-    mapTitle: "M：查看全城地图"
+    mapTitle: "M：查看全城地图",
+    minimize: "最小化地图",
+    restore: "打开地图"
   },
   cityMap: {
     eyebrow: "城池全貌",
@@ -95,7 +73,9 @@ export default {
     },
     placeholder: "按 Enter 向江湖发言……",
     send: "发送",
-    channel: "[ 附近 ] ▼"
+    channel: "[ 附近 ] ▼",
+    minimize: "最小化聊天",
+    restore: "打开聊天"
   },
   hotbar: {
     slotTitle: "按键 [{key}]：{name}",
@@ -106,22 +86,22 @@ export default {
     rightClickQ: "右键 [Q]",
     martialName: "鹤字锦",
     martialSub: "天河秘笈",
-    portraitTitle: "武当浪客",
-    portraitAlt: "浪客",
-    coins: "银两",
+
     character: "角色",
     inventory: "行囊",
     help: "秘笈",
     pkTitle: "开启/关闭 PK 标记",
     pkOn: "PK",
-    pkOff: "和平"
+    pkOff: "和平",
+    rotateTitle: "横屏旋转屏幕",
+    rotate: "旋转"
   },
   help: {
     eyebrow: "行走江湖秘笈",
     title: "新手指导",
-    move: "移动：左键点击地图（或按住鼠标跟随光标），或使用手机虚拟摇杆。",
-    combat: "战斗：使用底部栏的攻击按钮（手机端为攻击按钮）。",
-    skill: "招式：点击“左键/右键”槽位选择招式。左键点击敌人会跑过去攻击；右键点击敌人会跑过去，右键点击空地则原地施放。快捷键用于绑定右手招式。",
+    move: "移动：左键点击地图（或按住鼠标跟随光标），使用方向键（↑ ↓ ← →）或 W/A/S/D，或使用手机虚拟摇杆。",
+    combat: "战斗与互动：靠近NPC时按 [F] 键对话。使用底栏或手机端攻击按钮。",
+    skill: "招式：按 U, I, O, P 键直接向鼠标或最近目标施放招式。点击底栏 U, I, O, P 槽位绑定门派招式。",
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与银两：击败灰狼可获得经验、银两，并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
@@ -131,11 +111,9 @@ export default {
     reset: "从头开始（重置进度）"
   },
   login: {
-    brandTitle: "武林群侠传 II",
-    brandSubtitle: "豪杰雷争",
-    serverLoggedIn: "已登录服务器",
-    closeList: "关闭列表",
-    chooseServer: "重新选择服务器",
+    brandTitle: "江湖",
+    brandSubtitle: "行走江湖",
+    serverLoggedIn: "江湖之门",
     loginTab: "登录",
     registerTab: "注册账号",
     usernameLabel: "账号：",
@@ -149,12 +127,6 @@ export default {
     clearKey: "清空",
     loginButton: "登录",
     registerButton: "注册",
-    tags: {
-      recommended: "推荐",
-      new: "新服",
-      crowded: "拥挤",
-      normal: "正常"
-    },
     errors: {
       required: "请填写账号和密码。",
       usernamePattern: "账号必须为 3-30 个字母、数字或下划线。",
@@ -211,6 +183,8 @@ export default {
     handRight: "右键",
     leftHandTitle: "左键招式（点击选择）",
     rightHandTitle: "右键招式（点击选择）",
+    keySlotLabel: "按键",
+    assignKey: "绑定招式 [{key}]",
     picker: {
       eyebrow: "绑定招式",
       title: "为{hand}选择招式",
@@ -229,29 +203,99 @@ export default {
         "invalid-slot": "招式槽无效。"
       }
     },
+    modalTitle: "武学面板",
+    modalHint: "已学会的门派招式。点击按键或下方按钮快速绑定招式。",
+    bindToKey: "绑定到 [{key}]",
+    bindLeft: "绑定左键",
+    bindRight: "绑定右键",
+    cooldownSec: "{sec}秒",
+    rangeTag: "距离: {range}",
+    dmgTag: "伤害: {pct}%",
     thieuLam: {
-      laHanQuyen: { name: "罗汉拳", desc: "入门拳法，快速近身攻击。" },
-      caDiepThoai: { name: "迦叶腿", desc: "基础腿法，击中后使敌人迟缓。" },
-      viDaQuyen: { name: "韦陀拳", desc: "中级拳法，终结威力强劲。" },
-      daiTuDiChuong: { name: "大须弥掌", desc: "范围掌法，击晕周围敌人。" },
-      hueNhanChu: { name: "慧眼咒", desc: "独门心法，短时间提升暴击与攻击。" },
-      nhuLaiThanThuong: { name: "如来神掌", desc: "镇派绝学，大范围伤害并长时间定身。" }
+      laHanQuyen: {
+        name: "罗汉拳",
+        desc: "少林基础拳法，贴身近战攻击目标。"
+      },
+      thieuLamTruongPhap: {
+        name: "少林掌法",
+        desc: "少林刚猛掌法，造成中等近战伤害。"
+      },
+      daiTuDiChuong: {
+        name: "大须弥掌",
+        desc: "远程掌法，击晕远处目标。"
+      },
+      laHanTran: {
+        name: "罗汉阵",
+        desc: "罗汉护体法阵，提升 10% 攻击力、20% 移动速度与 5% 会心一击率，持续 3 分钟。"
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "少阳剑法",
+        desc: "武当基础剑术，轻灵快捷。"
+      },
+      thaiCucQuyen: {
+        name: "太极拳",
+        desc: "借力打力，造成强劲冲击伤害。"
+      },
+      tamThanhKiemPhap: {
+        name: "三清剑法",
+        desc: "连续施展三道剑气扫荡敌阵。"
+      },
+      toatHongQuanKhuyet: {
+        name: "紫霄罡气",
+        desc: "武当护体气功，提升 15% 攻击力，持续 3 分钟。"
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "峨眉剑法",
+        desc: "优雅柔美的剑术，造成连续伤害。"
+      },
+      mongDiepThoiTam: {
+        name: "梦蝶催心",
+        desc: "剑气如蝶翩翩，直袭目标心脉。"
+      },
+      tuHangPhoDo: {
+        name: "慈航普渡",
+        desc: "佛光普照，立即为自身恢复 50 点生命值。"
+      },
+      luuThuyKhanhVan: {
+        name: "流水庆云",
+        desc: "身法如行云流水，提升 25% 移动速度。"
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "五毒心法",
+        desc: "五毒秘传心法，攻击附带剧毒。"
+      },
+      truyTamDoc: {
+        name: "追心毒",
+        desc: "剧毒掌气透骨穿心。"
+      },
+      vanDocChieuHong: {
+        name: "万毒召蛊",
+        desc: "召唤万千毒虫攻击大范围目标。"
+      },
+      uHongPhietAnh: {
+        name: "幽魂掠影",
+        desc: "身形如幽灵掠影，提升 10% 暴击率。"
+      }
     }
   },
   character: {
     title: "角色",
     helpTitle: "帮助",
     closeTitle: "关闭（F3 / Esc）",
-    hint: "战斗属性由角色等级推算。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
+    hint: "战斗属性为实际交战使用的数值。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
     tabEquip: "装备",
     tabNews: "消息",
     locked: "{label}（未开放）",
     notEquipped: "{label}（未装备）",
     unequipTitle: "{name}（点击卸下）",
-    potential: "潜能",
     points: "点数：",
     nextLevel: "升级：",
-    playerAlt: "角色",
     slots: {
       belt: "腰带",
       bracers: "护腕",
@@ -274,13 +318,28 @@ export default {
     weight: "负重",
     count: "{used}/{total}",
     silver: "银两",
-    gold: "金元宝",
-    jade: "仙玉",
-    kimPhieu: "金票：",
+    copper: "铜钱",
+    gold: "黄金",
     ngucac: "[ 御阁 ]",
     quantity: "数量：{qty}",
     equipHint: "点击装备到{slot}",
     useHint: "点击使用"
+  },
+  shop: {
+    eyebrow: "汴京药铺",
+    title: "药铺",
+    greeting: "老夫专卖恢复生命与内力的灵药，侠客尽管挑选。",
+    balance: "银两：",
+    buy: "购买",
+    result: {
+      ok: "交易成功——已将 {qty} 件药品放入行囊。",
+      coins: "银两不足，无法购买此药品。",
+      guest: "请先登录并选择角色再进行交易。",
+      offline: "请连接服务器后再进行交易。",
+      range: "请靠近店主后再进行交易。",
+      error: "服务器未能完成交易，未扣除银两。",
+      unknown: "本店不出售此物品。"
+    }
   },
   slots: {
     armor: "战甲",
@@ -299,26 +358,11 @@ export default {
   stats: {
     hp: "生命",
     mp: "内力",
-    strength: "力量",
-    agility: "身法",
-    internal: "内功",
-    bone: "筋骨",
-    flexibility: "灵活",
     physicalAtk: "外功",
-    chiAtk: "内击",
-    damage: "伤害",
-    accuracy: "命中",
     physicalDef: "外防",
-    magicDef: "内防",
-    dodge: "闪避",
     crit: "暴击",
-    burst: "爆点",
-    burstHard: "爆刚",
-    woundRate: "伤口率",
-    critResist: "克怒",
-    cast: "出招",
-    attackSpeed: "攻速",
-    moveSpeed: "移动速度"
+    critDamage: "暴击命中",
+    attackSpeed: "攻速"
   },
   item: {
     "kim-sang-duoc": {
@@ -336,114 +380,6 @@ export default {
     "hoi-thanh-phu": {
       name: "回城符",
       desc: "空间符咒，可将行者送回故乡汴京。"
-    },
-    "ho-lo-tuu": {
-      name: "葫芦酒",
-      desc: "行者随身携带的酒葫芦，香气浓郁。"
-    },
-    "lenh-bai": {
-      name: "门派令牌",
-      desc: "武当信物，证明弟子的身份。"
-    },
-    "thiet-trao": {
-      name: "铁爪",
-      desc: "近战使用的凌厉兵器。"
-    },
-    "hac-ung-kiem": {
-      name: "黑鹰剑",
-      desc: "玄铁打造的长剑，锋利无双。"
-    },
-    "bi-kip-vo-cong": {
-      name: "武功秘籍",
-      desc: "记载练功心法的古籍。"
-    },
-    "thien-ha-mat-tich": {
-      name: "天河秘笈",
-      desc: "天河派的上乘秘笈。"
-    },
-    "cam-y-bao": {
-      name: "锦衣袍",
-      desc: "金线刺绣的锦袍，可提升防御。"
-    },
-    "thanh-long-dao": {
-      name: "青龙刀",
-      desc: "刻有青龙纹的大刀，气势沉雄。"
-    },
-    "ngoc-bo-dao": {
-      name: "羊脂玉佩",
-      desc: "祖传玉佩，散发淡淡灵气。"
-    },
-    "huyen-kim-thach": {
-      name: "幻金石",
-      desc: "用于锻造装备的珍贵矿石。"
-    },
-    "tui-bac": {
-      name: "银袋",
-      desc: "装有银两的袋子，可从野兽身上拾得。"
-    },
-    "duoc-vuong-lo": {
-      name: "药王露",
-      desc: "由千种草药提炼而成的疗伤灵液。"
-    },
-    "than-bi-hop": {
-      name: "神秘盒",
-      desc: "未开启的宝盒，其中暗藏奇物。"
-    },
-    "yeu-dan": {
-      name: "妖丹",
-      desc: "妖兽的内丹，蕴藏灵气精华。"
-    },
-    "huyet-chien-giap": {
-      name: "血战甲",
-      desc: "染血的战甲，防御极高。"
-    },
-    "bach-nien-linh-chi": {
-      name: "百年灵芝",
-      desc: "百年灵芝，大补元气。"
-    },
-    "tu-kim-ho-lo": {
-      name: "紫金葫芦",
-      desc: "紫金葫芦，可储藏回复灵丹。"
-    },
-    "ngoc-tinh-binh": {
-      name: "玉净瓶",
-      desc: "玉制净气宝瓶，可清心宁神。"
-    },
-    "phuong-vu-bao": {
-      name: "凤羽袍",
-      desc: "绣有凤羽的袍服，尊贵非凡。"
-    },
-    "phach-dao": {
-      name: "魄刀",
-      desc: "轻巧的刀，出手速度极快。"
-    },
-    "tu-tinh-nhan": {
-      name: "四星戒",
-      desc: "镶嵌四颗灵石的戒指。"
-    },
-    "linh-duong": {
-      name: "野味",
-      desc: "新鲜的兽肉，可用于烹饪回复。"
-    },
-    "tang-kinh-do": {
-      name: "藏经图",
-      desc: "通往藏经阁的密道地图。"
-    },
-    "ngoc-nhan": {
-      name: "玉戒",
-      desc: "朴素的玉戒，却暗藏灵气。"
-    },
-    "hoang-kim-huyen-thiet": {
-      name: "玄铁金",
-      desc: "玄铁金属，可打造上等兵器。"
-    },
-    "huyet-bo-dao": {
-      name: "血葡萄",
-      desc: "血色的灵药，可恢复伤势。"
-    },
-    "tu-kim-quan": {
-      name: "紫金冠",
-      desc: "嵌玉金冠，提升防御与命中。"
     }
   }
 };

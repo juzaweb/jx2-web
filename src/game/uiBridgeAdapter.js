@@ -1,18 +1,10 @@
 import { bridge, EVENTS } from "./bridge.js";
 import { applyQuantities, getQuantities } from "./items.js";
 import {
-  CITY_AVENUES,
-  CITY_BUILDINGS,
-  CITY_HOUSES,
-  CITY_PAGODAS,
-  CITY_PLAZA,
-  CITY_TREES,
-  WORLD_TILE
-} from "./worldConfig.js";
-
-/** Local radar view width, in ground tiles (enlarged view shows more tiles). */
-const MINIMAP_TILES = 20;
-const MINIMAP_ZOOM_TILES = 50;
+  MARKET_BOUNDS,
+  MARKET_BUILDINGS,
+  MARKET_TREES
+} from "./marketLayout.js";
 
 export class UIBridgeAdapter {
   constructor() {
@@ -49,8 +41,6 @@ export class UIBridgeAdapter {
     this.minimapCanvas = canvas || null;
     this.minimapCtx = canvas ? canvas.getContext("2d") : null;
     this.coordsElement = registration?.coordsEl || null;
-    // Enlarged radar (Tab) also shows twice the local view distance.
-    this.minimapZoomed = !!registration?.zoomed;
   }
 
   /**
@@ -86,8 +76,10 @@ export class UIBridgeAdapter {
    * @param {Record<string, number>} [quantities] - Defaults to the shared store
    */
   updateInventory(quantities) {
-    const { quickItems, inventoryItems } = applyQuantities(quantities || getQuantities());
-    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems });
+    const { quickItems, inventoryItems, capacity } = applyQuantities(
+      quantities || getQuantities()
+    );
+    bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems, capacity });
   }
 
   updateQuest(stats, onQuestComplete) {
@@ -119,32 +111,15 @@ export class UIBridgeAdapter {
     const w = this.minimapCanvas.width;
     const h = this.minimapCanvas.height;
 
-    // The minimap is a local radar: it follows the player and shows a fixed
-    // number of ground tiles around them, so Biện Kinh feels as large as the
-    // classic VLTK2 maps. Without city bounds (tests/other regions) it shows
-    // the whole world instead.
+    // The market map is small, so the minimap shows the whole playable area
+    // (the yellow dirt rectangle) instead of a cropped local radar.
     const city = worldConfig.cityBounds || {
       x0: 0,
       y0: 0,
       x1: worldConfig.width,
       y1: worldConfig.height
     };
-    let view;
-    if (worldConfig.cityBounds) {
-      // Measured in ground tiles (not a share of the city) and shaped to the
-      // canvas so the view stays undistorted. The enlarged minimap (Tab) simply
-      // shows more tiles.
-      const spanX = (this.minimapZoomed ? MINIMAP_ZOOM_TILES : MINIMAP_TILES) * WORLD_TILE;
-      const spanY = spanX * (h / w);
-      view = {
-        x0: player.x - spanX / 2,
-        y0: player.y - spanY / 2,
-        x1: player.x + spanX / 2,
-        y1: player.y + spanY / 2
-      };
-    } else {
-      view = { x0: 0, y0: 0, x1: worldConfig.width, y1: worldConfig.height };
-    }
+    const view = { x0: city.x0, y0: city.y0, x1: city.x1, y1: city.y1 };
 
     this.drawMap(this.minimapCtx, this.minimapCanvas, {
       view,
@@ -203,102 +178,49 @@ export class UIBridgeAdapter {
     const scaleY = h / (view.y1 - view.y0);
     const mapX = (gx) => (gx - view.x0) * scaleX;
     const mapY = (gy) => (gy - view.y0) * scaleY;
-    // Marker sizes track the canvas resolution so the full-city modal stays legible.
     const mark = Math.max(1, w / 220);
 
-    const cityX = mapX(city.x0);
-    const cityY = mapY(city.y0);
-    const cityW = (city.x1 - city.x0) * scaleX;
-    const cityH = (city.y1 - city.y0) * scaleY;
-
-    // 1. Forest ring around the ramparts
-    ctx.fillStyle = "#1e3324";
+    // Grass backdrop outside the playable dirt map.
+    ctx.fillStyle = "#3f4d35";
     ctx.fillRect(0, 0, w, h);
 
-    // 2. Inner city stone ground
-    ctx.fillStyle = "#4a4237";
-    ctx.fillRect(cityX, cityY, cityW, cityH);
-
-    // 3. Paving grid (subtle texture, mirrors the 76-unit floor tiles)
-    ctx.strokeStyle = "rgba(184, 176, 161, 0.22)";
-    ctx.lineWidth = Math.max(0.5, 0.5 * mark);
+    // Brick-paved map (same bounds as the physics world).
+    const bx = mapX(MARKET_BOUNDS.x0);
+    const by = mapY(MARKET_BOUNDS.y0);
+    const bw = (MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0) * scaleX;
+    const bh = (MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0) * scaleY;
+    ctx.fillStyle = "#b3a992";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = "#5f5340";
+    ctx.lineWidth = Math.max(1, 0.7 * mark);
     ctx.beginPath();
-    for (let gx = city.x0; gx <= city.x1; gx += 152) {
-      ctx.moveTo(mapX(gx), cityY);
-      ctx.lineTo(mapX(gx), cityY + cityH);
-    }
-    for (let gy = city.y0; gy <= city.y1; gy += 152) {
-      ctx.moveTo(cityX, mapY(gy));
-      ctx.lineTo(cityX + cityW, mapY(gy));
-    }
-    ctx.stroke();
-
-    // 4. Paved avenues
-    const avenueH = CITY_AVENUES.horizontal;
-    const avenueV = CITY_AVENUES.vertical;
-    ctx.fillStyle = "rgba(105, 95, 78, 0.85)";
-    ctx.fillRect(mapX(city.x0), mapY(avenueH.y), cityW, avenueH.height * scaleY);
-    ctx.fillRect(mapX(avenueV.x), mapY(city.y0), avenueV.width * scaleX, cityH);
-
-    // 5. Central plaza
-    ctx.fillStyle = "#e6dfd0";
-    ctx.fillRect(mapX(CITY_PLAZA.x), mapY(CITY_PLAZA.y), CITY_PLAZA.w * scaleX, CITY_PLAZA.h * scaleY);
-
-    // 6. City walls outline
-    ctx.strokeStyle = "#80735a";
-    ctx.lineWidth = Math.max(1.5, 0.7 * mark);
-    ctx.beginPath();
-    ctx.moveTo(cityX, cityY);
-    ctx.lineTo(cityX + cityW, cityY);
-    ctx.lineTo(cityX + cityW, cityY + cityH);
-    ctx.lineTo(cityX, cityY + cityH);
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + bw, by);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.lineTo(bx, by + bh);
     ctx.closePath();
     ctx.stroke();
 
-    // 7. Residential blocks (blue-tiled roofs)
-    ctx.fillStyle = "#3a5157";
-    CITY_HOUSES.forEach(({ x, y, w: bw, d: bh }) => {
-      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
-    });
-
-    // 8. Landmark buildings (shared with the Phaser scene)
-    ctx.fillStyle = "#33261c";
-    CITY_BUILDINGS.forEach(({ x, y, w: bw, d: bh }) => {
-      ctx.fillRect(mapX(x), mapY(y), bw * scaleX, bh * scaleY);
-    });
-
-    // 9. Pagodas
-    ctx.fillStyle = "#ffdd59";
-    CITY_PAGODAS.forEach(({ cx, cy }) => {
-      ctx.beginPath();
-      ctx.arc(mapX(cx), mapY(cy), 3.5 * mark, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // 10. Trees
-    ctx.fillStyle = "#3c7347";
-    CITY_TREES.forEach(([x, y]) => {
-      ctx.beginPath();
-      ctx.arc(mapX(x), mapY(y), 1.6 * mark, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // 11. Vạn Sự Thông Pavilion (green point)
-    const pavilion = CITY_BUILDINGS.find((building) => building.id === "pavilion");
-    if (pavilion) {
-      ctx.fillStyle = "#22c55e";
-      ctx.beginPath();
-      ctx.arc(
-        mapX(pavilion.x + pavilion.w / 2),
-        mapY(pavilion.y + pavilion.d / 2),
-        3.5 * mark,
-        0,
-        Math.PI * 2
+    // Landmarks: the two shop buildings.
+    MARKET_BUILDINGS.forEach((def) => {
+      ctx.fillStyle = "#4a3320";
+      ctx.fillRect(
+        mapX(def.x - def.w / 2),
+        mapY(def.y - def.d / 2),
+        Math.max(2, def.w * scaleX),
+        Math.max(2, def.d * scaleY)
       );
-      ctx.fill();
-    }
+    });
 
-    // Enemies (Red radar blips)
+    // Trees.
+    ctx.fillStyle = "#3c7347";
+    MARKET_TREES.forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(mapX(x), mapY(y), 1.8 * mark, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Enemies (red blips).
     if (enemies && enemies.length) {
       enemies.forEach((wolf) => {
         if (!wolf.active || wolf.isDead) return;
@@ -309,20 +231,16 @@ export class UIBridgeAdapter {
       });
     }
 
-    // Remote Players (Cyan radar blips)
+    // Remote players (cyan blips).
     if (remotePlayers && remotePlayers.length) {
       remotePlayers.forEach((rp) => {
-        // A RemotePlayer renders through `container` (it has no physics `sprite`);
-        // a destroyed one has already nulled it.
         if (!rp.container || !rp.container.active) return;
         const rx = mapX(rp.x);
         const ry = mapY(rp.y);
-
         ctx.fillStyle = "rgba(0, 210, 211, 0.25)";
         ctx.beginPath();
         ctx.arc(rx, ry, 6 * mark, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.fillStyle = "#00d2d3";
         ctx.beginPath();
         ctx.arc(rx, ry, 3 * mark, 0, Math.PI * 2);
@@ -330,20 +248,16 @@ export class UIBridgeAdapter {
       });
     }
 
-    // Player position (Golden yellow glowing beacon)
-    const px = mapX(player.x);
-    const py = mapY(player.y);
-
-    // Player sight radius
+    // Local player beacon.
+    const lx = mapX(player.x);
+    const ly = mapY(player.y);
     ctx.fillStyle = "rgba(255, 215, 0, 0.18)";
     ctx.beginPath();
-    ctx.arc(px, py, 10 * mark, 0, Math.PI * 2);
+    ctx.arc(lx, ly, 10 * mark, 0, Math.PI * 2);
     ctx.fill();
-
-    // Player center dot
     ctx.fillStyle = "#ffdd59";
     ctx.beginPath();
-    ctx.arc(px, py, 3.5 * mark, 0, Math.PI * 2);
+    ctx.arc(lx, ly, 3.5 * mark, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = Math.max(1, 0.5 * mark);

@@ -13,11 +13,15 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack } from "./pvp.js";
 import { computeDamage } from "./damage.js";
+import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { translate } from "../i18n/translator.js";
 
 let audioEnabled = true;
 let audioContext = null;
+
+const MAX_DROPS = 40;
+const UNOWNED_DROP_TTL_MS = 15000;
 
 export function isAudioEnabled() {
   return audioEnabled;
@@ -53,15 +57,6 @@ export function playTone(frequency = 220, duration = 0.07, type = "sine", volume
   } catch (_) {}
 }
 
-/**
- * Ceiling on remembered drops. Every client renders every kill's loot, so swept-up
- * entries must not accumulate for the whole session.
- */
-const MAX_DROPS = 32;
-
-/** Lifetime (ms) of a drop this client is not allowed to collect. */
-const UNOWNED_DROP_TTL_MS = 8000;
-
 /** Coerce a server-sent stat to a finite number, keeping the current value otherwise. */
 const toStat = (value, fallback) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -82,8 +77,8 @@ export class CombatSystem {
     this.onStateChange = onStateChange;
 
     this.attackReady = true;
-    this.drops = [];
-    /** Skill slots assigned to the left and right mouse buttons. */
+    /** Skill slots assigned to UIOP keys and mouse buttons. */
+    this.skillLoadout = { u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 };
     this.selectedSkillSlot = 0;
     this.leftSkillSlot = 0;
     /** id -> timestamp (ms) the skill becomes castable again. */
@@ -108,10 +103,20 @@ export class CombatSystem {
     return applyBuffsToStats(this.player.stats, this.buffs, now);
   }
 
+  /**
+   * Milliseconds until the next normal attack, shortened by the attack-speed
+   * multiplier (see combatConfig.js).
+   * @returns {number}
+   */
+  attackIntervalMs() {
+    const speed = Number(this.player?.stats?.attackSpeed);
+    return ATTACK_INTERVAL_MS / (Number.isFinite(speed) && speed > 0 ? speed : 1);
+  }
+
   performAttack() {
     if (!this.attackReady) return;
     this.attackReady = false;
-    this.scene.time.delayedCall(330, () => {
+    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
       this.attackReady = true;
     });
 
@@ -208,6 +213,10 @@ export class CombatSystem {
       this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
       return false;
     }
+    if (hand === "left" && skill.target === "self") {
+      this.ui.addLog("Chiêu thức tự thân không thể gán vào chuột trái.");
+      return false;
+    }
     if (!skillUnlocked(skill, this.player.stats.level)) {
       this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
       return false;
@@ -238,6 +247,80 @@ export class CombatSystem {
   }
 
   /**
+   * Update the active skill loadout.
+   * @param {Object} loadout
+   */
+  setSkillLoadout(loadout) {
+    if (!loadout) return;
+    this.skillLoadout = {
+      u: loadout.u ?? 0,
+      i: loadout.i ?? 1,
+      o: loadout.o ?? 2,
+      p: loadout.p ?? 3,
+      left: loadout.u ?? loadout.left ?? 0,
+      right: loadout.i ?? loadout.right ?? 1
+    };
+    this.selectedSkillSlot = this.skillLoadout.u;
+    this.leftSkillSlot = this.skillLoadout.i;
+    this.cancelPendingCast();
+  }
+
+  /**
+   * Cast the skill assigned to a specific key (u, i, o, p).
+   * @param {string} key
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkillByKey(key, aim = null) {
+    const slot = this.skillLoadout?.[key?.toLowerCase()];
+    if (slot === undefined) return false;
+    return this.castSkillBySlot(slot, aim);
+  }
+
+  /**
+   * Directly cast a skill assigned to a slot.
+   * @param {number} slot
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkillBySlot(slot, aim = null) {
+    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
+    if (!skill) {
+      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
+      return false;
+    }
+    return this.castSkill(skill, aim);
+  }
+
+  /**
+   * Direct casting execution logic.
+   * @param {Object} skill
+   * @param {{x:number,y:number}|null} [aim]
+   * @returns {boolean}
+   */
+  castSkill(skill, aim = null) {
+    if (!skill) return false;
+    if (!this.canCast(skill)) return false;
+
+    if (skill.target === "self") {
+      this.executeSkill(skill, null);
+      return true;
+    }
+
+    const target = this.findTarget(aim);
+    if (!target) {
+      if (aim && this.player) {
+        this.player.setFacingRight?.(aim.x >= this.player.x);
+      }
+      this.executeSkill(skill, null);
+      return true;
+    }
+
+    this.approachAndCast(skill, target);
+    return true;
+  }
+
+  /**
    * Right mouse button: cast on the clicked target, or release in place when the
    * click did not land on an enemy.
    * @param {{x:number,y:number}|null} [aim]
@@ -252,12 +335,8 @@ export class CombatSystem {
    */
   castLeftSkill(target) {
     const skill = this.getLeftSkill();
-    if (!skill || !target) return false;
+    if (!skill || !target || skill.target === "self") return false;
     if (!this.canCast(skill)) return true;
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return true;
-    }
     this.approachAndCast(skill, target);
     return true;
   }
@@ -270,24 +349,10 @@ export class CombatSystem {
   performSkill(aim = null) {
     const skill = this.getSelectedSkill();
     if (!skill) {
-      this.ui.addLog("Chưa gán chiêu thức vào tay phải.");
+      this.ui.addLog("Chưa gán chiêu thức vào ô này.");
       return;
     }
-    if (!this.canCast(skill)) return;
-
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return;
-    }
-
-    const target = this.findTarget(aim);
-    if (!target) {
-      // Right-click on empty ground: release in place.
-      this.executeSkill(skill, null);
-      return;
-    }
-
-    this.approachAndCast(skill, target);
+    this.castSkill(skill, aim);
   }
 
   /**
@@ -382,7 +447,35 @@ export class CombatSystem {
    * @returns {number}
    */
   skillReach(skill) {
-    return skill.radius > 0 ? skill.radius : skill.range;
+    if (skill.radius > 0) return skill.radius;
+    return Math.min(skill.range, this.screenCastRange());
+  }
+
+  /**
+   * Farthest world distance visible from the player, so a long-range skill
+   * cannot auto-target enemies that are off-screen. Uses the camera's actual
+   * world-view corners when available, which stays correct when the player is
+   * not centred (e.g. at the map edge).
+   * @returns {number}
+   */
+  screenCastRange() {
+    const camera = this.scene?.cameras?.main;
+    const zoom = camera?.zoom;
+    if (!camera || !zoom) return Infinity;
+
+    const view = camera.worldView;
+    if (view && view.width > 0 && Number.isFinite(view.right) && Number.isFinite(view.bottom)) {
+      const { x, y } = this.player;
+      const corners = [
+        [view.left, view.top],
+        [view.right, view.top],
+        [view.left, view.bottom],
+        [view.right, view.bottom]
+      ];
+      return Math.max(...corners.map(([cx, cy]) => Math.hypot(cx - x, cy - y)));
+    }
+
+    return Math.hypot(camera.width / (2 * zoom), camera.height / (2 * zoom));
   }
 
   /**
@@ -423,6 +516,9 @@ export class CombatSystem {
    * @param {number} time
    */
   update(time) {
+    const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
+    this.updateBuffs(now);
+
     const pending = this.pendingCast;
     if (!pending) return;
 
@@ -526,8 +622,9 @@ export class CombatSystem {
         .sort((a, b) => distanceTo(a) - distanceTo(b));
     }
 
+    const range = this.skillReach(skill);
     const nearest = alive
-      .filter((wolf) => distanceTo(wolf) <= skill.range)
+      .filter((wolf) => distanceTo(wolf) <= range)
       .sort((a, b) => distanceTo(a) - distanceTo(b))[0];
     return nearest ? [nearest] : [];
   }
@@ -554,6 +651,9 @@ export class CombatSystem {
     for (const effect of skill.effects || []) {
       if (effect.kind === "buff") {
         this.buffs.push({
+          skillId: skill.id,
+          formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
+          formationScale: skill.vfx?.type === "formation" && typeof skill.vfx.scale === "number" ? skill.vfx.scale : undefined,
           stat: effect.stat,
           amount: effect.amount,
           until: now + effect.duration
@@ -569,6 +669,52 @@ export class CombatSystem {
         }
       }
     }
+    if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
+      if (typeof skill.vfx.scale === "number") {
+        this.player.showFormation?.(skill.vfx.sprite, skill.vfx.scale);
+      } else {
+        this.player.showFormation?.(skill.vfx.sprite);
+      }
+    }
+  }
+
+  /**
+   * Filter expired buffs and update active formation aura under player feet.
+   * Only prunes and updates when an active buff has reached its expiration timestamp,
+   * avoiding allocations and redundant render state calls in the per-frame game loop.
+   * @param {number} now
+   */
+  updateBuffs(now) {
+    if (this.buffs.length === 0) return;
+
+    let hasExpired = false;
+    for (let i = 0; i < this.buffs.length; i++) {
+      if (this.buffs[i].until <= now) {
+        hasExpired = true;
+        break;
+      }
+    }
+    if (!hasExpired) return;
+
+    this.buffs = this.buffs.filter((buff) => buff.until > now);
+    const activeFormation = this.buffs.find((buff) => buff.formationSprite);
+    if (activeFormation) {
+      if (typeof activeFormation.formationScale === "number") {
+        this.player.showFormation?.(activeFormation.formationSprite, activeFormation.formationScale);
+      } else {
+        this.player.showFormation?.(activeFormation.formationSprite);
+      }
+    } else {
+      this.player.hideFormation?.();
+    }
+  }
+
+  /**
+   * Clear all active buffs and hide any buff formation rings.
+   */
+  clearBuffs() {
+    this.buffs = [];
+    this.player.hideFormation?.();
   }
 
   /**
@@ -617,7 +763,7 @@ export class CombatSystem {
     }
 
     this.attackReady = false;
-    this.scene.time.delayedCall(330, () => {
+    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
       this.attackReady = true;
     });
 
@@ -711,13 +857,7 @@ export class CombatSystem {
     }
 
     // Offline (no server connection) progression is frozen: the kill plays out,
-    // but the client never mints coins/EXP of its own.
-    const reward = rollKillReward(Math.random);
-    this.spawnDrop(
-      wolf.x + Phaser.Math.Between(-20, 20),
-      wolf.y + Phaser.Math.Between(-10, 10),
-      reward.drop
-    );
+    // but the client never mints coins/EXP of its own and nothing is dropped.
     this.ui.addLog("Đánh bại Sói Xám! (ngoại tuyến — không nhận tiến trình)");
 
     // Schedule enemy revive (the server drives respawn while connected)
@@ -739,12 +879,6 @@ export class CombatSystem {
     const x = reward.x ?? this.player.x;
     const y = reward.y ?? this.player.y;
     const killedByMe = this.isLocalKiller(reward.attackerId);
-
-    if (reward.drop) {
-      // Every client renders the kill's loot, but only the attributed killer may
-      // pick it up, so bystanders cannot duplicate the reward
-      this.spawnDrop(x, y, reward.drop, { collectable: killedByMe });
-    }
 
     if (!killedByMe) return;
 
@@ -849,6 +983,7 @@ export class CombatSystem {
    *   owned by another player, which only shows up in the world
    */
   spawnDrop(x, y, loot = null, { collectable = true } = {}) {
+    this.drops = this.drops || [];
     const rolled = loot || rollDrop();
     const dropEntry = DROP_TABLE_MAP.get(rolled.id);
 
@@ -861,7 +996,7 @@ export class CombatSystem {
       itemId: rolled.id,
       qty: rolled.qty ?? dropEntry?.qty ?? 1,
       name: dropEntry ? dropEntry.name : rolled.id,
-      // Someone else's loot can never be picked up, so it fades instead of littering
+      // Someone else's loot can never be picked up, so it fades instead of littering.
       expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
     };
 
@@ -882,6 +1017,7 @@ export class CombatSystem {
   }
 
   updateDrops(time) {
+    this.drops = this.drops || [];
     if (this.drops.length > MAX_DROPS) {
       this.drops = this.drops.filter((drop) => drop.active).slice(-MAX_DROPS);
     }
@@ -898,9 +1034,7 @@ export class CombatSystem {
       const dropIso = toIso(drop.x, drop.y + Math.sin(time / 180 + drop.phase) * 4);
       drop.visual.setPosition(dropIso.x, dropIso.y);
 
-      if (
-        Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38
-      ) {
+      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38) {
         this.collectDrop(drop);
       }
     });
@@ -913,10 +1047,7 @@ export class CombatSystem {
 
     // Coins are server-owned, so a pickup grants no bạc on the client. MP is
     // server-owned too: predict locally and mirror the restore into the pool.
-    this.player.stats.mp = Math.min(
-      this.player.stats.maxMp,
-      this.player.stats.mp + 5
-    );
+    this.player.stats.mp = Math.min(this.player.stats.maxMp, this.player.stats.mp + 5);
     this.scene.networkClient?.sendRestoreMp?.({ amount: 5 });
 
     addQuantity(drop.itemId, drop.qty);

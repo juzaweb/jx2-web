@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { QUICK_ITEMS } from "../../game/items.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
+import { getItemById, getQuantity } from "../../game/items.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { SkillIcon } from "../SkillIcon.jsx";
+import { setDragPayload, readDragPayload, hasDragPayload, acceptDrop } from "../Modals/dragItem.js";
+import { DEFAULT_QUICK_SLOTS } from "../../game/quickSlots.js";
 
 export function HotbarDock({
-  coins = 0,
   audioEnabled,
   onUseItem,
   onInventory,
   onCharacter,
+  onSkills,
   onOpenHelp,
   onToggleAudio,
   onLogout,
@@ -19,8 +21,15 @@ export function HotbarDock({
   skills = [],
   selectedSkillSlot = 0,
   leftSkillSlot = 0,
+  skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
   onPickSkill,
-  items = QUICK_ITEMS
+  onRotateScreen,
+  items = [],
+  inventoryItems = [],
+  quickSlotsMapping = DEFAULT_QUICK_SLOTS,
+  onAssignQuickSlot,
+  onClearQuickSlot,
+  onMoveQuickSlot
 }) {
   const { t } = useI18n();
   const [cooldownEnds, setCooldownEnds] = useState({});
@@ -57,28 +66,80 @@ export function HotbarDock({
 
   const cooldownLeft = (skillId) =>
     skillId ? Math.max(0, (cooldownEnds[skillId] || 0) - clock) : 0;
-  const selectedSkill = skills.find((skill) => skill.slot === selectedSkillSlot) || null;
-  const leftSkill = skills.find((skill) => skill.slot === leftSkillSlot) || null;
-  const leftCooldown = cooldownLeft(leftSkill?.id);
-  const rightCooldown = cooldownLeft(selectedSkill?.id);
+  const skillSlots = [
+    { key: "u", slot: skillLoadout?.u ?? leftSkillSlot ?? 0 },
+    { key: "i", slot: skillLoadout?.i ?? selectedSkillSlot ?? 1 },
+    { key: "o", slot: skillLoadout?.o ?? 2 },
+    { key: "p", slot: skillLoadout?.p ?? 3 }
+  ];
 
-  // The bottom bar always shows eight numbered slots; 1-4 hold consumables and
-  // the rest stay as empty placeholders.
-  const quickSlots = Array.from({ length: 8 }, (_, index) => {
+  const handleDragOver = (e) => {
+    if (hasDragPayload(e)) {
+      acceptDrop(e);
+    }
+  };
+
+  const handleDrop = (e, targetSlot) => {
+    e.preventDefault();
+    const payload = readDragPayload(e);
+    if (!payload) return;
+    if (payload.kind === "inventory" && payload.itemId) {
+      onAssignQuickSlot?.(targetSlot, payload.itemId);
+    } else if (payload.kind === "hotbar" && payload.fromSlot) {
+      onMoveQuickSlot?.(payload.fromSlot, targetSlot);
+    }
+  };
+
+  const handleDragStart = (e, fromSlot, itemId) => {
+    setDragPayload(e, {
+      kind: "hotbar",
+      fromSlot,
+      itemId
+    });
+  };
+
+  const handleContextMenu = (e, slot) => {
+    e.preventDefault();
+    onClearQuickSlot?.(slot);
+  };
+
+  const availableItems = inventoryItems.length > 0 ? inventoryItems : items;
+
+  // The 9 numbered slots at the bottom can have items dragged into them (default empty)
+  const quickSlots = Array.from({ length: 9 }, (_, index) => {
     const useSlot = index + 1;
-    const raw = items.find((entry) => entry.useSlot === useSlot);
-    return { useSlot, item: raw ? localizeItem(raw, t) : null };
+    const itemId = quickSlotsMapping?.[useSlot] || null;
+    const raw = itemId ? getItemById(itemId) : null;
+
+    let qty = 0;
+    if (itemId) {
+      const matched = (availableItems || []).filter((entry) => entry && entry.id === itemId);
+      if (matched.length > 0) {
+        qty = matched.reduce((sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1), 0);
+      } else {
+        qty = getQuantity(itemId);
+      }
+    }
+
+    const item = raw ? localizeItem({ ...raw, qty }, t) : null;
+    return { useSlot, item };
   });
 
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
-        {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
+        {/* Left Belt: 9 Numbered Quick Slots */}
         <div className="hotbar-slots">
           {quickSlots.map(({ useSlot, item }) => {
             if (!item) {
               return (
-                <div className="slot-item empty" id={`slot-${useSlot}`} key={`slot-${useSlot}`}>
+                <div
+                  className="slot-item empty"
+                  id={`slot-${useSlot}`}
+                  key={`slot-${useSlot}`}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, useSlot)}
+                >
                   <span className="slot-key">{useSlot}</span>
                 </div>
               );
@@ -87,9 +148,14 @@ export function HotbarDock({
               <div
                 className="slot-item"
                 id={`slot-${useSlot}`}
-                key={item.id}
+                key={`slot-${useSlot}`}
                 title={t("hotbar.slotTitle", { key: useSlot, name: item.name })}
-                onClick={() => onUseItem(useSlot)}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, useSlot, item.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, useSlot)}
+                onContextMenu={(e) => handleContextMenu(e, useSlot)}
+                onClick={() => onUseItem?.(useSlot)}
               >
                 <span className="slot-key">{useSlot}</span>
                 <div className={`item-icon ${item.icon}`} />
@@ -101,52 +167,31 @@ export function HotbarDock({
           })}
         </div>
 
-        {/* Middle: the left/right mouse skills and the sect skill bar */}
+        {/* Middle: 4 UIOP sect skill slots */}
         <div className="martial-center">
-          <button
-            type="button"
-            className="hand-slot"
-            id="left-hand-slot"
-            title={t("skills.leftHandTitle")}
-            onClick={() => onPickSkill?.("left")}
-          >
-            <SkillIcon skill={leftSkill} className="hand-glyph" />
-            {leftCooldown > 0 && <span className="hand-cd">{Math.ceil(leftCooldown / 1000)}</span>}
-            <span className="click-badge">{t("skills.handLeft")}</span>
-          </button>
-
-          <button
-            type="button"
-            className="hand-slot"
-            id="right-hand-slot"
-            title={t("skills.rightHandTitle")}
-            onClick={() => onPickSkill?.("right")}
-          >
-            <SkillIcon skill={selectedSkill} className="hand-glyph" />
-            {rightCooldown > 0 && <span className="hand-cd">{Math.ceil(rightCooldown / 1000)}</span>}
-            <span className="click-badge">{t("skills.handRight")}</span>
-          </button>
-
-        </div>
-
-        {/* Hero Portrait */}
-        <div className="hero-portrait" title={t("hotbar.portraitTitle")}>
-          <div className="portrait-avatar">
-            <img
-              src="/hero_portrait.png"
-              alt={t("hotbar.portraitAlt")}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                objectPosition: "center 15%",
-                display: "block"
-              }}
-            />
-          </div>
-          <div className="portrait-coins" id="coin-label">
-            {t("hotbar.coins")}: {coins}
-          </div>
+          {skillSlots.map(({ key, slot }) => {
+            const assignedSkill = skills.find((entry) => entry.slot === slot) || null;
+            const cd = cooldownLeft(assignedSkill?.id);
+            const keyLabel = key.toUpperCase();
+            return (
+              <button
+                key={key}
+                type="button"
+                className="hand-slot skill-key-slot"
+                id={`skill-slot-${key}`}
+                title={
+                  assignedSkill
+                    ? `${keyLabel}: ${t(assignedSkill.nameKey, undefined, assignedSkill.id)}`
+                    : t("skills.assignKey", { key: keyLabel }, `Gán chiêu [${keyLabel}]`)
+                }
+                onClick={() => onPickSkill?.(key)}
+              >
+                <SkillIcon skill={assignedSkill} className="hand-glyph" />
+                {cd > 0 && <span className="hand-cd">{Math.ceil(cd / 1000)}</span>}
+                <span className="click-badge">{keyLabel}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Right Utility: System Icons Tray */}
@@ -171,6 +216,15 @@ export function HotbarDock({
           </button>
           <button
             className="sys-btn"
+            id="skills-btn"
+            title={`${t("skills.modalTitle")} (F5)`}
+            onClick={onSkills}
+          >
+            <span className="sys-ico">🥋</span>
+            <span className="sys-lbl">{t("skills.modalTitle")}</span>
+          </button>
+          <button
+            className="sys-btn"
             id="help-btn"
             title={t("hotbar.help")}
             onClick={onOpenHelp}
@@ -187,6 +241,17 @@ export function HotbarDock({
             <span className="sys-ico">⚔️</span>
             <span className="sys-lbl">{pkEnabled ? t("hotbar.pkOn") : t("hotbar.pkOff")}</span>
           </button>
+          {onRotateScreen && (
+            <button
+              className="sys-btn"
+              id="rotate-btn"
+              title={t("hotbar.rotateTitle")}
+              onClick={onRotateScreen}
+            >
+              <span className="sys-ico">🔄</span>
+              <span className="sys-lbl">{t("hotbar.rotate")}</span>
+            </button>
+          )}
         </div>
       </div>
     </section>

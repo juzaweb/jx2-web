@@ -15,7 +15,6 @@ vi.mock("phaser", () => ({
 
 import { CombatSystem } from "./combat.js";
 import { computeDamage } from "./damage.js";
-import { DROP_TABLE, getQuantities } from "./items.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 
@@ -277,6 +276,7 @@ describe("CombatSystem kill rewards", () => {
     };
     const scene = {
       networkClient: { isConnected, sendRestoreMp: vi.fn() },
+      cameras: { main: { width: 5700, height: 3200, zoom: 1 } },
       time: { delayedCall: vi.fn() },
       add: { container: visualStub, circle: visualStub, polygon: visualStub }
     };
@@ -284,8 +284,6 @@ describe("CombatSystem kill rewards", () => {
     const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui, onStateChange);
 
     combat.setLocalPlayerId(playerId);
-    // Real spawnDrop (drop objects are asserted below), float text stubbed
-    vi.spyOn(combat, "spawnDrop");
     vi.spyOn(combat, "showFloatText").mockImplementation(() => {});
 
     return { combat, player, ui, onStateChange };
@@ -298,11 +296,33 @@ describe("CombatSystem kill rewards", () => {
     coins: 7,
     x: 1110,
     y: 590,
-    drop: { id: DROP_TABLE[0].id, qty: DROP_TABLE[0].qty },
     ...overrides
   });
 
-  it("renders the kill's drop for the attributed killer without minting stats", () => {
+  it("caps a ranged skill at the visible camera diagonal", () => {
+    const { combat } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    expect(combat.skillReach({ radius: 0, range: 6000 })).toBeCloseTo(
+      Math.hypot(5700 / 2, 3200 / 2)
+    );
+    expect(combat.skillReach({ radius: 0, range: 100 })).toBe(100);
+    expect(combat.skillReach({ radius: 110, range: 0 })).toBe(110);
+  });
+
+  it("uses the farthest camera corner when the player is not centred", () => {
+    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    combat.scene.cameras.main.worldView = { left: 0, top: 0, right: 1000, bottom: 600, width: 1000 };
+
+    player.x = 500;
+    player.y = 300;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(500, 300));
+
+    player.x = 0;
+    player.y = 0;
+    expect(combat.screenCastRange()).toBeCloseTo(Math.hypot(1000, 600));
+  });
+
+  it("reports the kill for the attributed killer without minting stats", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
 
     combat.applyServerReward(serverReward());
@@ -311,16 +331,14 @@ describe("CombatSystem kill rewards", () => {
     expect(player.stats.kills).toBe(0);
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
-    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it("renders the shared drop for bystanders without paying them", () => {
+  it("stays silent for a bystander's kill", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_khac" });
 
     combat.applyServerReward(serverReward());
 
-    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
     expect(player.stats.kills).toBe(0);
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
@@ -336,18 +354,17 @@ describe("CombatSystem kill rewards", () => {
 
     expect(player.stats.kills).toBe(0);
     expect(player.stats.exp).toBe(900);
-    expect(combat.spawnDrop).not.toHaveBeenCalled();
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it("freezes progression offline but still drops loot", () => {
+  it("freezes progression offline and drops nothing", () => {
     const { combat, player } = makeCombat({ isConnected: false });
     const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
 
     combat.handleWolfKill(wolf);
 
     expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(combat.spawnDrop).toHaveBeenCalledTimes(1);
+    expect(combat.drops).toBeUndefined();
     expect(player.stats.kills).toBe(0);
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
@@ -363,7 +380,6 @@ describe("CombatSystem kill rewards", () => {
     expect(player.stats.kills).toBe(0);
     expect(player.stats.exp).toBe(900);
     expect(player.stats.coins).toBe(10);
-    expect(combat.spawnDrop).not.toHaveBeenCalled();
   });
 
   it("mirrors the server ledger onto the local stats", () => {
@@ -406,75 +422,148 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).toHaveBeenCalledTimes(1);
   });
 
-  it("marks the kill's drop collectable only for the attributed killer", () => {
-    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
-    killer.applyServerReward(serverReward());
-
-    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
-    bystander.applyServerReward(serverReward());
-
-    expect(killer.drops).toHaveLength(1);
-    expect(killer.drops[0].collectable).toBe(true);
-    expect(bystander.drops).toHaveLength(1);
-    expect(bystander.drops[0].collectable).toBe(false);
+  it("updates skill loadout and provides fallback aliases", () => {
+    const { combat } = makeCombat();
+    combat.setSkillLoadout({ u: 2, i: 3, o: 4, p: 5 });
+    expect(combat.skillLoadout).toEqual({
+      u: 2,
+      i: 3,
+      o: 4,
+      p: 5,
+      left: 2,
+      right: 3
+    });
+    expect(combat.selectedSkillSlot).toBe(2);
   });
 
-  it("does not let a bystander pick up another player's kill loot", () => {
-    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_khac" });
-    combat.applyServerReward(serverReward());
-
-    const drop = combat.drops[0];
-    const before = getQuantities()[drop.itemId] ?? 0;
-    player.x = drop.x;
-    player.y = drop.y;
-    combat.updateDrops(0);
-
-    expect(drop.active).toBe(true);
-    expect(player.stats.coins).toBe(10);
-    expect(getQuantities()[drop.itemId]).toBe(before);
+  it("casts a skill directly by key", () => {
+    const { combat, player } = makeCombat();
+    player.sect = "thieu-lam";
+    combat.setSkillLoadout({ u: 2, i: 1, o: 0, p: 3 });
+    combat.executeSkill = vi.fn();
+    const ok = combat.castSkillByKey("u");
+    expect(ok).toBe(true);
+    expect(combat.executeSkill).toHaveBeenCalledTimes(1);
   });
 
-  it("still lets the killer pick up the loot the server rolled", () => {
-    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
-    combat.applyServerReward(serverReward());
+  it("handles unknown or empty slot without crashing", () => {
+    const { combat, player, ui } = makeCombat();
+    player.sect = "thieu-lam";
+    combat.setSkillLoadout({ u: 99, i: 1, o: 0, p: 3 });
+    const ok = combat.castSkillByKey("u");
+    expect(ok).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
+  });
+});
 
-    const drop = combat.drops[0];
-    const before = getQuantities()[drop.itemId] ?? 0;
-    player.x = drop.x;
-    player.y = drop.y;
-    combat.updateDrops(0);
+describe("CombatSystem hand assignments and self-skill gating", () => {
+  const makeCombat = () => {
+    const player = {
+      sect: "thieu-lam",
+      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100 },
+      x: 100,
+      y: 100
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const scene = { time: { now: 1000 } };
+    const combat = Object.create(CombatSystem.prototype);
+    combat.player = player;
+    combat.ui = ui;
+    combat.scene = scene;
+    combat.cancelPendingCast = vi.fn();
+    return { combat, ui };
+  };
 
-    expect(drop.active).toBe(false);
-    // Coins are server-owned, so a pickup adds no bạc on the client
-    expect(player.stats.coins).toBe(10);
-    expect(getQuantities()[drop.itemId]).toBe(before + drop.qty);
-    // The pickup's MP restore is mirrored into the server-owned pool
-    expect(combat.scene.networkClient.sendRestoreMp).toHaveBeenCalledWith({ amount: 5 });
+  it("refuses to equip self skills to the left mouse button", () => {
+    const { combat, ui } = makeCombat();
+
+    // Slot 3 is La Hán Trận (target: "self")
+    const ok = combat.equipSkill("left", 3);
+    expect(ok).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith("Chiêu thức tự thân không thể gán vào chuột trái.");
+
+    // Slot 3 can be equipped to right hand
+    const okRight = combat.equipSkill("right", 3);
+    expect(okRight).toBe(true);
+
+    // Slot 2 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
+    const okLeft = combat.equipSkill("left", 2);
+    expect(okLeft).toBe(true);
   });
 
-  it("fades the loot a bystander cannot take and keeps the killer's drop", () => {
-    const { combat: bystander } = makeCombat({ isConnected: true, playerId: "usr_khac" });
-    bystander.applyServerReward(serverReward());
-    bystander.updateDrops(9000);
-
-    const { combat: killer } = makeCombat({ isConnected: true, playerId: "usr_hero" });
-    killer.applyServerReward(serverReward());
-    killer.updateDrops(9000);
-
-    expect(bystander.drops[0].active).toBe(false);
-    expect(killer.drops[0].active).toBe(true);
+  it("refuses to cast self skills via castLeftSkill on a target", () => {
+    const { combat } = makeCombat();
+    combat.leftSkillSlot = 3; // La Hán Trận (self)
+    const target = { x: 120, y: 120, id: "wolf_1" };
+    expect(combat.castLeftSkill(target)).toBe(false);
   });
 
-  it("bounds the remembered drop list across many kills", () => {
-    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+  it("activates persistent formation ring on cast and hides it on expire or clear", () => {
+    const { combat } = makeCombat();
+    combat.buffs = [];
+    combat.player.showFormation = vi.fn();
+    combat.player.hideFormation = vi.fn();
 
-    for (let i = 0; i < 40; i++) {
-      combat.applyServerReward(serverReward());
-    }
-    player.x = -1000;
-    player.y = -1000;
-    combat.updateDrops(0);
+    const laHanTran = {
+      id: "la_han_tran",
+      target: "self",
+      effects: [
+        { kind: "buff", stat: "attackPct", amount: 0.1, duration: 180000 },
+        { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 }
+      ],
+      vfx: { type: "formation", sprite: "vfx-la-han-tran" }
+    };
 
-    expect(combat.drops.length).toBeLessThanOrEqual(32);
+    combat.applySelfEffects(laHanTran, 1000);
+    expect(combat.buffs).toHaveLength(2);
+    expect(combat.buffs[0]).toMatchObject({
+      skillId: "la_han_tran",
+      formationSprite: "vfx-la-han-tran",
+      until: 181000
+    });
+    expect(combat.player.showFormation).toHaveBeenCalledWith("vfx-la-han-tran");
+
+    // Before expiration: formation remains active without redundant re-shows
+    combat.player.showFormation.mockClear();
+    combat.update(50000);
+    expect(combat.player.showFormation).not.toHaveBeenCalled();
+    expect(combat.player.hideFormation).not.toHaveBeenCalled();
+
+    // After expiration: hideFormation is called
+    combat.update(182000);
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+
+    // clearBuffs also hides formation
+    combat.applySelfEffects(laHanTran, 200000);
+    expect(combat.buffs).toHaveLength(2);
+    combat.player.hideFormation.mockClear();
+    combat.clearBuffs();
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideFormation).toHaveBeenCalled();
+  });
+});
+
+describe("attack speed coefficient", () => {
+  const makeCombat = (attackSpeed) => {
+    const player = { stats: { attackSpeed }, playAttackMotion: vi.fn() };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn(), updateInventory: vi.fn() };
+    const scene = {
+      time: { delayedCall: vi.fn(), now: 0 },
+      cameras: { main: { width: 100, height: 100, zoom: 1 } },
+      add: { arc: () => ({ destroy() {} }) }
+    };
+    return new CombatSystem(scene, player, { getAlive: () => [] }, ui, () => {});
+  };
+
+  it("turns the coefficient into a shorter interval", () => {
+    expect(makeCombat(1).attackIntervalMs()).toBe(330);
+    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(275);
+    expect(makeCombat(1.5).attackIntervalMs()).toBe(220);
+  });
+
+  it("falls back to the base cadence for a missing or invalid coefficient", () => {
+    expect(makeCombat(undefined).attackIntervalMs()).toBe(330);
+    expect(makeCombat(0).attackIntervalMs()).toBe(330);
   });
 });

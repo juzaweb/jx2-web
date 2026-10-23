@@ -8,11 +8,12 @@
 import { rollKillReward } from "../../src/game/items.js";
 
 /**
- * Roll the reward for a defeated enemy.
+ * Roll the reward for a defeated enemy. Kills pay EXP and bạc only — there is no
+ * loot table, so nothing is dropped into the world.
  * @param {string} attackerId - id of the player whose hit landed the killing blow
  * @param {{id:number, x:number, y:number}} enemy
  * @param {Function|number} [rng=Math.random]
- * @returns {{ enemyId:number, attackerId:string, x:number, y:number, exp:number, coins:number, drop:{id:string, qty:number} }}
+ * @returns {{ enemyId:number, attackerId:string, x:number, y:number, exp:number, coins:number }}
  */
 export const rollEnemyReward = (attackerId, enemy, rng = Math.random) => ({
   enemyId: enemy.id,

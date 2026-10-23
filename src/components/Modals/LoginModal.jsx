@@ -3,15 +3,10 @@ import { apiClient } from "../../game/apiClient.js";
 import { writeSession } from "../../game/session.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
+import { LobbyScene } from "../LobbyScene.jsx";
+import { requestLandscapeFullscreen } from "../../game/orientation.js";
+import { SERVER_NAME } from "../../game/serverConfig.js";
 import "../../styles/login.css";
-
-const SERVERS = [
-  { id: "s1", name: "Youtube: PYTA Gaming", tagKey: "login.tags.recommended", tagClass: "recommended" },
-  { id: "s2", name: "Biện Kinh", tagKey: "login.tags.new", tagClass: "normal" },
-  { id: "s3", name: "Thành Đô", tagKey: "login.tags.crowded", tagClass: "crowded" },
-  { id: "s4", name: "Tương Dương", tagKey: "login.tags.crowded", tagClass: "crowded" },
-  { id: "s5", name: "Trường An", tagKey: "login.tags.normal", tagClass: "normal" },
-];
 
 const VK_NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const VK_ROW1 = ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"];
@@ -26,8 +21,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
   const [rememberAccount, setRememberAccount] = useState(true);
   const [showVK, setShowVK] = useState(false);
   const [activeInput, setActiveInput] = useState("username");
-  const [selectedServer, setSelectedServer] = useState(SERVERS[0]);
-  const [isServerListOpen, setIsServerListOpen] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,6 +49,9 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
       return;
     }
 
+    // Clear any previous (now stale) feedback while the availability check runs.
+    setUsernameFeedback(null);
+
     let isMounted = true;
     const timer = setTimeout(async () => {
       try {
@@ -64,7 +60,11 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           setUsernameFeedback(res);
         }
       } catch {
-        // Silently skip real-time check when offline or server unreachable
+        // Silently skip real-time check when offline or server unreachable,
+        // so a stale error never blocks registration.
+        if (isMounted) {
+          setUsernameFeedback(null);
+        }
       }
     }, 350);
 
@@ -155,12 +155,13 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         const session = {
           user: data.user,
           token: data.token,
-          server: selectedServer.name,
+          server: SERVER_NAME,
           loggedInAt: Date.now()
         };
         writeSession(session);
 
         setSuccessMsg(t("login.success.login"));
+        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -177,12 +178,13 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         const session = {
           user: data.user,
           token: data.token,
-          server: selectedServer.name,
+          server: SERVER_NAME,
           loggedInAt: Date.now()
         };
         writeSession(session);
 
         setSuccessMsg(t("login.success.register"));
+        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -224,20 +226,22 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
 
   return (
     <div className="jx2-login-overlay" id="jx2-login-overlay">
+      <LobbyScene />
       <LanguageSwitcher variant="login" />
 
-      {/* Top-Right Official Emblem */}
+      {/* Top-Right Title Emblem */}
       <div className="jx2-login-logo">
         <div className="jx2-logo-title-wrap">
-          <svg className="jx2-logo-sword-icon" viewBox="0 0 64 64" fill="none">
-            <path d="M10 54 L32 32 M32 32 L46 18 M46 18 L54 10 L50 6 L42 14 L28 28" stroke="#ff4500" strokeWidth="4" strokeLinecap="round" />
-            <path d="M26 38 L38 26" stroke="#fcd34d" strokeWidth="3" />
-            <circle cx="10" cy="54" r="4" fill="#ef4444" />
+          <svg className="jx2-logo-sword-icon" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <circle cx="32" cy="32" r="28" stroke="rgba(227, 194, 124, 0.62)" strokeWidth="1.3" />
+            <circle cx="32" cy="32" r="23" stroke="rgba(227, 194, 124, 0.25)" strokeWidth="1" />
+            <path d="M32 11 L36.5 29 L32 36 L27.5 29 Z" fill="#e9d3a0" />
+            <path d="M32 36 V50" stroke="#c9a961" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M23 43 H41" stroke="#c9a961" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
           <span className="jx2-logo-text">{t("login.brandTitle")}</span>
         </div>
         <div className="jx2-logo-subtitle">{t("login.brandSubtitle")}</div>
-        <div className="jx2-logo-domain">volam2.zing.vn</div>
       </div>
 
       {/* Main Login Box */}
@@ -253,42 +257,15 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
           <div className="jx2-box-title">{t("login.serverLoggedIn")}</div>
         </div>
 
-        {/* Server Preview Card */}
+        {/* Server Card — the game runs one fixed server */}
         <div className="jx2-server-card">
           <div className="jx2-server-badge">
             <span className="jx2-server-diamond">◆</span>
-            <span className="jx2-server-name">{selectedServer.name}</span>
+            <span className="jx2-server-name">{SERVER_NAME}</span>
             <span className="jx2-server-diamond">◆</span>
           </div>
 
           <div className="jx2-server-artwork" />
-
-          <button
-            type="button"
-            className="jx2-btn-server-select"
-            onClick={() => setIsServerListOpen(!isServerListOpen)}
-          >
-            {isServerListOpen ? t("login.closeList") : t("login.chooseServer")}
-          </button>
-
-          {/* Server Switcher Dropdown */}
-          {isServerListOpen && (
-            <div className="jx2-server-list">
-              {SERVERS.map((srv) => (
-                <div
-                  key={srv.id}
-                  className={`jx2-server-item ${srv.id === selectedServer.id ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedServer(srv);
-                    setIsServerListOpen(false);
-                  }}
-                >
-                  <span className="jx2-server-item-name">{srv.name}</span>
-                  <span className={`jx2-server-item-tag ${srv.tagClass}`}>{t(srv.tagKey)}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Mode Tabs */}

@@ -5,6 +5,8 @@ import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { setDragPayload, readDragPayload, canDropOnSlot, acceptDrop } from "./dragItem.js";
+import { useDraggablePanel } from "./useDraggablePanel.js";
+import { CharacterPreview } from "../CharacterPreview.jsx";
 
 /**
  * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
@@ -111,12 +113,14 @@ export function CharacterModal({
   stats,
   playerName = "",
   equipment = {},
+  gender = "male",
   onUnequipSlot,
   onEquipItem
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
   const [dragOverKey, setDragOverKey] = useState(null);
+  const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   if (!isOpen) return null;
 
@@ -185,12 +189,14 @@ export function CharacterModal({
   return (
     <div className="char-modal-overlay" id="character-modal">
       <div
-        className="char-panel"
+        className={`char-panel${dragging ? " is-dragging" : ""}`}
+        ref={panelRef}
+        style={panelStyle}
         role="dialog"
         aria-modal="false"
         aria-label={t("character.title")}
       >
-        <div className="char-titlebar">
+        <div className="char-titlebar" {...dragHandlers}>
           <span className="char-title">{t("character.title")}</span>
           <div className="char-titlebar-actions">
             <button
@@ -236,7 +242,7 @@ export function CharacterModal({
           <div className="char-side">
             <div className="char-stats">
               {sheet.vitals.map((row) => (
-                <div className="stat-row vital" key={row.key}>
+                <div className="stat-row vital" key={row.key} data-stat={row.key}>
                   <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
@@ -245,28 +251,11 @@ export function CharacterModal({
 
             <div className="char-stats">
               {sheet.combat.map((row) => (
-                <div className="stat-row" key={row.key}>
+                <div className="stat-row" key={row.key} data-stat={row.key}>
                   <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
                   <span className="stat-value">{row.value}</span>
                 </div>
               ))}
-            </div>
-
-            <div className="char-stats">
-              {sheet.attributes.map((row) => (
-                <div className="stat-row attr" key={row.key}>
-                  <span className="stat-label">{t(`stats.${row.key}`, undefined, row.label)}</span>
-                  <span className="stat-value">
-                    {row.base}
-                    <span className="attr-bonus">+{row.bonus}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="char-potential">
-              <span className="stat-label">{t("character.potential")}</span>
-              <span className="stat-value">{sheet.footer.potential}</span>
             </div>
           </div>
 
@@ -277,7 +266,7 @@ export function CharacterModal({
               </div>
 
               <div className="char-model">
-                <img src="/hero_full.png" alt={playerName || t("character.playerAlt")} />
+                <CharacterPreview gender={gender} />
                 {playerName && <div className="char-model-name">{playerName}</div>}
               </div>
 

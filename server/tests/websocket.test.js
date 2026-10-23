@@ -6,7 +6,19 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
-import { DROP_TABLE } from "../../src/game/items.js";
+import { MARKET_NPCS, MARKET_SPAWN } from "../../src/game/marketLayout.js";
+import { skillById } from "../../src/game/skills.js";
+
+const THIEU_LAM_PALM_IDS = [
+  "la_han_chuong",
+  "vi_da_chuong",
+  "dai_tu_di_chuong",
+  "la_han_tran",
+  "kim_cang_bat_hoai",
+  "nhu_lai_than_thuong"
+];
+const HAS_THIEU_LAM_PALM_KIT = THIEU_LAM_PALM_IDS.every((id) => Boolean(skillById(id)));
+const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -209,7 +221,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client1.send({
       type: "player_attack",
       payload: {
-        skill: "la_han_quyen",
+        skill: "normal",
         x: 5300,
         y: 5100,
         facingRight: true
@@ -218,7 +230,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     const attackBroadcast = await client2.waitFor((m) => m.type === "player_attacked");
     assert.equal(attackBroadcast.payload.id, "usr_hero1");
-    assert.equal(attackBroadcast.payload.skill, "la_han_quyen");
+    assert.equal(attackBroadcast.payload.skill, "normal");
 
     // Test chat broadcast: Client 2 chats -> Both receive player_chat
     client2.send({
@@ -370,7 +382,19 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client1.close();
   });
 
-  await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", async () => {
+  await t.test("Palm skill spends server-owned MP", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({ type: "player_join", payload: { id: "usr_palm_mp", token: "test-token", characterId: "char_mp_1", username: "PalmMp", x: 640, y: 620 } });
+    await client.waitFor((m) => m.type === "init_world");
+
+    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 640, y: 620, facingRight: true } });
+    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 48);
+    assert.equal(mp.payload.maxMp, 60);
+
+    await client.close();
+  });
+
+  await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", { skip: SKIP_NO_KIT }, async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     client.send({ type: "player_join", payload: { id: "usr_mp1", token: "test-token", characterId: "char_mp_1", username: "Mp1", x: 640, y: 620 } });
     await client.waitFor((m) => m.type === "init_world");
@@ -378,11 +402,11 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Each cast spends that skill's MP from the server-owned pool (level 1 -> maxMp 60).
     // Distinct skills are used so their individual cooldowns never block the next cast.
     const casts = [
-      { skill: "la_han_quyen", mp: 55 },
-      { skill: "ca_diep_thoai", mp: 48 },
-      { skill: "vi_da_quyen", mp: 36 },
-      { skill: "dai_tu_di_chuong", mp: 18 },
-      { skill: "hue_nhan_chu", mp: 3 }
+      { skill: "la_han_chuong", mp: 55 },
+      { skill: "vi_da_chuong", mp: 48 },
+      { skill: "dai_tu_di_chuong", mp: 36 },
+      { skill: "la_han_tran", mp: 18 },
+      { skill: "kim_cang_bat_hoai", mp: 3 }
     ];
     for (const step of casts) {
       client.send({ type: "player_attack", payload: { skill: step.skill, x: 640, y: 620, facingRight: true } });
@@ -405,7 +429,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client.close();
   });
 
-  await t.test("Skill hits are damage-authoritative (client damage is ignored)", async () => {
+  await t.test("Skill hits are damage-authoritative (client damage is ignored)", { skip: SKIP_NO_KIT }, async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     client.send({
       type: "player_join",
@@ -423,7 +447,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client.waitFor((m) => m.type === "init_world");
 
     // A hit without a preceding cast is ignored: damage cannot be minted freely.
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(
       client.messages.filter((m) => m.type === "enemy_hit" && m.payload.damage > 0).length,
@@ -432,8 +456,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     );
 
     // After a real cast the server recomputes the damage from the catalog.
-    client.send({ type: "player_attack", payload: { skill: "la_han_quyen", x: 8400, y: 6000, facingRight: true } });
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_quyen", damage: 9999 } });
+    client.send({ type: "player_attack", payload: { skill: "la_han_chuong", x: 8400, y: 6000, facingRight: true } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
     const hit = await client.waitFor(
       (m) => m.type === "enemy_hit" && m.payload.id === 0 && m.payload.damage > 0
     );
@@ -487,6 +511,81 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(resumed.payload.level, 2);
     assert.equal(resumed.payload.kills, 3);
     await client2.close();
+  });
+
+  await t.test("Shop purchases debit server silver and store the item", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: {
+        id: "usr_shop",
+        token: "test-token",
+        characterId: "char_shop_1",
+        username: "Shop",
+        x: 6400,
+        y: 6050
+      }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    // Buying from across the map is refused even with silver.
+    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const farAway = await client.waitFor(
+      (m) => m.type === "shop_result" && m.payload.ok === false
+    );
+    assert.equal(farAway.payload.reason, "range");
+    assert.equal(farAway.payload.coins, 0, "a refused purchase spends nothing");
+
+    // Walk up to the Dược Sư, then earn silver deterministically from the
+    // one-off quest payout instead of killing shared enemies (that would
+    // perturb the later enemy-state tests).
+    const duocNpc = MARKET_NPCS.find((npc) => npc.shop === "pharmacy");
+    client.send({
+      type: "player_move",
+      payload: { x: duocNpc.x, y: duocNpc.y + 80, vx: 0, vy: 0 }
+    });
+    client.send({ type: "quest_claim", payload: {} });
+    const earned = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins > 0);
+    assert.equal(earned.payload.coins, 20);
+
+    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const bought = await client.waitFor((m) => m.type === "shop_result");
+    assert.equal(bought.payload.ok, true);
+    assert.equal(bought.payload.itemId, "kim-sang-duoc");
+    assert.equal(bought.payload.qty, 1);
+    assert.equal(bought.payload.total, 8);
+    assert.equal(bought.payload.coins, earned.payload.coins - 8, "silver is debited by the server");
+
+    // The authoritative ledger and bag both reflect the purchase.
+    const progress = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins === earned.payload.coins - 8);
+    assert.equal(progress.payload.coins, earned.payload.coins - 8);
+
+    // Unknown stock and unaffordable quantities are refused without charging.
+    client.send({ type: "shop_buy", payload: { itemId: "thiet-trao", qty: 1 } });
+    const unknown = await client.waitFor((m) => m.type === "shop_result" && m.payload.ok === false);
+    assert.equal(unknown.payload.reason, "unknown");
+
+    client.send({ type: "shop_buy", payload: { itemId: "nu-nhi-hong", qty: 99 } });
+    const poor = await client.waitFor(
+      (m) => m.type === "shop_result" && m.payload.ok === false && m.payload.reason === "coins"
+    );
+    assert.equal(poor.payload.coins, earned.payload.coins - 8, "a refused purchase spends nothing");
+
+    await client.close();
+
+    // The server bag is authoritative and already contains the purchase.
+    const inventory = await (await fetch(`http://127.0.0.1:${port}/api/inventory/char_shop_1`)).json();
+    assert.equal(inventory.data.inventory["kim-sang-duoc"], 1, "the purchase is stored on the server bag");
+
+    // A guest (no verified character) cannot trade.
+    const guest = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    guest.send({ type: "player_join", payload: { id: "usr_shop_guest", username: "Guest" } });
+    await guest.waitFor((m) => m.type === "init_world");
+    guest.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const refused = await guest.waitFor((m) => m.type === "shop_result");
+    assert.equal(refused.payload.ok, false);
+    assert.equal(refused.payload.reason, "guest");
+    await guest.close();
   });
 
   await t.test("Unauthenticated joins earn nothing", async () => {
@@ -590,10 +689,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(reward2.payload.attackerId, "usr_wolf2");
     assert.equal(reward1.payload.exp, 35);
     assert.ok(reward1.payload.coins >= 3 && reward1.payload.coins <= 9);
-    assert.ok(
-      DROP_TABLE.some((entry) => entry.id === reward1.payload.drop.id),
-      "The reward always carries a catalog-backed drop"
-    );
+    assert.equal(reward1.payload.drop, undefined, "Kills no longer grant items");
 
     // Hitting a corpse resyncs instead of dealing damage twice
     client1.send({ type: "enemy_hit", payload: { id: 0, damage: 25 } });
@@ -777,7 +873,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(defeat.payload.victimId, "usr_pk2");
     assert.equal(defeat.payload.attackerId, "usr_pk1");
     assert.equal(defeat.payload.attackerName, "Kiếm Khách");
-    assert.deepEqual(defeat.payload.respawn, { x: 6400, y: 6200 });
+    assert.deepEqual(defeat.payload.respawn, { x: MARKET_SPAWN.x, y: MARKET_SPAWN.y });
 
     const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
     assert.equal(restored.payload.maxHp, 100);

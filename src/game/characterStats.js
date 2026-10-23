@@ -1,13 +1,20 @@
 /**
  * Character sheet derivation.
  *
- * The game currently persists only a small set of live values (level, HP, MP,
- * exp). The full JX2 sheet exposes many combat attributes that have no backing
- * model yet, so for this phase every derived value is computed from the
- * character level by a deterministic formula. Nothing here affects combat — it
- * is presentation only, and the shape is kept flat/testable so a real attribute
- * + equipment model can replace the formulas later without touching the modal.
+ * Every row is read from the same numbers the combat loop uses: the live stats
+ * snapshot (`attack`, `defense`, `critRate`, `critDamage`, `attackSpeed`)
+ * falling back to the base values in `combatConfig.js`. Attributes that have no
+ * backing model are not shown at all, so the sheet cannot claim a number the
+ * game does not actually roll.
  */
+
+import {
+  BASE_ATTACK,
+  BASE_ATTACK_SPEED,
+  BASE_CRIT_DAMAGE,
+  BASE_CRIT_RATE,
+  BASE_DEFENSE
+} from "./combatConfig.js";
 
 const MIN_LEVEL = 1;
 const MAX_LEVEL = 999;
@@ -20,8 +27,15 @@ const toInt = (value, fallback, min = Number.NEGATIVE_INFINITY) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const range = (min, max) => `${min}-${max}`;
-const percentFlat = (percent, flat) => `${percent}%+${flat}`;
+/** A non-negative float (crit chance is 0..1, crit damage 1.5 = +50%). */
+const toRate = (value, fallback) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
+const asPercent = (rate) => `${Math.round(rate * 100)}%`;
+/** Crit damage is a multiplier on the hit: 1.5 -> "×1.5" (+50% extra). */
+const asMultiplier = (factor) => `×${Number(factor.toFixed(2))}`;
 
 /**
  * Coerce any input into a usable, in-range character level.
@@ -33,50 +47,25 @@ export function normalizeLevel(level) {
 }
 
 /**
- * Attributes grow with level. `base` is the untrained floor (1) and `bonus` is
- * the level-driven growth; a future equipment model would add a second bonus.
- * @param {number} level
+ * Combat readouts, taken straight from the live stats and the shared combat
+ * constants. Level does not scale these — the game does not scale them either.
+ * @param {object} stats
  */
-function deriveAttributes(level) {
-  const steps = level - 1;
+function deriveCombat(stats) {
   return [
-    { key: "strength", label: "Sức mạnh", base: 1, bonus: steps },
-    { key: "agility", label: "Thân pháp", base: 1, bonus: Math.floor(steps * 1.2) },
-    { key: "internal", label: "Nội công", base: 1, bonus: steps * 2 },
-    { key: "bone", label: "Gân cốt", base: 1, bonus: Math.floor(steps * 0.8) },
-    { key: "flexibility", label: "Linh hoạt", base: 1, bonus: 0 }
-  ];
-}
-
-/**
- * Combat readouts derived from level. Ranges (min-max) and "percent+flat"
- * defences mirror how the original JX2 sheet formats these values.
- * @param {number} level
- */
-function deriveCombat(level) {
-  const steps = level - 1;
-
-  const physicalAtkMin = 240 + steps * 4;
-  const physicalAtkMax = physicalAtkMin + 40 + steps * 8;
-  const chiAtkMin = 245 + steps * 4;
-  const chiAtkMax = chiAtkMin + 40 + steps * 6;
-
-  return [
-    { key: "physicalAtk", label: "Ngoại công", value: range(physicalAtkMin, physicalAtkMax) },
-    { key: "chiAtk", label: "Nội kích", value: range(chiAtkMin, chiAtkMax) },
-    { key: "damage", label: "Sát thương", value: String(0) },
-    { key: "accuracy", label: "Chính xác", value: String(900 + steps * 5) },
-    { key: "physicalDef", label: "Ngoại phòng", value: percentFlat(0, 8 + steps) },
-    { key: "magicDef", label: "Nội phòng", value: percentFlat(0, 20 + steps * 2) },
-    { key: "dodge", label: "Né tránh", value: String(10 + steps * 2) },
-    { key: "crit", label: "Chí mạng", value: String(1 + Math.floor(steps / 5)) },
-    { key: "burst", label: "Điểm bạo", value: String(steps) },
-    { key: "burstHard", label: "Bạo cương", value: String(Math.floor(steps / 2)) },
-    { key: "woundRate", label: "Tỉ lệ thương", value: String(Math.floor(steps / 3)) },
-    { key: "critResist", label: "Khắc nộ", value: String(1 + Math.floor(steps / 10)) },
-    { key: "cast", label: "Xuất chiêu", value: String(0) },
-    { key: "attackSpeed", label: "Tốc độ đánh", value: String(60 + steps * 3) },
-    { key: "moveSpeed", label: "Tốc độ di chuyển", value: "5/14" }
+    { key: "physicalAtk", label: "Ngoại công", value: String(toInt(stats.attack, BASE_ATTACK, 0)) },
+    { key: "physicalDef", label: "Ngoại phòng", value: String(toInt(stats.defense, BASE_DEFENSE, 0)) },
+    { key: "crit", label: "Chí mạng", value: asPercent(Math.min(1, toRate(stats.critRate, BASE_CRIT_RATE))) },
+    {
+      key: "critDamage",
+      label: "Đòn chí mạng",
+      value: asMultiplier(toRate(stats.critDamage, BASE_CRIT_DAMAGE))
+    },
+    {
+      key: "attackSpeed",
+      label: "Tốc độ đánh",
+      value: asMultiplier(toRate(stats.attackSpeed, BASE_ATTACK_SPEED))
+    }
   ];
 }
 
@@ -87,8 +76,7 @@ function deriveCombat(level) {
  *   level: number,
  *   vitals: Array<{ key: string, label: string, value: string }>,
  *   combat: Array<{ key: string, label: string, value: string }>,
- *   attributes: Array<{ key: string, label: string, base: number, bonus: number }>,
- *   footer: { points: number, nextLevelExp: number, potential: number }
+ *   footer: { points: number, nextLevelExp: number }
  * }}
  */
 export function deriveCharacterSheet(stats = {}) {
@@ -105,12 +93,10 @@ export function deriveCharacterSheet(stats = {}) {
       { key: "hp", label: "Sinh lực", value: `${hp}/${maxHp}` },
       { key: "mp", label: "Nội lực", value: `${mp}/${maxMp}` }
     ],
-    combat: deriveCombat(level),
-    attributes: deriveAttributes(level),
+    combat: deriveCombat(stats),
     footer: {
       points: 0,
-      nextLevelExp: toInt(stats.nextExp, 100, 0),
-      potential: level * 3
+      nextLevelExp: toInt(stats.nextExp, 100, 0)
     }
   };
 }
