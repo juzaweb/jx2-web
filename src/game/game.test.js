@@ -132,10 +132,12 @@ const makeUseScene = ({ hp = 10, maxHp = 100, mp = 10, maxMp = 100 } = {}) => {
     player: { stats: { hp, maxHp, mp, maxMp }, heal, restoreMp, setPosition },
     combat: { showFloatText: vi.fn() },
     uiBridge: { addLog, updateHud: vi.fn(), updateInventory },
-    saveGame: vi.fn()
+    saveGame: vi.fn(),
+    quickSlots: { 1: "kim-sang-duoc", 2: "dai-hoan-dan", 3: "nu-nhi-hong", 4: "hoi-thanh-phu" }
   };
   // The stubbed scope still needs the sibling prototype methods useItem calls.
   scene.applyItemEffect = JiangHuScene.prototype.applyItemEffect;
+  scene.applyConsumableEffect = JiangHuScene.prototype.applyConsumableEffect;
   scene.onInventoryChanged = JiangHuScene.prototype.onInventoryChanged;
   return { scene, addLog, updateInventory, heal, restoreMp, setPosition };
 };

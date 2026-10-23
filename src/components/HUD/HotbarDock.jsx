@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
+import { getItemById, getQuantity } from "../../game/items.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { SkillIcon } from "../SkillIcon.jsx";
+import { setDragPayload, readDragPayload, hasDragPayload, acceptDrop } from "../Modals/dragItem.js";
+import { DEFAULT_QUICK_SLOTS } from "../../game/quickSlots.js";
 
 export function HotbarDock({
   audioEnabled,
@@ -20,7 +23,12 @@ export function HotbarDock({
   skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
   onPickSkill,
   onRotateScreen,
-  items = []
+  items = [],
+  inventoryItems = [],
+  quickSlotsMapping = DEFAULT_QUICK_SLOTS,
+  onAssignQuickSlot,
+  onClearQuickSlot,
+  onMoveQuickSlot
 }) {
   const { t } = useI18n();
   const [cooldownEnds, setCooldownEnds] = useState({});
@@ -64,39 +72,74 @@ export function HotbarDock({
     { key: "p", slot: skillLoadout?.p ?? 3 }
   ];
 
-  // The bottom bar puts consumables in 1-4 and sect skills in 5-9.
+  const handleDragOver = (e) => {
+    if (hasDragPayload(e)) {
+      acceptDrop(e);
+    }
+  };
+
+  const handleDrop = (e, targetSlot) => {
+    e.preventDefault();
+    const payload = readDragPayload(e);
+    if (!payload) return;
+    if (payload.kind === "inventory" && payload.itemId) {
+      onAssignQuickSlot?.(targetSlot, payload.itemId);
+    } else if (payload.kind === "hotbar" && payload.fromSlot) {
+      onMoveQuickSlot?.(payload.fromSlot, targetSlot);
+    }
+  };
+
+  const handleDragStart = (e, fromSlot, itemId) => {
+    setDragPayload(e, {
+      kind: "hotbar",
+      fromSlot,
+      itemId
+    });
+  };
+
+  const handleContextMenu = (e, slot) => {
+    e.preventDefault();
+    onClearQuickSlot?.(slot);
+  };
+
+  const availableItems = inventoryItems.length > 0 ? inventoryItems : items;
+
+  // The 9 numbered slots at the bottom can have items dragged into them (default empty)
   const quickSlots = Array.from({ length: 9 }, (_, index) => {
     const useSlot = index + 1;
-    const raw = items.find((entry) => entry.useSlot === useSlot);
-    const skill = useSlot >= 5 && useSlot <= 10
-      ? skills.find((entry) => entry.slot === useSlot - 5) || null
-      : null;
-    return { useSlot, item: raw ? localizeItem(raw, t) : null, skill };
+    const itemId = quickSlotsMapping?.[useSlot] || null;
+    const raw = itemId ? getItemById(itemId) : null;
+
+    let qty = 0;
+    if (itemId) {
+      const matched = (availableItems || []).filter((entry) => entry && entry.id === itemId);
+      if (matched.length > 0) {
+        qty = matched.reduce((sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1), 0);
+      } else {
+        qty = getQuantity(itemId);
+      }
+    }
+
+    const item = raw ? localizeItem({ ...raw, qty }, t) : null;
+    return { useSlot, item };
   });
 
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
-        {/* Left Belt: Numbered Quick Slots (Potions & Scrolls) */}
+        {/* Left Belt: 9 Numbered Quick Slots */}
         <div className="hotbar-slots">
-          {quickSlots.map(({ useSlot, item, skill }) => {
-            if (!item && !skill) {
-              return (
-                <div className="slot-item empty" id={`slot-${useSlot}`} key={`slot-${useSlot}`}>
-                  <span className="slot-key">{useSlot}</span>
-                </div>
-              );
-            }
-            if (!item && skill) {
+          {quickSlots.map(({ useSlot, item }) => {
+            if (!item) {
               return (
                 <div
-                  className="slot-item skill-slot"
+                  className="slot-item empty"
                   id={`slot-${useSlot}`}
-                  key={`skill-${skill.id}`}
-                  title={t(skill.nameKey, undefined, skill.nameKey)}
+                  key={`slot-${useSlot}`}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, useSlot)}
                 >
                   <span className="slot-key">{useSlot}</span>
-                  <SkillIcon skill={skill} className="slot-skill-img" />
                 </div>
               );
             }
@@ -104,9 +147,14 @@ export function HotbarDock({
               <div
                 className="slot-item"
                 id={`slot-${useSlot}`}
-                key={item.id}
+                key={`slot-${useSlot}`}
                 title={t("hotbar.slotTitle", { key: useSlot, name: item.name })}
-                onClick={() => onUseItem(useSlot)}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, useSlot, item.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, useSlot)}
+                onContextMenu={(e) => handleContextMenu(e, useSlot)}
+                onClick={() => onUseItem?.(useSlot)}
               >
                 <span className="slot-key">{useSlot}</span>
                 <div className={`item-icon ${item.icon}`} />

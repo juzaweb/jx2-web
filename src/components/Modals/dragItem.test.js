@@ -3,6 +3,7 @@ import {
   DRAG_MIME,
   DRAG_INVENTORY_MIME,
   DRAG_EQUIPMENT_MIME,
+  DRAG_HOTBAR_MIME,
   DRAG_SLOT_PREFIX,
   setDragPayload,
   readDragPayload,
@@ -59,6 +60,14 @@ describe("dragItem payload", () => {
     expect(event.dataTransfer.types).not.toContain(`${DRAG_SLOT_PREFIX}armor`);
   });
 
+  it("round-trips a hotbar payload", () => {
+    const event = makeEvent();
+    setDragPayload(event, { kind: "hotbar", fromSlot: 1, itemId: "kim-sang-duoc" });
+
+    expect(readDragPayload(event)).toEqual({ kind: "hotbar", fromSlot: 1, itemId: "kim-sang-duoc" });
+    expect(event.dataTransfer.types).toContain(DRAG_HOTBAR_MIME);
+  });
+
   it("ignores missing, malformed and foreign payloads", () => {
     expect(readDragPayload(makeEvent())).toBeNull();
     expect(readDragPayload(makeEvent({ [DRAG_MIME]: "not json" }))).toBeNull();
@@ -78,6 +87,7 @@ describe("dragItem payload", () => {
   it("reports the drag kind during dragover", () => {
     expect(dragKind(makeEvent({}, [DRAG_INVENTORY_MIME]))).toBe("inventory");
     expect(dragKind(makeEvent({}, [DRAG_EQUIPMENT_MIME]))).toBe("equipment");
+    expect(dragKind(makeEvent({}, [DRAG_HOTBAR_MIME]))).toBe("hotbar");
     expect(dragKind(makeEvent({}, ["text/plain"]))).toBeNull();
   });
 
