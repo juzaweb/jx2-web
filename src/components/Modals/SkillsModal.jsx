@@ -6,7 +6,7 @@ import { useDraggablePanel } from "./useDraggablePanel.js";
 import "../../styles/skills-modal.css";
 
 /**
- * Skills Panel modal inspired by JX2 / VLTK2 skill trees ("Võ Công").
+ * Skills Panel modal inspired by JX2 / VLTK2 skill trees ("Bảng Võ Học").
  */
 export function SkillsModal({
   isOpen,

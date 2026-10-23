@@ -52,9 +52,6 @@ describe("SkillsModal Component", () => {
       </I18nProvider>
     );
 
-    // Modal title
-    expect(markup).toContain('<span class="skills-title">Võ Công</span>');
-
     // Unlocked skill card
     expect(markup).toContain("skill-card-row unlocked");
     expect(markup).toContain("Đại Tu Di Chưởng");

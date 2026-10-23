@@ -202,7 +202,7 @@ export default {
         "invalid-slot": "Ô chiêu không hợp lệ."
       }
     },
-    modalTitle: "Võ Công",
+    modalTitle: "Võ Học Bảng",
     modalHint: "Chiêu thức môn phái đã học. Nhấp vào ô gán phím hoặc gán nhanh phía dưới để gán chiêu thức.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
