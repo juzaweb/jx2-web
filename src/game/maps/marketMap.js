@@ -92,7 +92,7 @@ export const MARKET_MAP = {
       label: "Đông Môn Thành",
       rect: { x: 10480, y: 4900, w: 520, h: 1200 },
       targetMapId: "dong-mon-thanh",
-      targetSpawn: { x: 1200, y: 3920 }
+      targetSpawn: { x: 1200, y: 7000 }
     }
   ],
 

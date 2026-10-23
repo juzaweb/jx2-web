@@ -11,6 +11,12 @@ const POS = WORLD_POSITION_SCALE;
 /** Vertical offset (rig units) for the health bar and name label. */
 const LABEL_OFFSET = 20;
 const NAME_OFFSET = 29;
+/**
+ * Monsters show their name everywhere the hero can see them. The cutoff only
+ * drops labels for enemies far outside the viewport (cheap, and keeps a dense
+ * camp from painting text across the whole screen).
+ */
+const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
 
 /** Client-driven respawn delay for regular monsters; a boss overrides it. */
 export const OFFLINE_RESPAWN_MS = 9000;
@@ -164,6 +170,7 @@ export class Enemy {
     this.nameText.setDepth(depth + 3);
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
+    this.nameText.setVisible(distance <= NAME_VISIBLE_RANGE);
 
     if (distance < BITE_TUNING.range && time > this.nextBite) {
       this.nextBite = time + BITE_TUNING.cooldownMs;

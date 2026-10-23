@@ -6,10 +6,16 @@ assumption in `BACKLOG.md` item B1.
 ## Goal & scope
 
 - Add a second, portal-linked map east of Biện Kinh: **Đông Môn Thành**, a
-  15 000 × 9 000 forest.
-- Fill it with a level 3–29 hunting ground: three camps (near trees 3-8, middle
-  wood 14-19, black heart 24-29), two monster species per band, 47 spawns spread
-  far apart. No boss.
+  24 000 × 14 000 forest.
+- Fill it with a level 3–29 hunting ground: **18 camps, one species each**,
+  **15 monsters per camp = 270 spawns**. No boss.
+- The camps are laid out as six columns marching east from the entrance in level
+  order — Sơn Cẩu (3) → Dã Lang (8) → Lâm Tặc (14) → Hắc Y (19) → Thiết Giáp (24)
+  → Ma Giáo (29). Each column holds three camps, so the level is strictly
+  non-decreasing with distance from the door; a registry test enforces that.
+- `CAMPS` is the hand-authored data; `expandCamps` scatters each camp's monsters
+  over a 1 500 px disc with a 400 px minimum gap (rejection sampling), so a camp
+  reads as animals foraging and no two sprites or health bars overlap.
 - Keep everything server-authoritative (health, death, respawn, reward, level).
 - Reuse the existing art: no new image assets, no Tiled/tilemap pipeline.
 
@@ -28,7 +34,7 @@ numbers the client renders:
 | --- | --- |
 | `mapRegistry.js` | `MAPS`, `getMap(id)`, `mapWorldConfig(map)`, `findPortal(mapId, portalId)`, `isInsideMap` |
 | `marketMap.js` | Biện Kinh packaged as a `MapDefinition`, including the 8 legacy wolf spawns |
-| `dongMonThanhMap.js` | Đông Môn Thành: 15 000 × 9 000 bounds, painted forest floor, trail, portal, 3 level zones, 47 spawns — no buildings, walls, gates, decor or boss |
+| `dongMonThanhMap.js` | Đông Môn Thành: 24 000 × 14 000 bounds, painted forest floor, trail, portal, 3 level zones, 18 same-level camps (270 spawns) — no buildings, walls, gates, decor or boss |
 | `portals.js` | Pure trigger state machine (`portalAt`, `stepPortalTrigger`, cooldown, arrival lock) |
 
 A `MapDefinition` carries: `id`, `name`, `safe`, `bounds`, `spawn`, `ground`
@@ -88,8 +94,10 @@ monster walks home. One camp can never follow a hero into the next.
 | Trung thành | Lâm Tặc, Hắc Y Sát Thủ | 14, 19 |
 | Nội thành | Thiết Giáp Binh, Ma Giáo Đệ Tử | 24, 29 |
 
-17 spawns in the near trees, 15 in the middle wood, 15 in the black heart — 47 in
-total, spaced hundreds of units apart ('no boss').
+Six species columns × three camps × fifteen monsters. A camp is always one
+species, so a pack never mixes levels, and the species order matches the walk in
+from the entrance. A monster shows its name anywhere in view (3 000 px); the
+cutoff only drops labels for enemies far outside the viewport.
 
 `soi-xam` (Sói Xám) keeps EXP 35 / 3–9 coins so the historical reward expectations
 stay intact.

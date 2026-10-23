@@ -1034,8 +1034,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const changed = await traveller.waitFor((m) => m.type === "map_changed");
 
     assert.equal(changed.payload.mapId, "dong-mon-thanh");
-    assert.deepEqual(changed.payload.spawn, { x: 1200, y: 3920 });
-    assert.equal(changed.payload.enemies.length, 47, "The forest ships its full hunting roster");
+    assert.deepEqual(changed.payload.spawn, { x: 1200, y: 7000 });
+    assert.equal(changed.payload.enemies.length, 270, "The forest ships its full hunting roster");
     assert.ok(changed.payload.enemies.every((enemy) => enemy.mapId === "dong-mon-thanh"));
     assert.ok(
       changed.payload.enemies.every((enemy) => !enemy.isBoss),

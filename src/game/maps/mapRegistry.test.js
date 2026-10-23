@@ -117,6 +117,33 @@ describe("map registry", () => {
     }
   });
 
+  it("puts the weakest camps nearest the entrance and the deadliest deepest", () => {
+    // Walking in from the entrance should always be a step up in level, never a
+    // wall of level-29s around the first clearing.
+    const map = MAPS["dong-mon-thanh"];
+    const bySpecies = new Map();
+
+    for (const spawn of map.enemySpawns) {
+      const distance = Math.hypot(spawn.x - map.spawn.x, spawn.y - map.spawn.y);
+      const entry = bySpecies.get(spawn.monsterId) || {
+        level: MONSTERS[spawn.monsterId].level,
+        nearest: Infinity
+      };
+      entry.nearest = Math.min(entry.nearest, distance);
+      bySpecies.set(spawn.monsterId, entry);
+    }
+
+    const ordered = [...bySpecies.values()].sort((a, b) => a.level - b.level);
+    for (let i = 1; i < ordered.length; i++) {
+      const previous = ordered[i - 1];
+      const current = ordered[i];
+      expect(
+        current.nearest,
+        `Lv${current.level} camps must sit deeper than Lv${previous.level} ones`
+      ).toBeGreaterThan(previous.nearest);
+    }
+  });
+
   it("keeps buildings out of the low-level hunting belt", () => {
     // The outskirts are woodland: a shop inside a level 1-10 zone would be a town
     // building dropped in the middle of a forest.
@@ -227,7 +254,7 @@ describe("portal geometry", () => {
 
   it("finds the portal under a ground position", () => {
     const map = MAPS["dong-mon-thanh"];
-    expect(portalAt(map, 300, 3900)?.id).toBe("west-gate");
-    expect(portalAt(map, 3000, 3900)).toBeNull();
+    expect(portalAt(map, 300, 7000)?.id).toBe("west-gate");
+    expect(portalAt(map, 3000, 7000)).toBeNull();
   });
 });
