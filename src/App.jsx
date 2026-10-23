@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { GameCanvas } from "./components/GameCanvas.jsx";
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from "react";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
@@ -41,6 +40,12 @@ import {
   clearSession
 } from "./game/session.js";
 import { requestLandscapeFullscreen, isMobileDevice } from "./game/orientation.js";
+
+// Phaser + the whole game scene graph live behind this boundary so the login and
+// lobby UI never wait for the ~1.2 MB engine bundle to download and parse.
+const GameCanvas = lazy(() =>
+  import("./components/GameCanvas.jsx").then((module) => ({ default: module.GameCanvas }))
+);
 
 const INITIAL_LOGS = [
   {
@@ -710,8 +715,23 @@ export function App() {
         </button>
       </div>
 
-      {/* Phaser Canvas Engine */}
-      <GameCanvas />
+      {/* Phaser Canvas Engine — engine chunk is loaded on demand */}
+      <Suspense
+        fallback={
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: "#0f0b08"
+            }}
+          />
+        }
+      >
+        <GameCanvas />
+      </Suspense>
 
       {/* React MMORPG Wuxia HUD */}
       <div className="hud-overlay" id="hud-overlay">
