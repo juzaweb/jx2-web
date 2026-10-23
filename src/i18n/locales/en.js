@@ -7,6 +7,7 @@ export default {
     joinLog: "{name} has joined {server}!",
     rotateDeviceTitle: "Rotate Device Horizontally",
     rotateDeviceDesc: "Please rotate your phone to landscape mode for the best gaming experience.",
+    rotateDeviceButton: "Rotate Screen",
     log: {
       welcome: "Welcome to Bianjing, honored warrior.",
       near: "Wanderer: The Jianghu is treacherous. Take care!",
@@ -90,7 +91,9 @@ export default {
     help: "Guide",
     pkTitle: "Toggle PK flag",
     pkOn: "PK",
-    pkOff: "Peace"
+    pkOff: "Peace",
+    rotateTitle: "Rotate screen horizontally",
+    rotate: "Rotate"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",

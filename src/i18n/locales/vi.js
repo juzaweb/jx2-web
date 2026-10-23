@@ -7,6 +7,7 @@ export default {
     joinLog: 'Hiệp khách {name} đã gia nhập {server}!',
     rotateDeviceTitle: "Xoay Ngang Màn Hình",
     rotateDeviceDesc: "Vui lòng xoay ngang điện thoại để trải nghiệm game tốt nhất.",
+    rotateDeviceButton: "Xoay Màn Hình",
     log: {
       welcome: "Chào mừng hiệp khách đến với Biện Kinh.",
       near: "Lãng Khách: Giang hồ hiểm ác, bảo trọng!",
@@ -90,7 +91,9 @@ export default {
     help: "Cẩm Nang",
     pkTitle: "Bật/tắt cờ PK",
     pkOn: "PK",
-    pkOff: "Hòa Bình"
+    pkOff: "Hòa Bình",
+    rotateTitle: "Xoay ngang màn hình",
+    rotate: "Xoay"
   },
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",
