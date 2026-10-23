@@ -28,6 +28,7 @@ const THIEU_LAM_SKILLS = [
     id: "la_han_quyen",
     sect: "thieu-lam",
     slot: 0,
+    icon: "/skills/la_han_quyen.png",
     glyph: "拳",
     nameKey: "skills.thieuLam.laHanQuyen.name",
     descKey: "skills.thieuLam.laHanQuyen.desc",
@@ -43,7 +44,9 @@ const THIEU_LAM_SKILLS = [
     id: "thieu_lam_truong_phap",
     sect: "thieu-lam",
     slot: 1,
+    icon: "/skills/thieu_lam_truong_phap.png",
     glyph: "掌",
+    requires: [{ id: "la_han_quyen", level: 1 }],
     nameKey: "skills.thieuLam.thieuLamTruongPhap.name",
     descKey: "skills.thieuLam.thieuLamTruongPhap.desc",
     unlockLevel: 1,
@@ -60,6 +63,7 @@ const THIEU_LAM_SKILLS = [
     slot: 2,
     icon: "/skills/dai_tu_di_chuong.png",
     glyph: "掌",
+    requires: [{ id: "thieu_lam_truong_phap", level: 1 }],
     nameKey: "skills.thieuLam.daiTuDiChuong.name",
     descKey: "skills.thieuLam.daiTuDiChuong.desc",
     unlockLevel: 1,
@@ -84,6 +88,7 @@ const THIEU_LAM_SKILLS = [
     slot: 3,
     icon: "/skills/la_han_tran.png",
     glyph: "陣",
+    requires: [{ id: "dai_tu_di_chuong", level: 1 }],
     nameKey: "skills.thieuLam.laHanTran.name",
     descKey: "skills.thieuLam.laHanTran.desc",
     unlockLevel: 1,
@@ -132,6 +137,7 @@ const VO_DANG_SKILLS = [
     sect: "vo-dang",
     slot: 1,
     glyph: "太",
+    requires: [{ id: "thieu_duong_kiem_phap", level: 1 }],
     nameKey: "skills.voDang.thaiCucQuyen.name",
     descKey: "skills.voDang.thaiCucQuyen.desc",
     unlockLevel: 1,
@@ -147,6 +153,7 @@ const VO_DANG_SKILLS = [
     sect: "vo-dang",
     slot: 2,
     glyph: "三",
+    requires: [{ id: "thai_cuc_quyen", level: 1 }],
     nameKey: "skills.voDang.tamThanhKiemPhap.name",
     descKey: "skills.voDang.tamThanhKiemPhap.desc",
     unlockLevel: 2,
@@ -162,6 +169,7 @@ const VO_DANG_SKILLS = [
     sect: "vo-dang",
     slot: 3,
     glyph: "罡",
+    requires: [{ id: "tam_thanh_kiem_phap", level: 2 }],
     nameKey: "skills.voDang.toatHongQuanKhuyet.name",
     descKey: "skills.voDang.toatHongQuanKhuyet.desc",
     unlockLevel: 3,
@@ -196,6 +204,7 @@ const NGA_MY_SKILLS = [
     sect: "nga-my",
     slot: 1,
     glyph: "蝶",
+    requires: [{ id: "nga_my_kiem_phap", level: 1 }],
     nameKey: "skills.ngaMy.mongDiepThoiTam.name",
     descKey: "skills.ngaMy.mongDiepThoiTam.desc",
     unlockLevel: 1,
@@ -211,6 +220,7 @@ const NGA_MY_SKILLS = [
     sect: "nga-my",
     slot: 2,
     glyph: "医",
+    requires: [{ id: "mong_diep_thoi_tam", level: 1 }],
     nameKey: "skills.ngaMy.tuHangPhoDo.name",
     descKey: "skills.ngaMy.tuHangPhoDo.desc",
     unlockLevel: 2,
@@ -227,6 +237,7 @@ const NGA_MY_SKILLS = [
     sect: "nga-my",
     slot: 3,
     glyph: "云",
+    requires: [{ id: "tu_hang_pho_do", level: 2 }],
     nameKey: "skills.ngaMy.luuThuyKhanhVan.name",
     descKey: "skills.ngaMy.luuThuyKhanhVan.desc",
     unlockLevel: 3,
@@ -261,6 +272,7 @@ const NGU_DOC_SKILLS = [
     sect: "ngu-doc",
     slot: 1,
     glyph: "心",
+    requires: [{ id: "ngu_doc_tam_phap", level: 1 }],
     nameKey: "skills.nguDoc.truyTamDoc.name",
     descKey: "skills.nguDoc.truyTamDoc.desc",
     unlockLevel: 1,
@@ -276,6 +288,7 @@ const NGU_DOC_SKILLS = [
     sect: "ngu-doc",
     slot: 2,
     glyph: "蛊",
+    requires: [{ id: "truy_tam_doc", level: 1 }],
     nameKey: "skills.nguDoc.vanDocChieuHong.name",
     descKey: "skills.nguDoc.vanDocChieuHong.desc",
     unlockLevel: 2,
@@ -291,6 +304,7 @@ const NGU_DOC_SKILLS = [
     sect: "ngu-doc",
     slot: 3,
     glyph: "影",
+    requires: [{ id: "van_doc_chieu_hong", level: 2 }],
     nameKey: "skills.nguDoc.uHongPhietAnh.name",
     descKey: "skills.nguDoc.uHongPhietAnh.desc",
     unlockLevel: 3,
@@ -377,7 +391,46 @@ export function skillCooldown(skill) {
 }
 
 /**
- * Whether a skill is available at the given level.
+ * Prerequisite list of a skill (empty when it is a tree root).
+ * @param {Object|string} skill
+ * @returns {{ id: string, level: number }[]}
+ */
+export function skillRequires(skill) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  return Array.isArray(entry?.requires) ? entry.requires : [];
+}
+
+/**
+ * Normalise a caller-supplied level to a usable integer.
+ * @param {*} level
+ * @returns {number}
+ */
+function normalizedLevel(level) {
+  return Number.isFinite(level) ? Math.floor(level) : 1;
+}
+
+/** Depth guard so a malformed (cyclic) catalog can never hang a reader. */
+const MAX_REQUIRE_DEPTH = 8;
+
+function isEntryUnlocked(entry, level, depth, seen) {
+  if (!entry || depth > MAX_REQUIRE_DEPTH || seen.has(entry.id)) return false;
+  if (level < entry.unlockLevel) return false;
+
+  const requires = Array.isArray(entry.requires) ? entry.requires : [];
+  if (requires.length === 0) return true;
+
+  const nextSeen = new Set(seen).add(entry.id);
+  return requires.every((req) => {
+    const prerequisite = SKILLS_BY_ID.get(req.id);
+    if (!prerequisite) return false;
+    const requiredLevel = req.level ?? prerequisite.unlockLevel;
+    if (level < requiredLevel) return false;
+    return isEntryUnlocked(prerequisite, level, depth + 1, nextSeen);
+  });
+}
+
+/**
+ * Whether a skill is available at the given level, including its prerequisites.
  * @param {Object|string} skill
  * @param {number} level
  * @returns {boolean}
@@ -385,8 +438,52 @@ export function skillCooldown(skill) {
 export function skillUnlocked(skill, level) {
   const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
   if (!entry) return false;
-  const normalized = Number.isFinite(level) ? Math.floor(level) : 1;
-  return normalized >= entry.unlockLevel;
+  return isEntryUnlocked(entry, normalizedLevel(level), 0, new Set());
+}
+
+/**
+ * Why a skill is still locked, or `null` when the skill is available.
+ *
+ * `{ kind: "level", level }` means the character level is still too low;
+ * `{ kind: "prereq", id, nameKey, level }` means another skill in the tree has
+ * to be available first. An unknown skill id also yields `null`; callers must
+ * gate availability with `skillUnlocked`, which returns `false` for it.
+ * @param {Object|string} skill
+ * @param {number} level
+ * @returns {{ kind: "level"|"prereq", level: number, id?: string, nameKey?: string }|null}
+ */
+export function skillLockReason(skill, level) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  if (!entry) return null;
+
+  const current = normalizedLevel(level);
+  if (current < entry.unlockLevel) {
+    return { kind: "level", level: entry.unlockLevel };
+  }
+
+  for (const req of skillRequires(entry)) {
+    const prerequisite = SKILLS_BY_ID.get(req.id);
+    const requiredLevel = req.level ?? prerequisite?.unlockLevel ?? 1;
+
+    if (current < requiredLevel) {
+      return {
+        kind: "prereq",
+        id: prerequisite?.id ?? req.id,
+        nameKey: prerequisite?.nameKey,
+        level: requiredLevel
+      };
+    }
+    if (prerequisite && !isEntryUnlocked(prerequisite, current, 1, new Set([entry.id]))) {
+      return {
+        kind: "prereq",
+        id: prerequisite.id,
+        nameKey: prerequisite.nameKey,
+        level: prerequisite.unlockLevel
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

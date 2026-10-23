@@ -201,13 +201,18 @@ export default {
       }
     },
     modalTitle: "Võ Công",
-    modalHint: "Chiêu thức môn phái đã học. Nhấp vào ô gán phím hoặc gán nhanh phía dưới để gán chiêu thức.",
+    modalHint: "Cây chiêu thức môn phái. Chọn một ô để xem chi tiết và gán phím nhanh.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
     bindRight: "Gán Chuột Phải",
     cooldownSec: "{sec}s",
     rangeTag: "Cự ly: {range}",
     dmgTag: "ST: {pct}%",
+    tree: {
+      requires: "Cần {name} cấp {level}",
+      empty: "Môn phái này chưa có chiêu thức.",
+      selectHint: "Chọn một ô chiêu thức để xem chi tiết."
+    },
     thieuLam: {
       laHanQuyen: {
         name: "La Hán Quyền",

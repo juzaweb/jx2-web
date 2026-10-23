@@ -1,6 +1,7 @@
 import React from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { skillUnlocked } from "../../game/skills.js";
+import { skillLockLabel } from "../../game/skillLockLabel.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 
 /**
@@ -17,6 +18,8 @@ export function SkillPickerModal({ isOpen, hand, skills = [], level = 1, selecte
     ? t("skills.handLeft")
     : t("skills.handRight");
   const availableSkills = skills.filter((skill) => hand !== "left" || skill.target !== "self");
+
+  const lockLabelFor = (skill) => skillLockLabel(skill, level, t);
 
   return (
     <div id="skill-picker-modal" className="overlay">
@@ -43,9 +46,7 @@ export function SkillPickerModal({ isOpen, hand, skills = [], level = 1, selecte
                 <SkillIcon skill={skill} className="skill-picker-glyph" />
                 <span className="skill-picker-name">{t(skill.nameKey, undefined, skill.id)}</span>
                 <span className="skill-picker-meta">
-                  {unlocked
-                    ? `${skill.mp} MP`
-                    : t("skills.picker.locked", { level: skill.unlockLevel })}
+                  {unlocked ? `${skill.mp} MP` : lockLabelFor(skill)}
                 </span>
               </button>
             );

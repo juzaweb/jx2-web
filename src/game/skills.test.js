@@ -11,6 +11,8 @@ import {
   skillForSlot,
   skillMpCost,
   skillCooldown,
+  skillRequires,
+  skillLockReason,
   skillUnlocked,
   skillSlot,
   normalizeSect
@@ -71,6 +73,8 @@ describe("skill catalog", () => {
 
   it("ships the palm icon and VFX sheet", () => {
     for (const file of [
+      "public/skills/la_han_quyen.png",
+      "public/skills/thieu_lam_truong_phap.png",
       "public/skills/dai_tu_di_chuong.png",
       "public/skills/vfx/dai_tu_di_chuong/sheet.png",
       "public/skills/la_han_tran.png",
@@ -120,6 +124,48 @@ describe("skill catalog", () => {
     expect(skillUnlocked("la_han_tran", 1)).toBe(true);
     expect(skillUnlocked("la_han_tran", 0)).toBe(false);
     expect(skillUnlocked("bogus", 99)).toBe(false);
+  });
+
+  it("declares prerequisites that exist inside the same sect", () => {
+    expect(skillRequires("la_han_quyen")).toEqual([]);
+    expect(skillRequires("la_han_tran")).toEqual([{ id: "dai_tu_di_chuong", level: 1 }]);
+
+    for (const sect of Object.keys(SKILLS_BY_SECT)) {
+      const ids = new Set(skillsForSect(sect).map((skill) => skill.id));
+      for (const skill of skillsForSect(sect)) {
+        for (const req of skillRequires(skill)) {
+          expect(ids.has(req.id), `${skill.id} requires ${req.id} outside ${sect}`).toBe(true);
+          expect(Number.isInteger(req.level)).toBe(true);
+          expect(req.level).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("resolves prerequisites when unlocking a skill", () => {
+    // tam_thanh_kiem_phap needs level 2 and also its prerequisite thai_cuc_quyen.
+    expect(skillUnlocked("tam_thanh_kiem_phap", 1)).toBe(false);
+    expect(skillUnlocked("tam_thanh_kiem_phap", 2)).toBe(true);
+
+    const gated = { id: "synthetic", unlockLevel: 1, requires: [{ id: "dai_tu_di_chuong", level: 5 }] };
+    expect(skillUnlocked(gated, 4)).toBe(false);
+    expect(skillUnlocked(gated, 5)).toBe(true);
+
+    const missing = { id: "synthetic", unlockLevel: 1, requires: [{ id: "nope", level: 1 }] };
+    expect(skillUnlocked(missing, 10)).toBe(false);
+  });
+
+  it("explains why a skill is still locked", () => {
+    expect(skillLockReason("la_han_quyen", 1)).toBeNull();
+    expect(skillLockReason("tam_thanh_kiem_phap", 1)).toEqual({ kind: "level", level: 2 });
+
+    const gated = { id: "synthetic", unlockLevel: 1, requires: [{ id: "dai_tu_di_chuong", level: 5 }] };
+    expect(skillLockReason(gated, 4)).toMatchObject({
+      kind: "prereq",
+      id: "dai_tu_di_chuong",
+      level: 5
+    });
+    expect(skillLockReason(gated, 5)).toBeNull();
   });
 
   it("has valid name and description in all locales for every skill", () => {

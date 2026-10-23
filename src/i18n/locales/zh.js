@@ -202,13 +202,18 @@ export default {
       }
     },
     modalTitle: "武学面板",
-    modalHint: "已学会的门派招式。点击按键或下方按钮快速绑定招式。",
+    modalHint: "门派招式树。选择一个招式格查看详情并快速绑定按键。",
     bindToKey: "绑定到 [{key}]",
     bindLeft: "绑定左键",
     bindRight: "绑定右键",
     cooldownSec: "{sec}秒",
     rangeTag: "距离: {range}",
     dmgTag: "伤害: {pct}%",
+    tree: {
+      requires: "需要 {name} 达到 {level} 级",
+      empty: "该门派暂无招式。",
+      selectHint: "选择一个招式格查看详情。"
+    },
     thieuLam: {
       laHanQuyen: {
         name: "罗汉拳",

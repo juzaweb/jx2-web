@@ -1,12 +1,29 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
-import { skillUnlocked } from "../../game/skills.js";
+import { skillLockReason, skillUnlocked } from "../../game/skills.js";
+import { formatSkillLock } from "../../game/skillLockLabel.js";
+import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 import "../../styles/skills-modal.css";
 
+const KEY_BINDINGS = ["u", "i", "o", "p"];
+
+const SECT_NAME_KEYS = {
+  "thieu-lam": "characterSelect.sectThieuLam",
+  "vo-dang": "characterSelect.sectVoDang",
+  "nga-my": "characterSelect.sectNgaMy",
+  "ngu-doc": "characterSelect.sectNguDoc"
+};
+
+const ARROW_MARKER_ID = "skill-tree-arrow";
+
 /**
  * Skills Panel modal inspired by JX2 / VLTK2 skill trees ("Bảng Võ Học").
+ *
+ * The left side renders the sect's skills as a tree of gold tiles joined by
+ * arrows (layout derived from each skill's `requires`); the right side shows the
+ * selected skill's details and its quick-bind buttons.
  */
 export function SkillsModal({
   isOpen,
@@ -19,21 +36,17 @@ export function SkillsModal({
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
+  const [pickedId, setPickedId] = useState(null);
   const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
+
+  const tree = useMemo(() => buildSkillTree(skills), [skills]);
+  const defaultId = useMemo(() => initialSelectedId(skills, level), [skills, level]);
+  const selectedId = skills.some((skill) => skill?.id === pickedId) ? pickedId : defaultId;
+  const selectedSkill = skills.find((skill) => skill?.id === selectedId) || null;
 
   if (!isOpen) return null;
 
-  const sectNameKey = `characterSelect.sect${
-    sect === "thieu-lam"
-      ? "ThieuLam"
-      : sect === "vo-dang"
-      ? "VoDang"
-      : sect === "nga-my"
-      ? "NgaMy"
-      : sect === "ngu-doc"
-      ? "NguDoc"
-      : "ThieuLam"
-  }`;
+  const sectNameKey = SECT_NAME_KEYS[sect] || SECT_NAME_KEYS["thieu-lam"];
 
   const getBoundSlots = (slot) => {
     const bound = [];
@@ -45,6 +58,10 @@ export function SkillsModal({
     if (skillLoadout.right === slot) bound.push("R");
     return bound;
   };
+
+  const selectedUnlocked = selectedSkill ? skillUnlocked(selectedSkill, level) : false;
+  const selectedLockReason = selectedUnlocked ? null : skillLockReason(selectedSkill, level);
+  const selectedLockLabel = formatSkillLock(selectedLockReason, t);
 
   return (
     <div className="skills-modal-overlay" id="skills-modal">
@@ -87,87 +104,168 @@ export function SkillsModal({
 
         {showHint && <div className="skills-hint">{t("skills.modalHint")}</div>}
 
-        {/* Skill List */}
-        <div className="skills-list">
-          {skills.map((skill) => {
-            const unlocked = skillUnlocked(skill, level);
-            const boundSlots = getBoundSlots(skill.slot);
-
-            return (
+        <div className="skills-body">
+          {/* Skill tree */}
+          <div className="skills-tree-scroll">
+            {tree.nodes.length === 0 ? (
+              <p className="skills-empty">{t("skills.tree.empty")}</p>
+            ) : (
               <div
-                key={skill.id}
-                className={`skill-card-row ${unlocked ? "unlocked" : "locked"}`}
+                className="skills-tree"
+                style={{ width: tree.width, height: tree.height }}
+                role="group"
+                aria-label={t("skills.modalTitle")}
               >
-                <div className="skill-card-main">
-                  <div className="skill-card-icon-wrap">
-                    <SkillIcon skill={skill} className="skill-card-icon" />
-                    {boundSlots.length > 0 && (
-                      <span className="skill-bound-badge">{boundSlots.join(", ")}</span>
-                    )}
-                  </div>
+                {tree.edges.length > 0 && (
+                  <svg
+                    className="skills-tree-links"
+                    width={tree.width}
+                    height={tree.height}
+                    viewBox={`0 0 ${tree.width} ${tree.height}`}
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <defs>
+                      <marker
+                        id={ARROW_MARKER_ID}
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="5"
+                        markerHeight="5"
+                        orient="auto"
+                      >
+                        <path d="M 0 0 L 10 5 L 0 10 z" />
+                      </marker>
+                    </defs>
+                    {tree.edges.map((edge) => (
+                      <path
+                        key={`${edge.from}->${edge.to}`}
+                        className="skill-tree-link"
+                        d={edge.path}
+                        markerEnd={`url(#${ARROW_MARKER_ID})`}
+                      />
+                    ))}
+                  </svg>
+                )}
 
-                  <div className="skill-card-details">
-                    <div className="skill-card-header">
-                      <span className="skill-card-name">
-                        {t(skill.nameKey, undefined, skill.id)}
+                {tree.nodes.map(({ skill, x, y }) => {
+                  const unlocked = skillUnlocked(skill, level);
+                  const lockReason = unlocked ? null : skillLockReason(skill, level);
+                  const isSelected = skill.id === selectedId;
+                  const boundSlots = getBoundSlots(skill.slot);
+                  const name = t(skill.nameKey, undefined, skill.id);
+                  const lockLabel = formatSkillLock(lockReason, t);
+
+                  return (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      className={`skill-node ${unlocked ? "unlocked" : "locked"}${
+                        isSelected ? " selected" : ""
+                      }`}
+                      style={{ left: x, top: y, width: tree.tile, height: tree.tile }}
+                      data-skill-id={skill.id}
+                      aria-pressed={isSelected}
+                      aria-label={lockLabel ? `${name} — ${lockLabel}` : name}
+                      title={lockLabel ? `${name} — ${lockLabel}` : name}
+                      onClick={() => setPickedId(skill.id)}
+                    >
+                      <span className="skill-node-face">
+                        <SkillIcon skill={skill} className="skill-node-icon" />
+                        {boundSlots.length > 0 && (
+                          <span className="skill-node-keys">{boundSlots.join("")}</span>
+                        )}
+                        {!unlocked && (
+                          <span className="skill-node-lock" aria-hidden="true">
+                            🔒
+                          </span>
+                        )}
                       </span>
-                      <span className="skill-card-meta">
-                        {unlocked
-                          ? `${skill.mp} MP`
-                          : t("skills.picker.locked", { level: skill.unlockLevel })}
-                      </span>
-                    </div>
+                      {!unlocked && (
+                        <span className="skill-node-level" aria-hidden="true">
+                          {lockReason?.level ?? skill.unlockLevel}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                    <div className="skill-card-stats">
-                      {skill.cooldown > 0 && (
-                        <span className="skill-stat-tag">
-                          CD: {t("skills.cooldownSec", { sec: (skill.cooldown / 1000).toFixed(1) })}
-                        </span>
-                      )}
-                      {skill.range > 0 && (
-                        <span className="skill-stat-tag">
-                          {t("skills.rangeTag", { range: skill.range })}
-                        </span>
-                      )}
-                      {skill.mult > 0 && (
-                        <span className="skill-stat-tag">
-                          {t("skills.dmgTag", { pct: Math.round(skill.mult * 100) })}
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="skill-card-desc">
-                      {t(skill.descKey, undefined, "")}
-                    </p>
-                  </div>
+          {/* Selected skill details */}
+          {selectedSkill ? (
+            <div className="skills-detail">
+              <div className="skills-detail-head">
+                <span className="skills-detail-icon-wrap">
+                  <SkillIcon skill={selectedSkill} className="skills-detail-icon" />
+                </span>
+                <div className="skills-detail-heading">
+                  <span className="skills-detail-name">
+                    {t(selectedSkill.nameKey, undefined, selectedSkill.id)}
+                  </span>
+                  <span
+                    className={`skills-detail-meta ${selectedUnlocked ? "unlocked" : "locked"}`}
+                  >
+                    {selectedUnlocked
+                      ? `${selectedSkill.mp} MP`
+                      : selectedLockLabel || t("skills.tree.selectHint")}
+                  </span>
                 </div>
+              </div>
 
-                {/* Quick Bind Buttons */}
-                {unlocked && (
-                  <div className="skill-card-actions">
-                    <span className="skill-bind-label">{t("skills.picker.eyebrow")}:</span>
-                    {["u", "i", "o", "p"].map((key) => {
-                      const isAssigned = skillLoadout[key] === skill.slot;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          className={`skill-action-btn key-btn ${isAssigned ? "active" : ""}`}
-                          title={t("skills.bindToKey", { key: key.toUpperCase() })}
-                          onClick={() => onEquipSkill?.(key, skill.slot)}
-                        >
-                          {key.toUpperCase()}
-                        </button>
-                      );
+              <p className="skills-detail-desc">{t(selectedSkill.descKey, undefined, "")}</p>
+
+              <div className="skills-detail-stats">
+                <span className="skills-stat-chip">
+                  {t("common.level")} {selectedSkill.unlockLevel}
+                </span>
+                {selectedSkill.cooldown > 0 && (
+                  <span className="skills-stat-chip">
+                    CD:{" "}
+                    {t("skills.cooldownSec", {
+                      sec: (selectedSkill.cooldown / 1000).toFixed(1)
                     })}
-                    {skill.target !== "self" && (
+                  </span>
+                )}
+                {selectedSkill.range > 0 && (
+                  <span className="skills-stat-chip">
+                    {t("skills.rangeTag", { range: selectedSkill.range })}
+                  </span>
+                )}
+                {selectedSkill.mult > 0 && (
+                  <span className="skills-stat-chip">
+                    {t("skills.dmgTag", { pct: Math.round(selectedSkill.mult * 100) })}
+                  </span>
+                )}
+              </div>
+
+              {selectedUnlocked && (
+                <div className="skills-detail-bind">
+                  <div className="skills-detail-bind-label">{t("skills.picker.eyebrow")}</div>
+                  <div className="skills-bind-grid">
+                    {KEY_BINDINGS.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`skill-action-btn key-btn ${
+                          skillLoadout[key] === selectedSkill.slot ? "active" : ""
+                        }`}
+                        title={t("skills.bindToKey", { key: key.toUpperCase() })}
+                        onClick={() => onEquipSkill?.(key, selectedSkill.slot)}
+                      >
+                        {key.toUpperCase()}
+                      </button>
+                    ))}
+                    {selectedSkill.target !== "self" && (
                       <button
                         type="button"
                         className={`skill-action-btn mouse-btn ${
-                          skillLoadout.left === skill.slot ? "active" : ""
+                          skillLoadout.left === selectedSkill.slot ? "active" : ""
                         }`}
                         title={t("skills.bindLeft")}
-                        onClick={() => onEquipSkill?.("left", skill.slot)}
+                        onClick={() => onEquipSkill?.("left", selectedSkill.slot)}
                       >
                         L
                       </button>
@@ -175,18 +273,22 @@ export function SkillsModal({
                     <button
                       type="button"
                       className={`skill-action-btn mouse-btn ${
-                        skillLoadout.right === skill.slot ? "active" : ""
+                        skillLoadout.right === selectedSkill.slot ? "active" : ""
                       }`}
                       title={t("skills.bindRight")}
-                      onClick={() => onEquipSkill?.("right", skill.slot)}
+                      onClick={() => onEquipSkill?.("right", selectedSkill.slot)}
                     >
                       R
                     </button>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="skills-detail skills-detail-empty">
+              <p className="skills-empty">{t("skills.tree.selectHint")}</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

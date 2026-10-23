@@ -96,6 +96,9 @@ Chưởng.** It ships as a 64×64 PNG icon plus a four-frame animated VFX:
 - The remaining five skills start with glyph fallbacks; assign rows 2–4 of the
   sheet when their art direction is confirmed (row 2 is the spiral/beam set,
   rows 3–4 are impact variants).
+- Slots 0 (`la_han_quyen`) and 1 (`thieu_lam_truong_phap`) now ship vector
+  emblems instead of glyphs: transparent 128×128 PNGs in the same gold palette,
+  regenerated with `python3 scripts/build_skill_icons.py` (SVG → `rsvg-convert`).
 - Verify no 404s in `npm run build` and in the running HUD.
 
 ## 4. VFX and rig animation

@@ -201,13 +201,18 @@ export default {
       }
     },
     modalTitle: "Martial Arts",
-    modalHint: "Sect skills learned. Click a shortcut key or button below to assign skills.",
+    modalHint: "Sect skill tree. Select a tile to see its details and quick-bind keys.",
     bindToKey: "Assign to [{key}]",
     bindLeft: "Assign Left Click",
     bindRight: "Assign Right Click",
     cooldownSec: "{sec}s",
     rangeTag: "Range: {range}",
     dmgTag: "Dmg: {pct}%",
+    tree: {
+      requires: "Requires {name} at level {level}",
+      empty: "This sect has no skills yet.",
+      selectHint: "Select a skill tile to see its details."
+    },
     thieuLam: {
       laHanQuyen: {
         name: "Arhat Fist",

@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { addQuantity, rollDrop, DROP_TABLE_MAP, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillById, skillsForSect, skillMpCost, skillUnlocked } from "./skills.js";
+import { skillById, skillsForSect, skillMpCost, skillLockReason, skillUnlocked } from "./skills.js";
 import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
 import {
   playSkillCastVfx,
@@ -217,7 +217,7 @@ export class CombatSystem {
       return false;
     }
     if (!skillUnlocked(skill, this.player.stats.level)) {
-      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      this.ui.addLog(this.skillLockMessage(skill));
       return false;
     }
     this.cancelPendingCast();
@@ -376,6 +376,19 @@ export class CombatSystem {
   }
 
   /**
+   * Explain why a skill cannot be used yet.
+   * @param {Object} skill
+   * @returns {string}
+   */
+  skillLockMessage(skill) {
+    const reason = skillLockReason(skill, this.player.stats.level);
+    if (reason?.kind === "prereq") {
+      return `Cần học ${translate(reason.nameKey, undefined, reason.id)} trước.`;
+    }
+    return `Chiêu này cần đạt cấp ${reason?.level ?? skill.unlockLevel}.`;
+  }
+
+  /**
    * Validate level, cooldown and MP without spending anything.
    * @param {Object} skill
    * @returns {boolean}
@@ -390,7 +403,7 @@ export class CombatSystem {
       return false;
     }
     if (!skillUnlocked(skill, this.player.stats.level)) {
-      this.ui.addLog(`Chiêu này cần đạt cấp ${skill.unlockLevel}.`);
+      this.ui.addLog(this.skillLockMessage(skill));
       return false;
     }
     if (this.player.stats.mp < skillMpCost(skill.id)) {
