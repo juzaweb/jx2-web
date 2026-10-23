@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NPC_DUOC, isPointOnNpc, npcApproachPoint, npcOriginY, npcScale } from "./npc.js";
+import { NPC_DUOC, isInTalkRange, isPointOnNpc, npcApproachPoint, npcOriginY, npcScale } from "./npc.js";
 
 const npc = { gx: 4580, gy: 7120 };
 
@@ -27,6 +27,18 @@ describe("herb-shop NPC", () => {
     const point = npcApproachPoint(npc);
     expect(point.x).toBe(npc.gx);
     expect(point.y).toBeGreaterThan(npc.gy);
+  });
+
+  it("talks to the NPC from the edge of its drawn body, not only its feet", () => {
+    // The sprite is ~257 px wide, so standing beside it must still count.
+    expect(isInTalkRange(npc, npc.gx + 200, npc.gy)).toBe(true);
+    expect(isInTalkRange(npc, npc.gx, npc.gy + 200)).toBe(true);
+    expect(isInTalkRange(npc, npc.gx, npc.gy - 300)).toBe(true);
+  });
+
+  it("keeps talking out of reach across the square", () => {
+    expect(isInTalkRange(npc, npc.gx + 400, npc.gy)).toBe(false);
+    expect(isInTalkRange(npc, npc.gx, npc.gy + 400)).toBe(false);
   });
 
   it("floats the name tag above the head height", () => {

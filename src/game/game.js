@@ -25,8 +25,8 @@ import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
 import {
   NPC_DUOC,
-  NPC_INTERACT_RANGE,
   createPharmacyNpc,
+  isInTalkRange,
   isPointOnNpc,
   npcApproachPoint
 } from "./npc.js";
@@ -1002,7 +1002,7 @@ export class JiangHuScene extends Phaser.Scene {
         npc,
         dist: Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.gx, npc.gy)
       }))
-      .filter((item) => item.dist <= NPC_INTERACT_RANGE)
+      .filter((item) => isInTalkRange(item.npc, this.player.x, this.player.y))
       .sort((a, b) => a.dist - b.dist);
 
     if (candidates.length > 0) {
@@ -1111,13 +1111,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Open a shop once the hero has walked within talking distance.
     if (this.pendingNpc) {
-      const dist = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        this.pendingNpc.gx,
-        this.pendingNpc.gy
-      );
-      if (dist <= NPC_INTERACT_RANGE) {
+      if (isInTalkRange(this.pendingNpc, this.player.x, this.player.y)) {
         this.pendingNpc = null;
         this.player.stopMovement();
         this.uiBridge.addLog("Đã đến gần NPC. Nhấn phím [F] để nói chuyện.");

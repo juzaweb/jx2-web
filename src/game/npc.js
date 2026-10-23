@@ -27,8 +27,16 @@ export const NPC_DUOC = {
 
 export const NPC_DUOC_ANIM = "npc-duoc-idle";
 
-/** How close (ground px) the hero must stand before an NPC can be talked to. */
-export const NPC_INTERACT_RANGE = 110;
+/**
+ * How close (ground px) the hero must stand before an NPC can be talked to.
+ *
+ * The shopkeeper sprite is ~257 world px wide (280 px frame at WORLD_SCALE),
+ * so a smaller radius made the hero stand visually on top of the NPC before the
+ * game agreed it was "near". The server already validates shop purchases with
+ * the same 260 px radius (see `SHOP_INTERACT_RANGE` in gameSocket.js), so the
+ * client matches it instead of rejecting valid interactions.
+ */
+export const NPC_INTERACT_RANGE = 260;
 
 /** Clickable body box, measured in ground px around the NPC's feet. */
 const HIT_HALF_WIDTH = 90;
@@ -62,6 +70,23 @@ export function isPointOnNpc(npc, x, y) {
     y < npc.gy + HIT_BELOW_FEET &&
     y > npc.gy - HIT_ABOVE_FEET
   );
+}
+
+/**
+ * Whether a ground point is close enough to talk to this NPC. The drawn sprite is
+ * much wider than the NPC's collision body, so a feet-to-feet radius alone reads
+ * as "I'm standing right next to him" while still being out of range. Overlapping
+ * the drawn body always counts.
+ * @param {{gx:number, gy:number}} npc
+ * @param {number} x ground-space x
+ * @param {number} y ground-space y
+ * @returns {boolean}
+ */
+export function isInTalkRange(npc, x, y) {
+  if (isPointOnNpc(npc, x, y)) return true;
+  const dx = x - npc.gx;
+  const dy = y - npc.gy;
+  return dx * dx + dy * dy <= NPC_INTERACT_RANGE * NPC_INTERACT_RANGE;
 }
 
 /**
