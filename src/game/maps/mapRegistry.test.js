@@ -75,14 +75,10 @@ describe("map registry", () => {
     }
   });
 
-  it("keeps walls and gates inside the map", () => {
+  it("keeps gates inside the map", () => {
     for (const id of MAP_IDS) {
       const map = MAPS[id];
       const bounds = boundsRect(map);
-      for (const wall of map.walls || []) {
-        expect(isInsideRect(bounds, wall.x, wall.y)).toBe(true);
-        expect(isInsideRect(bounds, wall.x + wall.w, wall.y + wall.h)).toBe(true);
-      }
       for (const gate of map.gates || []) {
         expect(isInsideRect(bounds, gate.x, gate.y)).toBe(true);
       }
@@ -121,6 +117,26 @@ describe("map registry", () => {
     }
   });
 
+  it("keeps buildings out of the low-level hunting belt", () => {
+    // The outskirts are woodland: a shop inside a level 1-10 zone would be a town
+    // building dropped in the middle of a forest.
+    for (const id of MAP_IDS) {
+      const map = MAPS[id];
+      const lowZones = (map.zones || []).filter((zone) => zone.maxLevel <= 10);
+
+      for (const building of map.buildings || []) {
+        for (const zone of lowZones) {
+          const inside =
+            building.x >= zone.bounds.x0 &&
+            building.x <= zone.bounds.x1 &&
+            building.y >= zone.bounds.y0 &&
+            building.y <= zone.bounds.y1;
+          expect(inside, `${id}/${building.id} must not sit in ${zone.id}`).toBe(false);
+        }
+      }
+    }
+  });
+
   it("builds a minimap descriptor from the active map only", () => {
     const market = mapWorldConfig("market");
     const town = mapWorldConfig("dong-mon-thanh");
@@ -129,8 +145,11 @@ describe("map registry", () => {
     expect(town.id).toBe("dong-mon-thanh");
     expect(market.width).toBe(mapSize("market").width);
     expect(town.cityBounds).toEqual(MAPS["dong-mon-thanh"].bounds);
+    // The descriptor mirrors the map, so a map with no buildings/walls (the
+    // forest) produces an empty descriptor rather than leaking the market's.
     expect(town.buildings).toEqual(MAPS["dong-mon-thanh"].buildings);
-    expect(town.walls.length).toBeGreaterThan(0);
+    expect(market.buildings.length).toBeGreaterThan(0);
+    expect(town.portals).toEqual(MAPS["dong-mon-thanh"].portals);
   });
 
   it("resolves portals by id for server-side travel validation", () => {
@@ -208,7 +227,7 @@ describe("portal geometry", () => {
 
   it("finds the portal under a ground position", () => {
     const map = MAPS["dong-mon-thanh"];
-    expect(portalAt(map, 300, 3500)?.id).toBe("west-gate");
-    expect(portalAt(map, 3000, 3500)).toBeNull();
+    expect(portalAt(map, 300, 3900)?.id).toBe("west-gate");
+    expect(portalAt(map, 3000, 3900)).toBeNull();
   });
 });

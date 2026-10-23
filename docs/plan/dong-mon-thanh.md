@@ -1,18 +1,21 @@
-# Đông Môn Thành — second map with a level 1–30 hunting ground
+# Đông Môn Thành — second map, a level 3–29 forest hunting ground
 
 Status: **implemented** (all phases shipped in one change). Replaces the single-map
 assumption in `BACKLOG.md` item B1.
 
 ## Goal & scope
 
-- Add a second, portal-linked map east of Biện Kinh: **Đông Môn Thành**.
-- Fill it with a level 1–30 hunting ground: three courtyards, two monster species
-  per band, and one level-30 boss in the keep.
+- Add a second, portal-linked map east of Biện Kinh: **Đông Môn Thành**, a
+  15 000 × 9 000 forest.
+- Fill it with a level 3–29 hunting ground: three camps (near trees 3-8, middle
+  wood 14-19, black heart 24-29), two monster species per band, 47 spawns spread
+  far apart. No boss.
 - Keep everything server-authoritative (health, death, respawn, reward, level).
 - Reuse the existing art: no new image assets, no Tiled/tilemap pipeline.
 
-Out of scope: NPCs, quests and shops inside the new town, loot drops, level-gap
-EXP scaling, and offline progression (still frozen, matching the existing test).
+Out of scope: NPCs, quests and shops — Đông Môn Thành has none, so nothing is
+bought or sold there (that stays in Biện Kinh). A map registry test enforces that
+no building sits in the level 1-10 belt, so the rule survives future edits.
 
 ## Architecture
 
@@ -25,20 +28,29 @@ numbers the client renders:
 | --- | --- |
 | `mapRegistry.js` | `MAPS`, `getMap(id)`, `mapWorldConfig(map)`, `findPortal(mapId, portalId)`, `isInsideMap` |
 | `marketMap.js` | Biện Kinh packaged as a `MapDefinition`, including the 8 legacy wolf spawns |
-| `dongMonThanhMap.js` | Đông Môn Thành: bounds, walls, gates, props, portals, 3 level zones, 23 spawns |
+| `dongMonThanhMap.js` | Đông Môn Thành: 15 000 × 9 000 bounds, painted forest floor, trail, portal, 3 level zones, 47 spawns — no buildings, walls, gates, decor or boss |
 | `portals.js` | Pure trigger state machine (`portalAt`, `stepPortalTrigger`, cooldown, arrival lock) |
 
 A `MapDefinition` carries: `id`, `name`, `safe`, `bounds`, `spawn`, `ground`
-(palette + tile keys + optional walkway/medallions), `buildings`, `trees`, `grass`,
-`walls`, `gates`, `banners`, `braziers`, `portals`, `enemySpawns`, `zones`, `npcs`.
+(palette, tile key, optional painted `regions`/`streets`, medallions), `buildings`,
+`trees`, `grass`, `gates`, `portals`, `enemySpawns`, `zones`, `npcs`.
 
 ### Rendering
 
 `src/game/marketWorld.js` became `src/game/worldManager.js`. `WorldManager` now
 takes a `MapDefinition`, draws the map from it, and tracks every GameObject it
 creates so `destroy()` can hand the scene back clean before the next map loads.
-New draw passes: `drawWalls` (slate blocks + collision bodies + minimap), `drawGates`
-(arch), `drawBanners`, `drawBraziers`, `drawPortals` (glowing trigger strips).
+Draw passes: `drawGround` (base tile → painted regions → stains → streets →
+medallions), `drawBuildings`, `drawVegetation`, `drawGates` (arch), `drawPortals`
+(rune circle) and `drawWorldBorder`.
+
+`ground.streets` entries are either **paving** (`tileKey` → masked, rotated strip,
+kerbs unless `kerb: false`) or **painted earth** (`fill` → band with ragged edges).
+Ground textures can also be painted in code (`PAINTED_GROUNDS`, e.g.
+`ground-forest`), so a map ships without new art.
+
+The wall/banner/brazier passes were deleted once no map declared them: dead
+render code in a data-driven renderer is worse than one `git revert` away.
 
 `src/game/mapStage.js` owns the lifecycle around the renderer: camera/physics
 bounds, NPCs, and the static colliders. The scene decides *when* a map changes;
@@ -62,16 +74,22 @@ pure trigger rule, calls `loadMap`, then tells the server.
 
 `src/game/enemyCatalog.js` is the single source of monster numbers, shared by both
 runtimes. `Wolf` became `Enemy(scene, x, y, id, monsterId)` (the `Wolf` name stays
-exported as an alias); `enemyVisuals.js` paints four vector body kinds. Each
-monster carries its own AI tuning and respawn delay, so the boss waits 180 s while
-regular monsters use the default.
+exported as an alias); `enemyVisuals.js` paints four vector body kinds. Every
+monster uses the shared tuning; a monster may still override `ai` or `respawnMs`,
+but none does today.
+
+AI has a **leash** (`ENEMY_TUNING.leashRange`) measured on the *player's* distance
+from the monster's spawn: a hero who leaves the camp ends the chase, and the
+monster walks home. One camp can never follow a hero into the next.
 
 | Tier | Monsters | Levels |
 | --- | --- | --- |
 | Ngoại thành | Sơn Cẩu, Dã Lang | 3, 8 |
 | Trung thành | Lâm Tặc, Hắc Y Sát Thủ | 14, 19 |
 | Nội thành | Thiết Giáp Binh, Ma Giáo Đệ Tử | 24, 29 |
-| Boss | Đông Môn Tướng Quân | 30 |
+
+17 spawns in the near trees, 15 in the middle wood, 15 in the black heart — 47 in
+total, spaced hundreds of units apart ('no boss').
 
 `soi-xam` (Sói Xám) keeps EXP 35 / 3–9 coins so the historical reward expectations
 stay intact.
@@ -96,14 +114,13 @@ stay intact.
 ## Verification
 
 1. `npm run build` — clean.
-2. `npm test` — 60 files / 489 tests.
-3. `npm run server:test` — 71 tests, including the new map-travel test.
+2. `npm test` — 61 files / 494 tests.
+3. `npm run server:test` — 75 tests, including the map-travel and leash tests.
    (Run the two suites in separate steps; the server suite has multi-second waits
    and is timing-sensitive while 60 Vitest workers are still exiting.)
-4. Manual: walk east through the Biện Kinh gate → Đông Môn Thành; fight each tier;
-   the boss hits far harder than a level-3 stray; return portal brings the hero back;
-   the minimap labels the town and marks the boss in orange; reload restores the map
-   and position.
+4. Manual: walk east through the Biện Kinh gate → Đông Môn Thành; fight each camp;
+   the deep wood hits far harder than a level-3 stray; the return portal brings the
+   hero back; the minimap follows the wider map; reload restores map and position.
 
 ## Decisions
 

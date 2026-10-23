@@ -16,6 +16,39 @@ const S = WORLD_SCALE;
 const GROUND_DEPTH = -100000;
 /** Thickness of the stone kerb that edges a walkway. */
 const KERB = 14;
+/** How many irregular blobs soften the edges of a painted path. */
+const PATH_EDGE_BLOBS = 44;
+/** Vertical spread of those blobs, in world pixels. */
+const PATH_EDGE_WOBBLE = 70;
+
+/**
+ * Ground tiles painted in code instead of shipped as images. Keyed by texture
+ * key, each painter draws into a `size` × `size` graphics that is then generated
+ * into a reusable texture.
+ */
+const PAINTED_GROUNDS = {
+  "ground-forest": (g, size) => {
+    g.fillStyle(0x3b4830, 1);
+    g.fillRect(0, 0, size, size);
+
+    const tones = [0x46553a, 0x33402b, 0x51603f, 0x2f3a28];
+    for (let i = 0; i < 140; i++) {
+      g.fillStyle(tones[i % tones.length], 0.5);
+      g.fillEllipse(
+        seeded(i * 1.7) * size,
+        seeded(i * 2.9 + 1) * size,
+        6 + seeded(i * 3.3) * 24,
+        5 + seeded(i * 4.1) * 15
+      );
+    }
+
+    // A few darker flecks read as leaf litter once tiled.
+    g.fillStyle(0x27311f, 0.6);
+    for (let i = 0; i < 40; i++) {
+      g.fillCircle(seeded(i * 5.3 + 2) * size, seeded(i * 6.7 + 3) * size, 1.5);
+    }
+  }
+};
 
 /**
  * Deterministic 0–1 noise, so ground detail is identical on every reload.
@@ -49,7 +82,7 @@ export class WorldManager {
   }
 
   /**
-   * Build the map: ground, props, walls, decorations, portals and collision.
+   * Build the map: ground, buildings, vegetation, gates, portals, collision.
    * @param {import("./maps/mapRegistry.js").MapDefinition} map
    */
   create(map) {
@@ -59,10 +92,7 @@ export class WorldManager {
     this.drawGround();
     this.drawBuildings();
     this.drawVegetation();
-    this.drawWalls();
     this.drawGates();
-    this.drawBanners();
-    this.drawBraziers();
     this.drawPortals();
     this.drawWorldBorder();
   }
@@ -97,6 +127,24 @@ export class WorldManager {
     return this.map?.bounds || { x0: 0, y0: 0, x1: 0, y1: 0 };
   }
 
+  /**
+   * Ground textures that live in code rather than in `public/`. Painted once per
+   * game, then tiled like any other texture.
+   * @param {string} key
+   * @returns {string} the key to tile
+   */
+  ensureGroundTexture(key) {
+    const paint = PAINTED_GROUNDS[key];
+    if (!paint || this.scene.textures.exists(key)) return key;
+
+    const size = 96;
+    const g = this.scene.make.graphics({ add: false });
+    paint(g, size);
+    g.generateTexture(key, size, size);
+    g.destroy();
+    return key;
+  }
+
   drawGround() {
     const B = this.bounds;
     const ground = this.map?.ground || {};
@@ -113,30 +161,79 @@ export class WorldManager {
     g.fillStyle(ground.fill ?? 0x8a8272, 1);
     g.fillRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
 
-    // Brick floor fills the whole playable map, exactly at the map bounds.
+    // The base tile fills the whole playable map, exactly at the map bounds.
     const floor = this.scene.add.tileSprite(
       B.x0 + (B.x1 - B.x0) / 2,
       B.y0 + (B.y1 - B.y0) / 2,
       B.x1 - B.x0,
       B.y1 - B.y0,
-      ground.tileKey || "ground-bricks"
+      this.ensureGroundTexture(ground.tileKey || "ground-bricks")
     );
     floor.setAlpha(ground.tileAlpha ?? 0.94).setDepth(GROUND_DEPTH + 1);
     this.track(floor);
 
+    this.drawGroundRegions();
     this.drawGroundStains();
-
-    if (ground.walkway) this.drawWalkway();
+    this.drawStreets();
 
     if (ground.medallions?.length) this.drawGroundDetails();
   }
 
   /**
-   * A street laid in a second brick style with stone kerbs, so it stands out from
-   * the square it crosses.
+   * Broad regions painted over the base tile — a forest floor, a packed-earth
+   * courtyard. Drawn under the streets so paths stay visible through them.
    */
-  drawWalkway() {
-    const W = this.map.ground.walkway;
+  drawGroundRegions() {
+    const regions = this.map?.ground?.regions || [];
+    if (!regions.length) return;
+
+    const g = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 1.5));
+    regions.forEach((region) => {
+      g.fillStyle(region.fill ?? 0x4a5440, region.alpha ?? 0.9);
+      g.fillRect(region.x, region.y, region.w, region.h);
+    });
+  }
+
+  /**
+   * Every street/path the map defines, back to front. A street with a `fill` is
+   * painted earth; one with a `tileKey` is paving.
+   */
+  drawStreets() {
+    (this.map?.ground?.streets || []).forEach((street) => {
+      if (street.fill !== undefined) this.drawPaintedPath(street);
+      else this.drawPavedStreet(street);
+    });
+  }
+
+  /**
+   * A trodden path: a filled band of earth with ragged edges. No texture and no
+   * kerbs — this is a forest trail, not a road.
+   * @param {{x:number, y:number, w:number, d:number, fill:number, alpha?:number}} W
+   */
+  drawPaintedPath(W) {
+    const g = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 3));
+    g.fillStyle(W.fill, W.alpha ?? 0.9);
+    g.fillRect(W.x, W.y, W.w, W.d);
+
+    // Blobs straddling both long edges, so the path does not end on a ruler line.
+    const jitter = (seed) => seeded(seed, 71.3, 0);
+    const centred = (seed) => (jitter(seed) - 0.5) * PATH_EDGE_WOBBLE;
+
+    for (let i = 0; i < PATH_EDGE_BLOBS; i++) {
+      const gx = W.x + jitter(i * 1.9) * W.w;
+      const blobW = 100 + jitter(i) * 130;
+      const blobH = 70 + jitter(i + 3) * 60;
+      g.fillEllipse(gx, W.y + centred(i * 2.7), blobW, blobH);
+      g.fillEllipse(gx, W.y + W.d + centred(i * 3.1), blobW, blobH);
+    }
+  }
+
+  /**
+   * A paved street: a masked, rotated paving strip with stone kerbs (unless the
+   * map asks for a kerbless track).
+   * @param {object} W street definition
+   */
+  drawPavedStreet(W) {
     const cx = W.x + W.w / 2;
     const cy = W.y + W.d / 2;
     const rotation = W.rotation ?? 0;
@@ -151,7 +248,8 @@ export class WorldManager {
       .setRotation(rotation)
       .setTileScale(W.tileScale ?? 0.55)
       .setTint(W.tint ?? 0xb0a288)
-      .setAlpha(0.97)
+      // A trail lets the ground underneath show through; a town street is solid.
+      .setAlpha(W.alpha ?? 0.97)
       .setDepth(GROUND_DEPTH + 3);
     this.track(paving);
 
@@ -171,6 +269,8 @@ export class WorldManager {
       grime.fillStyle(0x4b463c, 0.08);
       grime.fillEllipse(gx, gy, gw, gh);
     }
+
+    if (W.kerb === false) return;
 
     // Stone kerbs along both long edges so the paving sits above the square.
     const kerb = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 4));
@@ -205,7 +305,8 @@ export class WorldManager {
   /** Medallions and hairline cracks so the pavement does not feel flat. */
   drawGroundDetails() {
     const g = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 5));
-    const W = this.map.ground.walkway;
+    // Cracks follow the first (town) street; a forest map has none to follow.
+    const W = this.map.ground.streets?.[0];
     const medallions = this.map.ground.medallions || [];
 
     medallions.forEach(({ x: mx, y: my, r }, index) => {
@@ -270,44 +371,6 @@ export class WorldManager {
     });
   }
 
-  /**
-   * Town walls: a shadowed stone block with a lighter cap course, drawn at its
-   * base depth so a wall in front of the hero still overlaps them correctly.
-   */
-  drawWalls() {
-    (this.map?.walls || []).forEach((wall) => {
-      const g = this.track(this.scene.add.graphics().setDepth(wall.y + wall.h));
-
-      g.fillStyle(0x14161a, 0.3);
-      g.fillRect(wall.x + 12, wall.y + 16, wall.w, wall.h);
-
-      g.fillStyle(0x585d64, 1);
-      g.fillRect(wall.x, wall.y, wall.w, wall.h);
-
-      const capHeight = Math.min(22, wall.h * 0.4);
-      g.fillStyle(0x767c85, 1);
-      g.fillRect(wall.x, wall.y, wall.w, capHeight);
-
-      g.lineStyle(3, 0x2f3338, 0.75);
-      g.strokeRect(wall.x, wall.y, wall.w, wall.h);
-
-      // Block joints, spaced so long walls read as masonry.
-      g.lineStyle(1, 0x3c4148, 0.5);
-      const step = 140;
-      if (wall.w >= wall.h) {
-        for (let x = wall.x + step; x < wall.x + wall.w; x += step) {
-          g.lineBetween(x, wall.y + capHeight, x, wall.y + wall.h);
-        }
-      } else {
-        for (let y = wall.y + step; y < wall.y + wall.h; y += step) {
-          g.lineBetween(wall.x, y, wall.x + wall.w, y);
-        }
-      }
-
-      this.addBody(wall.x + wall.w / 2, wall.y + wall.h / 2, wall.w, wall.h);
-    });
-  }
-
   /** Decorative gate arch: two posts and a lintel, no collision. */
   drawGates() {
     (this.map?.gates || []).forEach((gate) => {
@@ -335,48 +398,31 @@ export class WorldManager {
     });
   }
 
-  /** Banner poles along the avenue. */
-  drawBanners() {
-    (this.map?.banners || []).forEach(({ x, y }) => {
-      const g = this.track(this.scene.add.graphics().setDepth(y));
-      g.fillStyle(0x2a241c, 1);
-      g.fillRect(x - 4, y - 220, 8, 220);
-      g.fillStyle(0x9d2a25, 1);
-      g.fillRect(x + 4, y - 214, 62, 22);
-      g.fillStyle(0xd9b25a, 1);
-      g.fillRect(x + 4, y - 214, 62, 4);
-      g.fillStyle(0x2a241c, 0.28);
-      g.fillEllipse(x, y + 2, 40, 10);
-    });
-  }
-
-  /** Iron braziers with a small flame. */
-  drawBraziers() {
-    (this.map?.braziers || []).forEach(({ x, y }) => {
-      const g = this.track(this.scene.add.graphics().setDepth(y));
-      g.fillStyle(0x0f1113, 0.3);
-      g.fillEllipse(x, y + 4, 54, 14);
-      g.fillStyle(0x4a4f56, 1);
-      g.fillRect(x - 4, y - 56, 8, 56);
-      g.fillStyle(0x5f656e, 1);
-      g.fillEllipse(x, y - 60, 40, 18);
-      g.fillStyle(0xf0a53a, 0.95);
-      g.fillEllipse(x, y - 74, 18, 26);
-      g.fillStyle(0xffd98a, 0.95);
-      g.fillEllipse(x, y - 78, 9, 14);
-    });
-  }
-
-  /** Glowing ground strips that mark a travel portal. */
+  /** A glowing rune circle on the ground that marks a travel portal. */
   drawPortals() {
     (this.map?.portals || []).forEach(({ rect }) => {
       const g = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 8));
-      g.fillStyle(0x8fd8ff, 0.16);
-      g.fillRect(rect.x, rect.y, rect.w, rect.h);
-      g.lineStyle(4, 0x9fe8ff, 0.55);
-      g.strokeRect(rect.x, rect.y, rect.w, rect.h);
-      g.lineStyle(2, 0xffffff, 0.25);
-      g.strokeRect(rect.x + 12, rect.y + 12, Math.max(0, rect.w - 24), Math.max(0, rect.h - 24));
+      const cx = rect.x + rect.w / 2;
+      const cy = rect.y + rect.h / 2;
+
+      // Soft glow, so the circle sits in grass rather than on top of it.
+      g.fillStyle(0x8fd8ff, 0.1);
+      g.fillEllipse(cx, cy, rect.w, rect.h);
+      g.lineStyle(3, 0x9fe8ff, 0.45);
+      g.strokeEllipse(cx, cy, rect.w, rect.h);
+      g.lineStyle(2, 0xffffff, 0.2);
+      g.strokeEllipse(cx, cy, rect.w * 0.62, rect.h * 0.62);
+
+      // Rune ticks between the two rings.
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.lineBetween(
+          cx + Math.cos(a) * rect.w * 0.33,
+          cy + Math.sin(a) * rect.h * 0.33,
+          cx + Math.cos(a) * rect.w * 0.41,
+          cy + Math.sin(a) * rect.h * 0.41
+        );
+      }
     });
   }
 

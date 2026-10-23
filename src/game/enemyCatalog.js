@@ -6,16 +6,10 @@
  * combat block to roll bites and the reward block to pay the killer, so both
  * runtimes can never drift apart.
  *
- * Levels are tuned for the Đông Môn Thành hunting grounds, which span levels 1-30.
+ * Levels are tuned for the Đông Môn Thành hunting grounds, which span levels 3-29.
  * `soi-xam` (Sói Xám) is the legacy market wolf: its reward stays at 35 EXP and
  * 3-9 coins so the existing server reward tests keep their expectations.
  */
-
-import { ENEMY_TUNING } from "./enemyAi.js";
-import { WORLD_SCALE } from "./worldConfig.js";
-
-/** Default AI tuning inherited by every monster that does not override it. */
-const DEFAULT_AI = { ...ENEMY_TUNING };
 
 /**
  * @typedef {object} MonsterVisual
@@ -40,7 +34,7 @@ const DEFAULT_AI = { ...ENEMY_TUNING };
  * @property {boolean} [isBoss]
  * @property {number} [respawnMs] Respawn delay override (server + offline client)
  * @property {MonsterVisual} visual
- * @property {typeof DEFAULT_AI} [ai]
+ * @property {object} [ai] Per-monster AI tuning overrides (falls back to ENEMY_TUNING)
  */
 
 /** @type {Record<string, MonsterDefinition>} */
@@ -237,44 +231,6 @@ export const MONSTERS = {
       }
     }
   },
-
-  // ── Boss ─────────────────────────────────────────────────────────────────
-  "dong-mon-tuong-quan": {
-    id: "dong-mon-tuong-quan",
-    name: "Đông Môn Tướng Quân",
-    level: 30,
-    maxHp: 1800,
-    attack: 34,
-    defense: 16,
-    critRate: 0.1,
-    critDamage: 1.8,
-    exp: 600,
-    coinsMin: 120,
-    coinsMax: 200,
-    isBoss: true,
-    // A boss must not pop back up on the regular ten-second timer.
-    respawnMs: 180000,
-    visual: {
-      kind: "boss",
-      scale: 1.3,
-      palette: {
-        shadow: 0x08070a,
-        body: 0x8c2f24,
-        dark: 0x4a1512,
-        head: 0xd9b382,
-        accent: 0xf5c542,
-        leg: 0x5c231c,
-        cloth: 0xa8231b
-      }
-    },
-    ai: {
-      ...DEFAULT_AI,
-      // Slower, wider-reaching: the boss guards a large courtyard.
-      aggroRange: 320 * WORLD_SCALE,
-      chaseSpeed: ENEMY_TUNING.chaseSpeed * 0.8,
-      stopDistance: ENEMY_TUNING.stopDistance
-    }
-  }
 };
 
 /** Every monster id, in catalog order (market wolf first). */

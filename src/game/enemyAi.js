@@ -16,7 +16,10 @@ export const ENEMY_TUNING = {
   chaseSpeed: 43 * POS * WORLD_SPEED_SCALE,
   stopDistance: 52 * WORLD_SCALE,
   idleSpeed: 22 * POS * WORLD_SPEED_SCALE,
-  homeEpsilon: 10 * WORLD_SCALE
+  homeEpsilon: 10 * WORLD_SCALE,
+  // How far a monster may stray from its spawn before it gives up the chase and
+  // walks home. Keeps one hunting camp from emptying into the next one.
+  leashRange: 560 * WORLD_SCALE
 };
 
 /**
@@ -100,8 +103,15 @@ export function stepEnemy(enemy, players = [], deltaMs = 0) {
   const tuning = enemy?.tuning || ENEMY_TUNING;
   const seconds = Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0) / 1000;
   const target = nearestPlayerInRange(enemy, players, tuning);
+  const leash = tuning.leashRange ?? ENEMY_TUNING.leashRange;
+  // The leash is measured on the *player*, not on the monster: a camp defends the
+  // ground around its spawn and cannot be pulled across the map. Measuring the
+  // player keeps the rule stateless, so there is no chase/return oscillation at
+  // the boundary — the hero simply has to leave the camp for the chase to end.
+  const defended =
+    target && Math.hypot(target.x - enemy.homeX, target.y - enemy.homeY) <= leash;
 
-  if (target) {
+  if (defended) {
     const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
     if (distance <= tuning.stopDistance) {
       return { x: enemy.x, y: enemy.y };

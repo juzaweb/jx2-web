@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MONSTERS, MONSTER_IDS, getMonster, monstersBetween, rewardForMonster } from "./enemyCatalog.js";
 
 describe("enemy catalog", () => {
-  it("ships two monsters per level tier plus a level-30 boss", () => {
+  it("ships two monsters per level tier and no boss", () => {
     const tiers = [
       [1, 10],
       [11, 20],
@@ -14,14 +14,12 @@ describe("enemy catalog", () => {
       // `soi-xam` is the legacy market wolf and shares the lowest band; the town
       // roster is the pair of hunting monsters each tier adds.
       const inTier = monstersBetween(min, max).filter(
-        (monster) => !monster.isBoss && monster.id !== "soi-xam"
+        (monster) => monster.id !== "soi-xam"
       );
       expect(inTier).toHaveLength(2);
     }
 
-    const bosses = MONSTER_IDS.map((id) => MONSTERS[id]).filter((monster) => monster.isBoss);
-    expect(bosses).toHaveLength(1);
-    expect(bosses[0].level).toBe(30);
+    expect(MONSTER_IDS.map((id) => MONSTERS[id]).filter((m) => m.isBoss)).toHaveLength(0);
   });
 
   it("keeps every id unique and every stat sane", () => {
@@ -69,11 +67,10 @@ describe("enemy catalog", () => {
     expect(getMonster().id).toBe("soi-xam");
   });
 
-  it("gives the boss a long respawn and the regular monsters the default", () => {
-    expect(MONSTERS["dong-mon-tuong-quan"].respawnMs).toBe(180000);
+  it("keeps every monster on the default respawn timer", () => {
     for (const id of MONSTER_IDS) {
-      if (id === "dong-mon-tuong-quan") continue;
       expect(MONSTERS[id].respawnMs).toBeUndefined();
+      expect(Boolean(MONSTERS[id].isBoss)).toBe(false);
     }
   });
 });

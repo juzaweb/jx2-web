@@ -1034,12 +1034,12 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const changed = await traveller.waitFor((m) => m.type === "map_changed");
 
     assert.equal(changed.payload.mapId, "dong-mon-thanh");
-    assert.deepEqual(changed.payload.spawn, { x: 1100, y: 3500 });
-    assert.equal(changed.payload.enemies.length, 23, "The town ships its full hunting roster");
+    assert.deepEqual(changed.payload.spawn, { x: 1200, y: 3920 });
+    assert.equal(changed.payload.enemies.length, 47, "The forest ships its full hunting roster");
     assert.ok(changed.payload.enemies.every((enemy) => enemy.mapId === "dong-mon-thanh"));
     assert.ok(
-      changed.payload.enemies.some((enemy) => enemy.monsterId === "dong-mon-tuong-quan"),
-      "The level-30 boss guards the keep"
+      changed.payload.enemies.every((enemy) => !enemy.isBoss),
+      "The forest has no boss"
     );
 
     // The roster spans all three level bands.

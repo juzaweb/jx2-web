@@ -56,13 +56,16 @@ export const MARKET_MAP = {
     tileKey: "ground-bricks",
     tileAlpha: 0.94,
     pad: 320,
-    walkway: {
-      ...MARKET_WALKWAY,
-      rotation: -0.13,
-      tileKey: "ground-walkway",
-      tint: 0xb0a288,
-      tileScale: 0.55
-    },
+    streets: [
+      {
+        ...MARKET_WALKWAY,
+        rotation: -0.13,
+        kerb: true,
+        tileKey: "ground-walkway",
+        tint: 0xb0a288,
+        tileScale: 0.55
+      }
+    ],
     medallions: MARKET_MEDALLIONS
   },
 
@@ -71,7 +74,6 @@ export const MARKET_MAP = {
   grass: MARKET_GRASS,
   npcs: MARKET_NPCS,
 
-  walls: [],
   gates: [
     {
       id: "market-east-gate",
@@ -83,8 +85,6 @@ export const MARKET_MAP = {
       label: "Đông Môn"
     }
   ],
-  banners: [],
-  braziers: [],
 
   portals: [
     {
@@ -92,7 +92,7 @@ export const MARKET_MAP = {
       label: "Đông Môn Thành",
       rect: { x: 10480, y: 4900, w: 520, h: 1200 },
       targetMapId: "dong-mon-thanh",
-      targetSpawn: { x: 1100, y: 3500 }
+      targetSpawn: { x: 1200, y: 3920 }
     }
   ],
 

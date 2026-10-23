@@ -102,15 +102,13 @@ describe("Enemies are built from the shared catalog", () => {
 
   it("takes name, level and health from the requested monster", () => {
     const scene = createScene();
-    const boss = new Wolf(scene, 8100, 3500, 7, "dong-mon-tuong-quan");
+    const enemy = new Wolf(scene, 12600, 8200, 7, "ma-giao-de-tu");
 
-    expect(boss.monsterId).toBe("dong-mon-tuong-quan");
-    expect(boss.name).toBe("Đông Môn Tướng Quân");
-    expect(boss.level).toBe(30);
-    expect(boss.maxHp).toBe(1800);
-    expect(boss.isBoss).toBe(true);
-    // A boss must not pop back up on the regular respawn timer.
-    expect(boss.respawnMs).toBe(180000);
+    expect(enemy.monsterId).toBe("ma-giao-de-tu");
+    expect(enemy.name).toBe("Ma Giáo Đệ Tử");
+    expect(enemy.level).toBe(29);
+    expect(enemy.maxHp).toBe(420);
+    expect(enemy.isBoss).toBe(false);
   });
 
   it("falls back to the wolf for an unknown monster id", () => {

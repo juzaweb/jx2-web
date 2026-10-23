@@ -9,12 +9,10 @@
  * safe          true = no monsters spawn when offline
  * bounds        {x0, y0, x1, y1} walkable rectangle; camera + physics clamp to it
  * spawn         {x, y} default / respawn point
- * ground        {rim, fill, tileKey, tileAlpha, pad, walkway?, medallions?}
+ * ground        {rim, fill, tileKey, tileAlpha, pad, regions?, streets?, medallions?}
  * buildings     shop footprints ({id, palette, x, y, w, d, scale, ...})
  * trees/grass   [x, y, scale, kind] prop lists
- * walls         [{id, x, y, w, h}] stone blocks: drawn, collidable, on the minimap
  * gates         [{id, x, y, w, h, orientation, label}] decorative arches
- * banners/braziers  [{x, y}] small decorations along the avenue
  * portals       [{id, label, rect:{x,y,w,h}, targetMapId, targetSpawn}]
  * enemySpawns   [{id, monsterId, x, y}] ids are unique per map
  * zones         [{id, minLevel, maxLevel, bounds:{x0,y0,x1,y1}}] level bands
@@ -40,10 +38,7 @@ import { MARKET_MAP } from "./marketMap.js";
  * @property {Array<object>} buildings
  * @property {Array<Array<number|string>>} trees
  * @property {Array<Array<number>>} grass
- * @property {Array<object>} walls
  * @property {Array<object>} gates
- * @property {Array<object>} banners
- * @property {Array<object>} braziers
  * @property {Array<object>} portals
  * @property {Array<{id:number, monsterId:string, x:number, y:number}>} enemySpawns
  * @property {Array<object>} zones
@@ -120,7 +115,6 @@ export function mapWorldConfig(map) {
     cityBounds: def.bounds,
     buildings: def.buildings,
     trees: def.trees,
-    walls: def.walls,
     gates: def.gates,
     portals: def.portals
   };
