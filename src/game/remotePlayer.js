@@ -5,6 +5,7 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
+import { ensureVfxTexture } from "./lazyAssets.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
 
 const S = WORLD_SCALE;
@@ -261,6 +262,8 @@ export class RemotePlayer {
    */
   showFormation(key = "vfx-la-han-tran", scale = 0.6) {
     if (!this.container || typeof this.scene?.add?.sprite !== "function") return;
+    // Queue the sheet on first use; skip this frame while it downloads.
+    ensureVfxTexture(this.scene, key);
     if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
     const animKey = `${key}-spin`;

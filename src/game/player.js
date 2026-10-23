@@ -7,6 +7,7 @@ import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
+import { ensureVfxTexture } from "./lazyAssets.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE, BASE_WALK_SPEED } from "./worldConfig.js";
 import {
   BASE_ATTACK,
@@ -593,6 +594,9 @@ export class Player {
    */
   showFormation(key = "vfx-la-han-tran", scale = 0.6) {
     if (!this.visual || typeof this.scene?.add?.sprite !== "function") return;
+    // The formation sheet may not be loaded yet; queue it and bail out until the
+    // next update retries (the buff re-applies the ring every frame).
+    ensureVfxTexture(this.scene, key);
     if (this.scene.textures?.exists && !this.scene.textures.exists(key)) return;
 
     const animKey = `${key}-spin`;

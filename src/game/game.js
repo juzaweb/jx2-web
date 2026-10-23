@@ -45,7 +45,8 @@ const MARKET_WORLD_CONFIG = {
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
 import { loadSkillLoadout } from "./skillLoadout.js";
-import { normalizeSect } from "./skills.js";
+import { normalizeSect, skillsForSect } from "./skills.js";
+import { ensureHeroBodyTexture, ensureSectVfx } from "./lazyAssets.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -58,11 +59,12 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   preload() {
-    // Baked body sheets: four direction rows x four walk frames. The procedural
-    // rig in heroRig.js remains the fallback when a sheet is unavailable.
-    for (const { key, url } of Object.values(HERO_BODY_TEXTURES)) {
-      if (this.textures.exists(key)) continue;
-      this.load.spritesheet(key, url, {
+    // Only the active character's walk sheet is needed at boot; the other gender
+    // is queued the first time the player switches (see ensureHeroBodyTexture).
+    const gender = normalizeGender(readSession()?.activeCharacter?.gender);
+    const bodySheet = HERO_BODY_TEXTURES[gender];
+    if (!this.textures.exists(bodySheet.key)) {
+      this.load.spritesheet(bodySheet.key, bodySheet.url, {
         frameWidth: HERO_BODY.frameWidth,
         frameHeight: HERO_BODY.frameHeight
       });
@@ -84,18 +86,8 @@ export class JiangHuScene extends Phaser.Scene {
     for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
       this.load.image(key, url);
     }
-    if (!this.textures.exists("vfx-dai-tu-di-chuong")) {
-      this.load.spritesheet("vfx-dai-tu-di-chuong", "/skills/vfx/dai_tu_di_chuong/sheet.png", {
-        frameWidth: 256,
-        frameHeight: 256
-      });
-    }
-    if (!this.textures.exists("vfx-la-han-tran")) {
-      this.load.spritesheet("vfx-la-han-tran", "/skills/vfx/la_han_tran/sheet.png", {
-        frameWidth: 256,
-        frameHeight: 256
-      });
-    }
+    // Skill VFX sheets are intentionally not loaded here: they are pulled in on
+    // demand once the hero's sect is known (see ensureSectVfx).
   }
 
   create() {
@@ -151,6 +143,11 @@ export class JiangHuScene extends Phaser.Scene {
       initialGender
     );
     this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
+    // Pull this sect's skill art in the background instead of every VFX sheet.
+    // Sessions without a chosen character (login screen, guests) download none.
+    if (session?.activeCharacter?.sect) {
+      ensureSectVfx(this, skillsForSect(session.activeCharacter.sect));
+    }
     this.enemyManager = new EnemyManager(this);
     // Biện Kinh is a safe city, so the offline roster starts empty; the server
     // populates enemies for maps that have them.
@@ -467,6 +464,7 @@ export class JiangHuScene extends Phaser.Scene {
       }),
       bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
         this.player?.setSect(normalizeSect(sect));
+        if (sect) ensureSectVfx(this, skillsForSect(sect));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
@@ -499,7 +497,13 @@ export class JiangHuScene extends Phaser.Scene {
         }
       }),
       bridge.on(EVENTS.SET_PLAYER_GENDER, (gender) => {
-        this.player?.setGender(gender);
+        const next = normalizeGender(gender);
+        if (ensureHeroBodyTexture(this, next)) {
+          this.player?.setGender(next);
+          return;
+        }
+        // Sheet still downloading: keep the current look, then swap it in.
+        this.load.once("complete", () => this.player?.setGender(next));
       }),
       bridge.on(EVENTS.ACTION_CHAT, (payload) => {
         if (this.networkClient?.isConnected) {

@@ -9,6 +9,7 @@
 
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionVector } from "./heroDirections.js";
+import { ensureVfxTexture } from "./lazyAssets.js";
 
 const DEPTH_BONUS = 12;
 
@@ -194,6 +195,9 @@ function playSpriteCastVfx(scene, skill, player, target) {
  */
 export function playSkillCastVfx(scene, player, skill, target = null) {
   if (!scene || !player?.sprite || !skill?.vfx) return;
+  // Sprite VFX sheets download on first use; a not-yet-ready sheet simply skips
+  // its visual for this cast instead of blocking the skill.
+  ensureVfxTexture(scene, skill.vfx.sprite);
   const p = baseAt(player.x, player.y);
   const color = skill.vfx.color || 0xffd166;
   const facingRight = player.visual?.scaleX >= 0;
