@@ -1,8 +1,9 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import en from "./locales/en.js";
 import vi from "./locales/vi.js";
 import zh from "./locales/zh.js";
-import { normalizeLanguage, translateFor } from "./translator.js";
+import { detectLanguage, normalizeLanguage, setRuntimeLanguage, translateFor } from "./translator.js";
 import { INVENTORY_ITEMS, QUICK_ITEMS } from "../game/items.js";
 
 const flattenKeys = (dictionary, prefix = "") =>
@@ -10,6 +11,26 @@ const flattenKeys = (dictionary, prefix = "") =>
     const path = prefix ? `${prefix}.${key}` : key;
     return value && typeof value === "object" ? flattenKeys(value, path) : [path];
   });
+
+describe("detectLanguage & persistence", () => {
+  it("defaults to 'vi' when localStorage is empty", () => {
+    window.localStorage.removeItem("jx2_language");
+    expect(detectLanguage()).toBe("vi");
+  });
+
+  it("returns stored language when set in localStorage", () => {
+    window.localStorage.setItem("jx2_language", "en");
+    expect(detectLanguage()).toBe("en");
+    window.localStorage.removeItem("jx2_language");
+  });
+
+  it("persists language using setRuntimeLanguage", () => {
+    setRuntimeLanguage("zh");
+    expect(window.localStorage.getItem("jx2_language")).toBe("zh");
+    expect(detectLanguage()).toBe("zh");
+    window.localStorage.removeItem("jx2_language");
+  });
+});
 
 describe("normalizeLanguage", () => {
   it("accepts supported codes and regional variants", () => {
