@@ -12,6 +12,7 @@ export function HotbarDock({
   onUseItem,
   onInventory,
   onCharacter,
+  onSkills,
   onOpenHelp,
   onToggleAudio,
   onLogout,
@@ -212,6 +213,15 @@ export function HotbarDock({
           >
             <span className="sys-ico">🎒</span>
             <span className="sys-lbl">{t("hotbar.inventory")}</span>
+          </button>
+          <button
+            className="sys-btn"
+            id="skills-btn"
+            title={`${t("skills.modalTitle")} (F5)`}
+            onClick={onSkills}
+          >
+            <span className="sys-ico">🥋</span>
+            <span className="sys-lbl">{t("skills.modalTitle")}</span>
           </button>
           <button
             className="sys-btn"

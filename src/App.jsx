@@ -12,6 +12,7 @@ import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
+import { SkillsModal } from "./components/Modals/SkillsModal.jsx";
 import { ShopModal } from "./components/Modals/ShopModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
@@ -110,6 +111,7 @@ export function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
+  const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
   // Both side panels start open so a fresh entry into the world already shows
@@ -386,6 +388,15 @@ export function App() {
     setIsInventoryOpen(false);
   }, []);
 
+  const handleOpenSkills = useCallback(() => {
+    dismissHelp();
+    setIsSkillsOpen(true);
+  }, [dismissHelp]);
+
+  const handleCloseSkills = useCallback(() => {
+    setIsSkillsOpen(false);
+  }, []);
+
   const handleCloseShop = useCallback(() => {
     setShopNpc(null);
     setShopResult(null);
@@ -417,6 +428,7 @@ export function App() {
         isHelpOpen ||
         isInventoryOpen ||
         isCharacterOpen ||
+        isSkillsOpen ||
         isCityMapOpen ||
         !!shopNpc ||
         isLoginOpen ||
@@ -442,7 +454,18 @@ export function App() {
           setIsHelpOpen(false);
           setIsInventoryOpen(false);
           setIsCharacterOpen(false);
+          setIsSkillsOpen(false);
           bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        }
+        return;
+      }
+
+      if (e.key === "F5") {
+        e.preventDefault();
+        if (isSkillsOpen) {
+          handleCloseSkills();
+        } else {
+          handleOpenSkills();
         }
         return;
       }
@@ -481,6 +504,11 @@ export function App() {
 
       if (isInventoryOpen) {
         handleCloseInventory();
+        return;
+      }
+
+      if (isSkillsOpen) {
+        handleCloseSkills();
         return;
       }
 
@@ -590,6 +618,7 @@ export function App() {
   const handleOpenHelp = useCallback(() => {
     setIsInventoryOpen(false);
     setIsCharacterOpen(false);
+    setIsSkillsOpen(false);
     setIsHelpOpen(true);
     bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
   }, []);
@@ -719,6 +748,7 @@ export function App() {
           onUseItem={handleUseItem}
           onInventory={handleOpenInventory}
           onCharacter={handleOpenCharacter}
+          onSkills={handleOpenSkills}
           onOpenHelp={handleOpenHelp}
           onToggleAudio={handleToggleAudio}
           onLogout={handleLogout}
@@ -807,6 +837,17 @@ export function App() {
         gender={normalizeGender(activeCharacter?.gender)}
         onUnequipSlot={handleUnequipSlot}
         onEquipItem={handleEquipItem}
+      />
+
+      {/* Skills Panel Modal (F5) */}
+      <SkillsModal
+        isOpen={isSkillsOpen}
+        onClose={handleCloseSkills}
+        skills={skillsForSect(activeCharacter?.sect)}
+        sect={activeCharacter?.sect || "thieu-lam"}
+        level={stats.level}
+        skillLoadout={skillLoadout}
+        onEquipSkill={handleEquipSkill}
       />
 
       {/* Choose the skill bound to each mouse button */}

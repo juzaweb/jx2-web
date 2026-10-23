@@ -202,7 +202,23 @@ export default {
         "invalid-slot": "Ô chiêu không hợp lệ."
       }
     },
+    modalTitle: "Võ Công",
+    modalHint: "Chiêu thức môn phái đã học. Nhấp vào ô gán phím hoặc gán nhanh phía dưới để gán chiêu thức.",
+    bindToKey: "Gán vào [{key}]",
+    bindLeft: "Gán Chuột Trái",
+    bindRight: "Gán Chuột Phải",
+    cooldownSec: "{sec}s",
+    rangeTag: "Cự ly: {range}",
+    dmgTag: "ST: {pct}%",
     thieuLam: {
+      laHanQuyen: {
+        name: "La Hán Quyền",
+        desc: "Quyền pháp cơ bản Thiếu Lâm, áp sát tấn công mục tiêu."
+      },
+      thieuLamTruongPhap: {
+        name: "Thiếu Lâm Chưởng Pháp",
+        desc: "Chưởng pháp Thiếu Lâm uy lực, gây sát thương cận chiến tầm trung."
+      },
       daiTuDiChuong: {
         name: "Đại Tu Di Chưởng",
         desc: "Chưởng pháp tầm xa, đánh choáng mục tiêu từ xa."
@@ -210,6 +226,60 @@ export default {
       laHanTran: {
         name: "La Hán Trận",
         desc: "Trận pháp hộ thể La Hán, tăng 10% lực tấn công, 20% tốc độ di chuyển và 5% tỉ lệ chí mạng trong 3 phút."
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "Thiếu Dương Kiếm Pháp",
+        desc: "Kiếm pháp cơ bản Võ Đang, linh hoạt nhanh nhẹn."
+      },
+      thaiCucQuyen: {
+        name: "Thái Cực Quyền",
+        desc: "Quyền pháp mượn lực đả lực, gây sát thương chấn động."
+      },
+      tamThanhKiemPhap: {
+        name: "Tam Thanh Kiếm Pháp",
+        desc: "Tuyệt kỹ ba đường kiếm khí liên hoàn tấn công kẻ địch."
+      },
+      toatHongQuanKhuyet: {
+        name: "Toát Hồng Quân Khuyết",
+        desc: "Khí công gia hộ Võ Đang, tăng 15% lực tấn công trong 3 phút."
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "Nga My Kiếm Pháp",
+        desc: "Kiếm pháp thanh thoát dịu dàng, uyển chuyển sát thương."
+      },
+      mongDiepThoiTam: {
+        name: "Mộng Điệp Thôi Tâm",
+        desc: "Kiếm khí tựa bướm vờn, công kích thẳng vào tâm trí mục tiêu."
+      },
+      tuHangPhoDo: {
+        name: "Từ Hàng Phổ Độ",
+        desc: "Phật quang phổ độ, lập tức hồi phục 50 HP cho bản thân."
+      },
+      luuThuyKhanhVan: {
+        name: "Lưu Thủy Khánh Vân",
+        desc: "Thân pháp như mây trôi nước chảy, tăng 25% tốc độ di chuyển."
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "Ngũ Độc Tâm Pháp",
+        desc: "Tâm pháp truyền đời Ngũ Độc, gây sát thương độc tố."
+      },
+      truyTamDoc: {
+        name: "Truy Tâm Độc",
+        desc: "Chưởng khí mang kịch độc xuyên thấu tâm can kẻ địch."
+      },
+      vanDocChieuHong: {
+        name: "Vạn Độc Triệu Cổ",
+        desc: "Triệu hồi vạn cổ độc trùng công kích mục tiêu diện rộng."
+      },
+      uHongPhietAnh: {
+        name: "U Hồn Phiệt Ảnh",
+        desc: "U linh xuất quỷ nhập thần, tăng 10% tỉ lệ chí mạng."
       }
     }
   },
