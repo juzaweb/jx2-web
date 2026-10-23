@@ -42,4 +42,9 @@ describe("CharacterModal stats sheet", () => {
       expect(markup).not.toContain(`data-stat="${key}"`);
     }
   });
+
+  it("renders equipment slots with drag-and-drop attributes", () => {
+    const markup = renderSheet();
+    expect(markup).toContain('class="equip-slot"');
+  });
 });
