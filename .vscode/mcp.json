@@ -1,9 +1,5 @@
 {
   "servers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
-    },
     "codegraph": {
       "command": "codegraph",
       "args": ["serve", "--mcp"]
