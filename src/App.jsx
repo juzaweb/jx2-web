@@ -631,6 +631,13 @@ export function App() {
         <div className="mobile-orientation-icon">📱</div>
         <div className="mobile-orientation-title">{t("app.rotateDeviceTitle")}</div>
         <div className="mobile-orientation-desc">{t("app.rotateDeviceDesc")}</div>
+        <button
+          type="button"
+          className="mobile-orientation-btn"
+          onClick={() => requestLandscapeFullscreen(true)}
+        >
+          {t("app.rotateDeviceButton")}
+        </button>
       </div>
 
       {/* Phaser Canvas Engine */}
@@ -676,6 +683,7 @@ export function App() {
           leftSkillSlot={leftSkillSlot}
           skillLoadout={skillLoadout}
           onPickSkill={handleOpenSkillPicker}
+          onRotateScreen={() => requestLandscapeFullscreen(true)}
         />
 
         <MobileControls

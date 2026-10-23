@@ -7,6 +7,7 @@ export default {
     joinLog: "侠客 {name} 已加入 {server}！",
     rotateDeviceTitle: "请横屏游玩",
     rotateDeviceDesc: "为了获得最佳游戏体验，请将手机旋转至横屏模式。",
+    rotateDeviceButton: "旋转屏幕",
     log: {
       welcome: "欢迎侠客来到汴京。",
       near: "浪客：江湖险恶，请多保重！",
@@ -91,7 +92,9 @@ export default {
     help: "秘笈",
     pkTitle: "开启/关闭 PK 标记",
     pkOn: "PK",
-    pkOff: "和平"
+    pkOff: "和平",
+    rotateTitle: "横屏旋转屏幕",
+    rotate: "旋转"
   },
   help: {
     eyebrow: "行走江湖秘笈",

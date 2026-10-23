@@ -1634,6 +1634,29 @@ body {
     color: #c9d0ca;
     max-width: 280px;
     line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .mobile-orientation-btn {
+    background: linear-gradient(180deg, #d4af37 0%, #9e7b26 100%);
+    border: 1px solid #ffeaa7;
+    color: #171712;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  }
+
+  .mobile-orientation-btn:hover {
+    filter: brightness(1.15);
+  }
+
+  .mobile-orientation-btn:active {
+    transform: scale(0.97);
   }
 
   @keyframes rotate-phone {
