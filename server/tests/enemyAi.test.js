@@ -41,6 +41,24 @@ test("Enemy AI suite", async (t) => {
     );
   });
 
+  await t.test("gives up the chase at the leash and walks home", () => {
+    const leash = ENEMY_TUNING.leashRange;
+    // The bait stands clear of the camp, so the wolf defends its ground instead.
+    const farFromHome = { ...wolf(), x: 840 + leash + 200 };
+    const bait = { id: "bait", x: farFromHome.x + 100, y: 600 };
+
+    const next = stepEnemy(farFromHome, [bait], 1000);
+    assert.ok(next.x < farFromHome.x, "heads home instead of following the player east");
+  });
+
+  await t.test("still chases a player who stands inside the camp", () => {
+    const shifted = { ...wolf(), x: 840 + 1000 };
+    const visitor = { id: "visitor", x: 840 + 1400, y: 600 };
+
+    const next = stepEnemy(shifted, [visitor], 1000);
+    assert.ok(next.x > shifted.x, "the camp is defended inside the leash");
+  });
+
   await t.test("walks back home when nobody is in range, and settles there", () => {
     const away = { ...wolf(), x: 940, y: 600 };
 

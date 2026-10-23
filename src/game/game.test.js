@@ -36,6 +36,22 @@ const bindTeardown = () => {
   return { registered, scope, shutdown };
 };
 
+describe("JiangHuScene map selection", () => {
+  const resolve = (scope, saved) =>
+    JiangHuScene.prototype.resolveInitialMapId.call(scope, saved);
+
+  it("prefers an explicit request, then the saved map, then the default", () => {
+    expect(resolve({ requestedMapId: "dong-mon-thanh" }, { mapId: "market" })).toBe(
+      "dong-mon-thanh"
+    );
+    expect(resolve({ requestedMapId: null }, { mapId: "dong-mon-thanh" })).toBe(
+      "dong-mon-thanh"
+    );
+    expect(resolve({ requestedMapId: null }, null)).toBe("market");
+    expect(resolve({ requestedMapId: null }, { mapId: "atlantis" })).toBe("market");
+  });
+});
+
 describe("JiangHuScene teardown", () => {
   it("closes the multiplayer client when Phaser shuts the scene down or destroys it", () => {
     const { registered, scope, shutdown } = bindTeardown();
@@ -197,7 +213,7 @@ describe("JiangHuScene.interactWithNearbyNpc", () => {
       started: true,
       isPaused: false,
       player: { x: 105, y: 105, stopMovement },
-      npcs: [npc],
+      stage: { npcs: [npc] },
       shopFlow: { open: openShop },
       uiBridge: { addLog }
     };
@@ -217,7 +233,7 @@ describe("JiangHuScene.interactWithNearbyNpc", () => {
       started: true,
       isPaused: false,
       player: { x: 100, y: 100, stopMovement },
-      npcs: [npc],
+      stage: { npcs: [npc] },
       shopFlow: { open: openShop },
       uiBridge: { addLog }
     };

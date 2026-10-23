@@ -16,7 +16,10 @@ export const ENEMY_TUNING = {
   chaseSpeed: 43 * POS * WORLD_SPEED_SCALE,
   stopDistance: 52 * WORLD_SCALE,
   idleSpeed: 22 * POS * WORLD_SPEED_SCALE,
-  homeEpsilon: 10 * WORLD_SCALE
+  homeEpsilon: 10 * WORLD_SCALE,
+  // How far a monster may stray from its spawn before it gives up the chase and
+  // walks home. Keeps one hunting camp from emptying into the next one.
+  leashRange: 560 * WORLD_SCALE
 };
 
 /**
@@ -38,11 +41,16 @@ export const BITE_TUNING = {
 
 /**
  * Nearest living player inside the aggro range.
- * @param {{x:number, y:number}} enemy
+ *
+ * A monster may carry its own `tuning` block (see `src/game/enemyCatalog.js`);
+ * anything missing falls back to the shared defaults, so a plain `{x, y}` enemy
+ * behaves exactly like the legacy wolf.
+ * @param {{x:number, y:number, tuning?:object}} enemy
  * @param {Array<{id:string, x:number, y:number}>} players
  * @returns {?{id:string, x:number, y:number}} null when nobody is in range
  */
-export function nearestPlayerInRange(enemy, players = []) {
+export function nearestPlayerInRange(enemy, players = [], tuning = enemy?.tuning || ENEMY_TUNING) {
+  const tuningBlock = tuning || ENEMY_TUNING;
   let nearest = null;
   let nearestDistance = Infinity;
 
@@ -50,7 +58,7 @@ export function nearestPlayerInRange(enemy, players = []) {
     if (!Number.isFinite(player?.x) || !Number.isFinite(player?.y)) return;
 
     const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (distance < ENEMY_TUNING.aggroRange && distance < nearestDistance) {
+    if (distance < tuningBlock.aggroRange && distance < nearestDistance) {
       nearest = player;
       nearestDistance = distance;
     }
@@ -86,31 +94,36 @@ const moveToward = (enemy, targetX, targetY, maxStep) => {
  * position once inside the stop distance, otherwise walk back home.
  * The caller owns the dead check (the server skips `isDead` enemies before
  * stepping them).
- * @param {{x:number, y:number, homeX:number, homeY:number}} enemy
+ * @param {{x:number, y:number, homeX:number, homeY:number, tuning?:object}} enemy
  * @param {Array<Object>} players
  * @param {number} deltaMs
  * @returns {{x:number, y:number}} authoritative next position
  */
 export function stepEnemy(enemy, players = [], deltaMs = 0) {
+  const tuning = enemy?.tuning || ENEMY_TUNING;
   const seconds = Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0) / 1000;
-  const target = nearestPlayerInRange(enemy, players);
+  const target = nearestPlayerInRange(enemy, players, tuning);
+  const leash = tuning.leashRange ?? ENEMY_TUNING.leashRange;
+  // The leash is measured on the *player*, not on the monster: a camp defends the
+  // ground around its spawn and cannot be pulled across the map. Measuring the
+  // player keeps the rule stateless, so there is no chase/return oscillation at
+  // the boundary — the hero simply has to leave the camp for the chase to end.
+  const defended =
+    target && Math.hypot(target.x - enemy.homeX, target.y - enemy.homeY) <= leash;
 
-  if (target) {
+  if (defended) {
     const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
-    if (distance <= ENEMY_TUNING.stopDistance) {
+    if (distance <= tuning.stopDistance) {
       return { x: enemy.x, y: enemy.y };
     }
-    // Stop at the stop distance: a long tick must not walk the wolf onto the player
-    const advance = Math.min(
-      ENEMY_TUNING.chaseSpeed * seconds,
-      distance - ENEMY_TUNING.stopDistance
-    );
+    // Stop at the stop distance: a long tick must not walk the monster onto the player
+    const advance = Math.min(tuning.chaseSpeed * seconds, distance - tuning.stopDistance);
     return moveToward(enemy, target.x, target.y, advance);
   }
 
   const homeDistance = Math.hypot(enemy.homeX - enemy.x, enemy.homeY - enemy.y);
-  if (homeDistance <= ENEMY_TUNING.homeEpsilon) {
+  if (homeDistance <= tuning.homeEpsilon) {
     return { x: enemy.x, y: enemy.y };
   }
-  return moveToward(enemy, enemy.homeX, enemy.homeY, ENEMY_TUNING.idleSpeed * seconds);
+  return moveToward(enemy, enemy.homeX, enemy.homeY, tuning.idleSpeed * seconds);
 }

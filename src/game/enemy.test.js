@@ -9,7 +9,7 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { Wolf } from "./enemy.js";
+import { EnemyManager, Wolf } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
 import { ENEMY_TUNING } from "./enemyAi.js";
 
@@ -21,7 +21,10 @@ const createScene = ({ isConnected = false } = {}) => {
       setDepth: () => node,
       setPosition: () => node,
       setScale: () => node,
-      setVisible: () => node,
+      setVisible: (value) => {
+        node.visible = value;
+        return node;
+      },
       setAlpha: () => node,
       setOrigin: () => node,
       setStrokeStyle: () => node,
@@ -89,6 +92,67 @@ const createWolf = ({ isConnected = true } = {}) => {
   const scene = createScene({ isConnected });
   return { scene, wolf: new Wolf(scene, 840, 600, 0) };
 };
+
+describe("Enemies are built from the shared catalog", () => {
+  it("defaults to the legacy market wolf", () => {
+    const { wolf } = createWolf();
+    expect(wolf.monsterId).toBe("soi-xam");
+    expect(wolf.name).toBe("Sói Xám");
+    expect(wolf.level).toBe(5);
+    expect(wolf.maxHp).toBe(45);
+    expect(wolf.isBoss).toBe(false);
+  });
+
+  it("takes name, level and health from the requested monster", () => {
+    const scene = createScene();
+    const enemy = new Wolf(scene, 12600, 8200, 7, "ma-giao-de-tu");
+
+    expect(enemy.monsterId).toBe("ma-giao-de-tu");
+    expect(enemy.name).toBe("Ma Giáo Đệ Tử");
+    expect(enemy.level).toBe(29);
+    expect(enemy.maxHp).toBe(420);
+    expect(enemy.isBoss).toBe(false);
+  });
+
+  it("falls back to the wolf for an unknown monster id", () => {
+    const scene = createScene();
+    const enemy = new Wolf(scene, 100, 100, 1, "khong-ton-tai");
+    expect(enemy.monsterId).toBe("soi-xam");
+  });
+
+  it("shows its name only while the hero could see it", () => {
+    const { wolf } = createWolf({ isConnected: false });
+
+    wolf.update(0, 16, player(900, 600), () => {});
+    expect(wolf.nameText.visible).toBe(true);
+
+    // Far across the clearing: the label is dropped, the monster is not.
+    wolf.update(16, 16, player(4300, 600), () => {});
+    expect(wolf.nameText.visible).toBe(false);
+    expect(wolf.sprite.active).toBe(true);
+  });
+});
+
+describe("EnemyManager roster lifecycle", () => {
+  const managerScene = () => ({
+    ...createScene(),
+    physics: { add: { sprite: createScene().physics.add.sprite } }
+  });
+
+  it("clears every enemy when the map changes but keeps the collider group", () => {
+    const scene = managerScene();
+    const manager = new EnemyManager(scene);
+    const group = { add() {}, clear() {}, destroy() {} };
+    manager.group = group;
+    manager.enemies = [new Wolf(scene, 100, 100, 0), new Wolf(scene, 200, 200, 1)];
+
+    expect(manager.getAll()).toHaveLength(2);
+    manager.clear();
+    expect(manager.getAll()).toHaveLength(0);
+    // World colliders point at this group, so it must survive a roster swap.
+    expect(manager.group).toBe(group);
+  });
+});
 
 const player = (x, y) => ({ x, y, sprite: { x, y } });
 

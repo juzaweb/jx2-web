@@ -15,6 +15,7 @@ import { DROP_TABLE_MAP } from "./items.js";
  * @property {number|null} y
  * @property {number} exp
  * @property {number} coins
+ * @property {string} [name] Display name of the defeated monster, when sent
  */
 
 /**
@@ -49,7 +50,7 @@ export function parseEnemyReward(payload = {}) {
     }
   }
 
-  return {
+  const reward = {
     enemyId: payload.enemyId,
     attackerId: typeof payload.attackerId === "string" ? payload.attackerId : null,
     x: Number.isFinite(payload.x) ? payload.x : null,
@@ -57,4 +58,12 @@ export function parseEnemyReward(payload = {}) {
     exp,
     coins
   };
+
+  // Optional: lets the combat log name the monster. Omitted entirely when absent,
+  // so the historical payload shape is unchanged.
+  if (typeof payload.name === "string" && payload.name.length > 0) {
+    reward.name = payload.name;
+  }
+
+  return reward;
 }

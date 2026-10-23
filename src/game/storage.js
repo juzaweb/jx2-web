@@ -82,6 +82,9 @@ export class StorageManager {
     try {
       const payload = {
         stats: data.stats,
+        // Which map the saved position belongs to (see src/game/maps). Older
+        // saves have no mapId and simply fall back to the default map.
+        mapId: typeof data.mapId === "string" ? data.mapId : undefined,
         position: data.position,
         questRewarded: !!data.questRewarded,
         audioEnabled: data.audioEnabled,

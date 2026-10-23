@@ -873,7 +873,11 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.equal(defeat.payload.victimId, "usr_pk2");
     assert.equal(defeat.payload.attackerId, "usr_pk1");
     assert.equal(defeat.payload.attackerName, "Kiếm Khách");
-    assert.deepEqual(defeat.payload.respawn, { x: MARKET_SPAWN.x, y: MARKET_SPAWN.y });
+    assert.deepEqual(defeat.payload.respawn, {
+      mapId: "market",
+      x: MARKET_SPAWN.x,
+      y: MARKET_SPAWN.y
+    });
 
     const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
     assert.equal(restored.payload.maxHp, 100);
@@ -987,15 +991,15 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    client1.send({ type: "player_join", payload: { id: "bp1", username: "Bp1", x: 100, y: 100 } });
+    client1.send({ type: "player_join", payload: { id: "bp1", username: "Bp1", x: 3000, y: 3000 } });
     await client1.waitFor((m) => m.type === "init_world");
-    client2.send({ type: "player_join", payload: { id: "bp2", username: "Bp2", x: 100, y: 100 } });
+    client2.send({ type: "player_join", payload: { id: "bp2", username: "Bp2", x: 3000, y: 3000 } });
     await client2.waitFor((m) => m.type === "init_world");
     await client1.waitFor((m) => m.type === "player_joined");
 
     const threshold = gameSocket.maxBufferedBytes;
     gameSocket.maxBufferedBytes = 0; // every socket now counts as "lagging"
-    client1.send({ type: "player_move", payload: { x: 110, y: 110 } });
+    client1.send({ type: "player_move", payload: { x: 3010, y: 3010 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     gameSocket.maxBufferedBytes = threshold;
 
@@ -1005,12 +1009,79 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
       "A skipped broadcast never reaches the lagging socket"
     );
 
-    client1.send({ type: "player_move", payload: { x: 120, y: 120 } });
+    client1.send({ type: "player_move", payload: { x: 3020, y: 3020 } });
     const moved = await client2.waitFor((m) => m.type === "player_moved");
-    assert.equal(moved.payload.x, 120, "With the threshold restored, updates flow again");
+    assert.equal(moved.payload.x, 3020, "With the threshold restored, updates flow again");
 
     await client1.close();
     await client2.close();
+  });
+
+  await t.test("Map travel: a portal swaps the map, the roster and the peer list", async () => {
+    const marketObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const traveller = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    marketObserver.send({ type: "player_join", payload: { id: "travel_2", username: "T2", x: 6400, y: 6050 } });
+    await marketObserver.waitFor((m) => m.type === "init_world");
+
+    traveller.send({ type: "player_join", payload: { id: "travel_1", username: "T1", x: 6400, y: 6050 } });
+    const init = await traveller.waitFor((m) => m.type === "init_world");
+    assert.equal(init.payload.mapId, "market", "A join without a map id lands in Biện Kinh");
+    await marketObserver.waitFor((m) => m.type === "player_joined");
+
+    // The market portal takes the hero east.
+    traveller.send({ type: "map_change", payload: { portalId: "east-gate" } });
+    const changed = await traveller.waitFor((m) => m.type === "map_changed");
+
+    assert.equal(changed.payload.mapId, "dong-mon-thanh");
+    assert.deepEqual(changed.payload.spawn, { x: 1200, y: 7000 });
+    assert.equal(changed.payload.enemies.length, 270, "The forest ships its full hunting roster");
+    assert.ok(changed.payload.enemies.every((enemy) => enemy.mapId === "dong-mon-thanh"));
+    assert.ok(
+      changed.payload.enemies.every((enemy) => !enemy.isBoss),
+      "The forest has no boss"
+    );
+
+    // The roster spans all three level bands.
+    const levels = changed.payload.enemies.map((enemy) => enemy.level);
+    assert.ok(levels.some((level) => level <= 10), "Tier 1 monsters");
+    assert.ok(levels.some((level) => level > 10 && level <= 20), "Tier 2 monsters");
+    assert.ok(levels.some((level) => level > 20), "Tier 3 monsters");
+
+    // The old map sees them leave, and only the original join was announced there.
+    await marketObserver.waitFor((m) => m.type === "player_left" && m.payload.id === "travel_1");
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(
+      marketObserver.messages.filter(
+        (m) => m.type === "player_joined" && m.payload.player.id === "travel_1"
+      ).length,
+      1,
+      "Arriving on the town is not announced to the market"
+    );
+
+    // The new map's roster is the one this player can hit.
+    traveller.send({ type: "enemy_hit", payload: { id: 0, damage: 5 } });
+    const hit = await traveller.waitFor((m) => m.type === "enemy_hit");
+    assert.equal(hit.payload.mapId, "dong-mon-thanh");
+    assert.equal(hit.payload.id, 0);
+
+    // Unknown portals, and portals of a map the player is not on, are refused.
+    traveller.send({ type: "map_change", payload: { portalId: "nowhere" } });
+    const rejected = await traveller.waitFor((m) => m.type === "map_change_rejected");
+    assert.equal(rejected.payload.mapId, "dong-mon-thanh");
+
+    marketObserver.send({ type: "map_change", payload: { portalId: "west-gate" } });
+    const rejected2 = await marketObserver.waitFor((m) => m.type === "map_change_rejected");
+    assert.equal(rejected2.payload.mapId, "market", "The market has no west-gate portal");
+
+    // Returning through the town portal brings the hero back west.
+    traveller.send({ type: "map_change", payload: { portalId: "west-gate" } });
+    const back = await traveller.waitFor((m) => m.type === "map_changed");
+    assert.equal(back.payload.mapId, "market");
+    assert.deepEqual(back.payload.spawn, { x: 10300, y: 5500 });
+
+    await traveller.close();
+    await marketObserver.close();
   });
 
   await t.test("Teardown test server", async () => {

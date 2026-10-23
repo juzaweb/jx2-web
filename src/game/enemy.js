@@ -1,39 +1,80 @@
 import * as Phaser from "phaser";
-import { stepEnemy, WOLF_COMBAT, BITE_TUNING } from "./enemyAi.js";
+import { stepEnemy, BITE_TUNING } from "./enemyAi.js";
+import { getMonster } from "./enemyCatalog.js";
+import { drawMonster } from "./enemyVisuals.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
 
 const S = WORLD_SCALE;
 const POS = WORLD_POSITION_SCALE;
+/** Vertical offset (rig units) for the health bar and name label. */
+const LABEL_OFFSET = 20;
+const NAME_OFFSET = 29;
+/**
+ * Roughly the camera's visible width (15 tiles × 380 px), so a name stays on
+ * screen while the monster does and is skipped once it is far outside the view.
+ */
+const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
 
-export class Wolf {
+/** Client-driven respawn delay for regular monsters; a boss overrides it. */
+export const OFFLINE_RESPAWN_MS = 9000;
+
+/**
+ * One monster instance. Its numbers come from the catalogue
+ * (`src/game/enemyCatalog.js`), so adding a species never means editing this
+ * class — only its `visual` block has to be understood by `enemyVisuals.js`.
+ */
+export class Enemy {
   /**
    * @param {Phaser.Scene} scene
    * @param {number} x
    * @param {number} y
    * @param {number} id
+   * @param {string} [monsterId]
    */
-  constructor(scene, x, y, id) {
+  constructor(scene, x, y, id, monsterId = "soi-xam") {
     this.scene = scene;
     this.id = id;
+    this.monster = getMonster(monsterId);
+    this.monsterId = this.monster.id;
+    this.name = this.monster.name;
+    this.level = this.monster.level;
+    this.isBoss = !!this.monster.isBoss;
+
     this.homeX = x;
     this.homeY = y;
-    this.hp = 45;
-    this.maxHp = 45;
-    this.attack = WOLF_COMBAT.attack;
-    this.defense = WOLF_COMBAT.defense;
-    this.critRate = WOLF_COMBAT.critRate;
-    this.critDamage = WOLF_COMBAT.critDamage;
-    this.stats = { ...WOLF_COMBAT };
+
+    this.maxHp = this.monster.maxHp;
+    this.hp = this.maxHp;
+    this.attack = this.monster.attack;
+    this.defense = this.monster.defense;
+    this.critRate = this.monster.critRate;
+    this.critDamage = this.monster.critDamage;
+    this.stats = {
+      attack: this.attack,
+      defense: this.defense,
+      critRate: this.critRate,
+      critDamage: this.critDamage
+    };
+    /** Per-species AI tuning; `stepEnemy` falls back to the shared defaults. */
+    this.tuning = this.monster.ai || null;
+    /** Bosses must not pop back up on the regular ten-second timer. */
+    this.respawnMs = Number.isFinite(this.monster.respawnMs)
+      ? this.monster.respawnMs
+      : OFFLINE_RESPAWN_MS;
+    this.respawnAt = 0;
+
+    this.visualScale = S * (this.monster.visual?.scale || 1);
+
     this.isDead = false;
     this.nextBite = 0;
-    // Skill control state: a stunned wolf holds still, a slowed one moves slower.
+    // Skill control state: a stunned monster holds still, a slowed one moves slower.
     this.stunUntil = 0;
     this.slowUntil = 0;
     this.slowPct = 0;
-    // Where the server last reported this wolf (see applyServerState). Left null
-    // until then, so a wolf never slides toward a position nobody has claimed.
+    // Where the server last reported this monster (see applyServerState). Left
+    // null until then, so it never slides toward a position nobody has claimed.
     this.targetX = null;
     this.targetY = null;
 
@@ -43,7 +84,9 @@ export class Wolf {
 
   createSprite(x, y) {
     this.sprite = this.scene.physics.add.sprite(x, y, "entity-dot");
-    this.sprite.setSize(30 * S, 22 * S);
+    const bodyW = (this.isBoss ? 46 : 30) * S;
+    const bodyH = (this.isBoss ? 32 : 22) * S;
+    this.sprite.setSize(bodyW, bodyH);
     this.sprite.body.setCollideWorldBounds(true);
     this.sprite.body.setDrag(250, 250);
     this.sprite.body.setMaxVelocity(90 * POS * WORLD_SPEED_SCALE, 90 * POS * WORLD_SPEED_SCALE);
@@ -55,39 +98,43 @@ export class Wolf {
     const iso = toIso(x, y);
     const depth = isoDepth(x, y);
     this.wolfVisual = this.scene.add.container(iso.x, iso.y).setDepth(depth);
-    this.wolfVisual.setScale(S);
-    this.drawWolf(this.wolfVisual);
+    this.wolfVisual.setScale(this.visualScale);
+    drawMonster(this.scene, this.wolfVisual, this.monster);
 
-    this.hpBack = this.scene.add.rectangle(iso.x, iso.y - 20 * S, 38 * S, 4 * S, 0x1b1714).setDepth(depth + 1);
-    this.hpFill = this.scene.add.rectangle(iso.x, iso.y - 20 * S, 36 * S, 2 * S, 0xc94a3f).setDepth(depth + 2);
-    this.nameText = this.scene.add.text(iso.x, iso.y - 29 * S, "Sói Xám", {
-      fontFamily: "Arial, Tahoma, sans-serif",
-      fontSize: "10px",
-      color: "#e5d6bb",
-      stroke: "#1c201a",
-      strokeThickness: 2
-    }).setOrigin(0.5).setDepth(depth + 3);
+    this.barWidth = (this.isBoss ? 52 : 38) * S;
+    this.hpBack = this.scene.add
+      .rectangle(iso.x, iso.y - LABEL_OFFSET * S, this.barWidth, 4 * S, 0x1b1714)
+      .setDepth(depth + 1);
+    this.hpFill = this.scene.add
+      .rectangle(iso.x, iso.y - LABEL_OFFSET * S, this.barWidth - 2 * S, 2 * S, 0xc94a3f)
+      .setDepth(depth + 2);
+
+    this.nameText = this.scene.add
+      .text(iso.x, iso.y - NAME_OFFSET * S, `${this.name} · Lv${this.level}`, {
+        fontFamily: "Arial, Tahoma, sans-serif",
+        fontSize: "10px",
+        color: this.isBoss ? "#f5c542" : "#e5d6bb",
+        stroke: "#1c201a",
+        strokeThickness: 2
+      })
+      .setOrigin(0.5)
+      .setDepth(depth + 3);
     this.nameText.setScale(S);
   }
 
-  drawWolf(container) {
-    const shadow = this.scene.add.ellipse(0, 13, 42, 12, 0x0b100d, 0.35);
-    const body = this.scene.add.ellipse(0, 0, 36, 20, 0x747b79).setStrokeStyle(2, 0x353d3a);
-    const head = this.scene.add.circle(17, -6, 10, 0x929b96).setStrokeStyle(2, 0x454b48);
-    const ear = this.scene.add.triangle(16, -16, -5, 8, 0, -7, 6, 7, 0x626b67);
-    const muzzle = this.scene.add.triangle(27, -2, -2, -5, 9, 0, -2, 5, 0xadb4a8);
-    const eye = this.scene.add.circle(20, -8, 2, 0xffd26b);
-    const leg1 = this.scene.add.rectangle(-10, 11, 5, 12, 0x424b48);
-    const leg2 = this.scene.add.rectangle(8, 11, 5, 12, 0x424b48);
-    const tail = this.scene.add.line(-19, 0, -1, 0, -10, -8, 0x858c87).setLineWidth(4);
-
-    container.add([shadow, tail, body, head, ear, muzzle, eye, leg1, leg2]);
-  }
-
   update(time, delta, player, onBite) {
-    if (!this.sprite.active || this.isDead) return;
+    if (!this.sprite.active) return;
 
-    // A stunned wolf holds position; a slowed one advances its clock slower.
+    // Client-owned rosters bring monsters back on their own timer; the server
+    // owns respawns whenever it is connected (see scheduleEnemyRespawn).
+    if (this.isDead) {
+      if (!this.usesServerMovement() && this.respawnAt && time >= this.respawnAt) {
+        this.revive();
+      }
+      return;
+    }
+
+    // A stunned monster holds position; a slowed one advances its clock slower.
     const stunned = time < this.stunUntil;
     const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
 
@@ -109,15 +156,20 @@ export class Wolf {
     this.wolfVisual.setPosition(iso.x, iso.y);
     this.wolfVisual.setDepth(depth);
 
-    this.hpBack.setPosition(iso.x, iso.y - 20 * S);
+    const ratio = Math.max(0, Math.min(1, this.hp / this.maxHp));
+    this.hpBack.setPosition(iso.x, iso.y - LABEL_OFFSET * S);
     this.hpBack.setDepth(depth + 1);
-    this.hpFill.setPosition(iso.x - 19 * S + (this.hp / this.maxHp) * 19 * S, iso.y - 20 * S);
+    this.hpFill.setPosition(
+      iso.x - (this.barWidth / 2) * (1 - ratio),
+      iso.y - LABEL_OFFSET * S
+    );
     this.hpFill.setDepth(depth + 2);
-    this.hpFill.width = Math.max(0.5, 36 * S * (this.hp / this.maxHp));
-    this.nameText.setPosition(iso.x, iso.y - 29 * S);
+    this.hpFill.width = Math.max(0.5, (this.barWidth - 2 * S) * ratio);
+    this.nameText.setPosition(iso.x, iso.y - NAME_OFFSET * S);
     this.nameText.setDepth(depth + 3);
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
+    this.nameText.setVisible(distance <= NAME_VISIBLE_RANGE);
 
     if (distance < BITE_TUNING.range && time > this.nextBite) {
       this.nextBite = time + BITE_TUNING.cooldownMs;
@@ -159,7 +211,13 @@ export class Wolf {
    */
   stepLocally(deltaMs, player) {
     const next = stepEnemy(
-      { x: this.x, y: this.y, homeX: this.homeX, homeY: this.homeY },
+      {
+        x: this.x,
+        y: this.y,
+        homeX: this.homeX,
+        homeY: this.homeY,
+        tuning: this.tuning
+      },
       [{ x: player.x, y: player.y }],
       deltaMs
     );
@@ -178,7 +236,8 @@ export class Wolf {
 
     this.placeAt(next.x, next.y);
     if (Math.abs(next.x - previousX) > 1) {
-      this.wolfVisual.setScale((next.x < previousX ? -1 : 1) * S, S);
+      const facing = next.x < previousX ? -1 : 1;
+      this.wolfVisual.setScale(facing * this.visualScale, this.visualScale);
     }
   }
 
@@ -242,11 +301,18 @@ export class Wolf {
     this.hpBack.setVisible(false);
     this.hpFill.setVisible(false);
     this.nameText.setVisible(false);
+
+    // Only the client-owned roster schedules its own return; the server sends
+    // `enemy_respawned` when it decides the monster is back.
+    if (!this.usesServerMovement()) {
+      this.respawnAt = (this.scene?.time?.now || 0) + this.respawnMs;
+    }
   }
 
   revive() {
     if (!this.sprite.active) return;
     this.isDead = false;
+    this.respawnAt = 0;
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
     this.sprite.body.enable = true;
@@ -257,18 +323,35 @@ export class Wolf {
     this.nameText.setVisible(true);
   }
 
+  /** Release every Phaser object this monster owns. */
+  destroy() {
+    this.sprite?.destroy?.();
+    this.wolfVisual?.destroy?.();
+    this.hpBack?.destroy?.();
+    this.hpFill?.destroy?.();
+    this.nameText?.destroy?.();
+    this.sprite = null;
+    this.wolfVisual = null;
+    this.hpBack = null;
+    this.hpFill = null;
+    this.nameText = null;
+  }
+
   get x() {
-    return this.sprite.x;
+    return this.sprite ? this.sprite.x : this.homeX;
   }
 
   get y() {
-    return this.sprite.y;
+    return this.sprite ? this.sprite.y : this.homeY;
   }
 
   get active() {
-    return this.sprite.active;
+    return !!this.sprite?.active;
   }
 }
+
+/** Backwards-compatible alias: the market wolf used to be its own class. */
+export { Enemy as Wolf };
 
 export class EnemyManager {
   /**
@@ -281,29 +364,63 @@ export class EnemyManager {
   }
 
   /**
-   * @param {Array<[number, number]>} positions spawn points; empty by default in peaceful cities like Biện Kinh
+   * Build the roster. Accepts catalog spawns (`{id, monsterId, x, y}`) and the
+   * legacy `[x, y]` pairs so old call sites keep working.
+   * @param {Array<object|[number, number]>} [spawns]
    */
-  create(positions = []) {
-    this.group = this.scene.physics.add.group();
-    positions.forEach((pos, i) => {
-      const wolf = new Wolf(this.scene, pos[0], pos[1], i);
-      this.group.add(wolf.sprite);
-      this.enemies.push(wolf);
-    });
+  create(spawns = []) {
+    // The physics group is long-lived: the world keeps colliders pointing at it,
+    // so it is emptied rather than replaced when a new roster is built.
+    this.clear();
+    if (!this.group) this.group = this.scene.physics.add.group();
+    spawns.forEach((spawn, index) => this.spawnOne(spawn, index));
+  }
+
+  /**
+   * @param {object|[number, number]} spawn
+   * @param {number} index
+   * @returns {Enemy}
+   */
+  spawnOne(spawn, index) {
+    const isPair = Array.isArray(spawn);
+    const x = isPair ? spawn[0] : spawn.x;
+    const y = isPair ? spawn[1] : spawn.y;
+    const id = isPair ? index : spawn.id ?? index;
+    const monsterId = isPair ? spawn[2] : spawn.monsterId;
+
+    const enemy = new Enemy(this.scene, x, y, id, monsterId);
+    this.group?.add(enemy.sprite);
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  /**
+   * Drop the whole roster (used when travelling to another map). The physics
+   * group stays alive on purpose: the world holds colliders against it, and
+   * destroying the group would leave those colliders pointing at nothing.
+   */
+  clear() {
+    this.enemies.forEach((enemy) => enemy.destroy());
+    this.enemies = [];
+    // Each enemy already released its own sprite, so only the group entries go.
+    this.group?.clear(false, false);
   }
 
   update(time, delta, player, onBite) {
-    this.enemies.forEach((wolf) => {
-      wolf.update(time, delta, player, onBite);
+    this.enemies.forEach((enemy) => {
+      enemy.update(time, delta, player, onBite);
     });
   }
 
+  /**
+   * Client-owned respawn sweep. Each monster carries its own timer, so this just
+   * revives whoever is due (kept for callers that still poke it directly).
+   */
   respawnEnemies() {
-    const aliveCount = this.enemies.filter((w) => w.active && !w.isDead).length;
-    if (aliveCount < 4) {
-      const deadWolves = this.enemies.filter((w) => w.isDead);
-      deadWolves.slice(0, 2).forEach((w) => w.revive());
-    }
+    const now = this.scene?.time?.now || 0;
+    this.enemies.forEach((enemy) => {
+      if (enemy.isDead && enemy.respawnAt && now >= enemy.respawnAt) enemy.revive();
+    });
   }
 
   getAll() {
@@ -327,8 +444,8 @@ export class EnemyManager {
    * @param {Object} state
    */
   applyEnemyState(state = {}) {
-    const wolf = this.getById(state.id);
-    if (wolf) wolf.applyServerState(state);
+    const enemy = this.getById(state.id);
+    if (enemy) enemy.applyServerState(state);
   }
 
   /**
@@ -337,13 +454,21 @@ export class EnemyManager {
    */
   applyServerSnapshot(enemies) {
     if (!Array.isArray(enemies)) return;
-    enemies.forEach((enemy) => {
-      if (!this.getById(enemy.id)) {
-        const wolf = new Wolf(this.scene, enemy.x, enemy.y, enemy.id);
-        this.group.add(wolf.sprite);
-        this.enemies.push(wolf);
+    if (!this.group) this.group = this.scene.physics.add.group();
+
+    enemies.forEach((state) => {
+      if (!this.getById(state.id)) {
+        const enemy = new Enemy(
+          this.scene,
+          state.x,
+          state.y,
+          state.id,
+          state.monsterId
+        );
+        this.group.add(enemy.sprite);
+        this.enemies.push(enemy);
       }
-      this.applyEnemyState(enemy);
+      this.applyEnemyState(state);
     });
   }
 }

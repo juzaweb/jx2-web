@@ -1,10 +1,5 @@
 import { bridge, EVENTS } from "./bridge.js";
 import { applyQuantities, getQuantities } from "./items.js";
-import {
-  MARKET_BOUNDS,
-  MARKET_BUILDINGS,
-  MARKET_TREES
-} from "./marketLayout.js";
 
 export class UIBridgeAdapter {
   constructor() {
@@ -126,7 +121,11 @@ export class UIBridgeAdapter {
       city,
       player,
       enemies,
-      remotePlayers
+      remotePlayers,
+      buildings: worldConfig.buildings || [],
+      trees: worldConfig.trees || [],
+      walls: worldConfig.walls || [],
+      portals: worldConfig.portals || []
     });
 
     // Direct DOM text update for 60fps performance without triggering React re-renders
@@ -160,7 +159,11 @@ export class UIBridgeAdapter {
       city,
       player,
       enemies,
-      remotePlayers
+      remotePlayers,
+      buildings: worldConfig.buildings || [],
+      trees: worldConfig.trees || [],
+      walls: worldConfig.walls || [],
+      portals: worldConfig.portals || []
     });
   }
 
@@ -169,9 +172,23 @@ export class UIBridgeAdapter {
    * Shared by the local radar and the full-city modal.
    * @param {CanvasRenderingContext2D} ctx
    * @param {HTMLCanvasElement} canvas
-   * @param {{view: object, city: object, player: object, enemies: Array<object>, remotePlayers: Array<object>}} frame
+   * @param {{view: object, city: object, player: object, enemies: Array<object>, remotePlayers: Array<object>, buildings?: Array<object>, trees?: Array<Array<number|string>>, walls?: Array<object>, portals?: Array<object>}} frame
    */
-  drawMap(ctx, canvas, { view, city, player, enemies, remotePlayers }) {
+  drawMap(
+    ctx,
+    canvas,
+    {
+      view,
+      city,
+      player,
+      enemies,
+      remotePlayers,
+      buildings = [],
+      trees = [],
+      walls = [],
+      portals = []
+    }
+  ) {
     const w = canvas.width;
     const h = canvas.height;
     const scaleX = w / (view.x1 - view.x0);
@@ -185,10 +202,10 @@ export class UIBridgeAdapter {
     ctx.fillRect(0, 0, w, h);
 
     // Brick-paved map (same bounds as the physics world).
-    const bx = mapX(MARKET_BOUNDS.x0);
-    const by = mapY(MARKET_BOUNDS.y0);
-    const bw = (MARKET_BOUNDS.x1 - MARKET_BOUNDS.x0) * scaleX;
-    const bh = (MARKET_BOUNDS.y1 - MARKET_BOUNDS.y0) * scaleY;
+    const bx = mapX(city.x0);
+    const by = mapY(city.y0);
+    const bw = (city.x1 - city.x0) * scaleX;
+    const bh = (city.y1 - city.y0) * scaleY;
     ctx.fillStyle = "#b3a992";
     ctx.fillRect(bx, by, bw, bh);
     ctx.strokeStyle = "#5f5340";
@@ -201,8 +218,19 @@ export class UIBridgeAdapter {
     ctx.closePath();
     ctx.stroke();
 
-    // Landmarks: the two shop buildings.
-    MARKET_BUILDINGS.forEach((def) => {
+    // Town walls first, so buildings and blips draw on top of them.
+    ctx.fillStyle = "#565b63";
+    walls.forEach((wall) => {
+      ctx.fillRect(
+        mapX(wall.x),
+        mapY(wall.y),
+        Math.max(1, wall.w * scaleX),
+        Math.max(1, wall.h * scaleY)
+      );
+    });
+
+    // Landmarks: shop buildings and their collision footprint.
+    buildings.forEach((def) => {
       ctx.fillStyle = "#4a3320";
       ctx.fillRect(
         mapX(def.x - def.w / 2),
@@ -214,19 +242,31 @@ export class UIBridgeAdapter {
 
     // Trees.
     ctx.fillStyle = "#3c7347";
-    MARKET_TREES.forEach(([x, y]) => {
+    trees.forEach(([x, y]) => {
       ctx.beginPath();
       ctx.arc(mapX(x), mapY(y), 1.8 * mark, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Enemies (red blips).
+    // Travel portals (pale blue) so the player can find the way out.
+    ctx.fillStyle = "rgba(159, 232, 255, 0.55)";
+    portals.forEach(({ rect }) => {
+      if (!rect) return;
+      ctx.fillRect(
+        mapX(rect.x),
+        mapY(rect.y),
+        Math.max(2, rect.w * scaleX),
+        Math.max(2, rect.h * scaleY)
+      );
+    });
+
+    // Enemies (red blips; bosses read bigger).
     if (enemies && enemies.length) {
-      enemies.forEach((wolf) => {
-        if (!wolf.active || wolf.isDead) return;
-        ctx.fillStyle = "#ff4d4f";
+      enemies.forEach((enemy) => {
+        if (!enemy.active || enemy.isDead) return;
+        ctx.fillStyle = enemy.isBoss ? "#ff9f1a" : "#ff4d4f";
         ctx.beginPath();
-        ctx.arc(mapX(wolf.x), mapY(wolf.y), 2.5 * mark, 0, Math.PI * 2);
+        ctx.arc(mapX(enemy.x), mapY(enemy.y), (enemy.isBoss ? 4 : 2.5) * mark, 0, Math.PI * 2);
         ctx.fill();
       });
     }

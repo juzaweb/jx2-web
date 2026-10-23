@@ -857,24 +857,22 @@ export class CombatSystem {
     }
   }
 
-  handleWolfKill(wolf) {
-    wolf.die();
+  handleWolfKill(enemy) {
+    enemy.die();
+    const name = enemy.name || "quái vật";
 
     // Online, enemy health and the reward are server-owned: the server rolls the
     // payout and broadcasts `enemy_reward` + an authoritative `player_progress`.
     if (this.usesServerRewards()) {
-      this.ui.addLog("Đánh bại Sói Xám!");
+      this.ui.addLog(`Đánh bại ${name}!`);
       return;
     }
 
     // Offline (no server connection) progression is frozen: the kill plays out,
     // but the client never mints coins/EXP of its own and nothing is dropped.
-    this.ui.addLog("Đánh bại Sói Xám! (ngoại tuyến — không nhận tiến trình)");
-
-    // Schedule enemy revive (the server drives respawn while connected)
-    this.scene.time.delayedCall(10000, () => {
-      wolf.revive();
-    });
+    // The monster schedules its own return from its catalog `respawnMs`
+    // (see src/game/enemy.js), so nothing else is needed here.
+    this.ui.addLog(`Đánh bại ${name}! (ngoại tuyến — không nhận tiến trình)`);
   }
 
   /**
@@ -893,7 +891,7 @@ export class CombatSystem {
 
     if (!killedByMe) return;
 
-    this.ui.addLog(`Đánh bại Sói Xám! +${reward.exp} EXP`);
+    this.ui.addLog(`Đánh bại ${reward.name || "quái vật"}! +${reward.exp} EXP`);
     this.showFloatText(x, y - 25, `+${reward.exp} EXP`, "#f3d17f");
   }
 

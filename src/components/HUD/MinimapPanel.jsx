@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
@@ -7,6 +7,14 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
+  // The scene announces the active map on boot and on every portal trip.
+  const [mapName, setMapName] = useState("");
+
+  useEffect(() => {
+    return bridge.on(EVENTS.MAP_CHANGED, (payload) => {
+      setMapName(payload?.name || "");
+    });
+  }, []);
 
   useEffect(() => {
     if (collapsed) return undefined;
@@ -76,7 +84,7 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
         </div>
 
         <div className="minimap-subinfo">
-          <span className="subzone-name">{t("minimap.subzone")}</span>
+          <span className="subzone-name">{mapName || t("minimap.subzone")}</span>
           <span className="coords" id="coords-text" ref={coordsRef}>
             6400 / 6200
           </span>
