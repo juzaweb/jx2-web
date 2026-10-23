@@ -203,7 +203,22 @@ export default {
         "invalid-slot": "招式槽无效。"
       }
     },
+    modalTitle: "武学面板",
+    modalHint: "已学会的门派招式。点击按键或下方按钮快速绑定招式。",
+    bindToKey: "绑定到 [{key}]",
+    bindLeft: "绑定左键",
+    bindRight: "绑定右键",
+    equippedTag: "已绑定：{slots}",
+    cooldownSec: "{sec}秒",
     thieuLam: {
+      laHanQuyen: {
+        name: "罗汉拳",
+        desc: "少林基础拳法，贴身近战攻击目标。"
+      },
+      thieuLamTruongPhap: {
+        name: "少林掌法",
+        desc: "少林刚猛掌法，造成中等近战伤害。"
+      },
       daiTuDiChuong: {
         name: "大须弥掌",
         desc: "远程掌法，击晕远处目标。"
@@ -211,6 +226,60 @@ export default {
       laHanTran: {
         name: "罗汉阵",
         desc: "罗汉护体法阵，提升 10% 攻击力、20% 移动速度与 5% 会心一击率，持续 3 分钟。"
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "少阳剑法",
+        desc: "武当基础剑术，轻灵快捷。"
+      },
+      thaiCucQuyen: {
+        name: "太极拳",
+        desc: "借力打力，造成强劲冲击伤害。"
+      },
+      tamThanhKiemPhap: {
+        name: "三清剑法",
+        desc: "连续施展三道剑气扫荡敌阵。"
+      },
+      toat_hong_quan_khuyet: {
+        name: "紫霄罡气",
+        desc: "武当护体气功，提升 15% 攻击力，持续 3 分钟。"
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "峨眉剑法",
+        desc: "优雅柔美的剑术，造成连续伤害。"
+      },
+      mongDiepThoiTam: {
+        name: "梦蝶催心",
+        desc: "剑气如蝶翩翩，直袭目标心脉。"
+      },
+      tuHangPhoDo: {
+        name: "慈航普渡",
+        desc: "佛光普照，立即为自身恢复 50 点生命值。"
+      },
+      luuThuyKhanhVan: {
+        name: "流水庆云",
+        desc: "身法如行云流水，提升 25% 移动速度。"
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "五毒心法",
+        desc: "五毒秘传心法，攻击附带剧毒。"
+      },
+      truyTamDoc: {
+        name: "追心毒",
+        desc: "剧毒掌气透骨穿心。"
+      },
+      vanDocChieuHong: {
+        name: "万毒召蛊",
+        desc: "召唤万千毒虫攻击大范围目标。"
+      },
+      uHongPhietAnh: {
+        name: "幽魂掠影",
+        desc: "身形如幽灵掠影，提升 10% 暴击率。"
       }
     }
   },

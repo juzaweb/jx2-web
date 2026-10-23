@@ -202,7 +202,22 @@ export default {
         "invalid-slot": "Invalid skill slot."
       }
     },
+    modalTitle: "Martial Arts",
+    modalHint: "Sect skills learned. Click a shortcut key or button below to assign skills.",
+    bindToKey: "Assign to [{key}]",
+    bindLeft: "Assign Left Click",
+    bindRight: "Assign Right Click",
+    equippedTag: "Assigned: {slots}",
+    cooldownSec: "{sec}s",
     thieuLam: {
+      laHanQuyen: {
+        name: "Arhat Fist",
+        desc: "Basic Shaolin fist strike to engage enemies in melee range."
+      },
+      thieuLamTruongPhap: {
+        name: "Shaolin Palm Technique",
+        desc: "Powerful Shaolin palm strike dealing medium melee damage."
+      },
       daiTuDiChuong: {
         name: "Great Sumeru Palm",
         desc: "Ranged palm strike that stuns the target from afar."
@@ -210,6 +225,60 @@ export default {
       laHanTran: {
         name: "Arhat Formation",
         desc: "Protective Buddhist formation that boosts attack power by 10%, movement speed by 20%, and critical rate by 5% for 3 minutes."
+      }
+    },
+    voDang: {
+      thieuDuongKiemPhap: {
+        name: "Shao Yang Sword Style",
+        desc: "Basic Wudang sword technique, agile and precise."
+      },
+      thaiCucQuyen: {
+        name: "Tai Chi Fist",
+        desc: "Defensive fist art redirecting force to deliver crushing impact."
+      },
+      tamThanhKiemPhap: {
+        name: "Three Pure Ones Sword",
+        desc: "Triple sword qi strikes sweeping through enemy ranks."
+      },
+      toat_hong_quan_khuyet: {
+        name: "Purple Cloud Guard",
+        desc: "Wudang qi buff increasing attack power by 15% for 3 minutes."
+      }
+    },
+    ngaMy: {
+      ngaMyKiemPhap: {
+        name: "Emei Sword Arts",
+        desc: "Graceful and elegant sword technique dealing continuous damage."
+      },
+      mongDiepThoiTam: {
+        name: "Butterfly Heart Strike",
+        desc: "Sword aura fluttering like butterflies directly invading the opponent's vitality."
+      },
+      tuHangPhoDo: {
+        name: "Merciful Salvation",
+        desc: "Buddhist light of compassion, instantly restoring 50 HP to self."
+      },
+      luuThuyKhanhVan: {
+        name: "Flowing Cloud Stride",
+        desc: "Agile footwork like drifting clouds, increasing movement speed by 25%."
+      }
+    },
+    nguDoc: {
+      nguDocTamPhap: {
+        name: "Five Poisons Mind Method",
+        desc: "Heritage secret technique infusing attacks with deadly venom."
+      },
+      truyTamDoc: {
+        name: "Heart-Piercing Venom",
+        desc: "Toxic palm blast penetrating deep into the foe's core."
+      },
+      vanDocChieuHong: {
+        name: "Ten Thousand Poison Gu",
+        desc: "Summons a swarm of venomous insects over a wide area."
+      },
+      uHongPhietAnh: {
+        name: "Phantom Ghost Shadow",
+        desc: "Ethereal movement enhancing critical hit chance by 10%."
       }
     }
   },
