@@ -3,7 +3,7 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, zoomed = false }) {
+export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, onToggleOrientation, quest, zoomed = false }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
@@ -36,6 +36,17 @@ export function MinimapPanel({ audioEnabled, onToggleAudio, onOpenHelp, quest, z
           </div>
           <div className="minimap-actions">
             <LanguageSwitcher variant="hud" />
+            {onToggleOrientation && (
+              <button
+                id="map-rotate-btn"
+                className="mini-btn gold"
+                title={t("orientation.tooltip")}
+                onClick={onToggleOrientation}
+                data-testid="hud-rotate-btn"
+              >
+                📱
+              </button>
+            )}
             <button
               id="map-help-btn"
               className="mini-btn gold"

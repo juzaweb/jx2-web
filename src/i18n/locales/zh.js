@@ -25,6 +25,13 @@ export default {
     help: "帮助",
     level: "等级"
   },
+  orientation: {
+    title: "旋转至横屏",
+    desc: "请将手机旋转至横屏，以获得最佳游戏体验。",
+    rotateBtn: "旋转屏幕",
+    dismissBtn: "继续竖屏",
+    tooltip: "旋转屏幕"
+  },
   npc: {
     "duoc-diem": {
       name: "药铺老板",

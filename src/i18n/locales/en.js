@@ -25,6 +25,13 @@ export default {
     help: "Help",
     level: "Level"
   },
+  orientation: {
+    title: "ROTATE SCREEN LANDSCAPE",
+    desc: "Please rotate your phone to landscape mode for the best gaming experience.",
+    rotateBtn: "Rotate Screen",
+    dismissBtn: "Continue in Portrait",
+    tooltip: "Rotate screen landscape"
+  },
   npc: {
     "duoc-diem": {
       name: "Apothecary Owner",

@@ -25,6 +25,13 @@ export default {
     help: "Trợ giúp",
     level: "Cấp"
   },
+  orientation: {
+    title: "XOAY NGANG MÀN HÌNH",
+    desc: "Vui lòng xoay ngang điện thoại để trải nghiệm game tốt nhất.",
+    rotateBtn: "Xoay Màn Hình",
+    dismissBtn: "Tiếp Tục Giữ Dọc",
+    tooltip: "Xoay ngang màn hình"
+  },
   npc: {
     "duoc-diem": {
       name: "Chủ Dược Điếm",

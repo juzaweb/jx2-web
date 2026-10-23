@@ -4,6 +4,7 @@ import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
+import { OrientationPrompt } from "./components/OrientationPrompt.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
@@ -105,6 +106,7 @@ export function App() {
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
+  const [showOrientationModal, setShowOrientationModal] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
   const [selectedSkillSlot, setSelectedSkillSlot] = useState(
@@ -551,6 +553,7 @@ export function App() {
           audioEnabled={audioEnabled}
           onToggleAudio={handleToggleAudio}
           onOpenHelp={handleOpenHelp}
+          onToggleOrientation={() => setShowOrientationModal(true)}
           quest={quest}
           zoomed={isMinimapZoomed}
         />
@@ -647,6 +650,12 @@ export function App() {
         selectedSlot={skillPickerHand === "left" ? leftSkillSlot : selectedSkillSlot}
         onSelect={handleEquipSkill}
         onClose={handleCloseSkillPicker}
+      />
+
+      {/* Screen Orientation Prompt / Rotation Modal */}
+      <OrientationPrompt
+        forceShow={showOrientationModal}
+        onClose={() => setShowOrientationModal(false)}
       />
     </main>
   );
