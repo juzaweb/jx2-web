@@ -8,6 +8,7 @@
  */
 
 import { toIso, isoDepth } from "./isoProjection.js";
+import { noise01 } from "./noise.js";
 import { WORLD_SCALE } from "./worldConfig.js";
 import { createShop } from "./marketBuildings.js";
 import { createVegetation } from "./marketProps.js";
@@ -50,16 +51,8 @@ const PAINTED_GROUNDS = {
   }
 };
 
-/**
- * Deterministic 0–1 noise, so ground detail is identical on every reload.
- * @param {number} seed
- * @param {number} salt
- * @param {number} offset
- */
-const seeded = (seed, salt = 12.9898, offset = 78.233) => {
-  const v = Math.sin(seed * salt + offset) * 43758.5453;
-  return v - Math.floor(v);
-};
+/** Ground detail uses the same deterministic noise as the map data. */
+const seeded = noise01;
 
 /**
  * Renders one map from its definition.

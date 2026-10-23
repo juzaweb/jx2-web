@@ -21,7 +21,10 @@ const createScene = ({ isConnected = false } = {}) => {
       setDepth: () => node,
       setPosition: () => node,
       setScale: () => node,
-      setVisible: () => node,
+      setVisible: (value) => {
+        node.visible = value;
+        return node;
+      },
       setAlpha: () => node,
       setOrigin: () => node,
       setStrokeStyle: () => node,
@@ -115,6 +118,18 @@ describe("Enemies are built from the shared catalog", () => {
     const scene = createScene();
     const enemy = new Wolf(scene, 100, 100, 1, "khong-ton-tai");
     expect(enemy.monsterId).toBe("soi-xam");
+  });
+
+  it("shows its name only while the hero could see it", () => {
+    const { wolf } = createWolf({ isConnected: false });
+
+    wolf.update(0, 16, player(900, 600), () => {});
+    expect(wolf.nameText.visible).toBe(true);
+
+    // Far across the clearing: the label is dropped, the monster is not.
+    wolf.update(16, 16, player(4300, 600), () => {});
+    expect(wolf.nameText.visible).toBe(false);
+    expect(wolf.sprite.active).toBe(true);
   });
 });
 

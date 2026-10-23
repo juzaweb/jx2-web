@@ -12,9 +12,8 @@ const POS = WORLD_POSITION_SCALE;
 const LABEL_OFFSET = 20;
 const NAME_OFFSET = 29;
 /**
- * Monsters show their name everywhere the hero can see them. The cutoff only
- * drops labels for enemies far outside the viewport (cheap, and keeps a dense
- * camp from painting text across the whole screen).
+ * Roughly the camera's visible width (15 tiles × 380 px), so a name stays on
+ * screen while the monster does and is skipped once it is far outside the view.
  */
 const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
 

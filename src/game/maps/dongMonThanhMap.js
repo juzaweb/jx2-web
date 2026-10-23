@@ -1,12 +1,11 @@
 /**
- * Đông Môn Thành — the wide forest east of Biện Kinh.
+ * Đông Môn Thành — 24 000 × 14 000 of forest east of Biện Kinh.
  *
- * The hero steps off the realm road into open woodland and pushes east: the near
- * trees hold levels 3-8, the middle wood 14-19 and the black heart of the forest
- * 24-29. The bands sit far apart on purpose — each is its own hunting camp, with
- * bare woodland you have to walk through between them.
- *
- * 24 000 × 14 000 of it: a long walk between the three camps.
+ * The hero steps off the realm road into open woodland. Six hunting columns march
+ * east, getting deadlier as you walk in: Sơn Cẩu (Lv3) → Dã Lang (8) → Lâm Tặc
+ * (14) → Hắc Y Sát Thủ (19) → Thiết Giáp Binh (24) → Ma Giáo Đệ Tử (29). Each
+ * column holds three camps of fifteen monsters, so a species never shares a
+ * clearing with another and the level never goes backwards on the way in.
  *
  * No walls, no paving, no shops and no boss — the floor is painted forest and the
  * only man-made mark is the dirt trail through it.
@@ -15,14 +14,16 @@
  * minimap and the server roster.
  */
 
+import { noise01 } from "../noise.js";
+
 /** Inclusive rectangle helper for the tier zones. */
 const zone = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
 
 /**
- * Hunting camps. Every camp is ONE species at one level — a pack of the same
- * monsters standing together — and the camps sit a long walk apart. `expandCamps`
- * turns this into the flat spawn list the renderer, the registry and the server
- * consume, so retuning a pack is one line here rather than five entries below.
+ * Hunting camps: one species at one level, `count` monsters scattered inside a
+ * single clearing. `expandCamps` turns this table into the flat spawn list the
+ * renderer, the registry and the server consume, so retuning a pack is one line
+ * here instead of fifteen entries below.
  */
 const CAMPS = [
   // One species per COLUMN, and the columns march east from the entrance in
@@ -65,12 +66,11 @@ const CAMP_RADIUS = 1500;
  * health-bar width (38 × S = 190) so a pack never turns into a pile of bars.
  */
 const CAMP_MIN_GAP = 400;
-
-/** Deterministic 0–1 noise, so a camp looks the same on every reload. */
-const campNoise = (seed) => {
-  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
+/**
+ * Placement attempts per monster before a camp settles for a crowded spot. The
+ * disc fits fifteen at this gap with room to spare, so this is only a safety net.
+ */
+const CAMP_ATTEMPTS_PER_MONSTER = 80;
 
 /**
  * Spread each camp's `count` monsters in a loose ring around its centre.
@@ -92,15 +92,15 @@ function expandCamps(camps) {
     // Rejection sampling on a disc: scattered, but never closer than the gap.
     for (let attempt = 0; placed.length < camp.count; attempt++) {
       const seed = seedBase + attempt * 1.7;
-      const angle = campNoise(seed) * Math.PI * 2;
-      const radius = Math.sqrt(campNoise(seed + 1)) * CAMP_RADIUS;
+      const angle = noise01(seed) * Math.PI * 2;
+      const radius = Math.sqrt(noise01(seed + 1)) * CAMP_RADIUS;
       const x = Math.round((camp.x + Math.cos(angle) * radius) / 10) * 10;
       const y = Math.round((camp.y + Math.sin(angle) * radius) / 10) * 10;
 
       const clear = occupied.every((spot) => Math.hypot(spot.x - x, spot.y - y) >= CAMP_MIN_GAP);
       // Give up searching eventually and take the spot, so a camp never silently
       // ships fewer monsters than it asks for.
-      if (clear || attempt > camp.count * 80) {
+      if (clear || attempt > camp.count * CAMP_ATTEMPTS_PER_MONSTER) {
         const spot = { x, y };
         placed.push(spot);
         occupied.push(spot);

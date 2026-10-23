@@ -117,6 +117,32 @@ describe("map registry", () => {
     }
   });
 
+  it("spreads a camp's monsters out and ships the same pack size per species", () => {
+    const map = MAPS["dong-mon-thanh"];
+    const bySpecies = new Map();
+
+    for (const spawn of map.enemySpawns) {
+      const pack = bySpecies.get(spawn.monsterId) || [];
+      pack.push(spawn);
+      bySpecies.set(spawn.monsterId, pack);
+    }
+
+    // A camp that silently drops or duplicates monsters would show up here.
+    const sizes = [...bySpecies.values()].map((pack) => pack.length);
+    expect(new Set(sizes).size).toBe(1);
+
+    for (const [monsterId, pack] of bySpecies) {
+      for (let i = 0; i < pack.length; i++) {
+        for (let j = i + 1; j < pack.length; j++) {
+          const gap = Math.hypot(pack[i].x - pack[j].x, pack[i].y - pack[j].y);
+          // 300 is below the authored 400 gap but still clears the health bar
+          // (190 px), so a data nudge doesn't break the build and a pile does.
+          expect(gap, `${monsterId} #${pack[i].id} vs #${pack[j].id}`).toBeGreaterThanOrEqual(300);
+        }
+      }
+    }
+  });
+
   it("puts the weakest camps nearest the entrance and the deadliest deepest", () => {
     // Walking in from the entrance should always be a step up in level, never a
     // wall of level-29s around the first clearing.
