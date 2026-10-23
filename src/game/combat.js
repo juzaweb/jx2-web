@@ -164,7 +164,6 @@ export class CombatSystem {
       .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < 85);
 
     if (!candidates.length) {
-      this.ui.addLog("Kiếm chiêu chưa chạm mục tiêu.");
       return;
     }
 
@@ -580,7 +579,6 @@ export class CombatSystem {
     }
 
     if (!targets.length) {
-      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tung ra, nhưng không trúng kẻ địch.`);
       return;
     }
 
