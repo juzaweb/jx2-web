@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 const TABS = ["all", "system", "near", "combat"];
 
-export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose, onOpen }) {
+export function ChatPanel({ logs = [], onSendMessage, collapsed = false, onClose, onOpen }) {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("all");
   const [inputText, setInputText] = useState("");
@@ -36,7 +36,7 @@ export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose, onO
   const handleSend = () => {
     const text = inputText.trim();
     if (!text) return;
-    onSendMessage(text);
+    onSendMessage?.(text);
     setInputText("");
   };
 
@@ -47,13 +47,16 @@ export function ChatPanel({ logs, onSendMessage, collapsed = false, onClose, onO
     }
   };
 
-  const filteredLogs = logs.filter((log) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "system") return log.type === "system" || log.type === "guide";
-    if (activeTab === "near") return log.type === "near";
-    if (activeTab === "combat") return log.type === "combat";
-    return true;
-  });
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    return logs.filter((log) => {
+      if (activeTab === "all") return true;
+      if (activeTab === "system") return log.type === "system" || log.type === "guide";
+      if (activeTab === "near") return log.type === "near";
+      if (activeTab === "combat") return log.type === "combat";
+      return true;
+    });
+  }, [logs, activeTab]);
 
   return (
     <section className="bottom-left-panel" id="chat-panel">
