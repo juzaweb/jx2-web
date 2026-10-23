@@ -16,6 +16,12 @@ import { ShopModal } from "./components/Modals/ShopModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
 import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
+import {
+  loadQuickSlots,
+  assignQuickSlot,
+  clearQuickSlot,
+  moveQuickSlot
+} from "./game/quickSlots.js";
 import { skillsForSect } from "./game/skills.js";
 import {
   applyQuantities,
@@ -115,6 +121,9 @@ export function App() {
   const [skillLoadout, setSkillLoadout] = useState(() =>
     loadSkillLoadout(readSession()?.activeCharacter?.id)
   );
+  const [quickSlots, setQuickSlots] = useState(() =>
+    loadQuickSlots(readSession()?.activeCharacter?.id)
+  );
   const selectedSkillSlot = skillLoadout.i;
   const leftSkillSlot = skillLoadout.u;
   const [skillPickerHand, setSkillPickerHand] = useState(null);
@@ -157,7 +166,7 @@ export function App() {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  // Switching characters loads that hero's skill layout and sect kit.
+  // Switching characters loads that hero's skill layout and quick slots mapping.
   useEffect(() => {
     const loadout = loadSkillLoadout(activeCharacter?.id);
     const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
@@ -180,10 +189,42 @@ export function App() {
     }
     setSkillLoadout(loadout);
     bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
+
+    const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
+    setQuickSlots(loadedQuickSlots);
+    bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
+
     if (activeCharacter?.sect) {
       bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
     }
   }, [activeCharacter?.id, activeCharacter?.sect]);
+
+  const handleAssignQuickSlot = useCallback(
+    (targetSlot, itemId) => {
+      const next = assignQuickSlot(activeCharacter?.id, quickSlots, targetSlot, itemId);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
+
+  const handleClearQuickSlot = useCallback(
+    (slot) => {
+      const next = clearQuickSlot(activeCharacter?.id, quickSlots, slot);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
+
+  const handleMoveQuickSlot = useCallback(
+    (fromSlot, toSlot) => {
+      const next = moveQuickSlot(activeCharacter?.id, quickSlots, fromSlot, toSlot);
+      setQuickSlots(next);
+      bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
+    },
+    [activeCharacter?.id, quickSlots]
+  );
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
   // rename in the users table reaches the HUD, the game scene and the network join.
@@ -670,6 +711,11 @@ export function App() {
         <HotbarDock
           audioEnabled={audioEnabled}
           items={inventory.quickItems}
+          inventoryItems={inventory.inventoryItems}
+          quickSlotsMapping={quickSlots}
+          onAssignQuickSlot={handleAssignQuickSlot}
+          onClearQuickSlot={handleClearQuickSlot}
+          onMoveQuickSlot={handleMoveQuickSlot}
           onUseItem={handleUseItem}
           onInventory={handleOpenInventory}
           onCharacter={handleOpenCharacter}

@@ -169,16 +169,13 @@ export function InventoryModal({
                 key={item.id}
                 className={`inv-slot${usable ? " usable" : ""}`}
                 title={item.name}
-                draggable={equippable}
-                onDragStart={
-                  equippable
-                    ? (event) =>
-                        setDragPayload(event, {
-                          kind: "inventory",
-                          itemId: item.id,
-                          slot: item.slot
-                        })
-                    : undefined
+                draggable={true}
+                onDragStart={(event) =>
+                  setDragPayload(event, {
+                    kind: "inventory",
+                    itemId: item.id,
+                    slot: item.slot
+                  })
                 }
                 onMouseEnter={(event) => handleSlotEnter(item, event)}
                 onClick={() => handleSlotClick(item)}

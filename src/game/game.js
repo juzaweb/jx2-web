@@ -9,6 +9,7 @@ import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { getQuantities, getQuantity, consumeQuantity, addQuantity, replaceQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { loadQuickSlots } from "./quickSlots.js";
 import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
@@ -45,9 +46,6 @@ import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
 import { loadSkillLoadout } from "./skillLoadout.js";
 import { normalizeSect } from "./skills.js";
-
-/** Hotbar slot -> consumable, used so useItem can look up the item behind a key. */
-const CONSUMABLE_BY_SLOT = new Map(QUICK_ITEMS.map((item) => [item.useSlot, item]));
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -415,6 +413,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Skill hotkeys U, I, O, P trigger direct casting.
     this.skillLoadout = loadSkillLoadout(readSession()?.activeCharacter?.id);
+    this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
     this.combat.setSkillLoadout(this.skillLoadout);
     this.bindSkillKeys();
 
@@ -427,21 +426,13 @@ export class JiangHuScene extends Phaser.Scene {
       window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
-    // Consumable hotkeys stay fixed on 1-4.
-    this.input.keyboard.on("keydown-ONE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(1);
-    });
-
-    this.input.keyboard.on("keydown-TWO", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(2);
-    });
-
-    this.input.keyboard.on("keydown-THREE", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(3);
-    });
-
-    this.input.keyboard.on("keydown-FOUR", () => {
-      if (!isTyping() && this.started && !this.isPaused) this.useItem(4);
+    // Number hotkeys 1-9 trigger quick slot items.
+    const numberKeyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"];
+    numberKeyNames.forEach((keyName, idx) => {
+      const slotNum = idx + 1;
+      this.input.keyboard.on(`keydown-${keyName}`, () => {
+        if (!isTyping() && this.started && !this.isPaused) this.useItem(slotNum);
+      });
     });
 
     // Listen to React UI Actions via Game Bridge
@@ -468,6 +459,11 @@ export class JiangHuScene extends Phaser.Scene {
         if (this.started && loadout) {
           this.skillLoadout = { ...this.skillLoadout, ...loadout };
           this.combat.setSkillLoadout(this.skillLoadout);
+        }
+      }),
+      bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
+        if (this.started && quickSlots) {
+          this.quickSlots = { ...this.quickSlots, ...quickSlots };
         }
       }),
       bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
@@ -565,33 +561,49 @@ export class JiangHuScene extends Phaser.Scene {
   useItem(slot) {
     if (!this.player || !this.started) return;
 
-    const item = CONSUMABLE_BY_SLOT.get(slot);
+    const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
+    const itemId = quickSlots?.[slot];
+    if (!itemId) return;
+
+    const item = getItemById(itemId);
     if (!item) return;
 
-    // Refuse an empty stack before any effect runs, so a depleted consumable can
-    // never heal for free.
-    if (getQuantity(item.id) <= 0) {
-      this.uiBridge.addLog(`Hành trang đã hết ${item.name}.`, "guide");
+    if (getQuantity(itemId) <= 0) {
+      this.uiBridge.addLog(`Hành trang đã hết ${item.name || itemId}.`, "guide");
       return;
     }
 
-    if (!this.applyItemEffect(slot)) return;
+    if (item.slot) {
+      this.equipItem(itemId);
+      return;
+    }
 
-    // Deduct only after a real use; an effect refused above (e.g. health full)
-    // returns false and leaves the stack intact. The live HUD shows the remainder.
-    const { ok } = consumeQuantity(item.id, 1);
+    if (!this.applyConsumableEffect(itemId)) return;
+
+    const { ok } = consumeQuantity(itemId, 1);
     if (!ok) return;
 
     this.onInventoryChanged();
   }
 
   /**
-   * Run the effect for a hotbar consumable slot.
-   * @param {number} slot
+   * Run the effect for a hotbar consumable slot or item id.
+   * @param {number|string} slotOrItemId
    * @returns {boolean} whether the item was actually consumed by the player
    */
-  applyItemEffect(slot) {
-    if (slot === 1) {
+  applyItemEffect(slotOrItemId) {
+    let itemId = slotOrItemId;
+    if (typeof slotOrItemId === "number") {
+      const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
+      itemId = quickSlots?.[slotOrItemId];
+    }
+    return this.applyConsumableEffect(itemId);
+  }
+
+  applyConsumableEffect(itemId) {
+    if (!itemId) return false;
+
+    if (itemId === "kim-sang-duoc") {
       // Kim Sáng Dược (+35 HP)
       if (this.player.stats.hp >= this.player.stats.maxHp) {
         this.uiBridge.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
@@ -607,7 +619,7 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 2) {
+    if (itemId === "dai-hoan-dan") {
       // Đại Hoàn Đan (+25 MP)
       if (this.player.stats.mp >= this.player.stats.maxMp) {
         this.uiBridge.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
@@ -623,8 +635,8 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 3) {
-      // Nữ Nhi Hồng (+50 HP & +30 MP) — pointless and now wasteful when both are full
+    if (itemId === "nu-nhi-hong") {
+      // Nữ Nhi Hồng (+50 HP & +30 MP)
       if (
         this.player.stats.hp >= this.player.stats.maxHp &&
         this.player.stats.mp >= this.player.stats.maxMp
@@ -643,12 +655,18 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
-    if (slot === 4) {
+    if (itemId === "hoi-thanh-phu") {
       // Hồi Thành Phù (Về điểm hồi sinh Biện Kinh)
       this.player.setPosition(MARKET_SPAWN.x, MARKET_SPAWN.y);
       this.combat.showFloatText(this.player.x, this.player.y - 68, `Về Biện Kinh`, "#ffdd59");
       playTone(330, 0.2, "sine", 0.04);
       this.uiBridge.addLog("Đã dùng Hồi Thành Phù quay về trung tâm Biện Kinh.", "system");
+      return true;
+    }
+
+    const item = getItemById(itemId);
+    if (item) {
+      this.uiBridge.addLog(`Đã sử dụng ${item.name}.`, "system");
       return true;
     }
 
@@ -1028,6 +1046,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.started = true;
     // Scope the bag to the active character before any load/save touches it.
     StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
+    this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
     // Re-entering (or switching characters) must re-read before any upload, so the
     // initial save below cannot clobber the new character's server bag.
     this.inventorySync?.reset();
