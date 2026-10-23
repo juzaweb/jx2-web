@@ -177,7 +177,6 @@ export class JiangHuScene extends Phaser.Scene {
       setQuantities: replaceQuantities,
       onAdopt: () => {
         this.uiBridge.updateInventory();
-        this.uiBridge.addLog("Đã đồng bộ hành trang từ máy chủ.", "system");
         this.saveGame(false);
       },
       onError: (error) => {
