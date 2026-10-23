@@ -92,9 +92,7 @@ export default {
     help: "秘笈",
     pkTitle: "开启/关闭 PK 标记",
     pkOn: "PK",
-    pkOff: "和平",
-    rotateTitle: "横屏旋转屏幕",
-    rotate: "旋转"
+    pkOff: "和平"
   },
   help: {
     eyebrow: "行走江湖秘笈",

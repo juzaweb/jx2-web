@@ -91,9 +91,7 @@ export default {
     help: "Guide",
     pkTitle: "Toggle PK flag",
     pkOn: "PK",
-    pkOff: "Peace",
-    rotateTitle: "Rotate screen horizontally",
-    rotate: "Rotate"
+    pkOff: "Peace"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",

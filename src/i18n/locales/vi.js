@@ -91,9 +91,7 @@ export default {
     help: "Cẩm Nang",
     pkTitle: "Bật/tắt cờ PK",
     pkOn: "PK",
-    pkOff: "Hòa Bình",
-    rotateTitle: "Xoay ngang màn hình",
-    rotate: "Xoay"
+    pkOff: "Hòa Bình"
   },
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",

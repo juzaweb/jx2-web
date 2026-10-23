@@ -779,7 +779,6 @@ export function App() {
           leftSkillSlot={leftSkillSlot}
           skillLoadout={skillLoadout}
           onPickSkill={handleOpenSkillPicker}
-          onRotateScreen={() => requestLandscapeFullscreen(true)}
         />
 
         <MobileControls

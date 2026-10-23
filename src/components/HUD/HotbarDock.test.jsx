@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HotbarDock } from "./HotbarDock.jsx";
@@ -36,12 +36,6 @@ describe("HotbarDock logic & props", () => {
     // Slot 1 is no longer empty, so 8 empty slots remain
     const emptyCount = (markup.match(/class="slot-item empty"/g) || []).length;
     expect(emptyCount).toBe(8);
-  });
-
-  it("passes onRotateScreen prop correctly", () => {
-    const handleRotate = vi.fn();
-    const element = <HotbarDock onRotateScreen={handleRotate} />;
-    expect(element.props.onRotateScreen).toBe(handleRotate);
   });
 
   it("renders skills button with 'Võ Công' label and hotkey title", () => {

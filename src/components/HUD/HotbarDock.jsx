@@ -23,7 +23,6 @@ export function HotbarDock({
   leftSkillSlot = 0,
   skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
   onPickSkill,
-  onRotateScreen,
   items = [],
   inventoryItems = [],
   quickSlotsMapping = DEFAULT_QUICK_SLOTS,
@@ -241,17 +240,6 @@ export function HotbarDock({
             <span className="sys-ico">⚔️</span>
             <span className="sys-lbl">{pkEnabled ? t("hotbar.pkOn") : t("hotbar.pkOff")}</span>
           </button>
-          {onRotateScreen && (
-            <button
-              className="sys-btn"
-              id="rotate-btn"
-              title={t("hotbar.rotateTitle")}
-              onClick={onRotateScreen}
-            >
-              <span className="sys-ico">🔄</span>
-              <span className="sys-lbl">{t("hotbar.rotate")}</span>
-            </button>
-          )}
         </div>
       </div>
     </section>
