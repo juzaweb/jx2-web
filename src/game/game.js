@@ -17,6 +17,7 @@ import { shouldReportPosition } from "./positionSync.js";
 import { InventorySyncer } from "./inventorySync.js";
 import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
+import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import {
   DEFAULT_MAP_ID,
@@ -34,6 +35,17 @@ import { ShopFlow } from "./shopFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
+
+/** Why the server refused a PvP hit, in the player's language. */
+const HIT_REJECT_MESSAGES = {
+  attacker_peaceful: "Bạn đang ở trạng thái Hoà Bình — hãy bật cờ PK rồi đánh lại.",
+  target_peaceful: "Đối thủ chưa bật cờ PK — đòn đánh không có hiệu lực.",
+  range: "Ngoài tầm tỷ thí — hãy áp sát đối thủ.",
+  iframe: "Đối thủ vừa trúng đòn (bất tử 0,7s) — đòn này bị bỏ.",
+  dodged: "Đối thủ đã né đòn (đang chạy ra xa)!",
+  target_missing: "Đối thủ không còn trên máy chủ.",
+  damage_invalid: "Sát thương không hợp lệ nên máy chủ đã bỏ."
+};
 
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
@@ -137,6 +149,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.stage = new MapStage(this);
     this.stage.build(this.map);
     this.pendingNpc = null;
+    /** Peer locked for a duel: walk into range, then keep striking (see updatePvpTarget). */
+    this.pvpTarget = null;
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
@@ -215,6 +229,9 @@ export class JiangHuScene extends Phaser.Scene {
         setAudioEnabled(this.savedData.audioEnabled);
         this.uiBridge.updateSoundButton(this.savedData.audioEnabled);
       }
+      // PK is a persistent choice: restore it so the HUD, the join packet and the
+      // server all agree instead of silently dropping back to peaceful.
+      this.player.setPkFlag(this.savedData.pkFlag === true);
     }
 
     // Camera follows the isometric visual (the sprite stays in ground space)
@@ -280,6 +297,12 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("player_defeated", (payload) => {
       this.handlePlayerDefeated(payload);
+    });
+
+    // The server refused a PvP hit: say why, instead of leaving the client to draw
+    // damage that never happened (reads as "hit landed but no HP loss").
+    this.networkClient.on("player_hit_rejected", (payload) => {
+      this.logHitRejection(payload);
     });
 
     this.networkClient.on("player_left", (payload) => {
@@ -365,6 +388,7 @@ export class JiangHuScene extends Phaser.Scene {
       // Any click re-targets the hero, so a pending NPC approach is cancelled
       // unless this click selects one again below.
       this.pendingNpc = null;
+      this.pvpTarget = null;
 
       // Check if clicking directly on an NPC (walk towards NPC)
       const clickedNpc = (this.stage?.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
@@ -373,6 +397,21 @@ export class JiangHuScene extends Phaser.Scene {
         this.pendingNpc = clickedNpc;
         this.player.moveTo(approach.x, approach.y);
         this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
+        return;
+      }
+
+      // Clicking a peer that carries the PK flag locks onto it for a duel: the
+      // hero walks into range and keeps striking until one of the flags drops.
+      const clickedPlayer = findPlayerAt(this.remotePlayerManager?.getAll?.() || [], worldX, worldY);
+      if (clickedPlayer && clickedPlayer.pkFlag === true) {
+        if (this.player.pkFlag === true) {
+          this.pvpTarget = clickedPlayer;
+        } else {
+          this.uiBridge.addLog("Mục tiêu đã bật cờ PK — hãy bật cờ PK của bạn để tỷ thí.", "system");
+        }
+        this.isPointerMoving = false;
+        this.player.moveTo(clickedPlayer.x, clickedPlayer.y);
+        this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xff5555);
         return;
       }
 
@@ -404,6 +443,7 @@ export class JiangHuScene extends Phaser.Scene {
       const ground = fromIso(pointer.worldX, pointer.worldY);
       this.combat.cancelPendingCast();
       this.pendingNpc = null;
+      this.pvpTarget = null;
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -455,10 +495,21 @@ export class JiangHuScene extends Phaser.Scene {
     this.unsubscribers.push(
       bridge.on(EVENTS.ACTION_START, () => this.startGame()),
       bridge.on(EVENTS.ACTION_ATTACK, () => {
-        if (this.started && !this.isPaused) this.combat.performAttack();
+        if (!this.started || this.isPaused) return;
+        // A locked duellist takes priority: press attack to close the gap, not
+        // to swing at air when the peer is still across the square.
+        if (this.pvpTarget) {
+          this.updatePvpTarget();
+          return;
+        }
+        this.combat.performAttack();
       }),
       bridge.on(EVENTS.ACTION_SKILL, () => {
-        if (this.started && !this.isPaused) this.combat.castSelectedSkill();
+        if (!this.started || this.isPaused) return;
+        // Same aim the skill keys use: the projectile follows the pointer instead
+        // of whatever direction the hero last walked.
+        const pointer = this.input.activePointer;
+        this.combat.castSelectedSkill(pointer ? fromIso(pointer.worldX, pointer.worldY) : null);
       }),
       bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, key, slot } = {}) => {
         if (this.started) {
@@ -642,6 +693,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.combat?.cancelPendingCast?.();
     this.player.stopMovement();
     this.pendingNpc = null;
+    this.pvpTarget = null;
     this.isPointerMoving = false;
 
     this.stage?.destroy();
@@ -715,6 +767,16 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     this.applyServerWorld(payload);
+
+    // The server rebuilt our player from the join packet — a snapshot taken when
+    // the socket opened. Re-assert the flag the HUD shows, otherwise a reconnect
+    // silently drops us back to peaceful server-side and every PvP hit is refused
+    // while the client still logs it.
+    this.networkClient?.sendPk?.({ pkFlag: this.player?.pkFlag === true });
+
+    // Re-announce the flag to the HUD too: the scene is created before React
+    // subscribes, so the boot-time emit alone can be missed.
+    bridge.emit(EVENTS.PK_CHANGED, this.player?.pkFlag === true);
   }
 
   /**
@@ -1001,7 +1063,8 @@ export class JiangHuScene extends Phaser.Scene {
         y: Math.round(this.player.y)
       },
       questRewarded: this.uiBridge.questRewarded,
-      audioEnabled: isAudioEnabled()
+      audioEnabled: isAudioEnabled(),
+      pkFlag: this.player.pkFlag === true
     });
     // The bag is character-scoped, so it is persisted under the active character.
     StorageManager.saveInventory(getQuantities());
@@ -1065,7 +1128,14 @@ export class JiangHuScene extends Phaser.Scene {
     const next = !this.player.pkFlag;
     this.player.setPkFlag(next);
     bridge.emit(EVENTS.PK_CHANGED, next);
+    // Keep the join snapshot in step: the socket replays it on every reconnect,
+    // and a stale `false` would undo the flag server-side.
+    if (this.networkClient?.savedPlayerData) {
+      this.networkClient.savedPlayerData.pkFlag = next;
+    }
     this.networkClient?.sendPk?.({ pkFlag: next });
+    // Persist the choice so a reload cannot revert it behind the player's back.
+    this.saveGame(false);
 
     this.uiBridge.addLog(
       next
@@ -1090,6 +1160,12 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (!isLocal) {
       this.remotePlayerManager.handlePlayerHp(payload);
+      // PvP damage is drawn from the server's answer, never optimistically: a dodged
+      // or refused strike must not leave a "-31" floating over an untouched body.
+      if (payload.source === "pvp" && payload.damage > 0) {
+        const peer = this.remotePlayerManager?.getAll?.().find((entry) => entry.id === payload.id);
+        if (peer) this.combat.showFloatText(peer.x, peer.y - 30, `-${payload.damage}`, "#ffb49a");
+      }
       return;
     }
 
@@ -1145,6 +1221,12 @@ export class JiangHuScene extends Phaser.Scene {
       payload.victimId === this.combat?.localPlayerId ||
       payload.victimId === this.remotePlayerManager?.localPlayerId;
 
+    // The duel is over for that peer: never chase a corpse across the map. Our
+    // own defeat also drops the lock — the server teleports us to the spawn.
+    if (isLocal || (this.pvpTarget && this.pvpTarget.id === payload.victimId)) {
+      this.pvpTarget = null;
+    }
+
     if (isLocal) {
       this.player.stats.hp = this.player.stats.maxHp;
       this.player.invulnerable = false;
@@ -1176,6 +1258,47 @@ export class JiangHuScene extends Phaser.Scene {
         "near"
       );
     }
+  }
+
+  /**
+   * Surface a refused PvP hit. Throttled per reason: a held attack button reports
+   * several times a second and the reason rarely changes between attempts.
+   * @param {{reason?:string}} payload
+   */
+  logHitRejection(payload = {}) {
+    const reason = typeof payload.reason === "string" ? payload.reason : "unknown";
+
+    // A range refusal means our copy of the peer is closer than the server's. Rather
+    // than leave the player guessing, lock onto them: the duel chase closes to
+    // striking distance and the next strike lands.
+    if (reason === "range" && typeof payload.targetId === "string") {
+      const peer = this.remotePlayerManager?.getAll?.().find((entry) => entry.id === payload.targetId);
+      if (peer) this.pvpTarget = peer;
+    }
+
+    // A dodge deserves its own on-screen tell; the client no longer draws damage
+    // before the server confirms it, so nothing misleading stays behind.
+    if (reason === "dodged" && typeof payload.targetId === "string") {
+      const peer = this.remotePlayerManager?.getAll?.().find((entry) => entry.id === payload.targetId);
+      if (peer) this.combat.showFloatText(peer.x, peer.y - 30, "NÉ!", "#9fd8ff");
+    }
+
+    const now = Date.now();
+    this.hitRejectAt = this.hitRejectAt || {};
+    if (this.hitRejectAt[reason] && now - this.hitRejectAt[reason] < 2500) return;
+    this.hitRejectAt[reason] = now;
+
+    // A range refusal carries the distance the server measured, which is the only
+    // way to tell a genuinely far target from a position mismatch. Reported in
+    // ground tiles: the raw world units mean nothing next to the zoomed-out camera.
+    const detail =
+      reason === "range" && typeof payload.distance === "number"
+        ? ` (cách ${(payload.distance / WORLD_TILE).toFixed(1)} ô, tối đa ${(PVP_ATTACK_RANGE / WORLD_TILE).toFixed(1)} ô)`
+        : "";
+    this.uiBridge.addLog(
+      `${HIT_REJECT_MESSAGES[reason] || "Đòn tỷ thí bị máy chủ từ chối."}${detail}`,
+      "combat"
+    );
   }
 
   sendNetworkJoin() {
@@ -1340,6 +1463,48 @@ export class JiangHuScene extends Phaser.Scene {
     this.inventorySync?.load();
   }
 
+  /**
+   * Keep a locked duellist honest: walk into range, then strike on every attack
+   * cooldown. The lock drops once the peer disappears, lowers its PK flag, or the
+   * local hero lowers theirs.
+   */
+  updatePvpTarget() {
+    const target = this.pvpTarget;
+    if (!target) return;
+
+    // A skill already cast at the target is driving the approach; two movement
+    // owners would make the hero stutter between the two ranges.
+    if (this.combat?.pendingCast) return;
+
+    // Walking away by hand cancels the auto-attack: the player is in control.
+    if (this.player.hasManualMoveInput?.()) {
+      this.pvpTarget = null;
+      return;
+    }
+
+    if (!target.container || target.container.active === false || target.pkFlag !== true) {
+      this.pvpTarget = null;
+      return;
+    }
+
+    if (this.player.pkFlag !== true) {
+      this.pvpTarget = null;
+      this.uiBridge.addLog("Đã tắt cờ PK — hủy mục tiêu tỷ thí.", "system");
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance > PVP_CHASE_DISTANCE) {
+      this.player.moveTo(target.x, target.y);
+      return;
+    }
+
+    // In range: stop walking (a stale click-to-move leg would keep the legs
+    // jogging) and let the combat system report the hit to the server.
+    this.player.stopMovement();
+    this.combat.performPvpAttack(target);
+  }
+
   update(time, delta) {
     if (!this.started || this.isPaused || !this.player) return;
 
@@ -1347,6 +1512,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.player.update(time, delta);
     // Drive pending melee approaches (walk into range, then release the skill).
     this.combat.update?.(time);
+    // Close on a locked duellist and strike once in range.
+    this.updatePvpTarget();
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 
@@ -1500,6 +1667,10 @@ export function createGame(parent) {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH
     },
+    // Keep simulating when the window loses focus. Phaser pauses the whole game on
+    // blur by default, which froze the auto-chase/attack the moment the player
+    // clicked the other duel window to control their second character.
+    pauseOnBlur: false,
     scene: [JiangHuScene]
   };
 

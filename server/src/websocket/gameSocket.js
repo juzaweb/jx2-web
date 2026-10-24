@@ -5,7 +5,7 @@ import { characterDb } from "../data/characterDb.js";
 import { userDb } from "../data/userDb.js";
 import { verifySessionToken } from "../auth/session.js";
 import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
-import { canPvpAttack, clampPvpDamage } from "../../../src/game/pvp.js";
+import { canPvpAttack, clampPvpDamage, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
 import { getMonster } from "../../../src/game/enemyCatalog.js";
@@ -189,7 +189,7 @@ export const ENEMY_RESPAWN_MS = 10000;
 export const ENEMY_TICK_MS = 100;
 
 /** Invulnerability window (ms) granted after any hit the server applies. */
-export const PLAYER_IFRAME_MS = 700;
+export { PLAYER_IFRAME_MS };
 
 /**
  * Minimum gap (ms) between a player's combat actions. Each action fans out to
@@ -209,10 +209,14 @@ export const MAX_HITS_PER_CAST = 8;
 const MAX_BUFFERED_BYTES = 1_000_000;
 
 /**
- * Area-of-interest radius (world px) for *streaming* events. Movement, combat and
- * HP/MP updates only reach players whose character is within this distance of the
- * event, turning the aggregate cost from O(N²) into O(N × neighbours). Identity
- * events (join/leave/snapshot) stay global so the roster and minimap are complete.
+ * Area-of-interest radius (world px) for *enemy* streaming. Enemy positions and
+ * damage only reach players whose character is within this distance of the event,
+ * turning the aggregate cost from O(N²) into O(N × neighbours).
+ *
+ * Player state is map-scoped instead (`broadcastToMap`), because the player roster
+ * already is: `init_world`, `player_joined` and `player_left` are map-wide, so the
+ * client draws every peer on the map. Streaming player state on a narrower radius
+ * left those peers frozen mid-walk — see `broadcastPlayerState`.
  */
 export const AOI_RADIUS = 800;
 
@@ -314,6 +318,8 @@ export class GameSocketManager {
       ? options.maxBufferedBytes
       : MAX_BUFFERED_BYTES;
     this.aoiRadius = Number.isFinite(options.aoiRadius) ? options.aoiRadius : AOI_RADIUS;
+    // Injectable so tests can pin the directional-dodge roll.
+    this.random = typeof options.random === "function" ? options.random : Math.random;
 
     this.setupServer();
     this.startHeartbeat();
@@ -455,6 +461,7 @@ export class GameSocketManager {
    * @param {number} sourceY
    * @param {WebSocket|null} senderWs
    * @param {Object} data
+   * @param {string|null} [mapId]
    */
   broadcastNear(sourceX, sourceY, senderWs, data, mapId = null) {
     const payload = JSON.stringify(data);
@@ -471,6 +478,20 @@ export class GameSocketManager {
       if (dx * dx + dy * dy > radiusSquared) return;
       client.send(payload);
     });
+  }
+
+  /**
+   * Fan out a player-owned event (position, gear, HP/MP, combat animation).
+   *
+   * Player state is map-scoped, not AOI-scoped: the roster is map-wide, so the
+   * client renders every peer on the map. Gating the state on a smaller radius
+   * made a peer stop mid-walk on everyone's screen while it kept moving for real.
+   * @param {Object} player - server player object the event belongs to
+   * @param {Object} data
+   * @param {WebSocket|null} [excludeWs] the sender, which already knows its own state
+   */
+  broadcastPlayerState(player, data, excludeWs = null) {
+    this.broadcastToMap(player.mapId, data, excludeWs);
   }
 
   /**
@@ -627,6 +648,10 @@ export class GameSocketManager {
     if (this.playerById.has(playerId)) {
       const existing = this.playerById.get(playerId);
       if (existing.ws !== ws) {
+        // Flag the outgoing socket first: its close handler runs asynchronously and
+        // would otherwise delete the registration we are about to overwrite, and
+        // announce a player_left for the very player that just reconnected.
+        existing.ws.__superseded = true;
         try {
           existing.ws.close();
         } catch {
@@ -796,6 +821,9 @@ export class GameSocketManager {
       id: player.id,
       username: player.username,
       displayName: player.displayName,
+      // Lets the client collapse duplicate copies of the same character (a stale
+      // tab, a reload race) into one avatar instead of two identical nameplates.
+      characterId: player.characterId || null,
       mapId: player.mapId,
       x: player.x,
       y: player.y,
@@ -845,11 +873,10 @@ export class GameSocketManager {
       });
     }
 
-    // Broadcast the position to nearby players only (AOI, same map)
-    this.broadcastNear(
-      player.x,
-      player.y,
-      ws,
+    // Broadcast the position to the rest of the map: the roster is map-wide, so
+    // every client on it already renders this avatar and must keep it moving.
+    this.broadcastPlayerState(
+      player,
       {
         type: "player_moved",
         payload: {
@@ -862,7 +889,7 @@ export class GameSocketManager {
           stance: player.stance
         }
       },
-      player.mapId
+      ws
     );
   }
 
@@ -879,15 +906,13 @@ export class GameSocketManager {
 
     player.equipment = sanitizeEquipment(payload.equipment);
 
-    this.broadcastNear(
-      player.x,
-      player.y,
-      ws,
+    this.broadcastPlayerState(
+      player,
       {
         type: "player_equipment",
         payload: { id: player.id, equipment: player.equipment }
       },
-      player.mapId
+      ws
     );
   }
 
@@ -923,16 +948,10 @@ export class GameSocketManager {
 
     player.hp = Math.min(player.maxHp, player.hp + amount);
 
-    this.broadcastNear(
-      player.x,
-      player.y,
-      null,
-      {
-        type: "player_hp",
-        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
-      },
-      player.mapId
-    );
+    this.broadcastPlayerState(player, {
+      type: "player_hp",
+      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+    });
   }
 
   /**
@@ -1061,18 +1080,12 @@ export class GameSocketManager {
     });
   }
 
-  /** Broadcast a player's authoritative MP pool to nearby players. */
+  /** Broadcast a player's authoritative MP pool to the map. */
   broadcastMp(player) {
-    this.broadcastNear(
-      player.x,
-      player.y,
-      null,
-      {
-        type: "player_mp",
-        payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
-      },
-      player.mapId
-    );
+    this.broadcastPlayerState(player, {
+      type: "player_mp",
+      payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+    });
   }
 
   /**
@@ -1122,10 +1135,8 @@ export class GameSocketManager {
     const y = clampNum(payload.y, aimBounds.y0, aimBounds.y1, player.y);
     const facingRight = payload.facingRight !== false;
 
-    this.broadcastNear(
-      x,
-      y,
-      ws,
+    this.broadcastPlayerState(
+      player,
       {
         type: "player_attacked",
         payload: {
@@ -1136,7 +1147,7 @@ export class GameSocketManager {
           facingRight
         }
       },
-      player.mapId
+      ws
     );
   }
 
@@ -1177,15 +1188,49 @@ export class GameSocketManager {
 
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
-    if (!target) return;
+    if (!target) return this.rejectHit(ws, "target_missing");
 
     const damage = clampPvpDamage(payload.damage);
-    if (damage === null) return;
+    if (damage === null) return this.rejectHit(ws, "damage_invalid");
 
     const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
-    if (!canPvpAttack(attacker, target, distance)) return;
+    if (!canPvpAttack(attacker, target, distance)) {
+      const reason = attacker.pkFlag !== true
+        ? "attacker_peaceful"
+        : target.pkFlag !== true
+          ? "target_peaceful"
+          : "range";
+      return this.rejectHit(ws, reason, {
+        targetId: target.id,
+        distance: Math.round(distance),
+        attacker: { x: Math.round(attacker.x), y: Math.round(attacker.y) },
+        target: { x: Math.round(target.x), y: Math.round(target.y) }
+      });
+    }
 
-    this.applyPlayerDamage(target, damage, attacker, "pvp");
+    // Directional dodge: only a target actively running *away* can slip a strike,
+    // and the roll lives here so a client cannot claim to have evaded.
+    if (rollDodge(attacker, target, this.random())) {
+      return this.rejectHit(ws, "dodged", {
+        targetId: target.id,
+        chance: Math.round(dodgeChance(attacker, target) * 100)
+      });
+    }
+
+    if (!this.applyPlayerDamage(target, damage, attacker, "pvp")) {
+      return this.rejectHit(ws, "iframe");
+    }
+  }
+
+  /**
+   * Tell the attacker why a PvP hit was refused. Without this the client draws
+   * damage the server never applied, which reads as "hit landed but no HP loss".
+   * @param {WebSocket} ws attacker socket
+   * @param {string} reason
+   * @param {Object} [detail] extra diagnostics (e.g. the measured distance)
+   */
+  rejectHit(ws, reason, detail = null) {
+    this.send(ws, { type: "player_hit_rejected", payload: { reason, ...(detail || {}) } });
   }
 
   /**
@@ -1206,35 +1251,51 @@ export class GameSocketManager {
     target.hp = Math.max(0, target.hp - damage);
     target.invulnerableUntil = now + PLAYER_IFRAME_MS;
 
-    // The victim always receives their own HP (distance 0); only nearby players do.
-    this.broadcastNear(
-      target.x,
-      target.y,
-      null,
-      {
-        type: "player_hp",
-        payload: {
-          id: target.id,
-          hp: target.hp,
-          maxHp: target.maxHp,
-          damage,
-          source,
-          sourceName:
-            sourceName ||
-            (source === "wolf"
-              ? "Sói Xám"
-              : attacker
-                ? attacker.displayName || attacker.username
-                : "Đối thủ")
-        }
-      },
-      target.mapId
-    );
+    const hpMessage = {
+      type: "player_hp",
+      payload: {
+        id: target.id,
+        hp: target.hp,
+        maxHp: target.maxHp,
+        damage,
+        source,
+        sourceName:
+          sourceName ||
+          (source === "wolf"
+            ? "Sói Xám"
+            : attacker
+              ? attacker.displayName || attacker.username
+              : "Đối thủ")
+      }
+    };
+
+    // Every player on the map holds this body, so every one of them gets the new
+    // HP — including the victim, who reads its own pool from here.
+    this.broadcastPlayerState(target, hpMessage);
+
+    // A strike can cross maps (the range check does not compare map ids), so the
+    // attacker may not be on the broadcast's map at all.
+    this.sendToAttackerOffMap(attacker, target.mapId, hpMessage);
 
     if (target.hp <= 0) {
       this.respawnPlayer(target, attacker, source);
     }
     return true;
+  }
+
+  /**
+   * Deliver a player event to the attacker when the broadcast cannot reach them,
+   * which now only happens when the two stand on different maps.
+   * @param {?Object} attacker
+   * @param {string} mapId - the map the broadcast went to
+   * @param {Object} message
+   */
+  sendToAttackerOffMap(attacker, mapId, message) {
+    if (!attacker) return;
+    if (attacker.mapId === mapId) return;
+    const attackerWs = this.playerById.get(attacker.id)?.ws;
+    if (!attackerWs) return;
+    this.send(attackerWs, message);
   }
 
   /**
@@ -1245,9 +1306,6 @@ export class GameSocketManager {
    * @param {"pvp"|"wolf"} source
    */
   respawnPlayer(victim, attacker = null, source = "wolf") {
-    // The defeat is announced where the fight happened, before the teleport.
-    const defeatX = victim.x;
-    const defeatY = victim.y;
     const map = getMap(victim.mapId);
 
     victim.hp = victim.maxHp;
@@ -1268,22 +1326,45 @@ export class GameSocketManager {
       }
     };
 
-    // The victim is already teleported, so it now sits outside the fight's AOI.
-    // Always deliver its own defeat; nearby players get it through the AOI.
+    // The victim is already teleported, so their own copy is sent directly; the
+    // rest of the map learns of the defeat through the broadcast.
     const victimWs = this.playerById.get(victim.id)?.ws || null;
     this.send(victimWs, defeatMessage);
-    this.broadcastNear(defeatX, defeatY, victimWs, defeatMessage, victim.mapId);
+    this.broadcastPlayerState(victim, defeatMessage, victimWs);
 
-    this.broadcastNear(
-      victim.x,
-      victim.y,
-      null,
-      {
-        type: "player_hp",
-        payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
-      },
-      victim.mapId
-    );
+    // The killer is usually on the same map and got it above; a cross-map strike
+    // still owes them their own kill.
+    this.sendToAttackerOffMap(attacker, victim.mapId, defeatMessage);
+
+    // The players who watched the fight still hold the victim where they fell. Send
+    // them the teleport and the restored HP, otherwise they keep drawing a corpse
+    // with an empty bar (and every later strike is measured against that stale body,
+    // so it is refused as out of range forever).
+    const movedMessage = {
+      type: "player_moved",
+      payload: {
+        id: victim.id,
+        x: victim.x,
+        y: victim.y,
+        vx: 0,
+        vy: 0,
+        direction: victim.direction,
+        stance: victim.stance
+      }
+    };
+    const restoredMessage = {
+      type: "player_hp",
+      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
+    };
+
+    // Same split as the defeat: the map gets it, the victim was moved to another
+    // map by the respawn and reads its own copy directly.
+    this.broadcastPlayerState(victim, movedMessage, victimWs);
+    this.broadcastPlayerState(victim, restoredMessage, victimWs);
+    this.sendToAttackerOffMap(attacker, victim.mapId, movedMessage);
+    this.sendToAttackerOffMap(attacker, victim.mapId, restoredMessage);
+
+    this.broadcastPlayerState(victim, restoredMessage);
   }
 
   /**
@@ -1488,13 +1569,10 @@ export class GameSocketManager {
       // A level-up heals HP and refills MP, matching the client's expectation.
       player.hp = player.maxHp;
       player.mp = player.maxMp;
-      this.broadcastNear(
-        player.x,
-        player.y,
-        null,
-        { type: "player_hp", payload: { id: player.id, hp: player.hp, maxHp: player.maxHp } },
-        player.mapId
-      );
+      this.broadcastPlayerState(player, {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      });
       this.broadcastMp(player);
     }
 
@@ -1690,7 +1768,19 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (player) {
       this.players.delete(ws);
-      this.playerById.delete(player.id);
+
+      // Only drop the id -> socket mapping when it still belongs to this socket.
+      // A reconnect registers a new socket under the same id first, and the old
+      // socket's close lands afterwards; deleting unconditionally would orphan the
+      // fresh connection (its peers disappear and every incoming `player_hit` is
+      // refused as "target_missing").
+      if (this.playerById.get(player.id)?.ws === ws) {
+        this.playerById.delete(player.id);
+      }
+
+      // A superseded socket has nothing to announce: the player is still here on
+      // the socket that replaced it.
+      if (ws.__superseded) return;
 
       const mapId = player.mapId || DEFAULT_MAP_ID;
       const mapStillOccupied = Array.from(this.players.values()).some(

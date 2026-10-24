@@ -7,13 +7,48 @@
  * server (to enforce) import this module so the rules never drift apart.
  */
 
-import { WORLD_SCALE } from "./worldConfig.js";
+import { WORLD_TILE } from "./worldConfig.js";
 
-/** Max distance (world px) at which one flagged player can strike another. */
-export const PVP_ATTACK_RANGE = 110 * WORLD_SCALE;
+/**
+ * Max distance at which one flagged player can strike another.
+ *
+ * Measured in ground tiles (1 tile = `WORLD_TILE` world units = one paving grid
+ * cell ~= 2.4 hero heights), because that is the unit the player actually sees.
+ * Raw world units are useless as a design knob here: the camera is zoomed far out,
+ * so 600 units look like "standing next to each other" while the server refuses.
+ */
+export const PVP_ATTACK_RANGE = 3 * WORLD_TILE;
 
 /** Hard ceiling on a single reported hit, mirroring the server's enemy clamp. */
 export const PVP_MAX_DAMAGE = 200;
+
+/**
+ * Invulnerability window (ms) the server grants after it applies a player hit.
+ * Shared so the client can pace its strikes to it instead of firing faster than
+ * the server will accept.
+ */
+export const PLAYER_IFRAME_MS = 700;
+
+/** Min gap (ms) between two PvP strikes from the same attacker. */
+export const PVP_HIT_COOLDOWN_MS = PLAYER_IFRAME_MS + 50;
+
+/**
+ * Ceiling of the directional dodge chance. Base PvP is a guaranteed hit; only a
+ * target that actively runs *away* from the strike can slip it, and even then at
+ * most this often. Running sideways, running in, or standing still never dodges.
+ */
+export const PVP_MAX_DODGE = 0.35;
+
+/** Below this speed (world units/s) the target counts as standing still. */
+export const PVP_DODGE_MIN_SPEED = 15;
+
+/**
+ * Distance a PvP approach closes to before releasing. Deliberately inside
+ * `PVP_ATTACK_RANGE`: the server measures the distance from its own (slightly
+ * older) copy of both positions, so casting exactly at the limit gets refused as
+ * out of range while the client swears it is in range.
+ */
+export const PVP_CAST_DISTANCE = PVP_ATTACK_RANGE - 100;
 
 /**
  * Decide whether one player is allowed to strike another.
@@ -48,4 +83,49 @@ export function canPvpAttack(attacker, target, distance, maxRange = PVP_ATTACK_R
 export function clampPvpDamage(damage) {
   if (typeof damage !== "number" || !Number.isFinite(damage) || damage <= 0) return null;
   return Math.round(Math.min(damage, PVP_MAX_DAMAGE));
+}
+
+/**
+ * Chance that a target escapes a strike by running away from it.
+ *
+ * `0` unless the target is genuinely retreating along the line of the attack:
+ * the fleeing component is the angle between the target's velocity and the vector
+ * from attacker to target, so a perpendicular dash (a sidestep) does not count and
+ * neither does charging straight in.
+ *
+ * @param {{x:number,y:number}} attacker
+ * @param {{x:number,y:number,vx?:number,vy?:number}} target
+ * @returns {number} chance in [0, PVP_MAX_DODGE]
+ */
+export function dodgeChance(attacker, target) {
+  if (!attacker || !target) return 0;
+
+  const vx = Number(target.vx) || 0;
+  const vy = Number(target.vy) || 0;
+  const speed = Math.hypot(vx, vy);
+  if (speed < PVP_DODGE_MIN_SPEED) return 0;
+
+  const dx = target.x - attacker.x;
+  const dy = target.y - attacker.y;
+  const separation = Math.hypot(dx, dy);
+  if (!separation) return 0;
+
+  // cos(angle) between "where I am running" and "away from the attacker".
+  const fleeing = (vx * dx + vy * dy) / (speed * separation);
+  if (!Number.isFinite(fleeing) || fleeing <= 0) return 0;
+  return Math.min(1, fleeing) * PVP_MAX_DODGE;
+}
+
+/**
+ * Decide one strike against the directional dodge rule.
+ * @param {{x:number,y:number}} attacker
+ * @param {{x:number,y:number,vx?:number,vy?:number}} target
+ * @param {number} roll uniform sample in [0, 1)
+ * @returns {boolean} true when the strike is dodged
+ */
+export function rollDodge(attacker, target, roll) {
+  const chance = dodgeChance(attacker, target);
+  if (chance <= 0) return false;
+  if (typeof roll !== "number" || !Number.isFinite(roll)) return false;
+  return roll < chance;
 }

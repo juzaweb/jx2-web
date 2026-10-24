@@ -11,7 +11,14 @@ const makeRect = () => {
     setDepth: vi.fn(() => rect),
     setStrokeStyle: vi.fn(() => rect),
     setPosition: vi.fn(() => rect),
-    setFillStyle: vi.fn(() => rect)
+    setFillStyle: vi.fn(() => rect),
+    // Phaser only redraws a Rectangle through setSize; mirror that here so the
+    // tests fail if the implementation goes back to assigning `.width`.
+    setSize: vi.fn((width, height) => {
+      rect.width = width;
+      rect.height = height;
+      return rect;
+    })
   };
   return rect;
 };
@@ -64,6 +71,10 @@ describe("layoutHealthBar", () => {
 
     layoutHealthBar(bar, 100, 200, 200, 50, 100);
 
+    expect(bar.fill.setSize).toHaveBeenCalledWith(
+      expect.closeTo(fullFillWidth * 0.5),
+      expect.any(Number)
+    );
     expect(bar.fill.width).toBeCloseTo(fullFillWidth * 0.5);
     expect(bar.fill.setFillStyle).toHaveBeenCalledTimes(1);
     expect(bar.back.setPosition).toHaveBeenCalledWith(100, expect.any(Number));

@@ -882,6 +882,15 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
     assert.equal(restored.payload.maxHp, 100);
 
+    // Players standing at the fight spot must learn about the teleport and the
+    // refilled HP, otherwise they keep a corpse with an empty bar on screen.
+    const teleport = await client1.waitFor((m) => m.type === "player_moved" && m.payload.id === "usr_pk2");
+    assert.deepEqual([teleport.payload.x, teleport.payload.y], [MARKET_SPAWN.x, MARKET_SPAWN.y]);
+    const refilled = await client1.waitFor(
+      (m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100
+    );
+    assert.equal(refilled.payload.maxHp, 100);
+
     // The victim is now at the respawn point, out of the attacker's range
     await new Promise((resolve) => setTimeout(resolve, 750));
     const afterRespawn = client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2").length;
@@ -902,6 +911,87 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await peaceful.close();
     await client2.close();
     await client1.close();
+  });
+
+  await t.test("PvP: a reconnect keeps the same player id hittable instead of orphaning it", async () => {
+    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    attacker.send({
+      type: "player_join",
+      payload: { id: "usr_rc_atk", username: "Atk", displayName: "Atk", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await attacker.waitFor((m) => m.type === "init_world");
+
+    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    victim.send({
+      type: "player_join",
+      payload: { id: "usr_rc_vic", username: "Vic", displayName: "Vic", x: 5200, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await victim.waitFor((m) => m.type === "init_world");
+
+    // A flaky link: the victim joins again on a new socket under the same id, so
+    // the server closes the old one and its close event lands afterwards.
+    const reconnected = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    reconnected.send({
+      type: "player_join",
+      payload: { id: "usr_rc_vic", username: "Vic", displayName: "Vic", x: 5200, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await reconnected.waitFor((m) => m.type === "init_world");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    attacker.send({ type: "player_hit", payload: { targetId: "usr_rc_vic", damage: 20 } });
+    const hit = await reconnected.waitFor(
+      (m) => m.type === "player_hp" && m.payload.id === "usr_rc_vic" && m.payload.damage > 0
+    );
+    assert.equal(hit.payload.hp, 80, "The reconnected socket still owns the player");
+
+    await attacker.close();
+    await reconnected.close();
+  });
+
+  await t.test("PvP: a retreating target can dodge, and the roll is server-side", async () => {
+    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    attacker.send({
+      type: "player_join",
+      payload: { id: "dodge_atk", username: "A", displayName: "Atk", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await attacker.waitFor((m) => m.type === "init_world");
+    victim.send({
+      type: "player_join",
+      payload: { id: "dodge_vic", username: "V", displayName: "Vic", x: 5400, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await victim.waitFor((m) => m.type === "init_world");
+
+    // The victim runs straight away from the attacker (+x), so the dodge window opens.
+    victim.send({ type: "player_move", payload: { x: 5400, y: 5000, vx: 300, vy: 0 } });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const originalRandom = gameSocket.random;
+    gameSocket.random = () => 0; // pin the roll: any chance at all => dodged
+    attacker.send({ type: "player_hit", payload: { targetId: "dodge_vic", damage: 20 } });
+    const dodge = await attacker.waitFor((m) => m.type === "player_hit_rejected" && m.payload.reason === "dodged");
+    assert.ok(dodge.payload.chance > 0, "The refusal reports the dodge chance");
+    assert.equal(
+      victim.messages.filter((m) => m.type === "player_hp" && m.payload.damage > 0).length,
+      0,
+      "A dodged strike deals no damage"
+    );
+
+    // Standing still closes the window: the very same roll now lands.
+    victim.send({ type: "player_move", payload: { x: 5400, y: 5000, vx: 0, vy: 0 } });
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    gameSocket.random = () => 0;
+    attacker.send({ type: "player_hit", payload: { targetId: "dodge_vic", damage: 20 } });
+    const landed = await victim.waitFor(
+      (m) => m.type === "player_hp" && m.payload.id === "dodge_vic" && m.payload.damage > 0
+    );
+    gameSocket.random = originalRandom;
+
+    assert.equal(landed.payload.hp, 80);
+
+    await attacker.close();
+    await victim.close();
   });
 
   await t.test("Combat actions are rate-limited (anti-amplification)", async () => {
@@ -928,34 +1018,65 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await observer.close();
   });
 
-  await t.test("Area of interest: streaming updates stay local", async () => {
+  await t.test("Player state is map-scoped, enemy state keeps its area of interest", async () => {
     const mover = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const nearObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    mover.send({ type: "player_join", payload: { id: "aoi_mover", username: "M", x: 1000, y: 1000 } });
+    // The roster is map-wide (init_world / player_joined / player_left), so the
+    // client renders every peer on the map and needs every peer's state. Streaming
+    // it on a radius instead froze those peers mid-walk on screen.
+    mover.send({ type: "player_join", payload: { id: "scope_mover", username: "M", x: 3000, y: 3000 } });
     await mover.waitFor((m) => m.type === "init_world");
-    nearObserver.send({ type: "player_join", payload: { id: "aoi_near", username: "N", x: 1050, y: 1000 } });
-    await nearObserver.waitFor((m) => m.type === "init_world");
-    farObserver.send({ type: "player_join", payload: { id: "aoi_far", username: "F", x: 6000, y: 6000 } });
+    farObserver.send({ type: "player_join", payload: { id: "scope_far", username: "F", x: 9500, y: 9000 } });
     await farObserver.waitFor((m) => m.type === "init_world");
 
     const radius = gameSocket.aoiRadius;
     gameSocket.aoiRadius = 400;
-    mover.send({ type: "player_move", payload: { x: 1010, y: 1000 } });
+    mover.send({ type: "player_move", payload: { x: 3010, y: 3000 } });
+    const moved = await farObserver.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "scope_mover"
+    );
+    gameSocket.aoiRadius = radius;
+
+    assert.equal(moved.payload.x, 3010, "A peer on the other side of the map still gets the move");
+
+    await mover.close();
+    await farObserver.close();
+  });
+
+  await t.test("Enemy state still streams on the area of interest", async () => {
+    const hitter = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const nearObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    hitter.send({ type: "player_join", payload: { id: "aoi_hitter", username: "H", x: 3000, y: 3000 } });
+    await hitter.waitFor((m) => m.type === "init_world");
+    // Wolf 0 lives at 8400,6000.
+    nearObserver.send({ type: "player_join", payload: { id: "aoi_near", username: "N", x: 8450, y: 6000 } });
+    await nearObserver.waitFor((m) => m.type === "init_world");
+    farObserver.send({ type: "player_join", payload: { id: "aoi_far", username: "F", x: 9500, y: 9000 } });
+    await farObserver.waitFor((m) => m.type === "init_world");
+
+    const radius = gameSocket.aoiRadius;
+    gameSocket.aoiRadius = 400;
+    hitter.send({ type: "enemy_hit", payload: { id: 0, damage: 5 } });
+    const nearHit = await nearObserver.waitFor((m) => m.type === "enemy_hit");
     await new Promise((resolve) => setTimeout(resolve, 80));
     gameSocket.aoiRadius = radius;
 
-    const isMover = (m) => m.type === "player_moved" && m.payload.id === "aoi_mover";
-    assert.equal(nearObserver.messages.filter(isMover).length, 1, "A nearby observer receives the update");
-    assert.equal(farObserver.messages.filter(isMover).length, 0, "A far observer does not");
+    assert.equal(nearHit.payload.id, 0, "A player standing next to the wolf sees the hit");
+    assert.equal(
+      farObserver.messages.filter((m) => m.type === "enemy_hit").length,
+      0,
+      "A player far from the wolf does not"
+    );
 
-    await mover.close();
+    await hitter.close();
     await nearObserver.close();
     await farObserver.close();
   });
 
-  await t.test("Area of interest: the victim always learns of its own defeat", async () => {
+  await t.test("A defeat reaches the victim and the rest of the map", async () => {
     const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
@@ -970,21 +1091,51 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     const radius = gameSocket.aoiRadius;
     gameSocket.aoiRadius = 400;
     attacker.send({ type: "player_hit", payload: { targetId: "kill_vic", damage: 100 } });
-    // The victim is teleported on death, so it must still receive the message
-    // even though it now sits far from the fight's AOI.
+    // The victim is teleported on death, so its own copy is sent directly; the rest
+    // of the map learns about the kill through the map-wide broadcast.
     await victim.waitFor((m) => m.type === "player_defeated" && m.payload.victimId === "kill_vic");
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    const farView = await farObserver.waitFor(
+      (m) => m.type === "player_defeated" && m.payload.victimId === "kill_vic"
+    );
     gameSocket.aoiRadius = radius;
 
-    assert.equal(
-      farObserver.messages.filter((m) => m.type === "player_defeated").length,
-      0,
-      "A far player does not see the defeat"
-    );
+    assert.equal(farView.payload.source, "pvp", "Every player on the map sees the kill");
 
     await attacker.close();
     await victim.close();
     await farObserver.close();
+  });
+
+  await t.test("PvP: the attacker sees the damage from beyond the enemy AOI", async () => {
+    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    attacker.send({
+      type: "player_join",
+      payload: { id: "far_atk", username: "A", x: 1000, y: 1000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await attacker.waitFor((m) => m.type === "init_world");
+    // 600 apart: inside the PvP reach, outside the 400-radius enemy AOI used below.
+    victim.send({
+      type: "player_join",
+      payload: { id: "far_vic", username: "V", x: 1600, y: 1000, hp: 100, maxHp: 100, pkFlag: true }
+    });
+    await victim.waitFor((m) => m.type === "init_world");
+
+    const radius = gameSocket.aoiRadius;
+    gameSocket.aoiRadius = 400;
+    attacker.send({ type: "player_hit", payload: { targetId: "far_vic", damage: 25 } });
+    const attackerView = await attacker.waitFor((m) => m.type === "player_hp" && m.payload.id === "far_vic");
+    gameSocket.aoiRadius = radius;
+
+    assert.equal(
+      attackerView.payload.hp,
+      75,
+      "The attacker is told the victim's new HP regardless of the streaming AOI"
+    );
+
+    await attacker.close();
+    await victim.close();
   });
 
   await t.test("Backpressure: lagging sockets are skipped", async () => {

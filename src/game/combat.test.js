@@ -17,6 +17,7 @@ import { CombatSystem } from "./combat.js";
 import { computeDamage } from "./damage.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
+import { PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 
 describe("computeDamage", () => {
   const baseAttacker = {
@@ -565,5 +566,163 @@ describe("attack speed coefficient", () => {
   it("falls back to the base cadence for a missing or invalid coefficient", () => {
     expect(makeCombat(undefined).attackIntervalMs()).toBe(330);
     expect(makeCombat(0).attackIntervalMs()).toBe(330);
+  });
+
+  it("paces PvP strikes to the server's i-frame instead of the melee cadence", () => {
+    expect(makeCombat(1).pvpAttackIntervalMs()).toBe(PVP_HIT_COOLDOWN_MS);
+    expect(makeCombat(3).pvpAttackIntervalMs()).toBe(PVP_HIT_COOLDOWN_MS);
+  });
+});
+
+describe("skill targeting", () => {
+  const peer = (id, x, y, extra = {}) => ({
+    id,
+    x,
+    y,
+    pkFlag: true,
+    displayName: id,
+    hp: 100,
+    maxHp: 100,
+    container: { active: true },
+    ...extra
+  });
+
+  const makeCombat = ({ pkFlag = true, pvpTarget = null, wolves = [], peers = [] } = {}) => {
+    const player = {
+      sect: "thieu-lam",
+      x: 0,
+      y: 0,
+      pkFlag,
+      visual: { scaleX: 1 },
+      faceDirection: vi.fn(),
+      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100, attack: 24, critRate: 0.12, critDamage: 1.5 }
+    };
+    const ring = { setStrokeStyle: () => ring, setDepth: () => ring, destroy: vi.fn() };
+    const scene = {
+      time: { now: 1000 },
+      cameras: { main: { width: 1000, height: 1000, zoom: 1 } },
+      add: { circle: () => ring },
+      tweens: { add: vi.fn() },
+      pvpTarget,
+      remotePlayerManager: { getAll: () => peers },
+      networkClient: { isConnected: true, sendPlayerHit: vi.fn(), sendAttack: vi.fn(), sendEnemyHit: vi.fn(), sendMove: vi.fn() }
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const combat = new CombatSystem(scene, player, { getAlive: () => wolves }, ui, () => {});
+    return { combat, scene, ui };
+  };
+
+  const wolf = (id, x, y) => ({ id, x, y, takeHit: vi.fn(), hp: 50, maxHp: 50, defense: 0 });
+
+  it("prefers the locked PvP target over a closer monster", () => {
+    const locked = peer("locked", 200, 0);
+    const { combat } = makeCombat({ pvpTarget: locked, peers: [locked], wolves: [wolf("wolf", 30, 0)] });
+
+    expect(combat.findTarget(null)).toBe(locked);
+  });
+
+  it("ignores the lock while the hero is peaceful", () => {
+    const locked = peer("locked", 200, 0);
+    const nearWolf = wolf("wolf", 30, 0);
+    const { combat } = makeCombat({ pkFlag: false, pvpTarget: locked, wolves: [nearWolf] });
+
+    expect(combat.findTarget(null)).toBe(nearWolf);
+  });
+
+  it("prefers the peer standing under the click", () => {
+    const clicked = peer("clicked", 500, 0);
+    const { combat } = makeCombat({ peers: [clicked], wolves: [wolf("wolf", 500, 0)] });
+
+    expect(combat.findTarget({ x: 500, y: 0 })).toBe(clicked);
+  });
+
+  it("auto-acquires a flagged peer already inside PvP range when nothing is locked", () => {
+    const near = peer("near", PVP_ATTACK_RANGE - 100, 0);
+    const { combat } = makeCombat({ peers: [near], wolves: [wolf("wolf", 30, 0)] });
+
+    expect(combat.findTarget(null)).toBe(near);
+  });
+
+  it("leaves far-away flagged peers alone and keeps the monster target", () => {
+    const far = peer("far", PVP_ATTACK_RANGE + 200, 0);
+    const nearWolf = wolf("wolf", 30, 0);
+    const { combat } = makeCombat({ peers: [far], wolves: [nearWolf] });
+
+    expect(combat.findTarget(null)).toBe(nearWolf);
+  });
+
+  it("clamps a peer cast inside the server's PvP range but not a monster cast", () => {
+    const skill = { radius: 0, range: 5000 };
+    const { combat } = makeCombat();
+    const monsterReach = combat.castReach(skill, wolf("w", 0, 0));
+
+    expect(monsterReach).toBe(combat.skillReach(skill));
+    expect(combat.castReach(skill, peer("p", 0, 0))).toBe(
+      Math.min(combat.skillReach(skill), PVP_CAST_DISTANCE)
+    );
+  });
+
+  it("resolves a pending approach against a peer and drops it when the flag falls", () => {
+    const locked = peer("locked", 200, 0);
+    const peaceful = peer("peaceful", 200, 0, { pkFlag: false });
+
+    const ready = makeCombat({ peers: [locked] });
+    expect(ready.combat.findPendingTarget("locked")).toBe(locked);
+    expect(ready.combat.findPendingTarget("missing")).toBeNull();
+
+    const dropped = makeCombat({ peers: [peaceful] });
+    expect(dropped.combat.findPendingTarget("peaceful")).toBeNull();
+  });
+
+  it("reports a skill hit on a peer without touching its local HP", () => {
+    const locked = peer("locked", 100, 0);
+    const { combat, scene } = makeCombat({ pvpTarget: locked, peers: [locked] });
+    combat.setLocalPlayerId("me");
+    combat.showFloatText = vi.fn();
+
+    combat.applySkillToPlayer({ id: "kiem_khi", nameKey: "skills.kiem_khi", mult: 1.5, vfx: {} }, locked);
+
+    expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
+      targetId: "locked",
+      damage: expect.any(Number)
+    });
+    expect(locked.hp).toBe(100);
+
+    // The server measures the distance from its own copy of both positions, so the
+    // fresh position has to be on the wire before the hit (same socket, in order).
+    expect(scene.networkClient.sendMove).toHaveBeenCalled();
+    expect(scene.networkClient.sendMove.mock.invocationCallOrder[0]).toBeLessThan(
+      scene.networkClient.sendPlayerHit.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("refuses a peer skill hit from out of range", () => {
+    const far = peer("far", 2000, 0);
+    const { combat, scene, ui } = makeCombat();
+    combat.setLocalPlayerId("me");
+    combat.showFloatText = vi.fn();
+
+    combat.applySkillToPlayer({ id: "kiem_khi", nameKey: "skills.kiem_khi", mult: 1.5, vfx: {} }, far);
+
+    expect(scene.networkClient.sendPlayerHit).not.toHaveBeenCalled();
+    expect(ui.addLog).toHaveBeenCalled();
+  });
+
+  it("explains a fruitless cast when the hero is peaceful next to a flagged peer", () => {
+    const near = peer("near", 100, 0);
+    const { combat, ui } = makeCombat({ pkFlag: false, peers: [near] });
+
+    combat.hintPeacefulDuelist({ id: "la_han_quyen", nameKey: "skills.thieuLam.laHanQuyen.name" });
+
+    expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("bật cờ PK"));
+  });
+
+  it("stays quiet about the PK hint when the hero is already flagged", () => {
+    const near = peer("near", 100, 0);
+    const { combat, ui } = makeCombat({ pkFlag: true, peers: [near] });
+
+    combat.hintPeacefulDuelist({ id: "la_han_quyen", nameKey: "skills.thieuLam.laHanQuyen.name" });
+
+    expect(ui.addLog).not.toHaveBeenCalled();
   });
 });

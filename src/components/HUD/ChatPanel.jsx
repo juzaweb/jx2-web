@@ -15,6 +15,20 @@ export function ChatPanel({ logs = [], onSendMessage, collapsed = false, onClose
     }
   }, [logs]);
 
+  // Hooks must run unconditionally: the collapsed branch below returns early, so
+  // the filter memo has to be declared before it (otherwise React throws
+  // "Rendered fewer hooks than expected" the moment the chat is minimized).
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    return logs.filter((log) => {
+      if (activeTab === "all") return true;
+      if (activeTab === "system") return log.type === "system" || log.type === "guide";
+      if (activeTab === "near") return log.type === "near";
+      if (activeTab === "combat") return log.type === "combat";
+      return true;
+    });
+  }, [logs, activeTab]);
+
   // Minimized state keeps a small tab on screen so the channel can be reopened.
   if (collapsed) {
     return (
@@ -46,17 +60,6 @@ export function ChatPanel({ logs = [], onSendMessage, collapsed = false, onClose
       handleSend();
     }
   };
-
-  const filteredLogs = useMemo(() => {
-    if (!logs) return [];
-    return logs.filter((log) => {
-      if (activeTab === "all") return true;
-      if (activeTab === "system") return log.type === "system" || log.type === "guide";
-      if (activeTab === "near") return log.type === "near";
-      if (activeTab === "combat") return log.type === "combat";
-      return true;
-    });
-  }, [logs, activeTab]);
 
   return (
     <section className="bottom-left-panel" id="chat-panel">

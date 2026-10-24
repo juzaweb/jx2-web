@@ -76,6 +76,7 @@ export class StorageManager {
    * @param {{ x: number, y: number }} [data.position] Player coordinates
    * @param {boolean} [data.questRewarded] Quest completion state
    * @param {boolean} [data.audioEnabled] Sound setting
+   * @param {boolean} [data.pkFlag] PK opt-in flag, restored on the next boot
    * @returns {boolean} Success status
    */
   static save(data) {
@@ -88,6 +89,9 @@ export class StorageManager {
         position: data.position,
         questRewarded: !!data.questRewarded,
         audioEnabled: data.audioEnabled,
+        // The PK flag is a player choice, not session state: it has to survive a
+        // reload or the HUD and the server disagree about who is flagged.
+        pkFlag: data.pkFlag === true,
         savedAt: Date.now()
       };
       localStorage.setItem(this.getKey(), JSON.stringify(payload));

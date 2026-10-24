@@ -116,6 +116,57 @@ describe("playSkillCastVfx sprite playback", () => {
     expect(tweenConfig.value.duration).toBe(950);
   });
 
+  it("flies to the aimed point when the cast has no target", () => {
+    const { scene, tweenConfig } = makeScene();
+    scene.add.sprite = () => makeSprite();
+
+    playSkillCastVfx(
+      scene,
+      makePlayer(),
+      { range: 6000, radius: 0, vfx: { sprite: "palm" } },
+      null,
+      { x: 400, y: 100 }
+    );
+
+    const end = toIso(400, 100);
+    expect(tweenConfig.value.x).toBe(end.x);
+    expect(tweenConfig.value.y).toBe(end.y - 26);
+  });
+
+  it("clamps a far aim point to the skill range", () => {
+    const { scene, tweenConfig } = makeScene();
+    scene.add.sprite = () => makeSprite();
+
+    playSkillCastVfx(
+      scene,
+      makePlayer(),
+      { range: 300, radius: 0, vfx: { sprite: "palm" } },
+      null,
+      { x: 1000, y: 100 }
+    );
+
+    const end = toIso(400, 100);
+    expect(tweenConfig.value.x).toBe(end.x);
+    expect(tweenConfig.value.y).toBe(end.y - 26);
+  });
+
+  it("falls back to the facing edge when the aim point sits on the hero", () => {
+    const { scene, tweenConfig } = makeScene();
+    scene.add.sprite = () => makeSprite();
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      { range: 6000, radius: 0, vfx: { sprite: "palm" } },
+      null,
+      { x: player.x, y: player.y }
+    );
+
+    const end = toIso(player.x + 2850, player.y);
+    expect(tweenConfig.value.x).toBe(end.x);
+  });
+
   it("uses the camera worldView when it is available", () => {
     const { scene, tweenConfig } = makeScene();
     scene.cameras.main.worldView = { left: 0, top: 0, right: 1000, bottom: 600, width: 1000 };

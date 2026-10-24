@@ -462,6 +462,27 @@ export class Player {
     }
   }
 
+  /**
+   * Whether the player is holding a movement input right now (keyboard or touch).
+   * Auto-move consumers (PvP chase, NPC approach) use this to yield to the player.
+   * @returns {boolean}
+   */
+  hasManualMoveInput() {
+    if (this.touchDirection) return true;
+    const k = this.keys;
+    if (!k) return false;
+    return Boolean(
+      k.A?.isDown ||
+        k.D?.isDown ||
+        k.W?.isDown ||
+        k.S?.isDown ||
+        k.LEFT?.isDown ||
+        k.RIGHT?.isDown ||
+        k.UP?.isDown ||
+        k.DOWN?.isDown
+    );
+  }
+
   setName(name) {
     if (!name) return;
     this.name = name;

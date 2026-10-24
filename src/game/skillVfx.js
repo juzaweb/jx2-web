@@ -63,15 +63,34 @@ function cameraEdgeDistance(scene, player, direction, maxDistance) {
 }
 
 /**
+ * Clamp a cast point to the skill's reach so a cursor far off-screen does not
+ * stretch the projectile across the whole map.
+ * @param {{x:number,y:number}} player
+ * @param {{x:number,y:number}} point
+ * @param {number} maxRange
+ * @returns {{x:number,y:number}}
+ */
+function clampedAimPoint(player, point, maxRange) {
+  const dx = point.x - player.x;
+  const dy = point.y - player.y;
+  const distance = Math.hypot(dx, dy);
+  if (!distance || distance <= maxRange) return { x: point.x, y: point.y };
+  const scale = maxRange / distance;
+  return { x: player.x + dx * scale, y: player.y + dy * scale };
+}
+
+/**
  * Play a catalog skill's sprite-sheet animation as a projectile that travels
- * from the caster toward the target (or to the camera edge when there is none).
+ * from the caster toward the target (or the aimed point, or the camera edge when
+ * there is neither).
  * @param {Phaser.Scene} scene
  * @param {Object} skill
  * @param {import("./player.js").Player} player
  * @param {Object|null} target
+ * @param {{x:number,y:number}|null} [aimPoint]
  * @returns {boolean} true when the sprite actually played
  */
-function playSpriteCastVfx(scene, skill, player, target) {
+function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
   const key = skill.vfx?.sprite;
   if (!key || !scene.textures.exists(key)) return false;
 
@@ -143,8 +162,10 @@ function playSpriteCastVfx(scene, skill, player, target) {
   }
 
   const maxRange = Number(skill.range) || Number(skill.radius) || 90;
-  const aim = target
-    ? { x: target.x, y: target.y }
+  const aimedAt = target || aimPoint;
+  const aimDistance = aimedAt ? Math.hypot(aimedAt.x - player.x, aimedAt.y - player.y) : 0;
+  const aim = aimedAt && aimDistance > 1
+    ? clampedAimPoint(player, aimedAt, maxRange)
     : (() => {
         const direction = directionVector(player.facingDirection);
         const distance = cameraEdgeDistance(scene, player, direction, maxRange);
@@ -193,7 +214,7 @@ function playSpriteCastVfx(scene, skill, player, target) {
  * @param {import("./player.js").Player} player
  * @param {Object} skill
  */
-export function playSkillCastVfx(scene, player, skill, target = null) {
+export function playSkillCastVfx(scene, player, skill, target = null, aimPoint = null) {
   if (!scene || !player?.sprite || !skill?.vfx) return;
   // Sprite VFX sheets download on first use; a not-yet-ready sheet simply skips
   // its visual for this cast instead of blocking the skill.
@@ -202,13 +223,16 @@ export function playSkillCastVfx(scene, player, skill, target = null) {
   const color = skill.vfx.color || 0xffd166;
   const facingRight = player.visual?.scaleX >= 0;
   const cast = skill.vfx.cast;
-  const targetPoint = target ? toIso(target.x, target.y) : null;
+  const aimedAt = target || aimPoint;
+  const targetPoint = aimedAt ? toIso(aimedAt.x, aimedAt.y) : null;
   const angle = targetPoint ? Math.atan2(targetPoint.y - p.y, targetPoint.x - p.x) : null;
   const degrees = angle === null ? (facingRight ? 0 : 180) : (angle * 180) / Math.PI;
   const offsetX = angle === null ? (facingRight ? 16 : -16) : Math.cos(angle) * 26;
   const offsetY = angle === null ? 0 : Math.sin(angle) * 26;
 
-  if (skill.vfx.type !== "formation" && skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target)) return;
+  if (skill.vfx.type !== "formation" && skill.vfx.sprite && playSpriteCastVfx(scene, skill, player, target, aimPoint)) {
+    return;
+  }
 
   // Baseline pulse so every cast is visibly telegraphed, whatever its type.
   const pulse = scene.add

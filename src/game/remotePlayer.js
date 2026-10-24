@@ -41,6 +41,8 @@ export class RemotePlayer {
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
     this.pkFlag = data.pkFlag === true;
+    /** Character this avatar belongs to, used to collapse stale duplicates. */
+    this.characterId = data.characterId || null;
     /** Gender synced from the server; drives the rig silhouette. */
     this.gender = normalizeGender(data.gender);
     this.walkPhase = 0;
@@ -134,6 +136,19 @@ export class RemotePlayer {
     if (Number.isFinite(stats.hp)) {
       this.hp = stats.hp;
     }
+  }
+
+  /**
+   * Blink the peer for a moment when the server reports damage on them. The
+   * overhead bar alone is easy to miss mid-fight, and the client draws its own
+   * optimistic damage numbers, so without this a landed hit looks like nothing.
+   */
+  flashHit() {
+    if (!this.container || !this.container.active) return;
+    this.container.setAlpha(0.55);
+    this.scene?.time?.delayedCall?.(150, () => {
+      if (this.container && this.container.active) this.container.setAlpha(1);
+    });
   }
 
   /**

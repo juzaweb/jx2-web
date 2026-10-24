@@ -28,6 +28,18 @@ export class RemotePlayerManager {
     if (!playerData || !playerData.id) return;
     if (this.localPlayerId && playerData.id === this.localPlayerId) return;
 
+    // One avatar per character: a stale socket from an earlier page load can still
+    // be on the server roster under a different player id, and two identical
+    // nameplates make it impossible to tell which body a hit actually landed on.
+    if (playerData.characterId) {
+      this.players.forEach((existing, key) => {
+        if (existing.characterId && existing.characterId === playerData.characterId && key !== playerData.id) {
+          existing.destroy();
+          this.players.delete(key);
+        }
+      });
+    }
+
     // Remove existing if duplicate
     if (this.players.has(playerData.id)) {
       this.players.get(playerData.id).destroy();
@@ -99,6 +111,7 @@ export class RemotePlayerManager {
     const player = this.players.get(payload.id);
     if (player) {
       player.applyStats(payload);
+      if (payload.damage > 0) player.flashHit?.();
     }
   }
 

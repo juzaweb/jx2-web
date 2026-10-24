@@ -66,11 +66,20 @@ export function layoutHealthBar(bar, x, overheadY, depthBase, hp, maxHp, scale =
   const barY = overheadY - BAR_TOP_OFFSET * scale;
   const width = HEALTH_BAR_WIDTH * scale;
   const { ratio, color } = healthBarStyle(hp, maxHp);
+  const fillWidth = (HEALTH_BAR_WIDTH - BAR_PADDING_X * 2) * scale * ratio;
+  const fillHeight = (HEALTH_BAR_HEIGHT - BAR_PADDING_Y * 2) * scale;
 
   bar.back.setPosition(x, barY);
   bar.back.setDepth(depthBase + BAR_DEPTH_BACK);
 
-  bar.fill.width = (HEALTH_BAR_WIDTH - BAR_PADDING_X * 2) * scale * ratio;
+  // `setSize` (not `fill.width = ...`): a Phaser Rectangle only rebuilds its drawn
+  // geometry through setSize, so assigning the property left every bar rendering at
+  // full width while only the hp number changed behind it.
+  if (typeof bar.fill.setSize === "function") {
+    bar.fill.setSize(fillWidth, fillHeight);
+  } else {
+    bar.fill.width = fillWidth;
+  }
   bar.fill.setPosition(x - width / 2 + BAR_PADDING_X * scale, barY);
   bar.fill.setDepth(depthBase + BAR_DEPTH_FILL);
   bar.fill.setFillStyle(color);

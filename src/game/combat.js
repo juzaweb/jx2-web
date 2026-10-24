@@ -11,7 +11,8 @@ import {
 } from "./skillVfx.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { canPvpAttack } from "./pvp.js";
+import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
+import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
 import { computeDamage } from "./damage.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
@@ -22,6 +23,17 @@ let audioContext = null;
 
 const MAX_DROPS = 40;
 const UNOWNED_DROP_TTL_MS = 15000;
+/** World-space reach (px) of a plain sword swing against a monster. */
+const MELEE_REACH = 85;
+
+/**
+ * A monster takes local damage through `takeHit`; a peer (RemotePlayer) does not,
+ * because the server owns every player's HP. That difference is the only thing
+ * that tells the two target kinds apart in a cast.
+ * @param {*} target
+ * @returns {boolean}
+ */
+const isPeerTarget = (target) => Boolean(target) && typeof target.takeHit !== "function";
 
 export function isAudioEnabled() {
   return audioEnabled;
@@ -113,10 +125,16 @@ export class CombatSystem {
     return ATTACK_INTERVAL_MS / (Number.isFinite(speed) && speed > 0 ? speed : 1);
   }
 
-  performAttack() {
-    if (!this.attackReady) return;
+  /**
+   * Start the attack cooldown and play the swing every strike shares: motion,
+   * sound, the broadcast to peers and the slash arc. PvP passes the facing so the
+   * hero turns toward its target instead of keeping the sprite's orientation.
+   * @param {boolean} [facingRight]
+   * @param {number} [intervalMs]
+   */
+  beginAttack(facingRight = this.player.visual.scaleX >= 0, intervalMs = this.attackIntervalMs()) {
     this.attackReady = false;
-    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
+    this.scene.time.delayedCall(intervalMs, () => {
       this.attackReady = true;
     });
 
@@ -125,7 +143,6 @@ export class CombatSystem {
 
     playTone(260, 0.07, "sawtooth", 0.02);
 
-    const facingRight = this.player.visual.scaleX >= 0;
     const slashOffsetX = facingRight ? 16 : -16;
     const base = toIso(this.player.x, this.player.y);
 
@@ -158,14 +175,18 @@ export class CombatSystem {
       duration: 190,
       onComplete: () => slash.destroy()
     });
+  }
 
+  /**
+   * The closest living monster inside sword reach.
+   * @returns {Object|null}
+   */
+  nearestEnemyInReach() {
     const candidates = this.enemyManager
       .getAlive()
-      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < 85);
+      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < MELEE_REACH);
 
-    if (!candidates.length) {
-      return;
-    }
+    if (!candidates.length) return null;
 
     candidates.sort(
       (a, b) =>
@@ -173,15 +194,58 @@ export class CombatSystem {
         Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
     );
 
-    const targetEnemy = candidates[0];
-    const result = computeDamage(this.player, targetEnemy, Math.random);
-    this.damageEnemy(targetEnemy, result.damage, result.crit);
+    return candidates[0];
+  }
 
-    if (result.crit) {
-      this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương!`);
-    } else {
-      this.ui.addLog(`Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương.`);
+  /**
+   * The closest PK-flagged player inside PvP range. Peers live in the scene's
+   * `RemotePlayerManager`, which may be absent (offline or before the handshake).
+   * @returns {Object|null}
+   */
+  nearestPvpTarget() {
+    const players = this.scene.remotePlayerManager?.getAll?.() || [];
+    return findNearestPvpTarget(this.player, players);
+  }
+
+  /**
+   * PvP strikes must not out-pace the server's i-frame: an early hit is dropped
+   * silently, so the client would draw damage that never happened.
+   * @returns {number}
+   */
+  pvpAttackIntervalMs() {
+    return Math.max(this.attackIntervalMs(), PVP_HIT_COOLDOWN_MS);
+  }
+
+  /**
+   * A plain attack: a monster in sword reach wins, otherwise a nearby duel target
+   * is struck, otherwise the swing merely plays through empty air.
+   */
+  performAttack() {
+    if (!this.attackReady) return;
+
+    const targetEnemy = this.nearestEnemyInReach();
+    if (targetEnemy) {
+      this.beginAttack();
+
+      const result = computeDamage(this.player, targetEnemy, Math.random);
+      this.damageEnemy(targetEnemy, result.damage, result.crit);
+
+      if (result.crit) {
+        this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương!`);
+      } else {
+        this.ui.addLog(`Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương.`);
+      }
+      return;
     }
+
+    // Nothing to cut in melee: a PK-flagged peer in range is the next best target.
+    const pvpTarget = this.player.pkFlag === true ? this.nearestPvpTarget() : null;
+    if (pvpTarget) {
+      this.performPvpAttack(pvpTarget);
+      return;
+    }
+
+    this.beginAttack();
   }
 
   /**
@@ -306,12 +370,13 @@ export class CombatSystem {
       return true;
     }
 
-    const target = this.findTarget(aim);
+    // A cursor sitting on the hero carries no direction; treat it as "no aim".
+    const aimPoint = aim && Math.hypot(aim.x - this.player.x, aim.y - this.player.y) > 1 ? aim : null;
+
+    const target = this.findTarget(aimPoint);
     if (!target) {
-      if (aim && this.player) {
-        this.player.setFacingRight?.(aim.x >= this.player.x);
-      }
-      this.executeSkill(skill, null);
+      // Nothing to hit: the projectile still flies toward where the player aimed.
+      this.executeSkill(skill, null, aimPoint);
       return true;
     }
 
@@ -362,7 +427,7 @@ export class CombatSystem {
    */
   approachAndCast(skill, target) {
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    if (distance <= this.skillReach(skill)) {
+    if (distance <= this.castReach(skill, target)) {
       this.executeSkill(skill, target);
       return;
     }
@@ -417,14 +482,19 @@ export class CombatSystem {
    * Spend the cost and release the skill.
    * @param {Object} skill
    * @param {Object|null} target
+   * @param {{x:number,y:number}|null} [aimPoint] cursor point when nothing was targeted
    */
-  executeSkill(skill, target) {
+  executeSkill(skill, target, aimPoint = null) {
     if (!this.canCast(skill)) return;
     const now = this.scene.time?.now ?? 0;
     const cost = skillMpCost(skill.id);
 
     this.skillCooldowns.set(skill.id, now + skill.cooldown);
     if (cost > 0) this.player.stats.mp -= cost;
+
+    // Turn toward the target before the motion starts so the body, the VFX and
+    // the packet that peers replay all agree on the direction.
+    this.aimAt(target || aimPoint);
 
     this.player.playSkillMotion?.(skill.vfx?.cast);
     playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
@@ -435,11 +505,12 @@ export class CombatSystem {
       "#ffe9a8"
     );
 
+    const aimed = target || aimPoint;
     this.scene.networkClient?.sendAttack?.({
       skill: skill.id,
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
-      facingRight: this.player.visual.scaleX >= 0
+      facingRight: aimed ? aimed.x >= this.player.x : this.player.facingDirection !== 6
     });
 
     bridge.emit(EVENTS.SKILL_CAST, {
@@ -449,7 +520,7 @@ export class CombatSystem {
       readyAt: this.skillCooldowns.get(skill.id)
     });
 
-    this.applySkill(skill, now, target);
+    this.applySkill(skill, now, target, aimPoint);
     this.ui.updateHud(this.player.stats);
   }
 
@@ -461,6 +532,39 @@ export class CombatSystem {
   skillReach(skill) {
     if (skill.radius > 0) return skill.radius;
     return Math.min(skill.range, this.screenCastRange());
+  }
+
+  /**
+   * Distance a cast at `target` may release from. A peer hit is validated by the
+   * server against the shared PvP range, so a long-range skill still has to close
+   * in before it can land.
+   * @param {Object} skill
+   * @param {Object} target
+   * @returns {number}
+   */
+  castReach(skill, target) {
+    const reach = this.skillReach(skill);
+    return isPeerTarget(target) ? Math.min(reach, PVP_CAST_DISTANCE) : reach;
+  }
+
+  /**
+   * Push the hero's current position to the server. A PvP hit is validated against
+   * the server's copy of both positions, so a strike that lands right after a
+   * chase would otherwise be measured from where we stood a frame ago and be
+   * refused as out of range.
+   */
+  syncPosition() {
+    const client = this.scene.networkClient;
+    if (!client?.isConnected) return;
+
+    const body = this.player.sprite?.body;
+    client.sendMove?.({
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+      vx: Math.round(body?.velocity?.x || 0),
+      vy: Math.round(body?.velocity?.y || 0),
+      direction: this.player.facing
+    });
   }
 
   /**
@@ -491,12 +595,15 @@ export class CombatSystem {
   }
 
   /**
-   * Pick the enemy nearest to the clicked point, or to the hero when no point
-   * was supplied.
+   * Pick the target of a cast: a locked or clicked duellist first, then the enemy
+   * nearest to the clicked point (or to the hero when no point was supplied).
    * @param {{x:number,y:number}|null} aim
    * @returns {Object|null}
    */
   findTarget(aim) {
+    const duellist = this.findPlayerTarget(aim);
+    if (duellist) return duellist;
+
     const alive = this.enemyManager.getAlive();
     if (!alive.length) return null;
 
@@ -524,6 +631,34 @@ export class CombatSystem {
   }
 
   /**
+   * The duellist a skill should aim at: the peer under the click, else the locked
+   * PvP target (`scene.pvpTarget`, set by clicking a flagged peer), else the
+   * closest flags-up opponent inside the PvP range. Only a hero flying the PK flag
+   * may acquire one — a peaceful hero never auto-attacks.
+   * @param {{x:number,y:number}|null} aim
+   * @returns {Object|null}
+   */
+  findPlayerTarget(aim) {
+    if (this.player.pkFlag !== true) return null;
+
+    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
+    if (aim) {
+      const clicked = findPlayerAt(peers, aim.x, aim.y);
+      if (clicked?.pkFlag === true) return clicked;
+    }
+
+    const locked = this.scene.pvpTarget;
+    if (isPeerTarget(locked) && locked.pkFlag === true && locked.container?.active !== false) {
+      return locked;
+    }
+
+    // Nothing picked: an opponent already inside striking range is still the most
+    // relevant target. Without this a skill cast next to a duellist flies past
+    // them and does nothing, which reads as "skill hits but no HP loss".
+    return findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE);
+  }
+
+  /**
    * Drive a pending approach. Called from the scene's update loop.
    * @param {number} time
    */
@@ -534,9 +669,7 @@ export class CombatSystem {
     const pending = this.pendingCast;
     if (!pending) return;
 
-    const target = this.enemyManager
-      .getAlive()
-      .find((wolf) => wolf.id === pending.targetId);
+    const target = this.findPendingTarget(pending.targetId);
     if (!target) {
       this.cancelPendingCast();
       this.ui.addLog("Mục tiêu đã biến mất.");
@@ -544,7 +677,7 @@ export class CombatSystem {
     }
 
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    if (distance <= this.skillReach(pending.skill)) {
+    if (distance <= this.castReach(pending.skill, target)) {
       this.pendingCast = null;
       this.player.stopMovement?.();
       this.executeSkill(pending.skill, target);
@@ -556,6 +689,21 @@ export class CombatSystem {
       this.lastChaseAt = time;
       this.player.moveTo(target.x, target.y);
     }
+  }
+
+  /**
+   * Resolve the id stored on a pending approach: a monster or a peer, whichever
+   * still holds it. A peer that left or lowered its PK flag ends the chase.
+   * @param {string} targetId
+   * @returns {Object|null}
+   */
+  findPendingTarget(targetId) {
+    const wolf = this.enemyManager.getAlive().find((entry) => entry.id === targetId);
+    if (wolf) return wolf;
+
+    const peer = (this.scene.remotePlayerManager?.getAll?.() || []).find((entry) => entry.id === targetId);
+    if (!isPeerTarget(peer) || peer.pkFlag !== true) return null;
+    return peer.container?.active === false ? null : peer;
   }
 
   /**
@@ -572,8 +720,10 @@ export class CombatSystem {
    * the nearest enemy / an area around the hero.
    * @param {Object} skill
    * @param {number} now
+   * @param {Object|null} [preferredTarget]
+   * @param {{x:number,y:number}|null} [aimPoint] cursor point when nothing was targeted
    */
-  applySkill(skill, now, preferredTarget = null) {
+  applySkill(skill, now, preferredTarget = null, aimPoint = null) {
     if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
       playSkillCastVfx(this.scene, this.player, skill);
       this.applySelfEffects(skill, now);
@@ -585,13 +735,20 @@ export class CombatSystem {
       ? this.resolveTargets(skill)
       : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill));
     const primary = targets[0] || null;
-    this.aimAt(primary);
-    playSkillCastVfx(this.scene, this.player, skill, primary);
+    this.aimAt(primary || aimPoint);
+    playSkillCastVfx(this.scene, this.player, skill, primary, aimPoint);
     if (skill.radius > 0) {
       playRangeIndicator(this.scene, this.player.x, this.player.y, skill.radius, skill.vfx?.color);
     }
 
+    // A peer's HP lives on the server, so that branch only reports the roll.
+    if (isPeerTarget(primary)) {
+      this.applySkillToPlayer(skill, primary);
+      return;
+    }
+
     if (!targets.length) {
+      this.hintPeacefulDuelist(skill);
       return;
     }
 
@@ -613,6 +770,54 @@ export class CombatSystem {
     const critText = anyCrit ? " (Chí mạng!)" : "";
     this.ui.addLog(
       `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!${critText}`
+    );
+  }
+
+  /**
+   * Resolve a skill cast against another player. The peer's HP is server-owned, so
+   * this only reports the roll; the returned `player_hp` (or a dodge refusal) drives
+   * the floating damage number.
+   * @param {Object} skill
+   * @param {Object} target
+   */
+  applySkillToPlayer(skill, target) {
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    const attacker = { id: this.localPlayerId, pkFlag: true };
+    const defender = { id: target.id, pkFlag: target.pkFlag === true };
+    if (!canPvpAttack(attacker, defender, distance)) {
+      this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
+      return;
+    }
+
+    playTargetMarker(this.scene, target.x, target.y, skill.vfx?.color);
+
+    const result = computeSkillDamage(skill, this.getEffectiveStats(), target, Math.random);
+    if (result.damage > 0) {
+      this.syncPosition();
+      this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, damage: result.damage });
+      // No damage number here: the server answers with player_hp (or a dodge
+      // refusal) and that is what draws the floating text.
+    }
+
+    this.ui.addLog(
+      `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!${result.crit ? " (Chí mạng!)" : ""}`
+    );
+  }
+
+  /**
+   * Explain a skill that found nothing when the reason is our own PK flag: an
+   * opponent stands in range but a peaceful hero cannot damage them.
+   * @param {Object} skill
+   */
+  hintPeacefulDuelist(skill) {
+    if (this.player.pkFlag === true) return;
+
+    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
+    const near = findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE);
+    if (!near) return;
+
+    this.ui.addLog(
+      `${near.displayName || "Đối thủ"} đã bật cờ PK — hãy bật cờ PK của bạn để ${translate(skill.nameKey, undefined, skill.id)} gây sát thương.`
     );
   }
 
@@ -758,75 +963,39 @@ export class CombatSystem {
       return;
     }
 
-    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
-    const defender = { id: target?.id, pkFlag: target?.pkFlag === true };
-    const distance = target
-      ? Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y)
-      : Number.NaN;
-
-    if (!canPvpAttack(attacker, defender, distance)) {
-      this.ui.addLog(
-        this.player.pkFlag === true
-          ? `${target?.displayName || "Đối thủ"} chưa bật cờ PK.`
-          : "Hãy bật cờ PK trước khi tấn công người chơi khác."
-      );
+    // Report the reasons a strike can be refused separately: one catch-all
+    // message made an out-of-range click look like a flag problem.
+    if (this.player.pkFlag !== true) {
+      this.ui.addLog("Hãy bật cờ PK trước khi tấn công người chơi khác.");
+      return;
+    }
+    if (!target || target.pkFlag !== true) {
+      this.ui.addLog(`${target?.displayName || "Đối thủ"} chưa bật cờ PK.`);
       return;
     }
 
-    this.attackReady = false;
-    this.scene.time.delayedCall(this.attackIntervalMs(), () => {
-      this.attackReady = true;
-    });
+    const attacker = { id: this.localPlayerId, pkFlag: true };
+    const defender = { id: target.id, pkFlag: true };
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
 
-    this.player.playAttackMotion?.();
-    playTone(300, 0.07, "sawtooth", 0.022);
+    if (!canPvpAttack(attacker, defender, distance)) {
+      this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chém — hãy tiến lại gần.`);
+      return;
+    }
 
     const facingRight = target.x >= this.player.x;
-    const slashOffsetX = facingRight ? 16 : -16;
-    const base = toIso(this.player.x, this.player.y);
-
-    this.scene.networkClient?.sendAttack?.({
-      skill: "normal",
-      x: Math.round(this.player.x),
-      y: Math.round(this.player.y),
-      facingRight
-    });
-
-    const slash = this.scene.add
-      .arc(
-        base.x + slashOffsetX,
-        base.y - 7,
-        34,
-        facingRight ? -70 : 110,
-        facingRight ? 70 : 250,
-        false,
-        0xe9d59c,
-        0.9
-      )
-      .setStrokeStyle(5, 0xf2e3bd, 0.95)
-      .setDepth(isoDepth(this.player.x, this.player.y) + 10);
-
-    this.scene.tweens.add({
-      targets: slash,
-      alpha: 0,
-      scale: 1.4,
-      duration: 190,
-      onComplete: () => slash.destroy()
-    });
+    this.aimAt(target);
+    this.beginAttack(facingRight, this.pvpAttackIntervalMs());
 
     const result = computeDamage(this.player, target, Math.random);
+    this.syncPosition();
     this.scene.networkClient?.sendPlayerHit?.({
       targetId: target.id,
       damage: result.damage
     });
 
-    // Optimistic feedback; the authoritative HP arrives back from the server.
-    this.showFloatText(
-      target.x,
-      target.y - 30,
-      result.crit ? `-${result.damage} BẠO KÍCH!` : `-${result.damage}`,
-      result.crit ? "#ffcc00" : "#ffb49a"
-    );
+    // Optimistic feedback is intentionally omitted: the server confirms the hit via
+    // player_hp (or refuses it), and the client draws the number from that.
     this.ui.addLog(
       `${result.crit ? "Chí mạng! " : ""}Kiếm chiêu chém tới ${target.displayName || "đối thủ"}!`
     );
