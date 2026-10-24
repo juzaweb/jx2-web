@@ -1,6 +1,6 @@
 # Giang Hồ — React & Phaser 3 Wuxia RPG
 
-A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs (Vo Lam Truyen Ky 2), built with **React**, **Vite**, and **Phaser 3**.
+A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs, built with **React**, **Vite**, and **Phaser 3**.
 
 ## Features
 - **Modern React UI Overlay:** Decoupled HUD components for Player Vitals (HP/MP/Stamina/EXP/Buff Aura), Minimap Radar & Quest tracker, Giang Ho Chat feed, and Authentic Hotbar Dock.
