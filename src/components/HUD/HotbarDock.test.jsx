@@ -38,6 +38,24 @@ describe("HotbarDock logic & props", () => {
     expect(emptyCount).toBe(8);
   });
 
+  it("memoizes quick slots calculation and updates when quickSlotsMapping or items change", () => {
+    const initialMapping = { 1: "kim-sang-duoc" };
+    const items = [{ id: "kim-sang-duoc", name: "Kim Sáng Dược", icon: "icon-hp-pot", qty: 10 }];
+
+    const markup1 = renderDockMarkup({ quickSlotsMapping: initialMapping, items });
+    expect(markup1).toContain('id="qty-kim-sang-duoc">10</span>');
+
+    const updatedMapping = { 1: "kim-sang-duoc", 2: "dai-hoan-dan" };
+    const items2 = [
+      { id: "kim-sang-duoc", name: "Kim Sáng Dược", icon: "icon-hp-pot", qty: 10 },
+      { id: "dai-hoan-dan", name: "Đại Hoàn Đan", icon: "icon-mp-pot", qty: 5 }
+    ];
+
+    const markup2 = renderDockMarkup({ quickSlotsMapping: updatedMapping, items: items2 });
+    expect(markup2).toContain('id="qty-kim-sang-duoc">10</span>');
+    expect(markup2).toContain('id="qty-dai-hoan-dan">5</span>');
+  });
+
   it("renders skills button with 'Võ Công' label and hotkey title", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
