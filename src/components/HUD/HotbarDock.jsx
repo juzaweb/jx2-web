@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { getItemById, getQuantity } from "../../game/items.js";
@@ -104,25 +104,28 @@ export function HotbarDock({
 
   const availableItems = inventoryItems.length > 0 ? inventoryItems : items;
 
-  // The 9 numbered slots at the bottom can have items dragged into them (default empty)
-  const quickSlots = Array.from({ length: 9 }, (_, index) => {
-    const useSlot = index + 1;
-    const itemId = quickSlotsMapping?.[useSlot] || null;
-    const raw = itemId ? getItemById(itemId) : null;
+  // Memoize quick slots computation to avoid expensive item lookups, filtering,
+  // quantity summations, and i18n localization on every 200ms cooldown clock timer tick.
+  const quickSlots = useMemo(() => {
+    return Array.from({ length: 9 }, (_, index) => {
+      const useSlot = index + 1;
+      const itemId = quickSlotsMapping?.[useSlot] || null;
+      const raw = itemId ? getItemById(itemId) : null;
 
-    let qty = 0;
-    if (itemId) {
-      const matched = (availableItems || []).filter((entry) => entry && entry.id === itemId);
-      if (matched.length > 0) {
-        qty = matched.reduce((sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1), 0);
-      } else {
-        qty = getQuantity(itemId);
+      let qty = 0;
+      if (itemId) {
+        const matched = (availableItems || []).filter((entry) => entry && entry.id === itemId);
+        if (matched.length > 0) {
+          qty = matched.reduce((sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1), 0);
+        } else {
+          qty = getQuantity(itemId);
+        }
       }
-    }
 
-    const item = raw ? localizeItem({ ...raw, qty }, t) : null;
-    return { useSlot, item };
-  });
+      const item = raw ? localizeItem({ ...raw, qty }, t) : null;
+      return { useSlot, item };
+    });
+  }, [quickSlotsMapping, availableItems, t]);
 
   return (
     <section className="bottom-dock" id="bottom-dock">
