@@ -209,19 +209,17 @@ export const MAX_HITS_PER_CAST = 8;
 const MAX_BUFFERED_BYTES = 1_000_000;
 
 /**
- * Area-of-interest radius (world px) for *enemy* streaming. Enemy positions and
- * damage only reach players whose character is within this distance of the event,
- * turning the aggregate cost from O(N²) into O(N × neighbours).
+ * Streaming scope: everything that lives on a map is broadcast to everyone
+ * standing on that map.
  *
- * Player state is map-scoped instead (`broadcastToMap`), because the player roster
- * already is: `init_world`, `player_joined` and `player_left` are map-wide, so the
- * client draws every peer on the map. Streaming player state on a narrower radius
- * left those peers frozen mid-walk — see `broadcastPlayerState`.
+ * Both rosters are map-wide (`init_world` ships every player *and* every enemy),
+ * so the client renders every avatar and every monster on the map. Gating state on
+ * a smaller radius did not hide anything — it only left those entities frozen
+ * mid-walk/standstill on screen, because their position packets silently stopped.
+ * Enemy counts per map are small (single digits), so the cost is a handful of
+ * extra messages per tick, while `maxBufferedBytes` still sheds lagging sockets.
+ * If a map ever needs culling, it has to hide the entities on the client first.
  */
-export const AOI_RADIUS = 800;
-
-/** Respawn point of the default map, kept for older callers. */
-export const PLAYER_SPAWN = { ...getMap(DEFAULT_MAP_ID).spawn };
 
 /** Max distance (ground px) between buyer and a shop NPC. */
 const SHOP_INTERACT_RANGE = 260;
@@ -317,7 +315,6 @@ export class GameSocketManager {
     this.maxBufferedBytes = Number.isFinite(options.maxBufferedBytes)
       ? options.maxBufferedBytes
       : MAX_BUFFERED_BYTES;
-    this.aoiRadius = Number.isFinite(options.aoiRadius) ? options.aoiRadius : AOI_RADIUS;
     // Injectable so tests can pin the directional-dodge roll.
     this.random = typeof options.random === "function" ? options.random : Math.random;
 
@@ -455,37 +452,8 @@ export class GameSocketManager {
   }
 
   /**
-   * Send a streaming event to the players within the AOI radius of a point,
-   * skipping `senderWs` and any socket under backpressure.
-   * @param {number} sourceX
-   * @param {number} sourceY
-   * @param {WebSocket|null} senderWs
-   * @param {Object} data
-   * @param {string|null} [mapId]
-   */
-  broadcastNear(sourceX, sourceY, senderWs, data, mapId = null) {
-    const payload = JSON.stringify(data);
-    const radiusSquared = this.aoiRadius * this.aoiRadius;
-    this.wss.clients.forEach((client) => {
-      if (client === senderWs || client.readyState !== WebSocket.OPEN) return;
-      if (client.bufferedAmount >= this.maxBufferedBytes) return;
-      const receiver = this.players.get(client);
-      if (!receiver) return;
-      // Coordinates are per-map, so a distance check alone would leak between maps.
-      if (mapId && receiver.mapId !== mapId) return;
-      const dx = receiver.x - sourceX;
-      const dy = receiver.y - sourceY;
-      if (dx * dx + dy * dy > radiusSquared) return;
-      client.send(payload);
-    });
-  }
-
-  /**
-   * Fan out a player-owned event (position, gear, HP/MP, combat animation).
-   *
-   * Player state is map-scoped, not AOI-scoped: the roster is map-wide, so the
-   * client renders every peer on the map. Gating the state on a smaller radius
-   * made a peer stop mid-walk on everyone's screen while it kept moving for real.
+   * Fan out a player-owned event (position, gear, HP/MP, combat animation) to
+   * everyone standing on the player's map.
    * @param {Object} player - server player object the event belongs to
    * @param {Object} data
    * @param {WebSocket|null} [excludeWs] the sender, which already knows its own state
@@ -508,27 +476,6 @@ export class GameSocketManager {
       const receiver = this.players.get(client);
       if (!receiver || receiver.mapId !== mapId) return;
       client.send(payload);
-    });
-  }
-
-  /**
-   * Fan a batch of enemy positions out to players near *any* of them on the same map.
-   * @param {Array<{id:number, x:number, y:number}>} moved
-   * @param {string} [mapId]
-   */
-  broadcastEnemiesMoved(moved, mapId = DEFAULT_MAP_ID) {
-    if (!moved.length) return;
-    const payload = JSON.stringify({ type: "enemy_moved", payload: { enemies: moved } });
-    const radiusSquared = this.aoiRadius * this.aoiRadius;
-    this.wss.clients.forEach((client) => {
-      if (client.readyState !== WebSocket.OPEN) return;
-      if (client.bufferedAmount >= this.maxBufferedBytes) return;
-      const receiver = this.players.get(client);
-      if (!receiver || receiver.mapId !== mapId) return;
-      const near = moved.some(
-        (enemy) => (receiver.x - enemy.x) ** 2 + (receiver.y - enemy.y) ** 2 <= radiusSquared
-      );
-      if (near) client.send(payload);
     });
   }
 
@@ -861,16 +808,6 @@ export class GameSocketManager {
     }
     if (payload.stance) {
       player.stance = payload.stance === "side" ? "side" : "front";
-    }
-
-    // Find newly visible enemies using the map's spatial grid and send them to
-    // the moving player only.
-    const nearEnemies = this.getNearEnemies(player.x, player.y, this.aoiRadius, player.mapId);
-    if (nearEnemies.length > 0) {
-      this.send(ws, {
-        type: "near_enemies",
-        payload: { enemies: nearEnemies }
-      });
     }
 
     // Broadcast the position to the rest of the map: the roster is map-wide, so
@@ -1427,30 +1364,6 @@ export class GameSocketManager {
   }
 
   /**
-   * Find raw living enemy objects near a position using the map's spatial grid.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} [radius]
-   * @param {string} [mapId]
-   * @returns {Array<Object>}
-   */
-  getNearLivingEnemies(x, y, radius = this.aoiRadius, mapId = DEFAULT_MAP_ID) {
-    return this.gridFor(mapId).getNear(x, y, radius).filter((enemy) => !enemy.isDead);
-  }
-
-  /**
-   * Find living enemy snapshots near a position using the map's spatial grid.
-   * @param {number} x
-   * @param {number} y
-   * @param {number} [radius]
-   * @param {string} [mapId]
-   * @returns {Array<Object>}
-   */
-  getNearEnemies(x, y, radius = this.aoiRadius, mapId = DEFAULT_MAP_ID) {
-    return this.getNearLivingEnemies(x, y, radius, mapId).map((enemy) => this.enemySnapshot(enemy));
-  }
-
-  /**
    * Apply damage from a client and broadcast the authoritative enemy health.
    * The killing blow also triggers the authoritative reward broadcast.
    * @param {WebSocket} ws
@@ -1511,32 +1424,20 @@ export class GameSocketManager {
       this.scheduleEnemyRespawn(enemy);
     }
 
-    this.broadcastNear(
-      enemy.x,
-      enemy.y,
-      null,
-      {
-        type: "enemy_hit",
-        payload: {
-          ...this.enemySnapshot(enemy),
-          damage,
-          attackerId: player.id
-        }
-      },
-      enemy.mapId
-    );
+    this.broadcastToMap(enemy.mapId, {
+      type: "enemy_hit",
+      payload: {
+        ...this.enemySnapshot(enemy),
+        damage,
+        attackerId: player.id
+      }
+    });
 
     if (killed) {
       // Rolled from the server's own health pool and attributed to the killing
       // blow, so the client that landed it cannot mint its own payout
       const reward = rollEnemyReward(player.id, enemy);
-      this.broadcastNear(
-        enemy.x,
-        enemy.y,
-        null,
-        { type: "enemy_reward", payload: reward },
-        enemy.mapId
-      );
+      this.broadcastToMap(enemy.mapId, { type: "enemy_reward", payload: reward });
 
       // The credited killer's ledger is updated here, on the server. The reward
       // broadcast above is only for rendering (drop + float text).
@@ -1667,7 +1568,7 @@ export class GameSocketManager {
       });
 
       if (moved.length) {
-        this.broadcastEnemiesMoved(moved, mapId);
+        this.broadcastToMap(mapId, { type: "enemy_moved", payload: { enemies: moved } });
       }
 
       // Player health is server-owned, so monsters bite on the server clock too.
@@ -1736,7 +1637,8 @@ export class GameSocketManager {
   }
 
   /**
-   * Restore a defeated enemy and tell every client at once.
+   * Restore a defeated enemy and tell every player on the map at once.
+   * @param {string} mapId
    * @param {number} enemyId
    */
   respawnEnemy(mapId, enemyId) {
@@ -1751,13 +1653,7 @@ export class GameSocketManager {
     enemy.isDead = false;
     this.gridFor(mapId).add(enemy);
 
-    this.broadcastNear(
-      enemy.x,
-      enemy.y,
-      null,
-      { type: "enemy_respawned", payload: this.enemySnapshot(enemy) },
-      mapId
-    );
+    this.broadcastToMap(mapId, { type: "enemy_respawned", payload: this.enemySnapshot(enemy) });
   }
 
   /**
