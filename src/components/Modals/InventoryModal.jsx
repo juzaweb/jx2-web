@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   INVENTORY_GRID_SIZE,
   splitSilver
@@ -10,7 +10,8 @@ import {
 import "./inventory.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
-import { setDragPayload, readDragPayload, dragKind, acceptDrop } from "./dragItem.js";
+import { readDragPayload, dragKind, acceptDrop } from "./dragItem.js";
+import { beginItemDrag, cancelItemDrag, didItemDragJustEnd } from "./pointerItemDrag.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 
 const TOOLTIP_OFFSET = 16;
@@ -27,6 +28,7 @@ export function InventoryModal({
   onUseItem,
   onEquipItem,
   onUnequipSlot,
+  onAssignQuickSlot,
   equipment = {},
   coins = 0,
   inventoryItems = EMPTY_GRID,
@@ -38,6 +40,11 @@ export function InventoryModal({
   const [showHint, setShowHint] = useState(false);
   const tooltipRef = useRef(null);
   const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
+
+  // Closing the bag mid-drag must not leave a ghost icon or window listeners behind.
+  useEffect(() => {
+    if (!isOpen) cancelItemDrag();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -75,15 +82,38 @@ export function InventoryModal({
     el.style.top = `${y}px`;
   };
 
-  const handleSlotClick = (item) => {
+  const handleSlotClick = (event, item) => {
     if (!item) return;
+    // The pointer drag ends with a click on the item it moved; do not also use it.
+    if (didItemDragJustEnd(event.currentTarget)) return;
     if (item.slot) {
       onEquipItem?.(item.id);
       return;
     }
     if (item.useSlot != null) {
-      onUseItem?.(item.useSlot);
+      // Use this exact item; the hotbar mapping may point somewhere else.
+      onUseItem?.(item.id);
     }
+  };
+
+  /**
+   * Drag a bag item with pointer events: onto the numbered bar to bind a quick
+   * slot, or onto its matching paper-doll slot to equip it.
+   */
+  const handleSlotPointerDown = (event, item) => {
+    beginItemDrag({
+      event,
+      payload: { kind: "inventory", itemId: item.id, slot: item.slot },
+      ghostIcon: item.icon,
+      onDrop: (zone) => {
+        if (!zone) return;
+        if (zone.type === "hotbar") {
+          onAssignQuickSlot?.(zone.slot, item.id);
+        } else if (zone.type === "equip" && item.slot && zone.slot === item.slot) {
+          onEquipItem?.(item.id);
+        }
+      }
+    });
   };
 
   // Only a worn item dragged off the character paper-doll can be dropped here.
@@ -169,16 +199,9 @@ export function InventoryModal({
                 key={item.id}
                 className={`inv-slot${usable ? " usable" : ""}`}
                 title={item.name}
-                draggable={true}
-                onDragStart={(event) =>
-                  setDragPayload(event, {
-                    kind: "inventory",
-                    itemId: item.id,
-                    slot: item.slot
-                  })
-                }
+                onPointerDown={(event) => handleSlotPointerDown(event, item)}
                 onMouseEnter={(event) => handleSlotEnter(item, event)}
-                onClick={() => handleSlotClick(item)}
+                onClick={(event) => handleSlotClick(event, item)}
               >
                 <span className={`inv-icon ${item.icon}`} />
                 {typeof item.qty === "number" && (

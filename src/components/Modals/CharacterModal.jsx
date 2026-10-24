@@ -4,7 +4,7 @@ import { getItemById } from "../../game/items.js";
 import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
-import { setDragPayload, readDragPayload, canDropOnSlot, acceptDrop } from "./dragItem.js";
+import { setDragPayload } from "./dragItem.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 import { CharacterPreview } from "../CharacterPreview.jsx";
 
@@ -114,37 +114,15 @@ export function CharacterModal({
   playerName = "",
   equipment = {},
   gender = "male",
-  onUnequipSlot,
-  onEquipItem
+  onUnequipSlot
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
-  const [dragOverKey, setDragOverKey] = useState(null);
   const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   if (!isOpen) return null;
 
   const sheet = deriveCharacterSheet(stats);
-
-  // Only highlight a slot for a bag item that belongs in it; other drags pass through.
-  const handleSlotDragOver = (event, slot) => {
-    if (!canDropOnSlot(event, slot.source)) return;
-    acceptDrop(event);
-    setDragOverKey(slot.key);
-  };
-
-  const clearSlotDragOver = (slot) =>
-    setDragOverKey((key) => (key === slot.key ? null : key));
-
-  // Dropping a bag item on a doll slot equips it when the slot matches.
-  const handleSlotDrop = (event, slot) => {
-    setDragOverKey(null);
-    const payload = readDragPayload(event);
-    if (payload?.kind === "inventory" && payload.slot === slot.source) {
-      event.preventDefault();
-      onEquipItem?.(payload.itemId);
-    }
-  };
 
   const renderSlot = (slot) => {
     const wornId = slot.source ? equipment?.[slot.source] : null;
@@ -154,14 +132,12 @@ export function CharacterModal({
       return (
         <button
           type="button"
-          className={`equip-slot filled${dragOverKey === slot.key ? " drag-over" : ""}`}
+          className="equip-slot filled"
           key={slot.key}
           title={t("character.unequipTitle", { name: item.name })}
+          data-equip-slot={slot.source}
           draggable
           onDragStart={(event) => setDragPayload(event, { kind: "equipment", slot: slot.source })}
-          onDragOver={(event) => handleSlotDragOver(event, slot)}
-          onDragLeave={() => clearSlotDragOver(slot)}
-          onDrop={(event) => handleSlotDrop(event, slot)}
           onClick={() => onUnequipSlot?.(slot.source)}
         >
           <span className={`inv-icon ${item.icon}`} />
@@ -169,15 +145,12 @@ export function CharacterModal({
       );
     }
 
-    const droppable = Boolean(slot.source);
     return (
       <div
-        className={`equip-slot${dragOverKey === slot.key ? " drag-over" : ""}`}
+        className="equip-slot"
         key={slot.key}
         title={t("character.notEquipped", { label: t(slot.labelKey) })}
-        onDragOver={droppable ? (event) => handleSlotDragOver(event, slot) : undefined}
-        onDragLeave={droppable ? () => clearSlotDragOver(slot) : undefined}
-        onDrop={droppable ? (event) => handleSlotDrop(event, slot) : undefined}
+        data-equip-slot={slot.source}
       >
         <svg className="equip-slot-icon" viewBox="0 0 24 24" aria-hidden="true">
           {SLOT_ICONS[slot.icon || slot.key]}

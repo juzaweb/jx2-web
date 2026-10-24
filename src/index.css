@@ -1544,6 +1544,52 @@ body {
   background: radial-gradient(circle at 40% 30%, #4a3520 0%, #1d1209 75%);
 }
 
+/* Drop feedback while dragging an item (inventory or another quick slot) onto
+   the numbered bar. The whole strip accepts the drop; this marks the slot that
+   would receive it. */
+.slot-item.is-drop-target,
+.slot-item.empty.is-drop-target {
+  opacity: 1;
+  border-color: #ffd43b;
+  box-shadow: 0 0 12px rgba(255, 212, 59, 0.75), inset 0 0 10px rgba(255, 212, 59, 0.35);
+}
+.slot-item.is-drop-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 212, 59, 0.18);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* Ghost of the item being dragged with pointer events. Its icon class comes from
+   styles/item-icons.css (background-image only), so the size lives here. */
+.item-drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  z-index: 9999;
+  pointer-events: none;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.7));
+  opacity: 0.92;
+  will-change: transform;
+}
+
+/* Keep the page from selecting text or showing a text cursor mid-drag. */
+body.is-item-dragging,
+body.is-item-dragging * {
+  user-select: none;
+  cursor: grabbing !important;
+}
+body.is-item-dragging .inv-tooltip {
+  display: none;
+}
+
 .slot-key {
   color: #ffe08d;
 }

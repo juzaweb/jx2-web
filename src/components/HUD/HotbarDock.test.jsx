@@ -56,6 +56,15 @@ describe("HotbarDock logic & props", () => {
     expect(markup2).toContain('id="qty-dai-hoan-dan">5</span>');
   });
 
+  it("marks the whole numbered bar as a drop target for dragged items", () => {
+    const markup = renderDockMarkup();
+
+    expect(markup).toContain('data-hotbar-strip=""');
+    for (let i = 1; i <= 9; i++) {
+      expect(markup).toContain(`data-hotbar-slot="${i}"`);
+    }
+  });
+
   it("renders skills button with 'Võ Công' label and hotkey title", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>

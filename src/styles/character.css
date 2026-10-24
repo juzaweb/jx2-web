@@ -221,7 +221,7 @@
 .equip-slot.filled:active {
   cursor: grabbing;
 }
-.equip-slot.drag-over {
+.equip-slot.is-drop-target {
   border-color: #ffe9ad;
   box-shadow: 0 0 10px rgba(255, 233, 173, 0.8), inset 2px 2px 5px rgba(0, 0, 0, 0.75);
 }

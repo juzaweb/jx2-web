@@ -4,7 +4,7 @@ import { localizeItem } from "../../i18n/localize.js";
 import { getItemById, getQuantity } from "../../game/items.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { SkillIcon } from "../SkillIcon.jsx";
-import { setDragPayload, readDragPayload, hasDragPayload, acceptDrop } from "../Modals/dragItem.js";
+import { beginItemDrag, didItemDragJustEnd } from "../Modals/pointerItemDrag.js";
 import { DEFAULT_QUICK_SLOTS } from "../../game/quickSlots.js";
 
 export function HotbarDock({
@@ -72,29 +72,30 @@ export function HotbarDock({
     { key: "p", slot: skillLoadout?.p ?? 3 }
   ];
 
-  const handleDragOver = (e) => {
-    if (hasDragPayload(e)) {
-      acceptDrop(e);
-    }
-  };
-
-  const handleDrop = (e, targetSlot) => {
-    e.preventDefault();
-    const payload = readDragPayload(e);
-    if (!payload) return;
-    if (payload.kind === "inventory" && payload.itemId) {
-      onAssignQuickSlot?.(targetSlot, payload.itemId);
-    } else if (payload.kind === "hotbar" && payload.fromSlot) {
-      onMoveQuickSlot?.(payload.fromSlot, targetSlot);
-    }
-  };
-
-  const handleDragStart = (e, fromSlot, itemId) => {
-    setDragPayload(e, {
-      kind: "hotbar",
-      fromSlot,
-      itemId
+  /**
+   * Items are dragged with pointer events rather than HTML5 drag-and-drop, so
+   * the gesture keeps working when the page is zoomed/scaled (the browser
+   * hit-tests HTML5 drops in unscaled coordinates and silently drops the item).
+   * Dropping on the bar — on a slot or in the gap between slots — moves the item
+   * to that quick slot.
+   */
+  const handleSlotPointerDown = (event, fromSlot, item) => {
+    beginItemDrag({
+      event,
+      payload: { kind: "hotbar", itemId: item.id, fromSlot },
+      ghostIcon: item.icon,
+      onDrop: (zone) => {
+        if (zone?.type === "hotbar" && zone.slot !== fromSlot) {
+          onMoveQuickSlot?.(fromSlot, zone.slot);
+        }
+      }
     });
+  };
+
+  const handleSlotClick = (event, useSlot) => {
+    // A drag already handled the gesture; ignore the click that ends it.
+    if (didItemDragJustEnd(event.currentTarget)) return;
+    onUseItem?.(useSlot);
   };
 
   const handleContextMenu = (e, slot) => {
@@ -130,8 +131,10 @@ export function HotbarDock({
   return (
     <section className="bottom-dock" id="bottom-dock">
       <div className="dock-container">
-        {/* Left Belt: 9 Numbered Quick Slots */}
-        <div className="hotbar-slots">
+        {/* Left Belt: 9 Numbered Quick Slots. The `data-hotbar-strip` /
+            `data-hotbar-slot` contract is read back by pointerItemDrag.js
+            (see HOTBAR_STRIP_ATTR / HOTBAR_SLOT_ATTR). */}
+        <div className="hotbar-slots" data-hotbar-strip="">
           {quickSlots.map(({ useSlot, item }) => {
             if (!item) {
               return (
@@ -139,8 +142,7 @@ export function HotbarDock({
                   className="slot-item empty"
                   id={`slot-${useSlot}`}
                   key={`slot-${useSlot}`}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, useSlot)}
+                  data-hotbar-slot={useSlot}
                 >
                   <span className="slot-key">{useSlot}</span>
                 </div>
@@ -152,12 +154,10 @@ export function HotbarDock({
                 id={`slot-${useSlot}`}
                 key={`slot-${useSlot}`}
                 title={t("hotbar.slotTitle", { key: useSlot, name: item.name })}
-                draggable={true}
-                onDragStart={(e) => handleDragStart(e, useSlot, item.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, useSlot)}
+                onPointerDown={(event) => handleSlotPointerDown(event, useSlot, item)}
                 onContextMenu={(e) => handleContextMenu(e, useSlot)}
-                onClick={() => onUseItem?.(useSlot)}
+                onClick={(event) => handleSlotClick(event, useSlot)}
+                data-hotbar-slot={useSlot}
               >
                 <span className="slot-key">{useSlot}</span>
                 <div className={`item-icon ${item.icon}`} />

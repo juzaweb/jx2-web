@@ -239,6 +239,17 @@ describe("JiangHuScene.useItem quantity", () => {
     expect(scene.saveGame).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the clicked bag item directly, even when no slot is bound", () => {
+    setQuantities({ "dai-hoan-dan": 2 });
+    const { scene, restoreMp } = makeUseScene({ mp: 10, maxMp: 100 });
+    scene.quickSlots = {};
+
+    JiangHuScene.prototype.useItem.call(scene, "dai-hoan-dan");
+
+    expect(restoreMp).toHaveBeenCalled();
+    expect(getQuantity("dai-hoan-dan")).toBe(1);
+  });
+
   it("does not deduct when the effect is refused (health already full)", () => {
     setQuantities({ "kim-sang-duoc": 3 });
     const { scene, heal } = makeUseScene({ hp: 100, maxHp: 100 });

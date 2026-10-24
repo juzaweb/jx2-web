@@ -319,7 +319,7 @@ export default {
     title: "Inventory",
     helpTitle: "Bag help",
     closeTitle: "Close (Esc)",
-    hint: "Click potions or talismans to use them. Drag equipment to the Character panel (F3) to wear it. Hover over an item to read its description.",
+    hint: "Click potions or talismans to use them. Drag an item onto the 1–9 bar to bind it to a hotkey (right-click a slot to clear it). Drag equipment to the Character panel (F3) to wear it. Hover over an item to read its description.",
     equip: "Equip",
     use: "Use",
     useTitle: "{name}",

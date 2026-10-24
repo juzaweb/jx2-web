@@ -749,11 +749,18 @@ export class JiangHuScene extends Phaser.Scene {
     this.loadMap(mapId, spawn, { notifyServer: false });
   }
 
-  useItem(slot) {
+  /**
+   * Use a hotbar quick slot or a concrete item id.
+   * The numbered bar passes a slot number; the bag passes the item it shows, so
+   * using an item never depends on where (or whether) it is bound to a slot.
+   * @param {number|string} slotOrItemId
+   */
+  useItem(slotOrItemId) {
     if (!this.player || !this.started) return;
 
     const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
-    const itemId = quickSlots?.[slot];
+    const itemId =
+      typeof slotOrItemId === "number" ? quickSlots?.[slotOrItemId] : slotOrItemId;
     if (!itemId) return;
 
     const item = getItemById(itemId);

@@ -43,8 +43,12 @@ describe("CharacterModal stats sheet", () => {
     }
   });
 
-  it("renders equipment slots with drag-and-drop attributes", () => {
+  it("exposes the paper-doll slots as pointer drop zones", () => {
     const markup = renderSheet();
     expect(markup).toContain('class="equip-slot"');
+    // Only slots backed by an equipment key accept a dropped item.
+    expect(markup).toContain('data-equip-slot="weapon"');
+    expect(markup).toContain('data-equip-slot="armor"');
+    expect(markup).not.toContain('data-equip-slot="undefined"');
   });
 });

@@ -319,7 +319,7 @@ export default {
     title: "Hành trang",
     helpTitle: "Trợ giúp túi đồ",
     closeTitle: "Đóng (Esc)",
-    hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Kéo trang bị sang bảng Nhân vật (F3) để mặc. Di chuột lên vật phẩm để xem mô tả.",
+    hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Kéo vật phẩm xuống thanh 1–9 để gán phím nhanh (chuột phải lên ô để bỏ gán). Kéo trang bị sang bảng Nhân vật (F3) để mặc. Di chuột lên vật phẩm để xem mô tả.",
     equip: "Mặc",
     use: "Dùng",
     useTitle: "{name}",

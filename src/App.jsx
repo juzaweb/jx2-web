@@ -874,6 +874,7 @@ export function App() {
         onUseItem={handleUseItem}
         onEquipItem={handleEquipItem}
         onUnequipSlot={handleUnequipSlot}
+        onAssignQuickSlot={handleAssignQuickSlot}
         equipment={equipment}
         coins={stats.coins}
         inventoryItems={inventory.inventoryItems}
@@ -889,7 +890,6 @@ export function App() {
         equipment={equipment}
         gender={normalizeGender(activeCharacter?.gender)}
         onUnequipSlot={handleUnequipSlot}
-        onEquipItem={handleEquipItem}
       />
 
       {/* Skills Panel Modal (F5) */}
