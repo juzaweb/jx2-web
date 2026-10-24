@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DRAG_GHOST_CLASS,
+  DRAG_SOURCE_CLASS,
   DROP_TARGET_CLASS,
   beginItemDrag,
   cancelItemDrag,
@@ -212,6 +213,7 @@ describe("pointer item drag", () => {
     expect(ghost).not.toBeNull();
     expect(ghost.className).toContain("icon-hp-pot");
     expect(document.body.classList.contains("is-item-dragging")).toBe(true);
+    expect(slots[0].classList.contains(DRAG_SOURCE_CLASS)).toBe(true);
     expect(slots[1].classList.contains(DROP_TARGET_CLASS)).toBe(true);
 
     window.dispatchEvent(pointerEvent("pointerup", 160, 820));
@@ -222,6 +224,7 @@ describe("pointer item drag", () => {
     );
     expect(document.querySelector(`.${DRAG_GHOST_CLASS}`)).toBeNull();
     expect(document.body.classList.contains("is-item-dragging")).toBe(false);
+    expect(slots[0].classList.contains(DRAG_SOURCE_CLASS)).toBe(false);
     expect(slots[1].classList.contains(DROP_TARGET_CLASS)).toBe(false);
   });
 
@@ -234,6 +237,7 @@ describe("pointer item drag", () => {
     window.dispatchEvent(pointerEvent("pointermove", 500, 300));
     window.dispatchEvent(pointerEvent("pointerup", 500, 300));
 
+    // The caller uses the null zone to unbind a quick slot.
     expect(onDrop).toHaveBeenCalledWith(null, {});
   });
 

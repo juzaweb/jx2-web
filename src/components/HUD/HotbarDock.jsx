@@ -77,7 +77,7 @@ export function HotbarDock({
    * the gesture keeps working when the page is zoomed/scaled (the browser
    * hit-tests HTML5 drops in unscaled coordinates and silently drops the item).
    * Dropping on the bar — on a slot or in the gap between slots — moves the item
-   * to that quick slot.
+   * to that quick slot; releasing anywhere else takes it off the bar.
    */
   const handleSlotPointerDown = (event, fromSlot, item) => {
     beginItemDrag({
@@ -85,9 +85,13 @@ export function HotbarDock({
       payload: { kind: "hotbar", itemId: item.id, fromSlot },
       ghostIcon: item.icon,
       onDrop: (zone) => {
-        if (zone?.type === "hotbar" && zone.slot !== fromSlot) {
-          onMoveQuickSlot?.(fromSlot, zone.slot);
+        if (zone?.type === "hotbar") {
+          if (zone.slot !== fromSlot) onMoveQuickSlot?.(fromSlot, zone.slot);
+          return;
         }
+        // Dropped away from every drop zone: unbind the quick slot. The item
+        // stays in the bag, so this is safe to undo by dragging it back down.
+        if (!zone) onClearQuickSlot?.(fromSlot);
       }
     });
   };

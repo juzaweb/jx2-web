@@ -29,6 +29,8 @@ export const ITEM_DRAG_THRESHOLD = 6;
 export const DRAG_GHOST_CLASS = "item-drag-ghost";
 /** CSS class added to the slot under the pointer. */
 export const DROP_TARGET_CLASS = "is-drop-target";
+/** CSS class added to the element the drag started from. */
+export const DRAG_SOURCE_CLASS = "drag-source";
 
 /** How long after a drop a follow-up click must still be ignored. */
 const CLICK_SUPPRESS_MS = 400;
@@ -183,6 +185,7 @@ const finish = (drag, { dropZone = null, cancelled = false } = {}) => {
   drag.cleanup();
 
   setHoveredZone(drag, null);
+  drag.source?.classList?.remove(DRAG_SOURCE_CLASS);
   drag.ghost?.remove();
   document.body.classList.remove(BODY_DRAGGING_CLASS);
 
@@ -243,6 +246,7 @@ export function beginItemDrag({ event, payload, ghostIcon, onDrop } = {}) {
       }
       drag.dragging = true;
       drag.ghost = createGhost(drag.ghostIcon, drag.x, drag.y);
+      drag.source?.classList?.add(DRAG_SOURCE_CLASS);
       document.body.classList.add(BODY_DRAGGING_CLASS);
     }
 

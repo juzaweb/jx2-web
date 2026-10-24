@@ -1562,6 +1562,14 @@ body {
   pointer-events: none;
 }
 
+/* The slot the item was picked up from fades while it is in flight, so it reads
+   as "being moved" — and, on release outside the bar, as "being removed". */
+.slot-item.drag-source,
+.inv-slot.drag-source {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
 /* Ghost of the item being dragged with pointer events. Its icon class comes from
    styles/item-icons.css (background-image only), so the size lives here. */
 .item-drag-ghost {
