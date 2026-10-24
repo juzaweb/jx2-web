@@ -46,6 +46,14 @@ export class JiangHuScene extends Phaser.Scene {
     super("JiangHuScene");
     this.started = false;
     this.isPaused = false;
+    /** A modal/shop asked for the pause; only that UI clears it again. */
+    this.manualPaused = false;
+    /**
+     * The socket gate. Starts closed: the world may not run until the server has
+     * accepted us, so a tab whose socket never opens (server down) stays frozen
+     * instead of silently playing a private copy of the world.
+     */
+    this.connectionBlocked = true;
     this.unsubscribers = [];
     /** Server sync for the active character's bag; built in create(). */
     this.inventorySync = null;
@@ -314,6 +322,8 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.on("connected", () => {
+      // Open the gate first: the world may move as soon as the server is there.
+      this.setConnectionBlocked(false);
       this.sendNetworkJoin();
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
         this.uiBridge.addLog("Đã kết nối máy chủ Giang Hồ — Trực tuyến.", "system");
@@ -321,11 +331,15 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.on("disconnected", () => {
+      this.setConnectionBlocked(true);
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
         this.uiBridge.addLog("Mất kết nối máy chủ. Đang tự động kết nối lại...", "system");
       }
     });
 
+    // Publish the closed gate before the handshake, so React can cover the HUD
+    // from the first frame (the scene freezes itself through startGame below).
+    this.setConnectionBlocked(true);
     this.networkClient.connect();
     this.bindSceneTeardown();
 
@@ -922,16 +936,48 @@ export class JiangHuScene extends Phaser.Scene {
     this.onInventoryChanged();
   }
 
+  /**
+   * Pause or resume on behalf of a UI panel (help, shop, city map). This is only
+   * one of the two reasons the world can be frozen, so it never resumes the
+   * world on its own — see applyPauseState().
+   * @param {boolean} paused
+   */
   setPaused(paused) {
-    this.isPaused = !!paused;
-    bridge.emit(EVENTS.GAME_PAUSED, this.isPaused);
-    if (this.isPaused) {
+    this.manualPaused = !!paused;
+    this.applyPauseState();
+  }
+
+  /**
+   * Open or close the connection gate. Closing freezes the world, so a dropped
+   * socket can no longer be played on client-side state the server will
+   * overwrite as soon as the reconnect lands.
+   * @param {boolean} blocked
+   */
+  setConnectionBlocked(blocked) {
+    this.connectionBlocked = !!blocked;
+    bridge.emit(EVENTS.NETWORK_STATE, { connected: !this.connectionBlocked });
+    this.applyPauseState();
+  }
+
+  /**
+   * The world runs only when neither a modal nor the socket gate asks for a
+   * pause. The two flags are independent: closing a modal must not resume a
+   * disconnected client, and reconnecting must not resume a paused one.
+   */
+  applyPauseState() {
+    const next = this.manualPaused || this.connectionBlocked;
+    const changed = this.isPaused !== next;
+    this.isPaused = next;
+    if (next) {
       this.physics.pause();
       if (this.player?.sprite?.body) {
         this.player.sprite.setVelocity(0, 0);
       }
     } else if (this.started) {
       this.physics.resume();
+    }
+    if (changed) {
+      bridge.emit(EVENTS.GAME_PAUSED, next);
     }
   }
 
@@ -1394,6 +1440,9 @@ export class JiangHuScene extends Phaser.Scene {
       this.unsubscribers.forEach((unsub) => unsub());
       this.unsubscribers = [];
     }
+    // The scene is going away, so nothing is left to gate: clear any overlay
+    // before the socket's own `close` can fire against a dead scene.
+    bridge.emit(EVENTS.NETWORK_STATE, { connected: true });
     if (this.networkClient) {
       this.networkClient.disconnect();
       this.networkClient = null;

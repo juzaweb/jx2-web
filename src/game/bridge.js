@@ -75,6 +75,8 @@ export const EVENTS = {
   SKILL_CAST: "SKILL_CAST",
   SHOP_OPENED: "SHOP_OPENED",
   SHOP_RESULT: "SHOP_RESULT",
+  /** Socket gate state for the overlay (payload: {connected}). */
+  NETWORK_STATE: "NETWORK_STATE",
 
   // React -> Phaser
   ACTION_START: "ACTION_START",

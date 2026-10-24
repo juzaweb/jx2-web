@@ -14,6 +14,12 @@ export default {
       guide: "使用 WASD 移动，按 1/2 喝药，鼠标/空格攻击，Q 释放剑气。"
     }
   },
+  connection: {
+    eyebrow: "江湖中斷",
+    title: "连接已断开",
+    desc: "无法连接至{server}服务器。为保护您的进度，行走已暂停。",
+    hint: "正在自动重新连接，请稍候。"
+  },
   language: {
     label: "语言",
     vi: "Tiếng Việt",

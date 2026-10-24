@@ -14,6 +14,12 @@ export default {
       guide: "Dùng WASD di chuyển, Phím 1/2 uống dược phẩm, Chuột/Space đánh, Q kiếm khí."
     }
   },
+  connection: {
+    eyebrow: "GIANG HỒ GIÁN ĐOẠN",
+    title: "Mất kết nối",
+    desc: "Không thể liên lạc với máy chủ {server}. Hành tẩu tạm dừng để bảo toàn dữ liệu.",
+    hint: "Đang tự động kết nối lại — vui lòng chờ trong giây lát."
+  },
   language: {
     label: "Ngôn ngữ",
     vi: "Tiếng Việt",

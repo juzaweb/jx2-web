@@ -19,6 +19,7 @@ import { NetworkClient } from "./networkClient.js";
 import { MARKET_SPAWN } from "./marketLayout.js";
 import { JiangHuScene } from "./game.js";
 import { setQuantities, getQuantity } from "./items.js";
+import { bridge, EVENTS } from "./bridge.js";
 
 /** Registers the scene lifecycle hooks the way Phaser's event emitter does. */
 const bindTeardown = () => {
@@ -133,6 +134,74 @@ describe("JiangHuScene teardown", () => {
     expect(() => JiangHuScene.prototype.shutdown.call(scope)).not.toThrow();
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(destroyRemotePlayers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("JiangHuScene connection gate", () => {
+  /**
+   * Scene scope with just the parts the pause gate touches: two independent
+   * pause reasons (a modal and the socket) feeding one frozen world.
+   */
+  const makeGateScene = (overrides = {}) => ({
+    started: true,
+    isPaused: false,
+    manualPaused: false,
+    connectionBlocked: false,
+    physics: { pause: vi.fn(), resume: vi.fn() },
+    player: { sprite: { body: {}, setVelocity: vi.fn() } },
+    // The gate methods call each other through `this`, so the scope needs them.
+    applyPauseState: JiangHuScene.prototype.applyPauseState,
+    ...overrides
+  });
+
+  it("freezes the world and publishes the state while the socket is down", () => {
+    const scene = makeGateScene();
+    const states = [];
+    const unsub = bridge.on(EVENTS.NETWORK_STATE, (state) => states.push(state));
+
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, true);
+    unsub();
+
+    expect(scene.connectionBlocked).toBe(true);
+    expect(scene.isPaused).toBe(true);
+    expect(scene.physics.pause).toHaveBeenCalledTimes(1);
+    expect(scene.player.sprite.setVelocity).toHaveBeenCalledWith(0, 0);
+    expect(states).toEqual([{ connected: false }]);
+  });
+
+  it("cannot be resumed by a panel closing while the socket is down", () => {
+    const scene = makeGateScene();
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, true);
+
+    // A help/shop modal closing calls setPaused(false) — the gate must hold.
+    JiangHuScene.prototype.setPaused.call(scene, false);
+
+    expect(scene.isPaused).toBe(true);
+    expect(scene.physics.resume).not.toHaveBeenCalled();
+  });
+
+  it("cannot be resumed by a reconnect while a panel is still open", () => {
+    const scene = makeGateScene();
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, true);
+    JiangHuScene.prototype.setPaused.call(scene, true);
+
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, false);
+
+    expect(scene.isPaused).toBe(true);
+    expect(scene.physics.resume).not.toHaveBeenCalled();
+  });
+
+  it("resumes only once both the panel and the socket are clear", () => {
+    const scene = makeGateScene();
+    JiangHuScene.prototype.setPaused.call(scene, true);
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, true);
+
+    JiangHuScene.prototype.setConnectionBlocked.call(scene, false);
+    expect(scene.physics.resume).not.toHaveBeenCalled();
+
+    JiangHuScene.prototype.setPaused.call(scene, false);
+    expect(scene.isPaused).toBe(false);
+    expect(scene.physics.resume).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -14,6 +14,12 @@ export default {
       guide: "Use WASD to move, keys 1/2 to drink potions, Mouse/Space to attack, Q for sword aura."
     }
   },
+  connection: {
+    eyebrow: "JIANGHU DISCONNECTED",
+    title: "Connection Lost",
+    desc: "Cannot reach the {server} server. Your journey is paused to protect your progress.",
+    hint: "Reconnecting automatically — please wait a moment."
+  },
   language: {
     label: "Language",
     vi: "Tiếng Việt",

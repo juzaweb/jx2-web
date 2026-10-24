@@ -4,6 +4,7 @@ import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
+import { ConnectionLostOverlay } from "./components/ConnectionLostOverlay.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
@@ -69,6 +70,13 @@ const isGuestSession = (session) =>
   session?.token === "offline-guest-token" ||
   String(session?.user?.id || "").startsWith("guest_");
 
+/**
+ * Grace period before the connection gate is shown. The scene seeds its gate as
+ * closed on every entry, so a perfectly healthy handshake also reports "down"
+ * for a few frames — without this delay every login would flash "Mất kết nối".
+ */
+const CONNECTION_GATE_DELAY_MS = 600;
+
 /** True while the user is typing in a chat/modal field, where shortcuts must not fire. */
 const isTypingTarget = (target) => {
   const tag = target?.tagName;
@@ -113,6 +121,10 @@ export function App() {
     return null;
   });
   const [isStarted, setIsStarted] = useState(true);
+  // Gameplay is gated on the socket: while it is down the Phaser scene freezes
+  // itself and this overlay covers the HUD until the reconnect lands.
+  const [isNetworkConnected, setIsNetworkConnected] = useState(false);
+  const [isConnectionGated, setIsConnectionGated] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
@@ -352,6 +364,10 @@ export function App() {
       setShopResult(result || null);
     });
 
+    const unsubNetwork = bridge.on(EVENTS.NETWORK_STATE, (state) => {
+      setIsNetworkConnected(!!state?.connected);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -365,8 +381,21 @@ export function App() {
       unsubLeftSkillSelected();
       unsubShopOpened();
       unsubShopResult();
+      unsubNetwork();
     };
   }, []);
+
+  // Show the gate only once the socket has stayed down past the grace period,
+  // so a normal handshake never flashes it. The scene freezes itself at once;
+  // this only governs what the player is told.
+  useEffect(() => {
+    if (isNetworkConnected) {
+      setIsConnectionGated(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setIsConnectionGated(true), CONNECTION_GATE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isNetworkConnected]);
 
   // Closing the help overlay also lifts the pause it applied. Opening a docked
   // panel (character / inventory) dismisses help the same way.
@@ -417,6 +446,10 @@ export function App() {
     const handleKeyDown = (e) => {
       if (isTypingTarget(e.target)) return;
       if (e.repeat) return;
+
+      // The connection gate owns the screen: no shortcut may open a panel over
+      // it while the socket is down.
+      if (activeCharacter && isConnectionGated) return;
 
       // The shop is a focused modal: only Escape leaves it, so global panel
       // shortcuts cannot open a hidden window underneath the counter.
@@ -532,6 +565,7 @@ export function App() {
     isHelpOpen,
     isCityMapOpen,
     isLoginOpen,
+    isConnectionGated,
     activeCharacter,
     currentUser,
     shopNpc,
@@ -885,6 +919,9 @@ export function App() {
         onSelect={handleEquipSkill}
         onClose={handleCloseSkillPicker}
       />
+
+      {/* Hard connection gate: the world stays frozen until the socket is back */}
+      <ConnectionLostOverlay visible={!!activeCharacter && isConnectionGated} />
     </main>
   );
 }
