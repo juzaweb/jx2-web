@@ -439,4 +439,38 @@ describe("Giang Ho Backend API Test Suite", () => {
       assert.equal(json.data.inventory.potion_hp, i + 1);
     }
   });
+
+  test("Error handling: masks 500 error messages in production environment", async () => {
+    const { errorHandler } = await import("../src/middlewares/errorHandler.js");
+
+    const internalErr = new Error("Sensitive internal database connection failed: sqlite /secret/path");
+
+    let responseStatus;
+    let responseJson;
+    const req = { method: "GET", originalUrl: "/api/test" };
+    const res = {
+      headersSent: false,
+      status(code) {
+        responseStatus = code;
+        return this;
+      },
+      json(data) {
+        responseJson = data;
+        return this;
+      }
+    };
+
+    const prevEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "production";
+      errorHandler(internalErr, req, res, () => {});
+
+      assert.equal(responseStatus, 500);
+      assert.equal(responseJson.success, false);
+      assert.equal(responseJson.error, "Đã xảy ra lỗi máy chủ nội bộ");
+      assert.equal(responseJson.stack, undefined);
+    } finally {
+      process.env.NODE_ENV = prevEnv;
+    }
+  });
 });
