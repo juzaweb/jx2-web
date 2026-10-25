@@ -1,24 +1,24 @@
 # 2D Game UI/UX Improvement Plan
 
-- **Date:** 2025-05-18
+- **Date:** 2026-10-25
 - **Project / engine:** JX2 Wuxia RPG ("Giang Hồ") — React 18 + Phaser 3.80 (Vite build system)
-- **Audit scope:** Full UI/UX architecture including HUD overlay (`src/components/HUD/*`), Modals (`src/components/Modals/*`), Mobile Controls (`src/components/MobileControls.jsx`), Styling & Design Tokens (`src/index.css`), and Phaser/React Event Bridge (`src/game/bridge.js`, `src/game/uiBridgeAdapter.js`).
-- **Limitations:** Static analysis and unit test inspection performed in sandbox environment. Live visual testing on physical mobile hardware / touch devices was simulated via CSS breakpoints and unit tests.
+- **Audit scope:** React HUD Overlay (`src/components/HUD/*`), Modals (`src/components/Modals/*`), Touch Controls (`src/components/MobileControls.jsx`), Game Orchestrator (`src/App.jsx`), Styling & Design Tokens (`src/index.css`), Phaser-React Event Bridge (`src/game/bridge.js`, `src/game/uiBridgeAdapter.js`), and Vitest test suite (`src/**/*.test.js`, `src/**/*.test.jsx`).
+- **Limitations:** Static code inspection, architectural review, and Vitest suite execution performed in headless Linux sandbox environment. Physical mobile device touch response and actual OLED screen rendering could not be directly playtested; verified via CSS media queries, responsive logic, and unit tests.
 
 ---
 
 ## Executive summary
 
-The "Giang Hồ" project delivers an authentic Wuxia MMORPG (Vo Lam Truyen Ky 2 inspired) experience blending Phaser 3 canvas rendering with a rich React UI overlay. The interface successfully captures the aesthetic of retro Wuxia RPGs (wood/metal borders, parchment modals, CJK glyphs, and status brackets).
+"Giang Hồ" is a browser-playable 2D Wuxia RPG combining a Phaser 3 canvas engine with a React 18 UI overlay. The game delivers a distinct Wuxia aesthetic with parchment modals, CJK icon glyphs, metallic brackets, and classic status bars.
 
-However, as the game scales in combat features, multi-faction skill systems, and cross-platform device support, several key UI/UX friction points impact player responsiveness, information clarity, and accessibility:
+As the gameplay expands across multi-faction sect skills, inventory management, NPC shops, and mobile touch controls, several key UI/UX friction points diminish combat responsiveness and player clarity:
 
-1. **Targeting & Enemy Combat Feedback:** Lack of an explicit target selection frame / enemy lock-on indicator, making multi-target combat and click-to-attack ambiguous.
-2. **Skill Cooldown & Resource Availability Readability:** Cooldown timer numbers in hotbar and skill slots lack visual radial sweep overlays or distinct styling when player MP/Stamina is insufficient for skill execution.
-3. **Mobile & Touch Ergonomics:** Overlap between virtual joystick, chat log, and hotbar dock on low-resolution mobile devices and small viewports (<720px).
-4. **Keybind Discoverability & Onboarding:** Critical keyboard shortcuts (`F3`, `F4`, `F5`, `Tab`, `M`) are hidden within tooltips or modal windows without interactive keybind overlays or first-time player prompts.
+1. **Targeting & Enemy Combat Feedback:** Lack of an explicit target selection frame / overhead ring and target health HUD, causing ambiguity during target selection and mob combat.
+2. **Skill Cooldown & Resource Readiness:** Cooldown timers render as plain text numbers without radial conic sweep overlays or distinct visual states when MP/Stamina is insufficient for skill execution.
+3. **Mobile & Touch Ergonomics:** Spatial collision between the virtual joystick, chat panel, and hotbar dock on low-resolution mobile viewports (<720px width).
+4. **Shortcut Discoverability:** Essential keyboard hotkeys (`F3`, `F4`, `F5`, `Tab`, `M`) rely on tooltips or help modals rather than persistent shortcut badge overlays on HUD controls.
 
-Implementing these prioritized recommendations will significantly reduce combat friction, increase visual responsiveness during high-intensity encounters, and improve playability on both desktop and touch devices.
+Addressing these prioritized improvements will enhance combat clarity, streamline input discoverability, and improve touch device ergonomics without changing core game mechanics or art direction.
 
 ---
 
@@ -26,68 +26,69 @@ Implementing these prioritized recommendations will significantly reduce combat 
 
 ### Observed Player Flows & Architecture
 
-1. **Title & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Seamless transition with localized language switcher (VI/EN) and responsive orientation warning for mobile portrait mode (`src/App.jsx`).
-2. **HUD & Vitals:** Top-Left `PlayerVitals` displays Level, EXP, HP, MP, Stamina, and Martial Aura slot. Top-Right `MinimapPanel` shows subzone, radar canvas, quest objective, and toggle controls (`src/components/HUD/`).
-3. **Action Dock & Hotbar:** Bottom `HotbarDock` houses 9 quick-slots (potions/items), 4 sect skill hotkeys (`U`, `I`, `O`, `P`), and system tray buttons (`F3` Char, `F4` Inv, `F5` Skills, Help, PK mode).
-4. **Mobile Controls:** `MobileControls` displays a virtual joystick on bottom-left and radial arc skill buttons on bottom-right when viewed on touch devices (`src/components/MobileControls.jsx`).
-5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `SkillPickerModal`. Panels support drag-and-drop (`useDraggablePanel.js`, `dragItem.js`).
+1. **Launch & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Managed smoothly in `src/App.jsx` with guest session handling, i18n support (VI/EN), and mobile orientation prompts.
+2. **HUD Overlay:** `PlayerVitals` top-left displays Level, EXP, HP, MP, Stamina, and Martial Aura. `MinimapPanel` top-right shows radar canvas, quest tracker, subzone, and zoom/collapse controls.
+3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 quick-slots (potions/items), 4 sect skill hotkeys (`U`, `I`, `O`, `P`), and system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode).
+4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and radial arc skill/attack/potion buttons on the bottom-right for touch devices (`src/components/MobileControls.jsx`).
+5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `SkillPickerModal`. Drag-and-drop support provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js`.
 
 ---
 
 ## Prioritized improvements
 
-### [P1] Target Frame and Targeted Enemy Selection Indicator
+### [P1] Target Selection Ring and Target Vitals HUD Frame
 - **Status:** Proposed
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/game/player.js`, `src/game/enemy.js`, `src/components/HUD/PlayerVitals.jsx`
-- **Player Impact:** When attacking wolves or NPCs, players cannot easily confirm which enemy is currently targeted or evaluate the enemy's remaining HP without closely observing floating damage text.
+- **Evidence:** `src/game/player.js`, `src/game/enemy.js`, `src/components/HUD/PlayerVitals.jsx`, `src/game/bridge.js`
+- **Player Impact:** When attacking wolves or NPCs, players cannot easily confirm which entity is currently locked on or evaluate enemy remaining health without watching floating damage numbers.
 - **Recommendation:**
-  1. Add an overhead selection ring or target indicator in Phaser around the active target.
-  2. Implement an optional top-center or top-left "Target Vitals" HUD panel showing the targeted enemy/NPC name, level, HP bar, and status effects.
+  1. Emit `TARGET_UPDATED` events over `bridge.js` when player selects or switches targets in Phaser.
+  2. Draw an overhead selection ring in Phaser around the active target entity.
+  3. Render a top-center "Target Vitals" HUD component displaying the target name, level, HP bar percentage, and status effects.
 - **Acceptance criteria:**
-  - [ ] Clicking or auto-targeting an enemy displays a distinct gold/red selection reticle around the entity sprite.
-  - [ ] Target HUD bar updates dynamically with real-time target HP percentage.
-  - [ ] Target frame clears immediately when the target dies or moves out of range.
-- **Validation:** Select enemies in Bien Kinh map; verify selection indicator alignment and real-time HP depletion during combat.
-- **Effort:** M (Requires Phaser entity selection logic + React bridge event `TARGET_UPDATED`)
-- **Dependencies / risks:** Minimal risk; bridge event needed for Target Vitals component.
+  - [ ] Selecting an enemy displays a golden/red selection ring around the entity sprite in Phaser.
+  - [ ] Target Vitals HUD frame appears top-center with live updating target health percentage.
+  - [ ] Target frame auto-clears when the target dies or moves beyond interaction range.
+- **Validation:** Select mobs in Bien Kinh map; verify selection reticle position and real-time HP depletion.
+- **Effort:** M (Requires Phaser selection tracking + React HUD bridge integration)
+- **Dependencies / risks:** Minimal risk; depends on target payload emitted via `bridge.js`.
 
 ---
 
-### [P1] Radial Cooldown Sweep & Insufficient Resource State for Hotbar Skills
+### [P1] Conic Radial Cooldown Sweep & Out-of-Resource States for Skill Icons
 - **Status:** Proposed
 - **Confidence:** High
 - **Type:** Observed issue
 - **Evidence:** `src/components/HUD/HotbarDock.jsx`, `src/components/SkillIcon.jsx`, `src/index.css`
-- **Player Impact:** Skill cooldowns currently render as plain text numbers overlaying skill glyphs (`<span className="hand-cd">3</span>`). Players cannot intuitively gauge cooldown progress at a glance or distinguish between a skill on cooldown vs. a skill unusable due to low MP/Stamina.
+- **Player Impact:** Skill cooldowns currently render as plain integer overlays (`<span className="hand-cd">3</span>`). Players cannot intuitively gauge cooldown sweep progress or distinguish between a skill on cooldown vs. a skill unusable due to insufficient MP.
 - **Recommendation:**
-  1. Add a CSS/SVG radial conic-gradient sweep overlay on skill slots during cooldown.
-  2. Apply a semi-transparent blue tint or desaturation filter (`.insufficient-mp`) when player current MP < skill MP cost.
+  1. Add a CSS conic-gradient dark radial sweep overlay on skill icons during cooldown countdown.
+  2. Apply an out-of-resource visual state (`.insufficient-mp` desaturation / blue tint) when current player MP < skill MP cost.
 - **Acceptance criteria:**
-  - [ ] Skill slots display a clockwise radial dark sweep indicating remaining cooldown fraction.
-  - [ ] Skills with MP cost exceeding current player MP show a visually distinct out-of-resource state (blue/gray shade + subtle MP warning tooltip).
-- **Validation:** Cast skills in quick succession; verify radial animation smooth countdown and resource cost validation.
-- **Effort:** S (CSS styling updates in `src/index.css` + MP cost check in `HotbarDock.jsx`)
+  - [ ] Skill icons render a smooth clockwise radial dark overlay representing remaining cooldown percentage.
+  - [ ] Skills with MP cost exceeding player MP display a visually distinct out-of-resource state.
+- **Validation:** Trigger skills in rapid succession; confirm radial sweep animation and low-MP visual feedback.
+- **Effort:** S (CSS conic gradient styling + MP check in `HotbarDock.jsx` and `SkillIcon.jsx`)
 - **Dependencies / risks:** None.
 
 ---
 
-### [P1] Mobile Ergonomics and HUD Viewport Collision Prevention
+### [P1] Mobile Joystick and Chat Panel Collision Prevention & Touch Hitbox Scaling
 - **Status:** Proposed
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/components/MobileControls.jsx`, `src/index.css` (media queries `@media (max-width: 720px)`), `src/components/HUD/ChatPanel.jsx`
-- **Player Impact:** On mobile devices or narrow browser windows (<768px width), the virtual joystick overlaps with the bottom-left chat panel or hotbar buttons, leading to accidental touch triggers during movement.
+- **Evidence:** `src/components/MobileControls.jsx`, `src/components/HUD/ChatPanel.jsx`, `src/index.css` (`@media (max-width: 720px)`)
+- **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlaps with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
 - **Recommendation:**
-  1. Auto-collapse or minimize `ChatPanel` into a small icon tab when mobile controls are active.
-  2. Increase touch target hitboxes for `MobileControls` radial arc buttons to at least 48x48px with 8px padding gaps.
-  3. Ensure virtual joystick base touch zone does not overlap with hotbar or bottom panel boundaries.
+  1. Automatically minimize `ChatPanel` into a compact icon tab when touch mobile controls are active.
+  2. Increase touch target hitboxes for `MobileControls` arc buttons to a minimum of 48x48px with 8px padding gaps.
+  3. Ensure virtual joystick touch capture zone is isolated from hotbar dock boundaries.
 - **Acceptance criteria:**
-  - [ ] On touch screens, `ChatPanel` defaults to minimized state to keep the joystick area clear.
-  - [ ] Skill arc buttons have minimum 48x48px touch boundaries without overlap.
-- **Validation:** Test on mobile viewport simulations (375x667, 414x896, 768x1024) and verify touch input isolation.
-- **Effort:** S (CSS layout & default collapsed state in `App.jsx`)
+  - [ ] On mobile touch viewports, `ChatPanel` defaults to collapsed state to keep the joystick area clear.
+  - [ ] Skill arc buttons maintain minimum 48x48px touch boundaries without touch event overlap.
+- **Validation:** Test on mobile viewport configurations (375x667, 414x896) in browser dev tools and verify gesture isolation.
+- **Effort:** S (CSS breakpoint adjustments and default state in `App.jsx`)
 - **Dependencies / risks:** None.
 
 ---
@@ -96,50 +97,51 @@ Implementing these prioritized recommendations will significantly reduce combat 
 - **Status:** Proposed
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/App.jsx` (Global keydown listener), `src/components/HUD/HotbarDock.jsx`
+- **Evidence:** `src/App.jsx` (Global keydown listener), `src/components/HUD/HotbarDock.jsx`, `src/components/HUD/MinimapPanel.jsx`
 - **Player Impact:** Essential keyboard shortcuts (`F3` Character, `F4` Inventory, `F5` Skills, `Tab` Zoom Minimap, `M` City Map) are listed in tooltips or `HelpModal`, but new players frequently miss them during active gameplay.
 - **Recommendation:**
-  1. Add visible hotkey badge overlays on system dock buttons (`[F3]`, `[F4]`, `[F5]`).
-  2. Display a brief floating keybind prompt (e.g. "Nhấn [M] để mở bản đồ thành thị") upon first entering Bien Kinh city.
+  1. Add legible hotkey badge overlays (`[F3]`, `[F4]`, `[F5]`) on system tray buttons in `HotbarDock.jsx`.
+  2. Add a `[Tab]` shortcut label on the minimap zoom button in `MinimapPanel.jsx`.
+  3. Display a floating contextual hint prompt (e.g., "Nhấn [M] để mở bản đồ thành thị") upon first city entry.
 - **Acceptance criteria:**
-  - [ ] System buttons in `HotbarDock` display small legible shortcut labels (`F3`, `F4`, `F5`).
-  - [ ] Minimap header displays `[Tab]` shortcut hint next to the zoom button.
-- **Validation:** Verify visual rendering of hotkey badges across screen resolutions.
-- **Effort:** XS (Minor JSX badge additions and CSS tweaks)
+  - [ ] Hotbar system tray buttons render distinct hotkey badges (`F3`, `F4`, `F5`).
+  - [ ] Minimap zoom button displays `[Tab]` label.
+- **Validation:** Confirm hotkey badge rendering across multiple screen resolutions.
+- **Effort:** XS (Minor JSX badge additions and CSS styling)
 - **Dependencies / risks:** None.
 
 ---
 
-### [P2] Enhanced Inventory Tooltips & Item Comparison
+### [P2] Comparative Inventory Tooltips & Rarity Border Highlights
 - **Status:** Proposed
 - **Confidence:** Medium
-- **Type:** Hypothesis to validate
+- **Type:** Observed issue
 - **Evidence:** `src/components/Modals/InventoryModal.jsx`, `src/components/Modals/CharacterModal.jsx`, `src/game/items.js`
-- **Player Impact:** Hovering over equipment items in the inventory shows basic stats, but players cannot easily compare the hovered item against their currently equipped gear in that slot.
+- **Player Impact:** Hovering over equipment items in the inventory displays basic item stats, but players cannot easily compare the item against currently worn gear in that equipment slot.
 - **Recommendation:**
-  1. Expand inventory hover tooltips to render a dual-card comparison view (Equipped vs. Hovered Item) showing stat deltas (+HP, +Def, +Atk in green/red text).
+  1. Expand inventory hover tooltips to render a dual comparison card (Equipped vs. Hovered Item) showing stat deltas (+HP, +Def, +Atk in green/red text).
   2. Add visual rarity border highlights (Common = Grey, Rare = Blue, Epic = Purple, Legendary = Gold).
 - **Acceptance criteria:**
-  - [ ] Hovering over inventory equipment renders comparative stat differences against equipped item.
-  - [ ] Item border colors reflect item tier/quality.
-- **Validation:** Hover over weapons/armor in inventory and verify side-by-side stat delta calculation.
+  - [ ] Hovering equipment items in inventory displays side-by-side comparison against equipped gear.
+  - [ ] Item icon borders reflect item rarity tier.
+- **Validation:** Hover over weapons and armor in inventory; verify comparison calculations and delta styling.
 - **Effort:** S (Tooltip component enhancement in `InventoryModal.jsx`)
-- **Dependencies / risks:** Dependent on item stat definition structure in `src/game/items.js` and `src/game/equipment.js`.
+- **Dependencies / risks:** Depends on equipment stat definitions in `src/game/equipment.js`.
 
 ---
 
-### [P3] Damage Floating Text & Floating Combat Feedback Polish
+### [P3] Floating Damage Text Styling & Critical Hit Animation Polish
 - **Status:** Proposed
 - **Confidence:** High
 - **Type:** Observed issue
 - **Evidence:** `src/game/combat.js`, `src/game/skillVfx.js`
-- **Player Impact:** Floating combat damage numbers pop up above targets, but critical hits, skill damage types, and healing numbers look visually homogenous.
+- **Player Impact:** Floating combat damage text pops up above targets, but critical hits, skill damage types, and healing numbers look visually homogenous.
 - **Recommendation:**
-  1. Differentiate floating text animations: Normal damage (yellow/white float up), Critical hits (larger red/gold bold pop with subtle scale spring), Healing (green float up with `+` prefix), Mana restoration (blue float up).
+  1. Differentiate floating combat text styling: Normal damage (yellow/white float up), Critical hits (larger red/gold pop with scale spring animation), Healing (green float up with `+` prefix), MP recovery (blue float up).
 - **Acceptance criteria:**
-  - [ ] Critical hits scale up to 1.4x size with red/gold styling.
-  - [ ] Healing and MP recovery text are colored green and blue respectively.
-- **Validation:** Engage enemies with skills and health potions; verify floating text colors and animation scaling.
+  - [ ] Critical hits scale up to 1.4x size with bold red/gold text outline.
+  - [ ] Healing and MP restoration numbers render in distinct green and blue colors.
+- **Validation:** Attack mobs and use health/mana potions; verify combat text colors and scale animations.
 - **Effort:** S (Phaser text styling in `src/game/combat.js`)
 - **Dependencies / risks:** None.
 
@@ -148,43 +150,43 @@ Implementing these prioritized recommendations will significantly reduce combat 
 ## Implementation phases
 
 ### Phase 1: High Impact Combat Clarity (Now)
-- Implement Target Selection Ring & Target Vitals HUD Panel (`[P1]`).
-- Implement Radial Cooldown Sweep & Insufficient Resource styling (`[P1]`).
+- Implement Target Selection Ring & Target Vitals HUD Frame (`[P1]`).
+- Implement Conic Radial Cooldown Sweep & Insufficient Resource Styling (`[P1]`).
 
 ### Phase 2: Mobile Ergonomics & Discoverability (Next)
-- Resolve Mobile Joystick / Chat Panel collision and touch target scaling (`[P1]`).
-- Add Hotkey Badges (`F3`, `F4`, `F5`, `Tab`, `M`) to HUD buttons (`[P2]`).
+- Resolve Mobile Joystick / Chat Panel Collision and Touch Hitbox Scaling (`[P1]`).
+- Add Hotkey Badges (`F3`, `F4`, `F5`, `Tab`, `M`) to HUD Controls (`[P2]`).
 
 ### Phase 3: Inventory Polish & Combat Visuals (Later)
-- Implement Item Comparison Tooltips & Rarity Borders (`[P2]`).
-- Enhance Floating Damage & Healing Text Animations (`[P3]`).
+- Implement Comparative Inventory Tooltips & Item Rarity Borders (`[P2]`).
+- Enhance Floating Combat Text Animations (`[P3]`).
 
 ---
 
 ## Validation checklist
 
-- [ ] **Target Resolutions:** Verify HUD rendering at 1920x1080 (Desktop Full HD), 1366x768 (Laptop), 1024x768 (Tablet), and 375x812 (Mobile Landscape/Portrait).
-- [ ] **Input Methods:** Verify full functionality via Keyboard (`W/A/S/D`, `Space`, `1-4`, `F3-F5`, `Tab`, `M`), Mouse (Left/Right click skills & movement), and Mobile Touch (Virtual Joystick + Skill Arc).
-- [ ] **Localization:** Confirm all newly added HUD labels and tooltips exist in both Vietnamese (`vi`) and English (`en`) translation keys (`src/i18n/`).
-- [ ] **Performance:** Ensure no frame drops or memory leaks occur during rapid skill casting or chat log spam (run unit test suite `npm test`).
+- [ ] **Target Resolutions:** Verify HUD layout across 1920x1080 (Desktop Full HD), 1366x768 (Laptop), 1024x768 (Tablet), and 375x812 (Mobile Portrait/Landscape).
+- [ ] **Input Methods:** Test functionality across Keyboard (`W/A/S/D`, `Space`, `1-4`, `F3-F5`, `Tab`, `M`), Mouse (Left/Right click combat & movement), and Touch (Virtual Joystick + Skill Arc).
+- [ ] **Localization:** Confirm all newly added HUD labels and tooltips exist in both Vietnamese (`vi`) and English (`en`) translation dictionaries (`src/i18n/`).
+- [ ] **Performance & Tests:** Verify `npm test` passes cleanly with zero regressions.
 
 ---
 
 ## Open questions
 
 1. *Targeting System:* Should target selection prioritize enemy entities under the mouse cursor, or automatically snap to the nearest aggressive enemy when a skill hotkey is pressed?
-2. *Target Vitals Placement:* Should the targeted enemy's vitals bar be anchored top-center (classic MMORPG style) or pinned attached to the entity's overhead in the Phaser canvas?
+2. *Target Vitals Placement:* Should the targeted enemy's vitals bar be anchored top-center (classic MMORPG style) or pinned directly attached to the entity's overhead sprite in Phaser?
 
 ---
 
 ## Out of scope
 
-- Full graphic asset redesign or replacement of original Wuxia UI sprite assets.
-- Backend server architecture or multiplayer synchronization protocol changes (unless emitting standard client bridge events).
-- Balance adjustments to character stats, skill damage formulas, or mob spawn rates.
+- Full graphical asset replacement or visual overhaul of authentic Wuxia UI sprite assets.
+- Backend server multiplayer synchronization protocol modifications.
+- Combat balance adjustments to character stats, skill damage formulas, or mob spawn rates.
 
 ---
 
 ## Completion criteria
 
-The UI/UX Improvement Plan is complete when findings are evidence-linked, prioritized with clear player impact, testable via acceptance criteria, and saved in `docs/plan/ui-ux-improvement-plan.md`.
+The UI/UX Improvement Plan is complete when findings are evidence-linked, prioritized with clear player impact, testable via acceptance criteria, saved in `docs/plan/ui-ux-improvement-plan.md`, and validated by running `npm test`.
