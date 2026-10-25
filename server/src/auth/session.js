@@ -42,9 +42,14 @@ export const verifySessionToken = (token) => {
     return null;
   }
 
-  const expected = Buffer.from(sign(payload));
-  const provided = Buffer.from(signature);
-  if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+  // Security: Compare signatures in constant time without leaking length differences via early return
+  const expectedBuf = Buffer.from(sign(payload));
+  const providedBuf = Buffer.from(signature);
+  const isSameLength = expectedBuf.length === providedBuf.length;
+  const compareBuf = isSameLength ? providedBuf : expectedBuf;
+  const isSignatureValid = crypto.timingSafeEqual(expectedBuf, compareBuf) && isSameLength;
+
+  if (!isSignatureValid) {
     return null;
   }
 
