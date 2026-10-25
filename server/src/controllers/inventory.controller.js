@@ -1,9 +1,19 @@
 import { store } from "../data/playerDb.js";
+import { characterDb } from "../data/characterDb.js";
+import { userDb } from "../data/userDb.js";
 
 export const getInventory = async (req, res, next) => {
   try {
     const { playerId } = req.params;
-    const inventory = await store.getInventory(playerId);
+    let inventory = await store.getInventory(playerId);
+
+    const ownerId = characterDb.getOwner(playerId);
+    if (ownerId && userDb.isAdmin(ownerId)) {
+      if (!inventory["lenh-bai-gm"]) {
+        inventory = { ...inventory, "lenh-bai-gm": 1 };
+        await store.setInventory(playerId, inventory);
+      }
+    }
 
     res.json({
       success: true,

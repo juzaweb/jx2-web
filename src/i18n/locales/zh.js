@@ -389,6 +389,57 @@ export default {
     "hoi-thanh-phu": {
       name: "回城符",
       desc: "空间符咒，可将行者送回故乡汴京。"
+    },
+    "lenh-bai-gm": {
+      name: "GM令牌",
+      desc: "GM总管至高令牌。可打开管理面板获取等级、恢复气血内力、获取药水与地图传送。"
+    }
+  },
+  gm: {
+    title: "GM令牌",
+    hint: "在线人物管理面板。所有操作均与服务器实时权威同步。",
+    tabs: {
+      level: "等级",
+      potions: "药品",
+      teleport: "传送",
+      utility: "功能"
+    },
+    level: {
+      title: "获取等级与经验",
+      quickLevel: "快速等级档位",
+      addLevel: "提升等级",
+      addExp: "获取经验",
+      customLevel: "自选等级 (1 - 150)",
+      setLevelBtn: "设定等级",
+      successSet: "等级设定成功！"
+    },
+    potions: {
+      title: "气血内力与药品",
+      healFull: "全满气血与内力",
+      receiveHp: "获取 99x 金创药",
+      receiveMp: "获取 99x 大还丹",
+      receiveWine: "获取 99x 女儿红",
+      receiveAll: "获取全部药品 (x99)",
+      fullHealed: "气血与内力已全部回满！",
+      potionsReceived: "药品已放入包裹。"
+    },
+    teleport: {
+      title: "回城与传送",
+      receiveScroll: "获取 99x 回城符",
+      toMarket: "传送：汴京主城",
+      toDongMonThanh: "传送：东门城野外",
+      toSpawn: "回城（复活点）"
+    },
+    utility: {
+      title: "银两与辅助功能",
+      addCoins1k: "获取 1,000 银两",
+      addCoins10k: "获取 10,000 银两",
+      addCoins100k: "获取 100,000 银两",
+      godMode: "无敌模式 (God Mode)",
+      godModeOn: "无敌模式：[已开启]",
+      godModeOff: "开启无敌模式",
+      speedBuff: "移速翻倍 (x2)",
+      speedNormal: "正常移速"
     }
   }
 };

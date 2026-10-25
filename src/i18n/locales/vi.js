@@ -388,6 +388,57 @@ export default {
     "hoi-thanh-phu": {
       name: "Hồi Thành Phù",
       desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
+    },
+    "lenh-bai-gm": {
+      name: "Lệnh Bài GM",
+      desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
+    }
+  },
+  gm: {
+    title: "Lệnh Bài GM",
+    hint: "Bảng quản trị nhân vật trực tuyến. Mọi thao tác được đồng bộ trực tiếp với máy chủ.",
+    tabs: {
+      level: "Đẳng Cấp",
+      potions: "Dược Phẩm",
+      teleport: "Truyền Tống",
+      utility: "Tiện Ích"
+    },
+    level: {
+      title: "Nhận Cấp & Kinh Nghiệm",
+      quickLevel: "Mốc cấp nhanh",
+      addLevel: "Thăng cấp",
+      addExp: "Nhận EXP",
+      customLevel: "Tùy chọn cấp độ (1 - 150)",
+      setLevelBtn: "Đặt Cấp",
+      successSet: "Đã thiết lập cấp độ thành công!"
+    },
+    potions: {
+      title: "Hồi Phục & Dược Phẩm",
+      healFull: "Hồi Đầy Máu & Mana",
+      receiveHp: "Nhận 99x Kim Sáng Dược",
+      receiveMp: "Nhận 99x Đại Hoàn Đan",
+      receiveWine: "Nhận 99x Nữ Nhi Hồng",
+      receiveAll: "Nhận Tất Cả Dược Phẩm (x99)",
+      fullHealed: "Đã hồi phục toàn bộ Sinh lực và Nội lực!",
+      potionsReceived: "Đã nhận dược phẩm vào túi đồ."
+    },
+    teleport: {
+      title: "Hồi Phù & Truyền Tống",
+      receiveScroll: "Nhận 99x Hồi Thành Phù",
+      toMarket: "Truyền Tống: Biện Kinh",
+      toDongMonThanh: "Truyền Tống: Đông Môn Thành",
+      toSpawn: "Hồi Thành (Điểm hồi sinh)"
+    },
+    utility: {
+      title: "Ngân Lượng & Tiện Ích",
+      addCoins1k: "Nhận 1.000 Bạc",
+      addCoins10k: "Nhận 10.000 Bạc (100 Vàng)",
+      addCoins100k: "Nhận 100.000 Bạc",
+      godMode: "Chế Độ Bất Tử",
+      godModeOn: "Bất Tử: [ĐANG BẬT]",
+      godModeOff: "Bật Bất Tử (God Mode)",
+      speedBuff: "Tăng Tốc Chạy (x2)",
+      speedNormal: "Tốc Độ Thường"
     }
   }
 };

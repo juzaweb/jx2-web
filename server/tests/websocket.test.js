@@ -647,6 +647,59 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     await client.close();
   });
 
+  await t.test("GM actions: authoritative level set, full heal, and god mode", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: { id: "usr_gm", username: "GM_Player", x: 640, y: 620 }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    // Test set_level
+    client.send({
+      type: "gm_action",
+      payload: { action: "set_level", level: 99 }
+    });
+    const progress = await client.waitFor((m) => m.type === "player_progress" && m.payload.level === 99);
+    assert.equal(progress.payload.level, 99);
+
+    // Test heal_full
+    client.send({
+      type: "gm_action",
+      payload: { action: "heal_full" }
+    });
+    const hp = await client.waitFor((m) => m.type === "player_hp");
+    assert.equal(hp.payload.hp, hp.payload.maxHp);
+
+    // Test god mode
+    client.send({
+      type: "gm_action",
+      payload: { action: "toggle_god_mode", enabled: true }
+    });
+    const gmState = await client.waitFor((m) => m.type === "gm_state");
+    assert.equal(gmState.payload.isGodMode, true);
+
+    await client.close();
+  });
+
+  await t.test("Non-admin cannot perform GM actions", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: { id: "usr_regular", username: "RegularPlayer", x: 640, y: 620 }
+    });
+    await client.waitFor((m) => m.type === "init_world");
+
+    client.send({
+      type: "gm_action",
+      payload: { action: "set_level", level: 99 }
+    });
+    const err = await client.waitFor((m) => m.type === "error");
+    assert.match(err.payload.message, /quyền quản trị GM/);
+
+    await client.close();
+  });
+
   await t.test("Enemy state is server-managed: shared HP, shared death and respawn", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);

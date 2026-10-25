@@ -388,6 +388,57 @@ export default {
     "hoi-thanh-phu": {
       name: "Return City Talisman",
       desc: "A spatial talisman that returns the traveler to Bianjing."
+    },
+    "lenh-bai-gm": {
+      name: "GM Imperial Token",
+      desc: "Supreme authority token of the GM. Opens admin control panel to grant levels, vitals, potions and map travel."
+    }
+  },
+  gm: {
+    title: "GM Command Panel",
+    hint: "Online character administration. Actions are synchronized authoritative with the server.",
+    tabs: {
+      level: "Level",
+      potions: "Potions",
+      teleport: "Teleport",
+      utility: "Utility"
+    },
+    level: {
+      title: "Level & Experience",
+      quickLevel: "Quick Level Milestones",
+      addLevel: "Advance Level",
+      addExp: "Gain Experience",
+      customLevel: "Custom Level (1 - 150)",
+      setLevelBtn: "Set Level",
+      successSet: "Level set successfully!"
+    },
+    potions: {
+      title: "Recovery & Potions",
+      healFull: "Full Restore HP & MP",
+      receiveHp: "Receive 99x Golden Radiance Elixir",
+      receiveMp: "Receive 99x Great Return Pill",
+      receiveWine: "Receive 99x Daughter's Red Wine",
+      receiveAll: "Receive All Potions (x99)",
+      fullHealed: "Fully restored Health and Inner force!",
+      potionsReceived: "Received potions to bag."
+    },
+    teleport: {
+      title: "Talismans & Teleport",
+      receiveScroll: "Receive 99x Return City Talisman",
+      toMarket: "Teleport: Bianjing City",
+      toDongMonThanh: "Teleport: East Gate Suburb",
+      toSpawn: "Recall to Spawn Point"
+    },
+    utility: {
+      title: "Silver & Utility",
+      addCoins1k: "Receive 1,000 Silver",
+      addCoins10k: "Receive 10,000 Silver (100 Gold)",
+      addCoins100k: "Receive 100,000 Silver",
+      godMode: "God Mode (Invulnerable)",
+      godModeOn: "God Mode: [ACTIVE]",
+      godModeOff: "Enable God Mode",
+      speedBuff: "Speed Boost (x2)",
+      speedNormal: "Normal Speed"
     }
   }
 };

@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
-import { STARTER_ITEMS } from "../../../src/game/items.js";
+import { STARTER_ITEMS, GM_STARTER_ITEMS } from "../../../src/game/items.js";
 
 /** Keys that would poison a plain object (and later SQL params) if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -367,7 +367,7 @@ export class PlayerDatabase {
    * @param {string} playerId
    * @returns {Record<string, number>} the stored bag
    */
-  grantStarterItems(playerId) {
+  grantStarterItems(playerId, { isAdmin = false } = {}) {
     const now = Date.now();
 
     if (!this.stmtGet.get(playerId)) {
@@ -381,7 +381,8 @@ export class PlayerDatabase {
       });
     }
 
-    this.stmtGrantStarter.run(JSON.stringify(STARTER_ITEMS), now, playerId);
+    const starter = isAdmin ? GM_STARTER_ITEMS : STARTER_ITEMS;
+    this.stmtGrantStarter.run(JSON.stringify(starter), now, playerId);
     return this.getInventory(playerId);
   }
 

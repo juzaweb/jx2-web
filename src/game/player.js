@@ -615,7 +615,8 @@ export class Player {
    */
   getSpeedMultiplier() {
     const effective = this.scene?.combat?.getEffectiveStats?.();
-    return Math.max(0.1, 1 + (Number(effective?.speedPct) || 0));
+    const gmMult = this.gmSpeedBoost ? 2.0 : 1.0;
+    return Math.max(0.1, 1 + (Number(effective?.speedPct) || 0)) * gmMult;
   }
 
   /**

@@ -338,6 +338,21 @@ export class CharacterDatabase {
   }
 
   /**
+   * Resolve the owner user ID of a character
+   * @param {string} characterId
+   * @returns {string|null}
+   */
+  getOwner(characterId) {
+    if (!characterId || typeof characterId !== "string") return null;
+    try {
+      const row = this.db.prepare("SELECT user_id FROM characters WHERE id = ?").get(characterId);
+      return row ? row.user_id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Count characters owned by a user.
    * @param {string} userId
    * @returns {number}

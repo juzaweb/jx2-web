@@ -14,6 +14,7 @@ import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.j
 import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
 import { SkillsModal } from "./components/Modals/SkillsModal.jsx";
 import { ShopModal } from "./components/Modals/ShopModal.jsx";
+import { GmModal } from "./components/Modals/GmModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
 import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
@@ -131,6 +132,7 @@ export function App() {
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
+  const [isGmOpen, setIsGmOpen] = useState(false);
   // Both side panels start open so a fresh entry into the world already shows
   // the map and the chat channel without a manual click.
   const [isChatOpen, setIsChatOpen] = useState(true);
@@ -368,6 +370,10 @@ export function App() {
       setIsNetworkConnected(!!state?.connected);
     });
 
+    const unsubGmModal = bridge.on(EVENTS.GM_MODAL_TOGGLE, () => {
+      setIsGmOpen((prev) => !prev);
+    });
+
     return () => {
       unsubStats();
       unsubQuest();
@@ -382,6 +388,7 @@ export function App() {
       unsubShopOpened();
       unsubShopResult();
       unsubNetwork();
+      unsubGmModal();
     };
   }, []);
 
@@ -918,6 +925,13 @@ export function App() {
         }
         onSelect={handleEquipSkill}
         onClose={handleCloseSkillPicker}
+      />
+
+      {/* GM Command Panel ("Lệnh Bài GM") */}
+      <GmModal
+        isOpen={isGmOpen}
+        onClose={() => setIsGmOpen(false)}
+        stats={stats}
       />
 
       {/* Hard connection gate: the world stays frozen until the socket is back */}

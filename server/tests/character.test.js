@@ -92,6 +92,24 @@ describe("Character API Test Suite", () => {
     });
   });
 
+  test("an admin account receives the GM item in the starter kit", async () => {
+    const { userDb } = await import("../src/data/userDb.js");
+    const adminUser = userDb.register("admin_char_test", "123456", "AdminChar");
+
+    const created = await fetch(`${baseUrl}/users/${adminUser.id}/characters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "AdminHero", sect: "thieu-lam" })
+    }).then((r) => r.json());
+
+    const bag = await fetch(
+      `${baseUrl}/inventory/${created.data.character.id}`
+    ).then((r) => r.json());
+
+    assert.equal(bag.data.inventory["lenh-bai-gm"], 1);
+    assert.equal(bag.data.inventory["kim-sang-duoc"], 50);
+  });
+
   test("the starter kit is never granted twice and never replaces a played bag", async () => {
     const { store } = await import("../src/data/playerDb.js");
     const userId = nextUser();

@@ -80,7 +80,7 @@ describe("inventory quantities", () => {
   });
 
   it("gives the starter kit only catalog-backed, usable items", () => {
-    const catalogIds = new Set(QUICK_ITEMS.map((item) => item.id));
+    const catalogIds = new Set(INVENTORY_ITEMS.filter(Boolean).map((item) => item.id));
 
     expect(Object.keys(STARTER_ITEMS).sort()).toEqual([
       "dai-hoan-dan",

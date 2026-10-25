@@ -46,6 +46,17 @@ export const QUICK_ITEMS = [
   }
 ];
 
+/**
+ * Supreme GM command token for admin control and testing.
+ */
+export const lenhBaiGm = {
+  id: "lenh-bai-gm",
+  useSlot: 5,
+  name: "Lệnh Bài GM",
+  icon: "icon-gm-token",
+  desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
+};
+
 /** Number of slots the inventory grid renders (5 columns x 6 rows). */
 export const INVENTORY_GRID_SIZE = 30;
 
@@ -73,12 +84,11 @@ const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 
 /**
  * The bag grid contents. Every entry is an item the player can actually obtain and
- * use: the four hotbar consumables, which are also the only things the shop and the
- * starter kit hand out. The rendered grid itself is a fixed 5x6 block of slots
+ * use: the hotbar consumables and tools. The rendered grid itself is a fixed 5x6 block of slots
  * (see {@link INVENTORY_GRID_SIZE}); an entry of `null` renders an empty slot.
  * @type {Array<null | {id:string, name:string, icon:string, slot?:string, bonuses?:Record<string,number>, desc:string, useSlot?:number}>}
  */
-export const INVENTORY_ITEMS = [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu];
+export const INVENTORY_ITEMS = [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu, lenhBaiGm];
 
 /**
  * Look up a catalog item by id across both the quick-slot and grid catalogs.
@@ -95,8 +105,8 @@ export function getItemById(id) {
 }
 
 /**
- * The kit every newly created character receives: health potions, mana potions and
- * return-city talismans. Only the server grants it (see
+ * The kit every newly created regular character receives: health potions, mana potions
+ * and return-city talismans. Only the server grants it (see
  * PlayerDatabase.grantStarterItems), so the client never seeds a bag on its own.
  * @type {Readonly<Record<string, number>>}
  */
@@ -104,6 +114,15 @@ export const STARTER_ITEMS = Object.freeze({
   "kim-sang-duoc": 50,
   "dai-hoan-dan": 50,
   "hoi-thanh-phu": 50
+});
+
+/**
+ * The kit granted to GM / Admin accounts, containing the GM Command Token.
+ * @type {Readonly<Record<string, number>>}
+ */
+export const GM_STARTER_ITEMS = Object.freeze({
+  ...STARTER_ITEMS,
+  "lenh-bai-gm": 1
 });
 
 /**

@@ -1,0 +1,297 @@
+/* ====================================================
+   GM Command Panel ("Lệnh Bài GM")
+   Royal Imperial Gold & Crimson Wuxia Palette
+==================================================== */
+.gm-modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.gm-panel {
+  position: absolute;
+  top: clamp(60px, 12vh, 120px);
+  left: clamp(20px, 20vw, 240px);
+  pointer-events: auto;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(165deg, #2b1414 0%, #1a0c0c 50%, #0d0606 100%);
+  border: 2px solid #d4af37;
+  outline: 2px solid #4a1515;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95), 0 0 25px rgba(212, 175, 55, 0.25), inset 0 0 30px rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.gm-panel.is-dragging {
+  box-shadow: 0 24px 75px rgba(0, 0, 0, 0.98), 0 0 35px rgba(255, 215, 0, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.gm-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #871f1f 0%, #5a1111 50%, #380a0a 100%);
+  border-bottom: 2px solid #d4af37;
+  box-shadow: inset 0 1px 0 rgba(255, 235, 170, 0.35), 0 2px 8px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  touch-action: none;
+}
+
+.gm-panel.is-dragging .gm-titlebar {
+  cursor: grabbing;
+}
+
+.gm-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-title-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-block;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.gm-title {
+  font-family: 'Cinzel', 'Noto Serif SC', serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #fff1b8;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9), 0 0 12px rgba(255, 215, 0, 0.6);
+}
+
+.gm-titlebar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.gm-icon-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: #ffe6a6;
+  background: radial-gradient(circle, #661e1e 0%, #380d0d 100%);
+  border: 1px solid #d4af37;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gm-icon-btn:hover {
+  background: radial-gradient(circle, #8c2a2a 0%, #4f1212 100%);
+  border-color: #ffd700;
+  color: #ffffff;
+}
+
+.gm-icon-btn.close:hover {
+  background: #c92a2a;
+  border-color: #ff6b6b;
+}
+
+.gm-hint {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ffec99;
+  background: rgba(135, 31, 31, 0.35);
+  border-bottom: 1px dashed rgba(212, 175, 55, 0.3);
+}
+
+.gm-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #140808;
+  border-bottom: 2px solid #5a1e1e;
+}
+
+.gm-tab {
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #b08d79;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.gm-tab:hover {
+  color: #ffe066;
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.gm-tab.active {
+  color: #ffd43b;
+  border-bottom: 2px solid #ffd43b;
+  background: linear-gradient(180deg, rgba(135, 31, 31, 0.4) 0%, rgba(43, 20, 20, 0.6) 100%);
+  text-shadow: 0 0 8px rgba(255, 212, 59, 0.5);
+}
+
+.gm-body {
+  padding: 14px;
+  overflow-y: auto;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fcc419;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.4) 0%, transparent 100%);
+}
+
+.gm-btn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.gm-btn {
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #3d1b1b 0%, #240f0f 100%);
+  border: 1px solid #8c5332;
+  border-radius: 3px;
+  color: #ffe8cc;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.gm-btn:hover {
+  background: linear-gradient(180deg, #592525 0%, #361414 100%);
+  border-color: #d4af37;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+.gm-btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.gm-btn.primary {
+  background: linear-gradient(180deg, #871f1f 0%, #4a1010 100%);
+  border-color: #f59f00;
+  color: #fff3bf;
+}
+
+.gm-btn.primary:hover {
+  background: linear-gradient(180deg, #a62828 0%, #631717 100%);
+  border-color: #ffd43b;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 212, 59, 0.5);
+}
+
+.gm-btn.gold {
+  background: linear-gradient(180deg, #664817 0%, #3d2b0e 100%);
+  border-color: #ffd43b;
+  color: #fff9db;
+}
+
+.gm-btn.gold:hover {
+  background: linear-gradient(180deg, #876020 0%, #523a13 100%);
+  border-color: #ffe066;
+  box-shadow: 0 0 12px rgba(255, 224, 102, 0.5);
+}
+
+.gm-btn.active-toggle {
+  background: linear-gradient(180deg, #2b8a3e 0%, #1e5a29 100%);
+  border-color: #69db7c;
+  color: #ebfbee;
+  box-shadow: 0 0 10px rgba(105, 219, 124, 0.4);
+}
+
+.gm-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.gm-input {
+  flex: 1;
+  padding: 7px 10px;
+  background: #140808;
+  border: 1px solid #7c4423;
+  border-radius: 3px;
+  color: #ffd43b;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+}
+
+.gm-input:focus {
+  border-color: #ffd43b;
+  box-shadow: 0 0 8px rgba(255, 212, 59, 0.4);
+}
+
+.gm-footer {
+  padding: 8px 14px;
+  background: #140808;
+  border-top: 1px solid #421818;
+  font-size: 11px;
+  color: #a37d68;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gm-status-pill {
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.gm-status-pill.online {
+  background: rgba(43, 138, 62, 0.25);
+  color: #69db7c;
+  border: 1px solid #2b8a3e;
+}
+

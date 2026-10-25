@@ -102,6 +102,8 @@ export const EVENTS = {
   SET_PLAYER_NAME: "SET_PLAYER_NAME",
   SET_PLAYER_GENDER: "SET_PLAYER_GENDER",
   ACTION_CHAT: "ACTION_CHAT",
+  ACTION_GM: "ACTION_GM",
+  GM_MODAL_TOGGLE: "GM_MODAL_TOGGLE",
   /** Fired after the hero arrives on a new map (payload: {mapId, name}). */
   MAP_CHANGED: "MAP_CHANGED",
   /** Fired when the server refuses a portal move. */

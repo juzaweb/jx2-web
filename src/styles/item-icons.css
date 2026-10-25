@@ -35,3 +35,9 @@
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="%230f3650" stroke="%2356c5e8" stroke-width="1.5"/><path d="M16 4 L19 14 L28 16 L19 18 L16 28 L13 18 L4 16 L13 14 Z" fill="%23a8eaff"/><circle cx="16" cy="16" r="3" fill="%23ffffff"/></svg>');
 }
 
+/* GM Imperial Token (Lệnh Bài GM) */
+.icon-gm-token {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><polygon points="16,2 27,6 31,16 27,26 16,30 5,26 1,16 5,6" fill="%232b0d0d" stroke="%23f59f00" stroke-width="2"/><polygon points="16,5 24,8 27,16 24,24 16,27 8,24 5,16 8,8" fill="%23861818" stroke="%23ffd43b" stroke-width="1.2"/><circle cx="16" cy="16" r="7" fill="%23fab005" stroke="%23ffe066" stroke-width="1"/><text x="16" y="19" font-size="7" font-weight="900" text-anchor="middle" fill="%23491212" font-family="Arial, sans-serif">GM</text></svg>');
+}
+
+

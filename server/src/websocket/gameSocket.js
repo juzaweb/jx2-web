@@ -544,6 +544,10 @@ export class GameSocketManager {
         this.handleQuestClaim(ws);
         break;
 
+      case "gm_action":
+        this.handleGmAction(ws, msg.payload);
+        break;
+
       case "ping":
         this.send(ws, { type: "pong", time: Date.now() });
         break;
@@ -591,6 +595,24 @@ export class GameSocketManager {
       store.setProgress(characterId, progress, userDb.resolveDisplayName(userId, displayName));
     }
 
+    const isAdmin = Boolean(
+      userDb.isAdmin(userId) ||
+      username.toLowerCase() === "admin" ||
+      username.toLowerCase().startsWith("gm")
+    );
+
+    if (isAdmin && characterId) {
+      const bag = store.getInventory(characterId);
+      if (!bag["lenh-bai-gm"]) {
+        bag["lenh-bai-gm"] = 1;
+        store.setInventory(characterId, bag);
+      }
+      this.send(ws, {
+        type: "inventory_sync",
+        payload: { inventory: bag }
+      });
+    }
+
     // If this player ID was already connected from an old socket, remove old one
     if (this.playerById.has(playerId)) {
       const existing = this.playerById.get(playerId);
@@ -625,6 +647,7 @@ export class GameSocketManager {
       direction: payload.direction === "left" ? "left" : "right",
       stance: payload.stance === "side" ? "side" : "front",
       equipment: sanitizeEquipment(payload.equipment),
+      isAdmin,
       // Character gender drives the peer's rig silhouette ("male" | "female").
       gender: payload.gender === "female" ? "female" : "male",
       characterId,
@@ -1182,6 +1205,7 @@ export class GameSocketManager {
    * @returns {boolean} whether the hit landed
    */
   applyPlayerDamage(target, damage, attacker = null, source = "wolf", sourceName = null) {
+    if (target.isGodMode) return false;
     const now = Date.now();
     if (now < target.invulnerableUntil) return false;
 
@@ -1328,6 +1352,208 @@ export class GameSocketManager {
         time: Date.now()
       }
     });
+  }
+
+  /**
+   * Authoritative handler for GM command actions
+   * @param {WebSocket} ws
+   * @param {Object} payload
+   */
+  handleGmAction(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player || !player.isAdmin) {
+      this.send(ws, {
+        type: "error",
+        payload: { message: "Bạn không có quyền quản trị GM!" }
+      });
+      return;
+    }
+
+    const action = payload.action;
+
+    switch (action) {
+      case "set_level": {
+        const level = clampNum(payload.level, 1, 150, player.progress?.level || 1);
+        const vitals = vitalsForLevel(level);
+        if (player.progress) {
+          player.progress.level = level;
+          player.progress.exp = 0;
+          if (player.characterId) {
+            store.setProgress(player.characterId, player.progress);
+          }
+        }
+        player.level = level;
+        player.maxHp = vitals.maxHp;
+        player.maxMp = vitals.maxMp;
+        player.hp = vitals.maxHp;
+        player.mp = vitals.maxMp;
+
+        this.send(ws, {
+          type: "player_progress",
+          payload: {
+            ...progressPayload(player.progress || { level, exp: 0, coins: 0, kills: 0 }),
+            levelUps: 1
+          }
+        });
+        this.broadcastToMap(player.mapId, {
+          type: "player_hp",
+          payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+        });
+        this.send(ws, {
+          type: "player_mp",
+          payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+        });
+        break;
+      }
+
+      case "add_level": {
+        const delta = clampNum(payload.levels, 1, 150, 1);
+        const current = player.progress?.level || player.level || 1;
+        const targetLevel = clampNum(current + delta, 1, 150, current);
+        this.handleGmAction(ws, { action: "set_level", level: targetLevel });
+        break;
+      }
+
+      case "add_exp": {
+        const exp = clampNum(payload.exp, 1, 10000000, 1000);
+        if (player.progress && player.characterId) {
+          const next = applyReward(player.progress, { exp });
+          player.progress = { level: next.level, exp: next.exp, coins: next.coins, kills: next.kills };
+          store.setProgress(player.characterId, player.progress);
+
+          const vitals = vitalsForLevel(next.level);
+          player.level = next.level;
+          player.maxHp = vitals.maxHp;
+          player.maxMp = vitals.maxMp;
+
+          if (next.levelUps > 0) {
+            player.hp = player.maxHp;
+            player.mp = player.maxMp;
+            this.broadcastToMap(player.mapId, {
+              type: "player_hp",
+              payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+            });
+            this.send(ws, {
+              type: "player_mp",
+              payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+            });
+          }
+
+          this.send(ws, {
+            type: "player_progress",
+            payload: { ...progressPayload(player.progress), levelUps: next.levelUps }
+          });
+        }
+        break;
+      }
+
+      case "heal_full": {
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        this.broadcastToMap(player.mapId, {
+          type: "player_hp",
+          payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+        });
+        this.send(ws, {
+          type: "player_mp",
+          payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
+        });
+        break;
+      }
+
+      case "add_items": {
+        if (!player.characterId) return;
+        const items = payload.items;
+        if (!items || typeof items !== "object") return;
+        const bag = store.getInventory(player.characterId);
+        for (const [id, qty] of Object.entries(items)) {
+          if (typeof qty === "number" && qty > 0) {
+            bag[id] = (bag[id] || 0) + Math.floor(qty);
+          }
+        }
+        store.setInventory(player.characterId, bag);
+        this.send(ws, {
+          type: "inventory_sync",
+          payload: { inventory: bag }
+        });
+        break;
+      }
+
+      case "add_coins": {
+        const amount = clampNum(payload.amount, 1, 10000000, 1000);
+        if (player.progress) {
+          player.progress.coins = (player.progress.coins || 0) + amount;
+          if (player.characterId) {
+            store.setProgress(player.characterId, player.progress);
+          }
+          this.send(ws, {
+            type: "player_progress",
+            payload: progressPayload(player.progress)
+          });
+        }
+        break;
+      }
+
+      case "teleport": {
+        const targetMapId = sanitizeStr(payload.mapId || "", 64);
+        if (!isKnownMap(targetMapId)) return;
+        const targetMap = getMap(targetMapId);
+        const spawn = payload.spawn || targetMap.spawn;
+        const currentMapId = player.mapId;
+
+        if (currentMapId !== targetMapId) {
+          this.broadcastToMap(currentMapId, {
+            type: "player_left",
+            payload: { id: player.id }
+          }, ws);
+          this.playerGrid.get(currentMapId)?.remove(player);
+
+          player.mapId = targetMapId;
+          player.x = spawn.x;
+          player.y = spawn.y;
+          this.playerGrid.get(targetMapId)?.add(player);
+
+          const newPeers = this.getPlayersOnMap(targetMapId, ws).map((p) => this.playerSnapshot(p));
+          const newEnemies = this.getEnemiesOnMap(targetMapId).map((e) => this.enemySnapshot(e));
+
+          this.send(ws, {
+            type: "map_changed",
+            payload: {
+              mapId: targetMapId,
+              spawn,
+              players: newPeers,
+              enemies: newEnemies
+            }
+          });
+
+          this.broadcastToMap(targetMapId, {
+            type: "player_joined",
+            payload: this.playerSnapshot(player)
+          }, ws);
+        } else {
+          player.x = spawn.x;
+          player.y = spawn.y;
+          this.playerGrid.get(currentMapId)?.update(player);
+          this.broadcastToMap(currentMapId, {
+            type: "player_moved",
+            payload: { id: player.id, x: spawn.x, y: spawn.y }
+          });
+        }
+        break;
+      }
+
+      case "toggle_god_mode": {
+        player.isGodMode = payload.enabled !== undefined ? Boolean(payload.enabled) : !player.isGodMode;
+        this.send(ws, {
+          type: "gm_state",
+          payload: { isGodMode: player.isGodMode }
+        });
+        break;
+      }
+
+      default:
+        break;
+    }
   }
 
   /**

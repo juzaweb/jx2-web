@@ -42,21 +42,29 @@ export class UserDatabase {
         password_hash TEXT NOT NULL,
         salt TEXT NOT NULL,
         display_name TEXT,
+        role TEXT DEFAULT 'player',
         created_at INTEGER NOT NULL,
         last_login INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     `);
 
+    // Ensure role column exists for pre-existing tables
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'player';");
+    } catch {
+      // Column already exists
+    }
+
     // Prepare statement caches
     this.stmtFindByUsername = this.db.prepare(
-      "SELECT id, username, password_hash, salt, display_name, created_at, last_login FROM users WHERE username = ?"
+      "SELECT id, username, password_hash, salt, display_name, role, created_at, last_login FROM users WHERE username = ?"
     );
     this.stmtFindById = this.db.prepare(
-      "SELECT id, username, display_name, created_at, last_login FROM users WHERE id = ?"
+      "SELECT id, username, display_name, role, created_at, last_login FROM users WHERE id = ?"
     );
     this.stmtInsertUser = this.db.prepare(
-      "INSERT INTO users (id, username, password_hash, salt, display_name, created_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO users (id, username, password_hash, salt, display_name, role, created_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     this.stmtUpdateLastLogin = this.db.prepare(
       "UPDATE users SET last_login = ? WHERE id = ?"
@@ -117,13 +125,15 @@ export class UserDatabase {
     const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
+    const role = cleanUsername === "admin" || cleanUsername.startsWith("admin_") ? "admin" : "player";
 
-    this.stmtInsertUser.run(id, cleanUsername, passwordHash, salt, cleanDisplayName, createdAt, null);
+    this.stmtInsertUser.run(id, cleanUsername, passwordHash, salt, cleanDisplayName, role, createdAt, null);
 
     return {
       id,
       username: cleanUsername,
       displayName: cleanDisplayName,
+      role,
       createdAt,
       lastLogin: null
     };
@@ -174,6 +184,7 @@ export class UserDatabase {
       id: user.id,
       username: user.username,
       displayName: user.display_name || user.username,
+      role: user.role || (user.username === "admin" ? "admin" : "player"),
       createdAt: user.created_at,
       lastLogin: now
     };
@@ -192,9 +203,22 @@ export class UserDatabase {
       id: user.id,
       username: user.username,
       displayName: user.display_name || user.username,
+      role: user.role || (user.username === "admin" ? "admin" : "player"),
       createdAt: user.created_at,
       lastLogin: user.last_login
     };
+  }
+
+  /**
+   * Check whether an account has administrator / GM privileges
+   * @param {string} id
+   * @returns {boolean}
+   */
+  isAdmin(id) {
+    if (!id || typeof id !== "string") return false;
+    const user = this.getUserById(id);
+    const uname = user?.username?.toLowerCase() || "";
+    return Boolean(user?.role === "admin" || uname === "admin" || uname.startsWith("admin_"));
   }
 
   /**

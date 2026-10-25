@@ -344,6 +344,21 @@ export class JiangHuScene extends Phaser.Scene {
       this.shopFlow.handleResult(payload);
     });
 
+    // Authoritative bag sync from server (e.g. GM item additions)
+    this.networkClient.on("inventory_sync", (payload) => {
+      if (payload?.inventory) {
+        replaceQuantities(payload.inventory);
+        this.onInventoryChanged();
+      }
+    });
+
+    // Authoritative GM state (e.g. God Mode toggle)
+    this.networkClient.on("gm_state", (payload) => {
+      if (payload?.isGodMode !== undefined && this.player) {
+        this.player.isGodMode = Boolean(payload.isGodMode);
+      }
+    });
+
     this.networkClient.on("connected", () => {
       // Open the gate first: the world may move as soon as the server is there.
       this.setConnectionBlocked(false);
@@ -580,6 +595,9 @@ export class JiangHuScene extends Phaser.Scene {
         if (this.networkClient?.isConnected) {
           this.networkClient.sendChat(payload);
         }
+      }),
+      bridge.on(EVENTS.ACTION_GM, (payload) => {
+        this.handleGmAction(payload);
       })
     );
 
@@ -838,6 +856,13 @@ export class JiangHuScene extends Phaser.Scene {
       return;
     }
 
+    if (itemId === "lenh-bai-gm") {
+      bridge.emit(EVENTS.GM_MODAL_TOGGLE);
+      this.uiBridge.addLog("Đã mở Giao diện Lệnh Bài GM.", "system");
+      playTone(660, 0.15, "triangle", 0.04);
+      return;
+    }
+
     if (!this.applyConsumableEffect(itemId)) return;
 
     const { ok } = consumeQuantity(itemId, 1);
@@ -926,6 +951,13 @@ export class JiangHuScene extends Phaser.Scene {
       return true;
     }
 
+    if (itemId === "lenh-bai-gm") {
+      bridge.emit(EVENTS.GM_MODAL_TOGGLE);
+      this.uiBridge.addLog("Đã mở Giao diện Lệnh Bài GM.", "system");
+      playTone(660, 0.15, "triangle", 0.04);
+      return false;
+    }
+
     const item = getItemById(itemId);
     if (item) {
       this.uiBridge.addLog(`Đã sử dụng ${item.name}.`, "system");
@@ -933,6 +965,82 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     return false;
+  }
+
+  /**
+   * Handle GM action invoked from the UI or client
+   * @param {Object} payload
+   */
+  handleGmAction(payload = {}) {
+    if (!payload?.action) return;
+
+    // Relay action to the authoritative server
+    if (this.networkClient?.isConnected) {
+      this.networkClient.sendGmAction(payload);
+    }
+
+    // Local immediate feedback / actions
+    switch (payload.action) {
+      case "heal_full":
+        if (this.player) {
+          this.player.stats.hp = this.player.stats.maxHp;
+          this.player.stats.mp = this.player.stats.maxMp;
+          this.combat.showFloatText(this.player.x, this.player.y - 68, "Full HP & MP!", "#ffd43b");
+          playTone(550, 0.15, "triangle", 0.04);
+          this.uiBridge.updateHud(this.player.stats);
+          this.uiBridge.addLog("Đã hồi phục toàn bộ Sinh lực và Nội lực!", "system");
+        }
+        break;
+
+      case "add_items":
+        if (payload.items) {
+          for (const [id, qty] of Object.entries(payload.items)) {
+            addQuantity(id, qty);
+          }
+          this.onInventoryChanged();
+          this.combat.showFloatText(this.player.x, this.player.y - 68, "Đã nhận dược phẩm!", "#69db7c");
+          playTone(520, 0.15, "triangle", 0.03);
+          this.uiBridge.addLog("Đã nhận vật phẩm vào túi đồ.", "system");
+        }
+        break;
+
+      case "toggle_god_mode":
+        if (this.player) {
+          this.player.isGodMode = payload.enabled ?? !this.player.isGodMode;
+          const status = this.player.isGodMode ? "Bật" : "Tắt";
+          this.uiBridge.addLog(`Chế độ Bất Tử: ${status}`, "system");
+          this.combat.showFloatText(
+            this.player.x,
+            this.player.y - 68,
+            this.player.isGodMode ? "Vô Địch (Bất Tử)" : "Tắt Bất Tử",
+            this.player.isGodMode ? "#fcc419" : "#ff8787"
+          );
+          playTone(this.player.isGodMode ? 880 : 330, 0.2, "sine", 0.04);
+        }
+        break;
+
+      case "toggle_speed":
+        if (this.player) {
+          this.player.gmSpeedBoost = payload.enabled ?? !this.player.gmSpeedBoost;
+          const text = this.player.gmSpeedBoost ? "Tăng tốc di chuyển (x2)" : "Tốc độ thường";
+          this.uiBridge.addLog(text, "system");
+          this.combat.showFloatText(this.player.x, this.player.y - 68, text, "#74c0fc");
+          playTone(660, 0.15, "triangle", 0.03);
+        }
+        break;
+
+      case "teleport":
+        if (payload.mapId) {
+          const map = getMap(payload.mapId);
+          if (map) {
+            this.loadMap(payload.mapId, payload.spawn || map.spawn, { notifyServer: true });
+          }
+        }
+        break;
+
+      default:
+        break;
+    }
   }
 
   /**

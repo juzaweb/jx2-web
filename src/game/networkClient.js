@@ -257,6 +257,14 @@ export class NetworkClient {
     this.send("player_chat", chatData);
   }
 
+  /**
+   * Send GM action request to authoritative server
+   * @param {Object} gmData
+   */
+  sendGmAction(gmData) {
+    this.send("gm_action", gmData);
+  }
+
   startPing() {
     this.stopPing();
     this.pingTimer = setInterval(() => {
