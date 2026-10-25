@@ -5,6 +5,7 @@
 - **Technical Artifacts:** ALL code, docstrings, and **GIT COMMIT MESSAGES** MUST be in **ENGLISH**.
 - **STRICT:** Never use Vietnamese in Git logs or Commit messages under any circumstances.
 - **DO NOT** commit or push anything without permission.
+- API documentation: http://192.168.1.13:8090/docs
 
 ### General Rules
 
