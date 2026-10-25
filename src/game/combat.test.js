@@ -725,4 +725,35 @@ describe("skill targeting", () => {
 
     expect(ui.addLog).not.toHaveBeenCalled();
   });
+
+  it("checks skill readiness via isSkillReady without logging", () => {
+    const { combat, ui } = makeCombat();
+    const skill = { id: "la_han_quyen", unlockLevel: 1 };
+
+    expect(combat.isSkillReady(skill)).toBe(true);
+    expect(ui.addLog).not.toHaveBeenCalled();
+
+    // On cooldown
+    combat.skillCooldowns.set("la_han_quyen", 2000);
+    expect(combat.isSkillReady(skill)).toBe(false);
+    expect(ui.addLog).not.toHaveBeenCalled();
+
+    // Out of MP
+    combat.skillCooldowns.clear();
+    combat.player.stats.mp = 0;
+    expect(combat.isSkillReady(skill)).toBe(false);
+    expect(ui.addLog).not.toHaveBeenCalled();
+  });
+
+  it("nearestEnemyInReach prefers scene.enemyTarget if in reach", () => {
+    const wolf1 = wolf("wolf1", 100, 0);
+    const wolf2 = wolf("wolf2", 50, 0);
+    const { combat, scene } = makeCombat({ wolves: [wolf1, wolf2] });
+    scene.enemyTarget = wolf1;
+
+    expect(combat.nearestEnemyInReach()).toBe(wolf1);
+
+    scene.enemyTarget = null;
+    expect(combat.nearestEnemyInReach()).toBe(wolf2);
+  });
 });

@@ -9,7 +9,7 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { EnemyManager, Wolf } from "./enemy.js";
+import { EnemyManager, Wolf, isPointOnEnemy, findEnemyAt } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
 import { ENEMY_TUNING } from "./enemyAi.js";
 
@@ -261,3 +261,86 @@ describe("Wolf movement is server-owned", () => {
     expect(bites).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("isPointOnEnemy and findEnemyAt mouse targeting", () => {
+  it("detects mouse click on a quadruped beast (wolf)", () => {
+    const enemy = {
+      x: 500,
+      y: 500,
+      isDead: false,
+      active: true,
+      monster: { visual: { kind: "beast", scale: 1 } }
+    };
+
+    expect(isPointOnEnemy(enemy, 500, 500)).toBe(true);
+    expect(isPointOnEnemy(enemy, 550, 520)).toBe(true);
+    expect(isPointOnEnemy(enemy, 440, 470)).toBe(true);
+    // Out of bounds
+    expect(isPointOnEnemy(enemy, 700, 500)).toBe(false);
+    expect(isPointOnEnemy(enemy, 500, 700)).toBe(false);
+  });
+
+  it("detects mouse click on a humanoid/boss enemy torso and head", () => {
+    const humanoid = {
+      x: 1000,
+      y: 1000,
+      isDead: false,
+      active: true,
+      monster: { visual: { kind: "humanoid" } }
+    };
+
+    // Body/torso above feet
+    expect(isPointOnEnemy(humanoid, 1000, 900)).toBe(true);
+    // Near feet
+    expect(isPointOnEnemy(humanoid, 1000, 1030)).toBe(true);
+    // Too far above head
+    expect(isPointOnEnemy(humanoid, 1000, 750)).toBe(false);
+  });
+
+  it("ignores dead or inactive enemies", () => {
+    const deadEnemy = {
+      x: 500,
+      y: 500,
+      isDead: true,
+      active: true,
+      monster: { visual: { kind: "beast" } }
+    };
+    expect(isPointOnEnemy(deadEnemy, 500, 500)).toBe(false);
+
+    const inactiveEnemy = {
+      x: 500,
+      y: 500,
+      isDead: false,
+      active: false,
+      monster: { visual: { kind: "beast" } }
+    };
+    expect(isPointOnEnemy(inactiveEnemy, 500, 500)).toBe(false);
+  });
+
+  it("findEnemyAt selects the closest enemy among candidates", () => {
+    const wolf1 = {
+      id: 1,
+      x: 300,
+      y: 300,
+      isDead: false,
+      active: true,
+      monster: { visual: { kind: "beast" } }
+    };
+    const wolf2 = {
+      id: 2,
+      x: 340,
+      y: 300,
+      isDead: false,
+      active: true,
+      monster: { visual: { kind: "beast" } }
+    };
+
+    // Click at 305, 300 is closer to wolf1
+    expect(findEnemyAt([wolf1, wolf2], 305, 300)).toBe(wolf1);
+    // Click at 335, 300 is closer to wolf2
+    expect(findEnemyAt([wolf1, wolf2], 335, 300)).toBe(wolf2);
+    // Click far away returns null
+    expect(findEnemyAt([wolf1, wolf2], 800, 800)).toBeNull();
+  });
+});
+

@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { MapStage } from "./mapStage.js";
 import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
-import { EnemyManager } from "./enemy.js";
+import { EnemyManager, findEnemyAt } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
@@ -151,6 +151,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.pendingNpc = null;
     /** Peer locked for a duel: walk into range, then keep striking (see updatePvpTarget). */
     this.pvpTarget = null;
+    /** Monster locked for combat: walk into range, then strike (see updateEnemyTarget). */
+    this.enemyTarget = null;
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
@@ -383,7 +385,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.isPointerMoving = false;
 
-    // Mouse input handlers (Left click: Move to destination, Right click: disabled)
+    // Mouse input handlers (Left click: Move/Attack, Right click: Cast Selected Skill)
     this.input.on("pointerdown", (pointer) => {
       if (!this.started || this.isPaused) return;
 
@@ -393,17 +395,22 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Ignore right mouse button entirely
-      if (pointer.rightButtonDown() || pointer.button === 2) return;
-
       const ground = fromIso(pointer.worldX, pointer.worldY);
       const worldX = ground.x;
       const worldY = ground.y;
 
-      // Any click re-targets the hero, so a pending NPC approach is cancelled
+      // Right mouse button casts the selected right-hand skill
+      if (pointer.rightButtonDown() || pointer.button === 2) {
+        this.pendingNpc = null;
+        this.combat.castSelectedSkill(ground);
+        return;
+      }
+
+      // Any left click re-targets the hero, so pending approaches are cancelled
       // unless this click selects one again below.
       this.pendingNpc = null;
       this.pvpTarget = null;
+      this.enemyTarget = null;
 
       // Check if clicking directly on an NPC (walk towards NPC)
       const clickedNpc = (this.stage?.npcs || []).find((npc) => isPointOnNpc(npc, worldX, worldY));
@@ -412,6 +419,16 @@ export class JiangHuScene extends Phaser.Scene {
         this.pendingNpc = clickedNpc;
         this.player.moveTo(approach.x, approach.y);
         this.showClickIndicator(clickedNpc.gx, clickedNpc.gy, 0x9be58b);
+        return;
+      }
+
+      // Check if clicking directly on a living monster (target and attack)
+      const clickedEnemy = findEnemyAt(this.enemyManager?.getAlive() || [], worldX, worldY);
+      if (clickedEnemy) {
+        this.enemyTarget = clickedEnemy;
+        this.isPointerMoving = false;
+        this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
+        this.updateEnemyTarget();
         return;
       }
 
@@ -430,7 +447,7 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Left click on terrain, enemies or other players: move to destination
+      // Left click on terrain: move to destination
       this.isPointerMoving = true;
       this.combat.cancelPendingCast();
       this.player.moveTo(worldX, worldY);
@@ -459,6 +476,7 @@ export class JiangHuScene extends Phaser.Scene {
       this.combat.cancelPendingCast();
       this.pendingNpc = null;
       this.pvpTarget = null;
+      this.enemyTarget = null;
       this.player.moveTo(ground.x, ground.y);
     });
 
@@ -564,6 +582,8 @@ export class JiangHuScene extends Phaser.Scene {
         if (!this.isPaused) {
           this.combat.cancelPendingCast();
           this.pendingNpc = null;
+          this.pvpTarget = null;
+          this.enemyTarget = null;
           this.player.setTouchDirection(direction);
         }
       }),
@@ -712,6 +732,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.player.stopMovement();
     this.pendingNpc = null;
     this.pvpTarget = null;
+    this.enemyTarget = null;
     this.isPointerMoving = false;
 
     this.stage?.destroy();
@@ -1334,6 +1355,9 @@ export class JiangHuScene extends Phaser.Scene {
     if (isLocal || (this.pvpTarget && this.pvpTarget.id === payload.victimId)) {
       this.pvpTarget = null;
     }
+    if (isLocal) {
+      this.enemyTarget = null;
+    }
 
     if (isLocal) {
       this.player.stats.hp = this.player.stats.maxHp;
@@ -1613,6 +1637,58 @@ export class JiangHuScene extends Phaser.Scene {
     this.combat.performPvpAttack(target);
   }
 
+  /**
+   * Chase and attack a locked monster target: close the gap into reach, then strike
+   * using the left-hand skill or normal physical attack on every attack cooldown.
+   * Drops when the monster dies, is despawned, or the player moves manually.
+   */
+  updateEnemyTarget() {
+    const target = this.enemyTarget;
+    if (!target) return;
+
+    // A skill already cast at the target is driving the approach
+    if (this.combat?.pendingCast) return;
+
+    // Walking away manually cancels the target lock
+    if (this.player?.hasManualMoveInput?.()) {
+      this.enemyTarget = null;
+      return;
+    }
+
+    if (target.isDead || target.active === false) {
+      this.enemyTarget = null;
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+
+    const leftSkill = this.combat?.getLeftSkill?.();
+    const canUseLeftSkill =
+      leftSkill && leftSkill.target === "enemy" && this.combat?.isSkillReady?.(leftSkill);
+
+    if (canUseLeftSkill) {
+      const reach = this.combat.castReach(leftSkill, target);
+      if (distance <= reach) {
+        this.player.stopMovement?.();
+        this.combat.executeSkill(leftSkill, target);
+      } else {
+        this.player.moveTo(target.x, target.y);
+      }
+      return;
+    }
+
+    // Normal attack fallback (reach matches MELEE_REACH = 280)
+    const attackReach = 280;
+    if (distance <= attackReach) {
+      this.player.stopMovement?.();
+      if (this.combat?.attackReady) {
+        this.combat.performAttack();
+      }
+    } else {
+      this.player.moveTo(target.x, target.y);
+    }
+  }
+
   update(time, delta) {
     if (!this.started || this.isPaused || !this.player) return;
 
@@ -1622,6 +1698,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.combat.update?.(time);
     // Close on a locked duellist and strike once in range.
     this.updatePvpTarget();
+    // Close on a targeted enemy and strike once in range.
+    this.updateEnemyTarget();
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 

@@ -472,3 +472,73 @@ export class EnemyManager {
     });
   }
 }
+
+/**
+ * Whether a ground-space coordinate lands on a living enemy's clickable body box.
+ * @param {Enemy} enemy
+ * @param {number} x
+ * @param {number} y
+ * @returns {boolean}
+ */
+export function isPointOnEnemy(enemy, x, y) {
+  if (!enemy || enemy.isDead || enemy.active === false) return false;
+  const ex = enemy.x;
+  const ey = enemy.y;
+  if (typeof ex !== "number" || typeof ey !== "number" || !Number.isFinite(ex) || !Number.isFinite(ey)) {
+    return false;
+  }
+
+  const isBoss = Boolean(enemy.isBoss);
+  const isHumanoid =
+    enemy.monster?.visual?.kind === "humanoid" ||
+    enemy.monster?.visual?.kind === "armored" ||
+    enemy.monster?.visual?.kind === "boss";
+
+  if (isHumanoid) {
+    const halfWidth = isBoss ? 120 : 90;
+    const above = isBoss ? 280 : 200;
+    const below = isBoss ? 80 : 60;
+    if (Math.abs(x - ex) <= halfWidth && y >= ey - above && y <= ey + below) {
+      return true;
+    }
+  } else {
+    const scale = enemy.monster?.visual?.scale || 1;
+    const halfWidth = 100 * scale;
+    const halfHeight = 85 * scale;
+    if (Math.abs(x - ex) <= halfWidth && Math.abs(y - ey) <= halfHeight) {
+      return true;
+    }
+  }
+
+  const fallbackRadius = isBoss ? 140 : 90;
+  return Math.hypot(x - ex, y - ey) <= fallbackRadius;
+}
+
+/**
+ * Find the closest living monster under a ground-space coordinate.
+ * @param {Array<Enemy>} enemies
+ * @param {number} x
+ * @param {number} y
+ * @returns {Enemy|null}
+ */
+export function findEnemyAt(enemies, x, y) {
+  if (!Array.isArray(enemies)) return null;
+  if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+
+  let best = null;
+  let bestDist = Infinity;
+  for (const enemy of enemies) {
+    if (!enemy || enemy.isDead || enemy.active === false) continue;
+    if (isPointOnEnemy(enemy, x, y)) {
+      const dist = Math.hypot(x - enemy.x, y - enemy.y);
+      if (dist < bestDist) {
+        best = enemy;
+        bestDist = dist;
+      }
+    }
+  }
+  return best;
+}
+

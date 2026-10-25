@@ -24,7 +24,7 @@ let audioContext = null;
 const MAX_DROPS = 40;
 const UNOWNED_DROP_TTL_MS = 15000;
 /** World-space reach (px) of a plain sword swing against a monster. */
-const MELEE_REACH = 85;
+const MELEE_REACH = 280;
 
 /**
  * A monster takes local damage through `takeHit`; a peer (RemotePlayer) does not,
@@ -179,9 +179,18 @@ export class CombatSystem {
 
   /**
    * The closest living monster inside sword reach.
+   * Prefers the scene's targeted enemy if already in range.
    * @returns {Object|null}
    */
   nearestEnemyInReach() {
+    const locked = this.scene?.enemyTarget;
+    if (locked && !locked.isDead && locked.active !== false) {
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, locked.x, locked.y);
+      if (dist <= MELEE_REACH) {
+        return locked;
+      }
+    }
+
     const candidates = this.enemyManager
       .getAlive()
       .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < MELEE_REACH);
@@ -230,10 +239,11 @@ export class CombatSystem {
       const result = computeDamage(this.player, targetEnemy, Math.random);
       this.damageEnemy(targetEnemy, result.damage, result.crit);
 
+      const targetName = targetEnemy.name || "mục tiêu";
       if (result.crit) {
-        this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương!`);
+        this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng ${targetName} gây ${result.damage} sát thương!`);
       } else {
-        this.ui.addLog(`Kiếm chiêu đánh trúng Sói Xám gây ${result.damage} sát thương.`);
+        this.ui.addLog(`Kiếm chiêu đánh trúng ${targetName} gây ${result.damage} sát thương.`);
       }
       return;
     }
@@ -451,6 +461,22 @@ export class CombatSystem {
       return `Cần học ${translate(reason.nameKey, undefined, reason.id)} trước.`;
     }
     return `Chiêu này cần đạt cấp ${reason?.level ?? skill.unlockLevel}.`;
+  }
+
+  /**
+   * Check if a skill is unlocked, off cooldown, and the player has enough MP,
+   * without logging failure messages.
+   * @param {Object} skill
+   * @returns {boolean}
+   */
+  isSkillReady(skill) {
+    if (!skill) return false;
+    const now = this.scene.time?.now ?? 0;
+    const readyAt = this.skillCooldowns.get(skill.id) || 0;
+    if (now < readyAt) return false;
+    if (!skillUnlocked(skill, this.player.stats?.level ?? 1)) return false;
+    if ((this.player.stats?.mp ?? 0) < skillMpCost(skill.id)) return false;
+    return true;
   }
 
   /**
