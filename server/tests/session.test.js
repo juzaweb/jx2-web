@@ -27,4 +27,11 @@ test("Session token suite", async (t) => {
     assert.equal(verifySessionToken("abc."), null);
     assert.equal(verifySessionToken(12345), null);
   });
+
+  await t.test("handles signature length mismatches safely without side-channel timing leaks", () => {
+    const token = createSessionToken("user_123_abcd");
+    const [encoded] = token.split(".");
+    assert.equal(verifySessionToken(encoded + ".shortsig"), null);
+    assert.equal(verifySessionToken(encoded + "." + "a".repeat(128)), null);
+  });
 });
