@@ -29,9 +29,9 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 
 1. **Launch & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Managed smoothly in `src/App.jsx` with guest session handling, i18n support (VI/EN), and mobile orientation prompts.
 2. **HUD Overlay:** `PlayerVitals` top-left displays Level, EXP, HP, MP, Stamina, and Martial Aura. `MinimapPanel` top-right shows radar canvas, quest tracker, subzone, and zoom/collapse controls.
-3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 quick-slots (potions/items), 4 sect skill hotkeys (`U`, `I`, `O`, `P`), and system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode).
-4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and radial arc skill/attack/potion buttons on the bottom-right for touch devices (`src/components/MobileControls.jsx`).
-5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `SkillPickerModal`. Drag-and-drop support provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js`.
+3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 mixed quick-slots (each holds a consumable item or a sect skill), plus system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode). Techniques are dragged from the `F5` skill tree onto a slot and cast with its number key; consumables are dragged from the bag.
+4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button, four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them) and two fixed potion buttons.
+5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `MobileSkillPicker`. Pointer drag support is provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js` (skills and items share the same drag pipeline).
 
 ---
 
@@ -62,7 +62,7 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 - **Confidence:** High
 - **Type:** Observed issue
 - **Evidence:** `src/components/HUD/HotbarDock.jsx`, `src/components/SkillIcon.jsx`, `src/index.css`
-- **Player Impact:** Skill cooldowns currently render as plain integer overlays (`<span className="hand-cd">3</span>`). Players cannot intuitively gauge cooldown sweep progress or distinguish between a skill on cooldown vs. a skill unusable due to insufficient MP.
+- **Player Impact:** Skill cooldowns currently render as plain integer overlays (`<span className="slot-cd">3</span>`). Players cannot intuitively gauge cooldown sweep progress or distinguish between a skill on cooldown vs. a skill unusable due to insufficient MP.
 - **Recommendation:**
   1. Add a CSS conic-gradient dark radial sweep overlay on skill icons during cooldown countdown.
   2. Apply an out-of-resource visual state (`.insufficient-mp` desaturation / blue tint) when current player MP < skill MP cost.

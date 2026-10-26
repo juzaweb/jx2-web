@@ -8,9 +8,9 @@ Trận** (icon + four-frame formation VFX), slot 3 **Kim Cang Bất Hoại**, sl
 **Như Lai Thần Chưởng** (icon + four-frame impact VFX).
 
 La Hán Chưởng and Vi Đà Chưởng (the interim entry palms) were dropped, and the
-remaining slots were renumbered so the kit has no gaps. `DEFAULT_SKILL_LOADOUT`
-still points at slots 0-3 and `App.jsx` repairs any saved slot that no longer
-exists in the sect kit.
+remaining slots were renumbered so the kit has no gaps. Slots are cast by
+binding a technique to a hotbar slot (drag from `F5`) or to a mobile arc button;
+unknown saved bindings resolve to an empty slot instead of throwing.
 
 ## 1. What was removed (done)
 
@@ -26,7 +26,8 @@ deleted so nothing from that kit survives in the client, server, or assets:
 | Server skill-cost/damage assertions that require a live catalog | `server/tests/websocket.test.js` | skipped with `SKIP_NO_KIT`, must be re-enabled when the full kit lands; a focused single-skill MP test runs today |
 
 When a sect has no kit, `skillsForSect()` returns `[]`, the hotbar renders empty
-slots, and casting logs "Chưa gán chiêu thức vào tay phải." instead of throwing.
+slots, and casting logs "Môn phái này chưa có chiêu thức ở ô đó." instead of
+throwing.
 Thiếu Lâm now owns one palm skill; the other three sects remain skill-less until
 their kits land.
 
@@ -61,8 +62,9 @@ Design rules:
 - **Thiếu Lâm Tâm Pháp is a passive, not a cast.** It carries no `mp`, no
   `cooldown` and no `vfx`; `passive: true` plus an
   `effects: [{ kind: "regen", hpPerSecond: 2 }]` entry is all the game loop
-  needs. `combat.castSkill()` refuses it with a log line, the hotbar slot binds
-  but pressing it never spends MP, and `passiveRegen.js` sums the unlocked
+  needs. `combat.castSkill()` refuses it with a log line, passive arts are
+  excluded from the `F5` drag sources and the mobile picker so they cannot be
+  bound, and `passiveRegen.js` sums the unlocked
   passive arts of the sect every frame.
 - The regen tick mirrors each healed point to the server with `player_heal`
   (same path as a potion), so HP stays server-authoritative and is clamped to

@@ -4,11 +4,12 @@ A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs
 
 ## Features
 - **Modern React UI Overlay:** Decoupled HUD components for Player Vitals (HP/MP/Stamina/EXP/Buff Aura), Minimap Radar & Quest tracker, Giang Ho Chat feed, and Authentic Hotbar Dock.
+- **Mixed Skill & Item Hotbar:** Slots `1`–`9` hold either a consumable or a sect skill. Drag techniques from the `F5` skill tree onto a slot, then press that number to cast.
 - **Phaser 3 Game Engine:** 60FPS Arcade physics, world map, collision detection, and entity management.
 - **Event-Driven Bridge:** Reactive bi-directional communication between Phaser game loop and React components.
 - **Sound & Combat:** Web Audio API synth effects for attacks, skills, potion drinking, and sound toggle.
-- **Persistent Progress:** Automatic and manual progress saving with `localStorage`.
-- **Responsive & Touch Friendly:** On-screen mobile d-pad and combat buttons for mobile screens.
+- **Persistent Progress:** Progress, hotbar bindings, mobile skill layout, inventory and equipment are saved per character with `localStorage`.
+- **Responsive & Touch Friendly:** Virtual joystick, attack button, and four configurable skill buttons (tap `+` to assign a technique, hold to rebind).
 
 ## Getting Started
 
@@ -49,16 +50,14 @@ npm run test:watch
 ```
 
 ## Controls
-- **Move:** `W`, `A`, `S`, `D` or Arrow keys
-- **Basic Attack:** `Space` or Left Click on the map
-- **Kiếm Khí Skill:** `Q` or `8` or Right Click
-- **Quick Potions:**
-  - `1`: Kim Sáng Dược (+35 HP)
-  - `2`: Đại Hoàn Đan (+25 MP)
-  - `3`: Nữ Nhi Hồng (+50 HP & +30 MP)
-  - `4`: Hồi Thành Phù (Return to central Bien Kinh)
-- **Pause & Guide:** `Esc` or click the Guide button
-- **Mobile:** Touch directional pad and action buttons
+- **Move:** `W`, `A`, `S`, `D`, Arrow keys, or left-click the map (hold to follow the cursor)
+- **Basic Attack:** `Space` or left-click an enemy
+- **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind.
+- **Consumables (hotbar `1`–`9`):** drag potions or scrolls from the bag onto a slot, then press the number to use them.
+- **Talk to NPC:** `F`
+- **Character:** `F3` · **Inventory:** `F4` · **Skills:** `F5`
+- **Minimap zoom:** `Tab` · **City map:** `M` · **Pause/Guide:** `Esc`
+- **Mobile:** virtual joystick, central Attack button, four skill buttons (tap an empty `+` to choose a technique, hold a bound button to change it), and two fixed potion buttons (Kim Sáng Dược / Đại Hoàn Đan).
 
 ## Architecture
 ```
@@ -72,20 +71,23 @@ src/
 │   │   ├── PlayerVitals.jsx   # Top-left HP/MP/EXP/Buff HUD
 │   │   ├── MinimapPanel.jsx   # Top-right radar & quest tracker
 │   │   ├── ChatPanel.jsx      # Bottom-left multi-tab chat feed
-│   │   └── HotbarDock.jsx     # Bottom quick-slots & system dock
+│   │   └── HotbarDock.jsx     # Bottom quick-slots (items/skills) & system dock
 │   ├── Modals/
-│   │   ├── StartModal.jsx     # Entry modal
-│   │   └── HelpModal.jsx      # Guide & progress reset modal
-│   └── MobileControls.jsx     # Touch d-pad and skill buttons
+│   │   ├── LoginModal.jsx / CharacterSelectModal.jsx
+│   │   ├── CharacterModal.jsx / InventoryModal.jsx
+│   │   ├── SkillsModal.jsx    # F5 tree; skill drag sources for slots 1-9
+│   │   ├── ShopModal.jsx / CityMapModal.jsx / HelpModal.jsx / GmModal.jsx
+│   │   └── pointerItemDrag.js # Pointer drag shared by inventory & hotbar
+│   ├── MobileControls.jsx     # Joystick, attack, configurable skill arc
+│   └── MobileSkillPicker.jsx  # Assign a skill to a mobile arc button
 └── game/
     ├── bridge.js         # Pub/Sub bridge between React & Phaser
-    ├── uiBridgeAdapter.js# Bridge adapter for HUD and minimap radar
     ├── game.js           # Phaser Scene & game factory
-    ├── world.js          # Map rendering & terrain layout
-    ├── player.js         # Player physics, sprite, and controls
-    ├── enemy.js          # Wolf entities (rendering + bite checks)
-    ├── enemyAi.js        # Shared enemy AI: server tick + offline fallback
-    ├── enemySync.js      # Pure rules for server-authoritative enemy state
-    ├── combat.js         # Combat system and sound synth
+    ├── combat.js         # Combat system, casting and sound synth
+    ├── skills.js         # Sect skill catalog (id, slot, cost, effects)
+    ├── quickSlots.js     # Hotbar slots 1-9: item id or `skill:<skillId>`
+    ├── mobileSkills.js   # Four per-character mobile skill bindings
+    ├── skillVfx.js       # Skill cast/impact visual effects
+    ├── inventorySync.js  # Mirrors the bag with the server
     └── storage.js        # Progress persistence
 ```

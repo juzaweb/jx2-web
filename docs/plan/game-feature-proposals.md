@@ -26,7 +26,7 @@ This document proposes 5 prioritized, evidence-backed features designed to deepe
 The implemented gameplay loop follows a classic ARPG structure:
 
 1. **Player Goal:** Advance character level (up to 150), acquire silver coins and rare materials, unlock sect martial arts, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
-2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile D-Pad), target skills (Q/W/E/R/T/Y or mouse clicks), consumable usage (potions 1-3, town scroll 4), and talking to shopkeepers (`NPC_DUOC`).
+2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile joystick), casting the skill bound to a hotbar slot (`1`-`9`, assigned by dragging from the `F5` tree), consumable usage from hotbar slots, and talking to shopkeepers (`NPC_DUOC`).
 3. **Challenge / Opposition:** Aggressive and leashed enemy camps (`src/game/enemyCatalog.js`) in Đông Môn Thành (`dongMonThanhMap.js`). Enemies bite, pathfind toward players, and respawn on server ticks.
 4. **Feedback and Rewards:** Server-calculated damage numbers, floaty text, Web Audio synth sounds, EXP bar gains, silver payouts, and item drop rolls (`rollDrop()` in `src/game/items.js`).
 5. **Progression and Persistence:** Level vitals calculated in `src/game/progression.js`, equipment stat bonuses derived in `src/game/equipment.js` (`attack`, `defense`, `maxHp`, `maxMp`, `critRate`, `accuracy`), and `localStorage` / WebSocket sync via `src/game/storage.js` and `server/src/websocket/gameSocket.js`.
@@ -127,7 +127,7 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] All skills have valid unlock levels, MP costs, cooldowns, and range parameters.
   - [ ] All skill names and descriptions resolve in VI, EN, and ZH locales without missing keys.
   - [ ] Catalog invariants pass in `skills.test.js` for all 4 sects.
-- **Validation plan:** Run `npm test` covering catalog invariants; inspect skill binding in `SkillPickerModal`.
+- **Validation plan:** Run `npm test` covering catalog invariants; verify each new skill can be dragged from the `F5` tree onto a hotbar slot and cast with its number key, and assigned to a mobile arc button.
 - **Evidence:** `docs/plan/sect-skills.md` details exact planned skill specifications for Võ Đang, Nga My, and Ngũ Độc.
 - **Assumptions / open questions:** Initial Ngũ Độc implementation uses existing `slow`/`stun`/`heal`/`buff` mechanics before engine v2 DoT ticks.
 

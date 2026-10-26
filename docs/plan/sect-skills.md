@@ -8,8 +8,9 @@ each ships as its own reviewable change.
 ## Goal & scope
 
 - Give each remaining sect a kit of six skills on the same six-slot model:
-  slots `0..5`, unlock levels `1 / 1 / 3 / 5 / 7 / 10`, bound to the two mouse
-  hands through `SkillPickerModal`.
+  slots `0..5`, unlock levels `1 / 1 / 3 / 5 / 7 / 10`. Castable skills are bound
+  by dragging them from the `F5` skill tree onto hotbar slots `1..9`, and by
+  picking them for the mobile arc buttons.
 - Keep the existing model: server-authoritative MP, cooldown, range and damage;
   client-side VFX and animation.
 - Ship real icons plus VI/EN/ZH copy.
@@ -26,8 +27,8 @@ each ships as its own reviewable change.
 | Server validation | `server/src/websocket/gameSocket.js` | `skillById` / `skillMpCost` / `skillCooldown`, `lastCast` window, `MAX_HITS_PER_CAST`, authoritative enemy HP |
 | VFX primitives | `src/game/skillVfx.js` | cast `slash` / `kick` / `shockwave` / `aura`; impact `spark` / `burst` / `dust` |
 | Rig animation | `src/game/heroRigView.js` | animation kind derived from `vfx.cast` |
-| Loadout | `src/game/skillLoadout.js` | default `{ left: 0, right: 1 }` already valid for every sect with slots 0/1 |
-| Keybinds | `src/game/keybinds.js` | default `Q W E R T Y` assign the right hand |
+| Hotbar bindings | `src/game/quickSlots.js` | slots 1-9 store an item id or `skill:<skillId>`; cast with the matching number key |
+| Mobile bindings | `src/game/mobileSkills.js` | four per-character skill ids; empty by default (tap `+` to assign) |
 | Sect / gender | `CharacterSelectModal` + `server/src/data/characterDb.js` | Nga My is female-only; the other three are male |
 | Icons | `public/skills/<id>.png` | sourced from the VLTK2 CDN (see "Icons") |
 
@@ -86,7 +87,7 @@ the caster.
 | 5 | Vô Thiên Ma Công | 10 | 35 | 30000 | self AoE r140 | slow 40% / 2.5s + stun 1s | shockwave / burst |
 
 If v2 lands, replace slot 1/2 with a `poison` DoT and slot 4 with a `lifesteal`
-strike; keep the same ids so saved loadouts stay valid.
+strike; keep the same ids so saved hotbar and mobile bindings stay valid.
 
 ## Icons
 
