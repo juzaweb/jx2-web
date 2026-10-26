@@ -900,11 +900,12 @@ describe("CombatSystem channelled flurry", () => {
     isDead: false
   });
 
-  const makeCombat = ({ wolves = [] } = {}) => {
+  const makeCombat = ({ wolves = [], peers = [] } = {}) => {
     const player = {
       sect: "thieu-lam",
       x: 0,
       y: 0,
+      pkFlag: true,
       visual: { scaleX: 1 },
       faceDirection: vi.fn(),
       moveTo: vi.fn(),
@@ -918,6 +919,7 @@ describe("CombatSystem channelled flurry", () => {
       cameras: { main: { width: 1000, height: 1000, zoom: 1 } },
       add: { circle: () => fx, arc: () => fx, ellipse: vi.fn(() => fx) },
       tweens: { add: vi.fn() },
+      remotePlayerManager: { getAll: () => peers },
       networkClient: {
         isConnected: true,
         sendEnemyHit: vi.fn(),
@@ -1006,5 +1008,117 @@ describe("CombatSystem channelled flurry", () => {
 
     expect(combat.castSkill(skillById("dai_tu_di_chuong"))).toBe(false);
     expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("liên hoàn chiêu thức"));
+  });
+
+  it("channels onto a PK player, landing every punch through the PvP path", () => {
+    const peer = {
+      id: "peer-1",
+      pkFlag: true,
+      displayName: "Đối thủ",
+      x: 100,
+      y: 0,
+      container: { active: true }
+    };
+    const { combat, scene } = makeCombat({ peers: [peer] });
+    combat.setLocalPlayerId("me");
+
+    combat.applySkill(skillById("la_han_quyen"), 0, peer);
+    expect(combat.channel).toMatchObject({ targetId: "peer-1", hitsLeft: 20 });
+
+    for (let t = 0; t <= 4750; t += 250) combat.updateChannel(t);
+
+    expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledTimes(20);
+    expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
+      targetId: "peer-1",
+      skill: "la_han_quyen"
+    });
+    expect(scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
+    // The splash ring is shown for a player target too: the skill behaves the same.
+    expect(scene.add.ellipse).toHaveBeenCalledTimes(20);
+  });
+
+  it("ends a PvP flurry when the target lowers the PK flag", () => {
+    const peer = {
+      id: "peer-1",
+      pkFlag: true,
+      displayName: "Đối thủ",
+      x: 100,
+      y: 0,
+      container: { active: true }
+    };
+    const { combat } = makeCombat({ peers: [peer] });
+    combat.setLocalPlayerId("me");
+
+    combat.applySkill(skillById("la_han_quyen"), 0, peer);
+    combat.updateChannel(0);
+    peer.pkFlag = false;
+    combat.updateChannel(250);
+
+    expect(combat.channel).toBeNull();
+  });
+
+  it("refuses to report a PvP hit while the hero is peaceful", () => {
+    const peer = {
+      id: "peer-1",
+      pkFlag: true,
+      displayName: "Đối thủ",
+      x: 100,
+      y: 0,
+      container: { active: true }
+    };
+    const { combat, scene } = makeCombat({ peers: [peer] });
+    combat.setLocalPlayerId("me");
+    combat.player.pkFlag = false;
+
+    expect(combat.applySkillToPlayer(skillById("la_han_quyen"), peer)).toBe(false);
+    expect(scene.networkClient.sendPlayerHit).not.toHaveBeenCalled();
+  });
+
+  it("lands an AoE skill on flagged players inside its area", () => {
+    const nearPeer = {
+      id: "peer-near",
+      pkFlag: true,
+      displayName: "Gần",
+      x: 100,
+      y: 0,
+      container: { active: true }
+    };
+    const farPeer = {
+      id: "peer-far",
+      pkFlag: true,
+      displayName: "Xa",
+      x: 5000,
+      y: 0,
+      container: { active: true }
+    };
+    const peaceful = {
+      id: "peer-peace",
+      pkFlag: false,
+      displayName: "Hiền",
+      x: 120,
+      y: 0,
+      container: { active: true }
+    };
+    const { combat, scene } = makeCombat({ peers: [nearPeer, farPeer, peaceful] });
+    combat.setLocalPlayerId("me");
+
+    const aoe = {
+      id: "nhu_lai_than_chuong",
+      nameKey: "skills.thieuLam.nhuLaiThanChuong.name",
+      target: "enemy",
+      radius: 900,
+      range: 6000,
+      mult: 2.4,
+      vfx: { cast: "shockwave" }
+    };
+
+    combat.applySkill(aoe, 0, nearPeer);
+
+    expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledTimes(1);
+    expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
+      targetId: "peer-near",
+      skill: "nhu_lai_than_chuong"
+    });
+    expect(scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
   });
 });

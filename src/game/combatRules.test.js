@@ -209,4 +209,14 @@ describe("consumeCastHit", () => {
     // 5s flurry + 0.4s slack = 5.4s window, so a hit at 6.5s is too late.
     expect(consumeCastHit(cast, skill, 6500)).toBe(false);
   });
+
+  it("paces channel hits so the whole flurry cannot be burst at once", () => {
+    const skill = { id: "la_han_quyen", channel: { durationMs: 5000, intervalMs: 250 } };
+    const cast = { skillId: "la_han_quyen", at: 1000, hits: 0 };
+
+    expect(consumeCastHit(cast, skill, 1000)).toBe(true);
+    // 150ms later is under the 200ms pacing floor (250ms - 50ms jitter slack).
+    expect(consumeCastHit(cast, skill, 1150)).toBe(false);
+    expect(consumeCastHit(cast, skill, 1200)).toBe(true);
+  });
 });

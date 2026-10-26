@@ -645,10 +645,15 @@ export class CombatSystem {
     const center = skill.radius > 0
       ? this.resolveCastCenter(skill, preferredTarget, aimPoint)
       : null;
-    const targets = skill.radius > 0
+    const preferredPeer = isPeerTarget(preferredTarget) ? preferredTarget : null;
+    const monsters = skill.radius > 0
       ? this.resolveTargets(skill, center)
-      : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill));
-    const primary = targets[0] || null;
+      : (preferredPeer ? [] : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill)));
+    // An AoE hits every flagged player in its area too, not just monsters.
+    const peers = skill.radius > 0
+      ? this.resolvePeerTargets(skill, center)
+      : (preferredPeer ? [preferredPeer] : []);
+    const primary = preferredPeer || peers[0] || monsters[0] || null;
     // An AoE's art must land on the same centre the damage is resolved around,
     // even when the nearest victim is offset inside the radius.
     const vfxTarget = skill.radius > 0 ? center : primary;
@@ -658,28 +663,34 @@ export class CombatSystem {
       playRangeIndicator(this.scene, center.x, center.y, skill.radius, skill.vfx?.color);
     }
 
-    // A peer's HP lives on the server, so that branch only reports the roll.
-    if (isPeerTarget(primary)) {
-      this.applySkillToPlayer(skill, primary);
-      return;
-    }
-
-    if (!targets.length) {
-      this.hintPeacefulDuelist(skill);
-      return;
-    }
-
+    // A channel holds the caster in a five-second flurry. Both monsters and
+    // peers can be its target, each resolved by its own server path per strike.
     if (isChannelSkill(skill)) {
-      this.startChannel(skill, targets[0], now);
+      const channelTarget = preferredPeer || monsters[0] || null;
+      if (channelTarget) {
+        this.startChannel(skill, channelTarget, now);
+        return;
+      }
+    }
+
+    if (!monsters.length && !peers.length) {
+      this.hintPeacefulDuelist(skill);
       return;
     }
 
     let hits = 0;
 
-    for (const wolf of targets) {
+    for (const wolf of monsters) {
       playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
       this.damageEnemy(wolf, { skill: skill.id });
       hits++;
+    }
+
+    // One position sync covers every peer this cast names.
+    if (peers.length > 0) this.syncPosition();
+
+    for (const peer of peers) {
+      if (this.applySkillToPlayer(skill, peer, { log: false, sync: false })) hits++;
     }
 
     this.ui.addLog(
@@ -752,17 +763,47 @@ export class CombatSystem {
     this.player.playSkillMotion?.(channel.skill.vfx?.cast);
     playTone(200, 0.05, "square", 0.018);
     playTargetMarker(this.scene, target.x, target.y, channel.skill.vfx?.color);
+
+    // The ring marks the area every strike reaches, whatever the target kind:
+    // the server resolves the same splash for monsters and flagged players.
     const splash = splashRadius(channel.skill);
     if (splash > 0) {
-      // The server resolves the spread damage; this ring shows the area each
-      // punch reaches so the player can read why nearby monsters lose HP.
       playRangeIndicator(this.scene, target.x, target.y, splash, channel.skill.vfx?.color);
     }
-    this.damageEnemy(target, { skill: channel.skill.id });
+
+    if (!this.strikeChannelTarget(target, channel.skill)) return;
 
     channel.hitsLeft -= 1;
     channel.nextAt = now + channel.intervalMs;
     if (channel.hitsLeft <= 0) this.endChannel();
+  }
+
+  /**
+   * Land one strike of a channel on its resolved target. Monsters go through the
+   * enemy-hit path; a peer goes through the PvP path, where the server recomputes
+   * damage and lets this skill's ticks through the target's i-frame.
+   * @param {Object} target monster or peer
+   * @param {Object} skill
+   * @returns {boolean} false when the strike can no longer be delivered
+   */
+  strikeChannelTarget(target, skill) {
+    if (!isPeerTarget(target)) {
+      this.damageEnemy(target, { skill: skill.id });
+      return true;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
+    const defender = { id: target.id, pkFlag: target.pkFlag === true };
+    if (!canPvpAttack(attacker, defender, distance)) {
+      this.endChannel(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
+      return false;
+    }
+
+    playSkillImpactVfx(this.scene, target.x, target.y, skill);
+    this.syncPosition();
+    this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, skill: skill.id });
+    return true;
   }
 
   /**
@@ -782,24 +823,30 @@ export class CombatSystem {
    * the floating damage number.
    * @param {Object} skill
    * @param {Object} target
+   * @param {{log?: boolean, sync?: boolean}} [options] suppress the per-target log
+   *   and the position sync for a multi-target cast
+   * @returns {boolean} whether the hit was reported to the server
    */
-  applySkillToPlayer(skill, target) {
+  applySkillToPlayer(skill, target, { log = true, sync = true } = {}) {
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    const attacker = { id: this.localPlayerId, pkFlag: true };
+    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
     const defender = { id: target.id, pkFlag: target.pkFlag === true };
     if (!canPvpAttack(attacker, defender, distance)) {
-      this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
-      return;
+      if (log) this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
+      return false;
     }
 
     playTargetMarker(this.scene, target.x, target.y, skill.vfx?.color);
 
-    this.syncPosition();
+    if (sync) this.syncPosition();
     this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, skill: skill.id });
 
-    this.ui.addLog(
-      `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!`
-    );
+    if (log) {
+      this.ui.addLog(
+        `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!`
+      );
+    }
+    return true;
   }
 
   /**
@@ -861,6 +908,30 @@ export class CombatSystem {
       .filter((wolf) => playerDistanceTo(wolf) <= range)
       .sort((a, b) => playerDistanceTo(a) - playerDistanceTo(b))[0];
     return nearest ? [nearest] : [];
+  }
+
+  /**
+   * Flagged players inside a cast's area. An AoE uses the same centre and radius
+   * as its monster resolution so both target kinds are hit by the same cast; a
+   * peaceful hero never auto-acquires a duellist.
+   * @param {Object} skill
+   * @param {{x:number,y:number}|null} [center] AoE centre
+   * @returns {Object[]}
+   */
+  resolvePeerTargets(skill, center = null) {
+    if (this.player.pkFlag !== true) return [];
+
+    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
+    const origin = center || { x: this.player.x, y: this.player.y };
+    const distanceToCenter = (peer) =>
+      Phaser.Math.Distance.Between(origin.x, origin.y, peer.x, peer.y);
+    return peers
+      .filter(
+        (peer) =>
+          isPeerTarget(peer) && peer.pkFlag === true && peer.container?.active !== false
+      )
+      .filter((peer) => distanceToCenter(peer) <= skill.radius)
+      .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));
   }
 
   /**

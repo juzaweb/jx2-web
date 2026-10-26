@@ -22,6 +22,7 @@ import {
   attackIntervalFor,
   consumeCastHit,
   hasSplash,
+  isChannelSkill,
   maxTravelDistance,
   splashMultiplier,
   splashVictims
@@ -1513,39 +1514,61 @@ export class GameSocketManager {
   }
 
   /**
-   * Recompute one PvP strike from server-owned stats.
+   * Authorize one follow-up strike and recompute its damage from server-owned
+   * stats. Shared by monster (`enemy_hit`) and player (`player_hit`) hits: both
+   * must follow an accepted cast or swing, and neither trusts a client number.
    *
-   * A skill hit must follow an accepted cast (same id, inside the hit window,
-   * under the per-cast cap) and is recomputed from the skill multiplier. A plain
-   * hit must follow an accepted swing and consumes that swing, so one click can
-   * never land twice.
-   *
-   * @param {Object} attacker
-   * @param {Object} target
+   * @param {Object} attacker server player object
+   * @param {number} defenderDefense target's defense (monster catalog or derived)
    * @param {*} requestedSkill raw `payload.skill`
    * @param {number} now
-   * @returns {number|null} damage, or null when the action is not authorized
+   * @returns {{ skill: Object|null, attackerStats: Object, damage: number }|null}
+   *   null when no accepted cast/swing authorizes the hit
    */
-  resolvePlayerHitDamage(attacker, target, requestedSkill, now) {
+  resolveHitDamage(attacker, defenderDefense, requestedSkill, now) {
     const attackerStats = this.effectiveStats(attacker, now);
-    const targetStats = this.effectiveStats(target, now);
-
     const skill = requestedSkill ? skillById(requestedSkill) : null;
+
     if (skill) {
       if (skill.sect !== attacker.sect) return null;
       if (!consumeCastHit(attacker.lastCast, skill, now)) return null;
-      return computeSkillDamage(
+      return {
         skill,
-        { attack: attackerStats.attack, critRate: attackerStats.critRate, critDamage: attackerStats.critDamage },
-        { defense: targetStats.defense },
-        this.random
-      ).damage;
+        attackerStats,
+        damage: computeSkillDamage(
+          skill,
+          attackerStats,
+          { defense: defenderDefense },
+          this.random
+        ).damage
+      };
     }
 
     const swing = attacker.lastSwing;
     if (!swing || swing.used || now - swing.at > HIT_WINDOW_MS) return null;
     swing.used = true;
-    return computeDamage(attackerStats, targetStats, this.random).damage;
+    return {
+      skill: null,
+      attackerStats,
+      damage: computeDamage(attackerStats, { defense: defenderDefense }, this.random).damage
+    };
+  }
+
+  /**
+   * Whether a target stands inside the area the server authorized for an AoE
+   * cast. Non-AoE casts and casts that do not match are left to their own checks.
+   * @param {Object|null} cast server-side `lastCast`
+   * @param {Object|null} skill
+   * @param {{x:number,y:number}} target
+   * @param {{x:number,y:number}} fallback caster position when the cast has no aim
+   * @returns {boolean}
+   */
+  isInsideCastArea(cast, skill, target, fallback) {
+    if (!(skill?.radius > 0) || cast?.skillId !== skill.id) return true;
+    const center = cast.aim || fallback;
+    return (
+      Math.hypot(center.x - target.x, center.y - target.y) <= skill.radius + HIT_RADIUS_SLACK
+    );
   }
 
   /**
@@ -1560,21 +1583,48 @@ export class GameSocketManager {
     const attacker = this.players.get(ws);
     if (!attacker) return;
 
-    // Rate-limit hits per attacker so a spamming client can't amplify one socket
-    // into a broadcast storm. (The target's 700ms iframe already caps the damage.)
+    // Rate-limit plain swings and one-shot skills per attacker so a spamming
+    // client can't amplify one socket into a broadcast storm. A channel's ticks
+    // are bounded by its cast's own hit cap, so they are not throttled here.
     const now = Date.now();
-    if (now < attacker.nextHitAt) return;
-    attacker.nextHitAt = now + ACTION_COOLDOWN_MS;
+    const skill = payload.skill ? skillById(payload.skill) : null;
+    const channelled = Boolean(skill && isChannelSkill(skill));
+    if (!channelled) {
+      if (now < attacker.nextHitAt) return;
+      attacker.nextHitAt = now + ACTION_COOLDOWN_MS;
+    }
 
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
     if (!target) return this.rejectHit(ws, "target_missing");
 
-    const damage = this.resolvePlayerHitDamage(attacker, target, payload.skill, now);
-    if (damage === null) return this.rejectHit(ws, "no_action");
-    if (!(damage > 0)) return this.rejectHit(ws, "damage_invalid");
-
     const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
+
+    // An AoE cast's hit must land inside the area the server authorised, not just
+    // inside PvP range: the client can name any flagged player it likes.
+    const cast = attacker.lastCast;
+    if (!this.isInsideCastArea(cast, skill, target, attacker)) {
+      const center = cast?.aim || attacker;
+      return this.rejectHit(ws, "range", {
+        targetId: target.id,
+        distance: Math.round(Math.hypot(center.x - target.x, center.y - target.y))
+      });
+    }
+
+    // A single-target skill also has its own reach, which must be enforced here:
+    // PvP range alone would let a short melee skill hit across a whole tile.
+    if (skill && skill.radius === 0 && distance > skill.range + HIT_RADIUS_SLACK) {
+      return this.rejectHit(ws, "range", {
+        targetId: target.id,
+        distance: Math.round(distance)
+      });
+    }
+
+    const targetStats = this.effectiveStats(target, now);
+    const hit = this.resolveHitDamage(attacker, targetStats.defense, payload.skill, now);
+    if (hit === null) return this.rejectHit(ws, "no_action");
+    if (!(hit.damage > 0)) return this.rejectHit(ws, "damage_invalid");
+
     if (!canPvpAttack(attacker, target, distance)) {
       const reason = attacker.pkFlag !== true
         ? "attacker_peaceful"
@@ -1598,9 +1648,81 @@ export class GameSocketManager {
       });
     }
 
-    if (!this.applyPlayerDamage(target, damage, attacker, "pvp")) {
+    // Splash victims are chosen before the primary can die: a killing blow
+    // teleports the body to its respawn point, which would move the centre of
+    // the strike. The same radius the client draws is what the server uses.
+    const splashTargets = skill && hasSplash(skill)
+      ? this.pvpSplashTargets(attacker, target, skill)
+      : [];
+
+    if (!this.applyPlayerDamage(target, hit.damage, attacker, "pvp", null, { ignoreIframe: channelled })) {
       return this.rejectHit(ws, "iframe");
     }
+
+    this.applyPvpSplash(attacker, splashTargets, skill, now, hit.attackerStats);
+  }
+
+  /**
+   * Flagged players caught by a splash strike centred on `primary`.
+   * @param {Object} attacker
+   * @param {Object} primary the player the strike landed on
+   * @param {Object} skill
+   * @returns {Object[]} up to `splashMaxTargets(skill)` players
+   */
+  pvpSplashTargets(attacker, primary, skill) {
+    const candidates = [];
+    for (const other of this.players.values()) {
+      if (other.id === attacker.id || other.id === primary.id) continue;
+      if (other.mapId !== primary.mapId || other.hp <= 0 || other.pkFlag !== true) continue;
+      candidates.push(other);
+    }
+    return splashVictims(primary, candidates, skill);
+  }
+
+  /**
+   * Spread a landed PvP strike onto the other players caught in its radius,
+   * mirroring the monster splash so the skill behaves the same on either target.
+   * @param {Object} attacker
+   * @param {Object[]} victims
+   * @param {Object} skill
+   * @param {number} now
+   * @param {Object} [attackerStats] already-computed stats from the primary hit
+   */
+  applyPvpSplash(attacker, victims, skill, now, attackerStats = null) {
+    if (!skill || victims.length === 0) return;
+
+    const stats = attackerStats || this.effectiveStats(attacker, now);
+
+    for (const victim of victims) {
+      const distance = Math.hypot(attacker.x - victim.x, attacker.y - victim.y);
+      if (!canPvpAttack(attacker, victim, distance)) continue;
+
+      const victimStats = this.effectiveStats(victim, now);
+      const damage = this.computeSplashDamage(skill, stats, victimStats.defense);
+      if (damage <= 0) continue;
+
+      // A splash tick is part of the same channelled strikes, so it follows the
+      // same i-frame rule as the primary punch.
+      this.applyPlayerDamage(victim, damage, attacker, "pvp", null, { ignoreIframe: true });
+    }
+  }
+
+  /**
+   * Roll one splash strike. Splash uses a fixed fraction of the skill's
+   * multiplier and the same server RNG as a direct hit, for either target kind.
+   * @param {Object} skill
+   * @param {Object} attackerStats
+   * @param {number} defenderDefense
+   * @returns {number}
+   */
+  computeSplashDamage(skill, attackerStats, defenderDefense) {
+    return computeSkillDamage(
+      skill,
+      attackerStats,
+      { defense: defenderDefense },
+      this.random,
+      splashMultiplier(skill)
+    ).damage;
   }
 
   /**
@@ -1623,15 +1745,20 @@ export class GameSocketManager {
    * @param {?Object} attacker - server player object that caused it
    * @param {"pvp"|"wolf"} source
    * @param {string|null} [sourceName] Display name of the attacking monster
+   * @param {{ignoreIframe?: boolean}} [options] a channelled skill's own ticks
+   *   punch through the target's i-frame and do not open a new one; all other
+   *   sources stay throttled
    * @returns {boolean} whether the hit landed
    */
-  applyPlayerDamage(target, damage, attacker = null, source = "wolf", sourceName = null) {
+  applyPlayerDamage(target, damage, attacker = null, source = "wolf", sourceName = null, { ignoreIframe = false } = {}) {
     if (target.isGodMode) return false;
     const now = Date.now();
-    if (now < target.invulnerableUntil) return false;
+    if (!ignoreIframe) {
+      if (now < target.invulnerableUntil) return false;
+      target.invulnerableUntil = now + PLAYER_IFRAME_MS;
+    }
 
     target.hp = Math.max(0, target.hp - damage);
-    target.invulnerableUntil = now + PLAYER_IFRAME_MS;
 
     const hpMessage = {
       type: "player_hp",
@@ -2041,45 +2168,31 @@ export class GameSocketManager {
     if (!enemy) return;
 
     const now = Date.now();
-    let damage = 0;
-    let attackerStats = null;
     const skill = payload.skill ? skillById(payload.skill) : null;
 
-    if (skill && skill.sect === player.sect) {
-      // Only a hit that follows a validated cast is accepted; otherwise a client
-      // could mint damage without paying MP or cooldown.
-      const cast = player.lastCast;
-      if (!consumeCastHit(cast, skill, now)) return;
+    // A skill id from another sect must never degrade into a free plain swing.
+    if (skill && skill.sect !== player.sect) return;
 
-      // Skill hits are authoritative: the server recomputes the damage from the
-      // catalog and the player's own derived stats, never from the client.
-      // An AoE hit must land inside the cast's own impact area; older clients
-      // without an aim point keep the caster-centred fallback.
+    // Reach/area checks run before the cast's hit budget is consumed, so a
+    // mistimed hit cannot burn one of the cast's authorized strikes.
+    const cast = player.lastCast;
+    if (skill) {
       if (skill.radius > 0) {
-        const center = cast.aim || { x: player.x, y: player.y };
-        const distanceToCenter = Math.hypot(center.x - enemy.x, center.y - enemy.y);
-        if (distanceToCenter > skill.radius + HIT_RADIUS_SLACK) return;
+        if (!this.isInsideCastArea(cast, skill, enemy, player)) return;
       } else {
         const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
         if (distance > skill.range + skill.radius + HIT_RADIUS_SLACK) return;
       }
-
-      attackerStats = this.effectiveStats(player, now);
-      damage = computeSkillDamage(skill, attackerStats, { defense: enemy.defense }, this.random).damage;
     } else {
-      // A plain sword hit must follow an accepted swing, land inside melee reach,
-      // and consumes that swing: the client cannot choose its own damage, hit
-      // from across the map, or land the same swing on several monsters.
-      const swing = player.lastSwing;
-      if (!swing || swing.used || now - swing.at > HIT_WINDOW_MS) return;
-
       const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
       if (distance > MELEE_REACH + HIT_RADIUS_SLACK) return;
-
-      swing.used = true;
-      damage = computeDamage(this.effectiveStats(player, now), enemy, this.random).damage;
     }
 
+    // Shared authorization + damage recomputation (also used by player_hit).
+    const hit = this.resolveHitDamage(player, enemy.defense, payload.skill, now);
+    if (!hit) return;
+
+    const { damage, attackerStats } = hit;
     if (damage <= 0) return;
 
     // Already dead on the server: resync the hitter instead of applying damage twice
@@ -2099,13 +2212,7 @@ export class GameSocketManager {
     }
 
     for (const victim of splashTargets) {
-      const splashDamage = computeSkillDamage(
-        skill,
-        attackerStats,
-        { defense: victim.defense },
-        this.random,
-        splashMultiplier(skill)
-      ).damage;
+      const splashDamage = this.computeSplashDamage(skill, attackerStats, victim.defense);
       if (this.applyEnemyDamage(player, victim, splashDamage, skill, now)) {
         this.rewardKill(ws, player, victim);
       }

@@ -30,6 +30,9 @@ export const MAX_CHANNEL_HITS = 40;
 /** Extra time (ms) after a channel's nominal duration to accept a laggy final hit. */
 export const CHANNEL_HIT_SLACK_MS = 400;
 
+/** Tolerance (ms) under a channel interval when pacing its hits server-side. */
+export const CHANNEL_HIT_GAP_SLACK_MS = 50;
+
 /**
  * Duration (ms) of a channelled skill, or 0 when it is a one-shot cast.
  * @param {Object} skill
@@ -94,10 +97,12 @@ export function maxHitsPerCast(skill) {
  * Consume one authorized follow-up hit from an accepted cast.
  *
  * Returns false when the hit does not belong to that cast, arrives outside the
- * cast's hit window, or exceeds the cast's hit cap. On success the cast's hit
- * counter is incremented so one cast can never authorize more hits than allowed.
+ * cast's hit window, exceeds the cast's hit cap, or comes faster than a channel
+ * tick is allowed to (so a forged client cannot burst the whole flurry at once).
+ * On success the cast's hit counter and last-hit timestamp are updated.
  *
- * @param {{ skillId: string, at: number, hits: number }|null} cast server-side `lastCast`
+ * @param {{ skillId: string, at: number, hits: number, lastHitAt?: number }|null} cast
+ *   server-side `lastCast`
  * @param {Object} skill the accepted skill, from the catalog
  * @param {number} now
  * @returns {boolean}
@@ -106,7 +111,15 @@ export function consumeCastHit(cast, skill, now) {
   if (!cast || cast.skillId !== skill?.id) return false;
   if (now - cast.at > castHitWindowMs(skill)) return false;
   if (cast.hits >= maxHitsPerCast(skill)) return false;
+
+  // Pace channel ticks server-side; the slack absorbs normal network jitter.
+  const minGapMs = Math.max(0, channelIntervalMs(skill) - CHANNEL_HIT_GAP_SLACK_MS);
+  if (minGapMs > 0 && Number.isFinite(cast.lastHitAt) && now - cast.lastHitAt < minGapMs) {
+    return false;
+  }
+
   cast.hits += 1;
+  cast.lastHitAt = now;
   return true;
 }
 
