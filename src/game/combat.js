@@ -91,10 +91,6 @@ export class CombatSystem {
     this.onStateChange = onStateChange;
 
     this.attackReady = true;
-    /** Skill slots assigned to UIOP keys and mouse buttons. */
-    this.skillLoadout = { u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 };
-    this.selectedSkillSlot = 0;
-    this.leftSkillSlot = 0;
     /** id -> timestamp (ms) the skill becomes castable again. */
     this.skillCooldowns = new Map();
     /** Active timed buffs: { stat, amount, until }. */
@@ -270,105 +266,13 @@ export class CombatSystem {
   }
 
   /**
-   * The skill currently assigned to the right hand.
-   * @returns {Object|undefined}
-   */
-  getSelectedSkill() {
-    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.selectedSkillSlot);
-  }
-
-  /**
-   * The skill assigned to the left mouse button.
-   * @returns {Object|undefined}
-   */
-  getLeftSkill() {
-    return skillsForSect(this.player.sect).find((skill) => skill.slot === this.leftSkillSlot);
-  }
-
-  /**
-   * Validate and assign a skill slot to one mouse button.
-   * @param {"left"|"right"} hand
-   * @param {number} slot
-   * @returns {boolean}
-   */
-  equipSkill(hand, slot) {
-    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
-    if (!skill) {
-      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
-      return false;
-    }
-    if (hand === "left" && skill.target === "self") {
-      this.ui.addLog("Chiêu thức tự thân không thể gán vào chuột trái.");
-      return false;
-    }
-    if (!skillUnlocked(skill, this.player.stats.level)) {
-      this.ui.addLog(this.skillLockMessage(skill));
-      return false;
-    }
-    this.cancelPendingCast();
-    if (hand === "left") {
-      this.leftSkillSlot = slot;
-      bridge.emit(EVENTS.LEFT_SKILL_SELECTED, slot);
-    } else {
-      this.selectedSkillSlot = slot;
-      bridge.emit(EVENTS.SKILL_SELECTED, slot);
-    }
-    return true;
-  }
-
-  /**
-   * Keyboard shortcut: assign a skill to the right mouse button.
-   * @param {number} slot
-   * @returns {boolean}
-   */
-  selectSkill(slot) {
-    const ok = this.equipSkill("right", slot);
-    if (ok) {
-      const skill = this.getSelectedSkill();
-      this.ui.addLog(`Tay phải: ${translate(skill.nameKey, undefined, skill.id)} (chuột phải để dùng).`);
-    }
-    return ok;
-  }
-
-  /**
-   * Update the active skill loadout.
-   * @param {Object} loadout
-   */
-  setSkillLoadout(loadout) {
-    if (!loadout) return;
-    this.skillLoadout = {
-      u: loadout.u ?? 0,
-      i: loadout.i ?? 1,
-      o: loadout.o ?? 2,
-      p: loadout.p ?? 3,
-      left: loadout.u ?? loadout.left ?? 0,
-      right: loadout.i ?? loadout.right ?? 1
-    };
-    this.selectedSkillSlot = this.skillLoadout.u;
-    this.leftSkillSlot = this.skillLoadout.i;
-    this.cancelPendingCast();
-  }
-
-  /**
-   * Cast the skill assigned to a specific key (u, i, o, p).
-   * @param {string} key
+   * Cast a skill bound to a numbered hotbar slot, by catalog id.
+   * @param {string} skillId
    * @param {{x:number,y:number}|null} [aim]
    * @returns {boolean}
    */
-  castSkillByKey(key, aim = null) {
-    const slot = this.skillLoadout?.[key?.toLowerCase()];
-    if (slot === undefined) return false;
-    return this.castSkillBySlot(slot, aim);
-  }
-
-  /**
-   * Directly cast a skill assigned to a slot.
-   * @param {number} slot
-   * @param {{x:number,y:number}|null} [aim]
-   * @returns {boolean}
-   */
-  castSkillBySlot(slot, aim = null) {
-    const skill = skillsForSect(this.player.sect).find((entry) => entry.slot === slot);
+  castSkillById(skillId, aim = null) {
+    const skill = skillsForSect(this.player.sect).find((entry) => entry.id === skillId);
     if (!skill) {
       this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
       return false;
@@ -411,43 +315,7 @@ export class CombatSystem {
   }
 
   /**
-   * Right mouse button: cast on the clicked target, or release in place when the
-   * click did not land on an enemy.
-   * @param {{x:number,y:number}|null} [aim]
-   */
-  castSelectedSkill(aim = null) {
-    this.performSkill(aim);
-  }
-
-  /**
-   * Left mouse button: cast on a clicked enemy. The hero walks into range first.
-   * @param {Object} target
-   */
-  castLeftSkill(target) {
-    const skill = this.getLeftSkill();
-    if (!skill || !target || skill.target === "self") return false;
-    if (!this.canCast(skill)) return true;
-    this.approachAndCast(skill, target);
-    return true;
-  }
-
-  /**
-   * Start a cast. Melee skills first walk the hero into range (VLTK2 behaviour);
-   * the actual release happens in update() once the target is reachable.
-   * @param {{x:number,y:number}|null} [aim]
-   */
-  performSkill(aim = null) {
-    const skill = this.getSelectedSkill();
-    if (!skill) {
-      this.ui.addLog("Chưa gán chiêu thức vào ô này.");
-      return;
-    }
-    this.castSkill(skill, aim);
-  }
-
-  /**
-   * Walk the hero into the skill's reach, then release it. Used by both mouse
-   * buttons when an enemy is targeted.
+   * Walk the hero into the skill's reach, then release it.
    * @param {Object} skill
    * @param {Object} target
    */

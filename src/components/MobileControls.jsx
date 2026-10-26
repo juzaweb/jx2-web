@@ -1,6 +1,12 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { SkillIcon } from "./SkillIcon.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
+import { MOBILE_SKILL_SLOTS } from "../game/mobileSkills.js";
+
+/** Stable default so a missing prop never re-creates the array each render. */
+const EMPTY_SKILL_SLOTS = Object.freeze(
+  Array.from({ length: MOBILE_SKILL_SLOTS }, () => null)
+);
 
 /**
  * Mobile Controls with Virtual Joystick on bottom-left and Arc Skill Buttons on bottom-right.
@@ -8,11 +14,11 @@ import { useI18n } from "../i18n/I18nProvider.jsx";
 export function MobileControls({
   onMove,
   onAttack,
-  onSkill,
-  onCastKey,
+  onCastSkill,
+  onAssignSkill,
   onUseItem,
   skills = [],
-  skillLoadout = { u: 0, i: 1, o: 2, p: 3 }
+  skillSlots = EMPTY_SKILL_SLOTS
 }) {
   const { t } = useI18n();
   const [joystickActive, setJoystickActive] = useState(false);
@@ -20,6 +26,16 @@ export function MobileControls({
   const activePointerId = useRef(null);
   const baseRef = useRef(null);
   const activeDirRef = useRef(null);
+  /** Pending long-press that turns a bound button into a re-bind gesture. */
+  const longPressTimer = useRef(null);
+  const longPressFired = useRef(false);
+
+  useEffect(
+    () => () => {
+      clearTimeout(longPressTimer.current);
+    },
+    []
+  );
 
   const calculateDirection = (dx, dy) => {
     const dist = Math.hypot(dx, dy);
@@ -92,21 +108,47 @@ export function MobileControls({
     }
   };
 
-  const skillKeys = [
-    { key: "u", slot: skillLoadout?.u ?? 0, angle: 180, label: "U" },
-    { key: "i", slot: skillLoadout?.i ?? 1, angle: 215, label: "I" },
-    { key: "o", slot: skillLoadout?.o ?? 2, angle: 250, label: "O" },
-    { key: "p", slot: skillLoadout?.p ?? 3, angle: 285, label: "P" }
-  ];
+  // Four arc buttons, each bound to a chosen skill (empty until the player taps
+  // the "+" and picks one).
+  const arcSlots = Array.from({ length: MOBILE_SKILL_SLOTS }, (_, idx) => {
+    const skillId = skillSlots?.[idx] || null;
+    const skill = skillId ? skills.find((entry) => entry?.id === skillId) || null : null;
+    return { idx, skill };
+  });
 
-  const handleSkillPress = (key) => (e) => {
+  const handlePickPress = (idx) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onCastKey) {
-      onCastKey(key);
-    } else {
-      onSkill?.();
-    }
+    onAssignSkill?.(idx);
+  };
+
+  const startSkillPress = (idx, skill) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Capture the pointer so the release still lands on this button even if the
+    // finger drifts — otherwise the cast would be lost.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    longPressFired.current = false;
+    clearTimeout(longPressTimer.current);
+    // Hold a bound button to choose a different skill for it.
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onAssignSkill?.(idx);
+    }, 500);
+  };
+
+  const endSkillPress = (skill) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    if (longPressFired.current) return;
+    onCastSkill?.(skill.id);
+  };
+
+  const cancelSkillPress = () => {
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
   };
 
   const handleAttackPress = (e) => {
@@ -157,40 +199,52 @@ export function MobileControls({
           <span className="arc-label">Công</span>
         </button>
 
-        {/* Skill Buttons in Arc (U, I, O, P) */}
-        {skillKeys.map(({ key, slot, label }, idx) => {
-          const skill = skills.find((s) => s.slot === slot) || null;
+        {/* Skill Buttons in Arc: empty slots show "+", tap to choose a skill */}
+        {arcSlots.map(({ idx, skill }) => {
+          const label = skill
+            ? `${t(skill.nameKey, undefined, skill.id)} — ${t("skills.mobilePicker.rebind")}`
+            : t("skills.mobilePicker.empty");
           return (
             <button
-              key={key}
-              id={`mobile-skill-${key}`}
-              className={`arc-btn arc-btn-skill arc-skill-${idx}`}
-              onPointerDown={handleSkillPress(key)}
-              title={skill ? t(skill.nameKey, undefined, skill.id) : label}
+              key={`mobile-skill-${idx}`}
+              id={`mobile-skill-${idx}`}
+              className={`arc-btn arc-btn-skill arc-skill-${idx}${
+                skill ? "" : " arc-btn-empty"
+              }`}
+              onPointerDown={skill ? startSkillPress(idx, skill) : handlePickPress(idx)}
+              onPointerUp={skill ? endSkillPress(skill) : undefined}
+              onPointerCancel={skill ? cancelSkillPress : undefined}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                onAssignSkill?.(idx);
+              }}
+              title={label}
+              aria-label={label}
             >
               {skill ? (
                 <SkillIcon skill={skill} className="arc-skill-img" />
               ) : (
-                <span className="arc-glyph">氣</span>
+                <span className="arc-plus" aria-hidden="true">
+                  +
+                </span>
               )}
-              <span className="arc-badge">{label}</span>
             </button>
           );
         })}
 
-        {/* Quick Potions Arc (Slots 1 & 2) */}
+        {/* Quick Potions Arc (fixed consumables, independent of hotbar slots) */}
         <button
           className="arc-btn arc-btn-potion arc-potion-1"
-          onPointerDown={handlePotionPress(1)}
-          title="Kim Sáng Dược (1)"
+          onPointerDown={handlePotionPress("kim-sang-duoc")}
+          title="Kim Sáng Dược (+35 HP)"
         >
           <span className="arc-icon">🧪</span>
           <span className="arc-badge">1</span>
         </button>
         <button
           className="arc-btn arc-btn-potion arc-potion-2"
-          onPointerDown={handlePotionPress(2)}
-          title="Đại Hoàn Đan (2)"
+          onPointerDown={handlePotionPress("dai-hoan-dan")}
+          title="Đại Hoàn Đan (+25 MP)"
         >
           <span className="arc-icon">🍷</span>
           <span className="arc-badge">2</span>

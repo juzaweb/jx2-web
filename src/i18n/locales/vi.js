@@ -85,6 +85,7 @@ export default {
   },
   hotbar: {
     slotTitle: "Phím [{key}]: {name}",
+    skillBindingTitle: "Phím [{key}]: {name}",
     skillSlotTitle: "Phím [8] hoặc [Q]: Tuyệt kỹ Kiếm Khí",
     attackTitle: "Đánh thường (cận chiến)",
     skillTitle: "Chuột Phải / Phím Q: Kiếm Khí Bát Hoang",
@@ -104,7 +105,7 @@ export default {
     title: "Hướng Dẫn Tân Thủ",
     move: "Di chuyển: Nhấp chuột trái vào bản đồ (hoặc giữ chuột để chạy theo con trỏ), dùng phím Mũi tên (↑ ↓ ← →) hoặc W/A/S/D, hoặc cần gạt ảo trên mobile.",
     combat: "Chiến đấu & Tương tác: Nhấn [F] khi lại gần NPC để nói chuyện. Dùng nút Tấn công trên thanh dưới hoặc mobile.",
-    skill: "Chiêu thức: Nhấn các phím U, I, O, P để thi triển kỹ năng trực tiếp về phía con trỏ chuột hoặc mục tiêu gần nhất. Nhấp vào các ô U, I, O, P trên thanh Hotbar để gán chiêu thức môn phái.",
+    skill: "Chiêu thức: Mở bảng Võ Công [F5], kéo chiêu thả vào các ô số 1-9 trên thanh dưới để gán. Nhấn phím số tương ứng để thi triển về phía con trỏ chuột hoặc mục tiêu gần nhất. Chuột phải vào ô để gỡ chiêu.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
@@ -193,6 +194,13 @@ export default {
       title: "Chọn chiêu cho {hand}",
       locked: "Cần cấp {level}"
     },
+    mobilePicker: {
+      eyebrow: "Gán chiêu",
+      title: "Chọn chiêu cho nút {index}",
+      empty: "Chưa gán chiêu — chạm để chọn",
+      rebind: "Giữ để đổi chiêu",
+      clear: "Gỡ chiêu khỏi nút này"
+    },
     keybind: {
       short: "Đổi phím",
       eyebrow: "Thiết lập",
@@ -207,7 +215,8 @@ export default {
       }
     },
     modalTitle: "Võ Công",
-    modalHint: "Cây chiêu thức môn phái. Chọn một ô để xem chi tiết và gán phím nhanh.",
+    modalHint: "Cây chiêu thức môn phái. Chọn một ô để xem chi tiết, kéo chiêu thả vào ô số 1-9 để gán phím nhanh.",
+    dragHint: "Kéo chiêu thức thả vào ô số 1-9 trên thanh dưới để gán phím nhanh.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
     bindRight: "Gán Chuột Phải",

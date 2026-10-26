@@ -1,11 +1,44 @@
 /**
  * Per-character quick slot assignments for hotbar slots 1 through 9.
+ *
+ * A slot holds one binding string: either an item id (`kim-sang-duoc`) or a
+ * skill binding tagged with {@link SKILL_BINDING_PREFIX} (`skill:dai_tu_di_chuong`).
  * Default is empty for all 9 slots.
  */
 
 const STORAGE_PREFIX = "jx2_quick_slots_";
 
 export const QUICK_SLOT_COUNT = 9;
+
+/** Prefix that marks a hotbar binding as a sect skill instead of an item id. */
+export const SKILL_BINDING_PREFIX = "skill:";
+
+/**
+ * Whether a hotbar binding points at a skill.
+ * @param {unknown} binding
+ * @returns {boolean}
+ */
+export function isSkillBinding(binding) {
+  return typeof binding === "string" && binding.startsWith(SKILL_BINDING_PREFIX);
+}
+
+/**
+ * Encode a skill id as a hotbar binding.
+ * @param {string} skillId
+ * @returns {string}
+ */
+export function skillBinding(skillId) {
+  return `${SKILL_BINDING_PREFIX}${skillId}`;
+}
+
+/**
+ * The skill id inside a hotbar binding, or null for item bindings.
+ * @param {unknown} binding
+ * @returns {string|null}
+ */
+export function skillIdFromBinding(binding) {
+  return isSkillBinding(binding) ? binding.slice(SKILL_BINDING_PREFIX.length) : null;
+}
 
 export const DEFAULT_QUICK_SLOTS = Object.freeze({
   1: null,

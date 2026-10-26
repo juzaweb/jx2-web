@@ -7,7 +7,7 @@ import { I18nProvider } from "../../i18n/I18nProvider.jsx";
 const renderDockMarkup = (props = {}) => {
   return renderToStaticMarkup(
     <I18nProvider>
-      <HotbarDock skills={[]} skillLoadout={{ u: 0, i: 1, o: 2, p: 3 }} {...props} />
+      <HotbarDock skills={[]} {...props} />
     </I18nProvider>
   );
 };
@@ -34,6 +34,28 @@ describe("HotbarDock logic & props", () => {
     expect(markup).toContain('id="qty-kim-sang-duoc">10</span>');
 
     // Slot 1 is no longer empty, so 8 empty slots remain
+    const emptyCount = (markup.match(/class="slot-item empty"/g) || []).length;
+    expect(emptyCount).toBe(8);
+  });
+
+  it("renders an assigned skill in a numbered slot with its cooldown layer", () => {
+    const quickSlotsMapping = { 2: "skill:dai_tu_di_chuong" };
+    const skills = [
+      {
+        id: "dai_tu_di_chuong",
+        glyph: "掌",
+        nameKey: "skills.thieuLam.daiTuDiChuong.name"
+      }
+    ];
+
+    const markup = renderDockMarkup({ quickSlotsMapping, skills });
+
+    expect(markup).toContain('id="slot-2"');
+    expect(markup).toContain('class="slot-item skill-binding"');
+    expect(markup).toContain("slot-skill-icon");
+    expect(markup).toContain('data-skill-id="dai_tu_di_chuong"');
+
+    // Slot 2 is no longer empty, so 8 empty slots remain.
     const emptyCount = (markup.match(/class="slot-item empty"/g) || []).length;
     expect(emptyCount).toBe(8);
   });

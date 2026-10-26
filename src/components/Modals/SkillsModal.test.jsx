@@ -80,14 +80,14 @@ describe("SkillsModal Component", () => {
     expect(markup).toContain("Cần cấp 5");
   });
 
-  it("shows the default selected skill details and bind buttons", () => {
+  it("shows the default selected skill details and the drag hint", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <SkillsModal
           isOpen={true}
           skills={mockSkills}
           level={5}
-          skillLoadout={{ u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 }}
+          quickSlotsMapping={{ 1: "skill:test_skill_1", 4: "skill:test_skill_1" }}
         />
       </I18nProvider>
     );
@@ -96,9 +96,8 @@ describe("SkillsModal Component", () => {
     expect(markup).toContain("12 MP");
     expect(markup).toContain("Cự ly: 200");
     expect(markup).toContain("ST: 120%");
-    expect(markup).toContain("key-btn active");
-    expect(markup).toContain("mouse-btn active");
-    expect(markup).toContain('<span class="skill-node-keys">UL</span>');
+    expect(markup).toContain('class="skills-drag-hint"');
+    expect(markup).toContain('<span class="skill-node-keys">1 4</span>');
   });
 
   it("reports the prerequisite that still blocks a skill", () => {

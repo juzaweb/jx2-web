@@ -459,35 +459,19 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).toHaveBeenCalledTimes(1);
   });
 
-  it("updates skill loadout and provides fallback aliases", () => {
-    const { combat } = makeCombat();
-    combat.setSkillLoadout({ u: 2, i: 3, o: 4, p: 5 });
-    expect(combat.skillLoadout).toEqual({
-      u: 2,
-      i: 3,
-      o: 4,
-      p: 5,
-      left: 2,
-      right: 3
-    });
-    expect(combat.selectedSkillSlot).toBe(2);
-  });
-
-  it("casts a skill directly by key", () => {
+  it("casts a hotbar-bound skill by catalog id", () => {
     const { combat, player } = makeCombat();
     player.sect = "thieu-lam";
-    combat.setSkillLoadout({ u: 2, i: 1, o: 0, p: 3 });
     combat.executeSkill = vi.fn();
-    const ok = combat.castSkillByKey("u");
+    const ok = combat.castSkillById("la_han_tran");
     expect(ok).toBe(true);
     expect(combat.executeSkill).toHaveBeenCalledTimes(1);
   });
 
-  it("handles unknown or empty slot without crashing", () => {
+  it("handles an unknown skill id without crashing", () => {
     const { combat, player, ui } = makeCombat();
     player.sect = "thieu-lam";
-    combat.setSkillLoadout({ u: 99, i: 1, o: 0, p: 3 });
-    const ok = combat.castSkillByKey("u");
+    const ok = combat.castSkillById("no_such_skill");
     expect(ok).toBe(false);
     expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
   });
@@ -510,30 +494,6 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
     combat.cancelPendingCast = vi.fn();
     return { combat, ui };
   };
-
-  it("refuses to equip self skills to the left mouse button", () => {
-    const { combat, ui } = makeCombat();
-
-    // Slot 2 is La Hán Trận (target: "self")
-    const ok = combat.equipSkill("left", 2);
-    expect(ok).toBe(false);
-    expect(ui.addLog).toHaveBeenCalledWith("Chiêu thức tự thân không thể gán vào chuột trái.");
-
-    // Slot 2 can be equipped to right hand
-    const okRight = combat.equipSkill("right", 2);
-    expect(okRight).toBe(true);
-
-    // Slot 1 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
-    const okLeft = combat.equipSkill("left", 1);
-    expect(okLeft).toBe(true);
-  });
-
-  it("refuses to cast self skills via castLeftSkill on a target", () => {
-    const { combat } = makeCombat();
-    combat.leftSkillSlot = 3; // La Hán Trận (self)
-    const target = { x: 120, y: 120, id: "wolf_1" };
-    expect(combat.castLeftSkill(target)).toBe(false);
-  });
 
   it("activates persistent formation ring on cast and hides it on expire or clear", () => {
     const { combat } = makeCombat();

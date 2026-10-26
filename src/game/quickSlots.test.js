@@ -7,7 +7,10 @@ import {
   saveQuickSlots,
   assignQuickSlot,
   clearQuickSlot,
-  moveQuickSlot
+  moveQuickSlot,
+  skillBinding,
+  isSkillBinding,
+  skillIdFromBinding
 } from "./quickSlots.js";
 
 describe("quickSlots", () => {
@@ -56,5 +59,19 @@ describe("quickSlots", () => {
     slots = moveQuickSlot("char1", slots, 1, 5);
     expect(slots[1]).toBe("hoi-thanh-phu");
     expect(slots[5]).toBe("kim-sang-duoc");
+  });
+
+  it("tags skill bindings apart from item ids", () => {
+    expect(skillBinding("dai_tu_di_chuong")).toBe("skill:dai_tu_di_chuong");
+    expect(isSkillBinding("skill:dai_tu_di_chuong")).toBe(true);
+    expect(isSkillBinding("kim-sang-duoc")).toBe(false);
+    expect(skillIdFromBinding("skill:dai_tu_di_chuong")).toBe("dai_tu_di_chuong");
+    expect(skillIdFromBinding("kim-sang-duoc")).toBeNull();
+    expect(skillIdFromBinding(null)).toBeNull();
+  });
+
+  it("stores a skill binding in a numbered slot", () => {
+    const slots = assignQuickSlot("char1", {}, 2, skillBinding("la_han_tran"));
+    expect(slots[2]).toBe("skill:la_han_tran");
   });
 });

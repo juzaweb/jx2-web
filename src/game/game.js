@@ -8,7 +8,7 @@ import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { getQuantities, getQuantity, consumeQuantity, addQuantity, replaceQuantities, getItemById, QUICK_ITEMS } from "./items.js";
-import { loadQuickSlots } from "./quickSlots.js";
+import { loadQuickSlots, skillIdFromBinding } from "./quickSlots.js";
 import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
@@ -49,7 +49,6 @@ const HIT_REJECT_MESSAGES = {
 
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
-import { loadSkillLoadout } from "./skillLoadout.js";
 import { normalizeSect, skillsForSect } from "./skills.js";
 import { ensureHeroBodyTexture, ensureSectVfx } from "./lazyAssets.js";
 
@@ -399,12 +398,9 @@ export class JiangHuScene extends Phaser.Scene {
       const worldX = ground.x;
       const worldY = ground.y;
 
-      // Right mouse button casts the selected right-hand skill
-      if (pointer.rightButtonDown() || pointer.button === 2) {
-        this.pendingNpc = null;
-        this.combat.castSelectedSkill(ground);
-        return;
-      }
+      // Right click has no hotbar action anymore; ignore it so it cannot move the
+      // hero or fire a skill bound to nothing.
+      if (pointer.rightButtonDown() || pointer.button === 2) return;
 
       // Any left click re-targets the hero, so pending approaches are cancelled
       // unless this click selects one again below.
@@ -500,10 +496,9 @@ export class JiangHuScene extends Phaser.Scene {
     };
     this.isTyping = isTyping;
 
-    // Skill hotkeys U, I, O, P trigger direct casting.
-    this.skillLoadout = loadSkillLoadout(readSession()?.activeCharacter?.id);
+    // Hotbar quick slots hold either a consumable item or a sect skill, so a
+    // number key both casts bound skills and drinks bound potions.
     this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
-    this.combat.setSkillLoadout(this.skillLoadout);
     this.bindSkillKeys();
 
     // Prevent default context menu on right click
@@ -515,7 +510,7 @@ export class JiangHuScene extends Phaser.Scene {
       window.removeEventListener("contextmenu", this.contextMenuHandler);
     });
 
-    // Number hotkeys 1-9 trigger quick slot items.
+    // Number hotkeys 1-9 use the quick slot: cast its skill or drink its item.
     const numberKeyNames = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE"];
     numberKeyNames.forEach((keyName, idx) => {
       const slotNum = idx + 1;
@@ -537,29 +532,15 @@ export class JiangHuScene extends Phaser.Scene {
         }
         this.combat.performAttack();
       }),
-      bridge.on(EVENTS.ACTION_SKILL, () => {
-        if (!this.started || this.isPaused) return;
-        // Same aim the skill keys use: the projectile follows the pointer instead
-        // of whatever direction the hero last walked.
+      bridge.on(EVENTS.ACTION_CAST_SKILL, ({ skillId } = {}) => {
+        if (!this.started || this.isPaused || !skillId) return;
+        // Same aim the number keys use: the projectile follows the pointer
+        // instead of whatever direction the hero last walked.
         const pointer = this.input.activePointer;
-        this.combat.castSelectedSkill(pointer ? fromIso(pointer.worldX, pointer.worldY) : null);
-      }),
-      bridge.on(EVENTS.ACTION_EQUIP_SKILL, ({ hand, key, slot } = {}) => {
-        if (this.started) {
-          const slotKey = key || (hand === "left" ? "u" : hand === "right" ? "i" : hand);
-          if (["u", "i", "o", "p"].includes(slotKey)) {
-            this.skillLoadout = { ...this.skillLoadout, [slotKey]: slot };
-            this.combat.setSkillLoadout(this.skillLoadout);
-          } else {
-            this.combat.equipSkill(hand, slot);
-          }
-        }
-      }),
-      bridge.on(EVENTS.SET_SKILL_LOADOUT, (loadout = {}) => {
-        if (this.started && loadout) {
-          this.skillLoadout = { ...this.skillLoadout, ...loadout };
-          this.combat.setSkillLoadout(this.skillLoadout);
-        }
+        this.combat.castSkillById(
+          skillId,
+          pointer ? fromIso(pointer.worldX, pointer.worldY) : null
+        );
       }),
       bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
         if (this.started && quickSlots) {
@@ -854,16 +835,28 @@ export class JiangHuScene extends Phaser.Scene {
    * Use a hotbar quick slot or a concrete item id.
    * The numbered bar passes a slot number; the bag passes the item it shows, so
    * using an item never depends on where (or whether) it is bound to a slot.
+   * A slot bound to a sect skill casts it instead.
    * @param {number|string} slotOrItemId
    */
   useItem(slotOrItemId) {
     if (!this.player || !this.started) return;
 
     const quickSlots = this.quickSlots || loadQuickSlots(readSession()?.activeCharacter?.id);
-    const itemId =
+    const binding =
       typeof slotOrItemId === "number" ? quickSlots?.[slotOrItemId] : slotOrItemId;
-    if (!itemId) return;
+    if (!binding) return;
 
+    const boundSkillId = skillIdFromBinding(binding);
+    if (boundSkillId) {
+      const pointer = this.input.activePointer;
+      this.combat.castSkillById(
+        boundSkillId,
+        pointer ? fromIso(pointer.worldX, pointer.worldY) : null
+      );
+      return;
+    }
+
+    const itemId = binding;
     const item = getItemById(itemId);
     if (!item) return;
 
@@ -1540,7 +1533,7 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * Bind the configurable skill keys (U, I, O, P) and NPC interaction key (F).
+   * Bind the NPC interaction key (F). Casting lives on the 1-9 hotbar keys.
    */
   bindSkillKeys() {
     if (this.skillKeyHandler) return;
@@ -1554,17 +1547,6 @@ export class JiangHuScene extends Phaser.Scene {
       if (key === "f") {
         event.preventDefault();
         this.interactWithNearbyNpc();
-        return;
-      }
-
-      if (["u", "i", "o", "p"].includes(key)) {
-        event.preventDefault();
-        const pointer = this.input.activePointer;
-        let aim = null;
-        if (pointer) {
-          aim = fromIso(pointer.worldX, pointer.worldY);
-        }
-        this.combat.castSkillByKey(key, aim);
       }
     };
     this.input.keyboard.on("keydown", this.skillKeyHandler);
@@ -1693,21 +1675,6 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-
-    const leftSkill = this.combat?.getLeftSkill?.();
-    const canUseLeftSkill =
-      leftSkill && leftSkill.target === "enemy" && this.combat?.isSkillReady?.(leftSkill);
-
-    if (canUseLeftSkill) {
-      const reach = this.combat.castReach(leftSkill, target);
-      if (distance <= reach) {
-        this.player.stopMovement?.();
-        this.combat.executeSkill(leftSkill, target);
-      } else {
-        this.player.moveTo(target.x, target.y);
-      }
-      return;
-    }
 
     // Normal attack fallback (reach matches MELEE_REACH = 280)
     const attackReach = 280;

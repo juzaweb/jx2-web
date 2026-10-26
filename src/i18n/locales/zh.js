@@ -85,6 +85,7 @@ export default {
   },
   hotbar: {
     slotTitle: "按键 [{key}]：{name}",
+    skillBindingTitle: "按键 [{key}]：{name}",
     skillSlotTitle: "按键 [8] 或 [Q]：剑气绝技",
     attackTitle: "普通攻击（近战）",
     skillTitle: "右键 / Q 键：剑气八荒",
@@ -105,7 +106,7 @@ export default {
     title: "新手指导",
     move: "移动：左键点击地图（或按住鼠标跟随光标），使用方向键（↑ ↓ ← →）或 W/A/S/D，或使用手机虚拟摇杆。",
     combat: "战斗与互动：靠近NPC时按 [F] 键对话。使用底栏或手机端攻击按钮。",
-    skill: "招式：按 U, I, O, P 键直接向鼠标或最近目标施放招式。点击底栏 U, I, O, P 槽位绑定门派招式。",
+    skill: "招式：打开武学面板 [F5]，将招式拖到下方快捷栏 1-9 格即可绑定。按对应数字键向鼠标或最近目标施放。右键点击格子可解除绑定。",
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与银两：击败灰狼可获得经验、银两，并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
@@ -194,6 +195,13 @@ export default {
       title: "为{hand}选择招式",
       locked: "需要等级 {level}"
     },
+    mobilePicker: {
+      eyebrow: "绑定招式",
+      title: "为按钮 {index} 选择招式",
+      empty: "未绑定招式——点击选择",
+      rebind: "长按更换招式",
+      clear: "解除该按钮的招式"
+    },
     keybind: {
       short: "快捷键",
       eyebrow: "设置",
@@ -208,7 +216,8 @@ export default {
       }
     },
     modalTitle: "武学面板",
-    modalHint: "门派招式树。选择一个招式格查看详情并快速绑定按键。",
+    modalHint: "门派招式树。选择一个招式查看详情，将它拖到下方快捷栏 1-9 格即可绑定对应按键。",
+    dragHint: "将招式拖到下方快捷栏 1-9 格即可绑定对应按键。",
     bindToKey: "绑定到 [{key}]",
     bindLeft: "绑定左键",
     bindRight: "绑定右键",

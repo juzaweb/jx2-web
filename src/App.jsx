@@ -4,6 +4,7 @@ import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
+import { MobileSkillPicker } from "./components/MobileSkillPicker.jsx";
 import { ConnectionLostOverlay } from "./components/ConnectionLostOverlay.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
@@ -11,18 +12,21 @@ import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
 import { CityMapModal } from "./components/Modals/CityMapModal.jsx";
 import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
-import { SkillPickerModal } from "./components/Modals/SkillPickerModal.jsx";
 import { SkillsModal } from "./components/Modals/SkillsModal.jsx";
 import { ShopModal } from "./components/Modals/ShopModal.jsx";
 import { GmModal } from "./components/Modals/GmModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
 import { normalizeGender } from "./game/gender.js";
-import { loadSkillLoadout, saveSkillLoadout } from "./game/skillLoadout.js";
+import {
+  loadMobileSkills,
+  assignMobileSkill
+} from "./game/mobileSkills.js";
 import {
   loadQuickSlots,
   assignQuickSlot,
   clearQuickSlot,
-  moveQuickSlot
+  moveQuickSlot,
+  skillBinding
 } from "./game/quickSlots.js";
 import { skillsForSect } from "./game/skills.js";
 import {
@@ -139,15 +143,14 @@ export function App() {
   const [isMinimapOpen, setIsMinimapOpen] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
-  const [skillLoadout, setSkillLoadout] = useState(() =>
-    loadSkillLoadout(readSession()?.activeCharacter?.id)
-  );
   const [quickSlots, setQuickSlots] = useState(() =>
     loadQuickSlots(readSession()?.activeCharacter?.id)
   );
-  const selectedSkillSlot = skillLoadout.i;
-  const leftSkillSlot = skillLoadout.u;
-  const [skillPickerHand, setSkillPickerHand] = useState(null);
+  const [mobileSkills, setMobileSkills] = useState(() =>
+    loadMobileSkills(readSession()?.activeCharacter?.id)
+  );
+  // Index of the mobile arc button being rebound, or null when the picker is closed.
+  const [mobileSkillPicker, setMobileSkillPicker] = useState(null);
   const [shopNpc, setShopNpc] = useState(null);
   const [shopResult, setShopResult] = useState(null);
   const [stats, setStats] = useState({
@@ -187,36 +190,14 @@ export function App() {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  // Switching characters loads that hero's skill layout and quick slots mapping.
+  // Switching characters loads that hero's hotbar assignments (items or skills).
   useEffect(() => {
-    const loadout = loadSkillLoadout(activeCharacter?.id);
-    const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
-    // A passive art (tâm pháp) is always on, so it can never be bound to a cast
-    // key or a mouse button: only castable skills are valid assignments.
-    const castableSkills = kit.filter((skill) => !skill.passive);
-    const validLeftSkills = castableSkills.filter((skill) => skill.target !== "self");
-    const firstLeftSlot = validLeftSkills[0]?.slot;
-    const firstCastableSlot = castableSkills[0]?.slot;
-    if (Number.isInteger(firstCastableSlot)) {
-      if (!castableSkills.some((skill) => skill.slot === loadout.u)) loadout.u = firstCastableSlot;
-      if (!castableSkills.some((skill) => skill.slot === loadout.i)) loadout.i = firstCastableSlot;
-      if (!castableSkills.some((skill) => skill.slot === loadout.o)) loadout.o = firstCastableSlot;
-      if (!castableSkills.some((skill) => skill.slot === loadout.p)) loadout.p = firstCastableSlot;
-      if (Number.isInteger(firstLeftSlot) && !validLeftSkills.some((skill) => skill.slot === loadout.left)) {
-        loadout.left = firstLeftSlot;
-      } else if (!Number.isInteger(loadout.left)) {
-        loadout.left = firstLeftSlot ?? loadout.u;
-      }
-      if (!castableSkills.some((skill) => skill.slot === loadout.right)) {
-        loadout.right = loadout.i ?? firstCastableSlot;
-      }
-    }
-    setSkillLoadout(loadout);
-    bridge.emit(EVENTS.SET_SKILL_LOADOUT, loadout);
-
     const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
     setQuickSlots(loadedQuickSlots);
     bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
+
+    setMobileSkills(loadMobileSkills(activeCharacter?.id));
+    setMobileSkillPicker(null);
 
     if (activeCharacter?.sect) {
       bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
@@ -248,6 +229,45 @@ export function App() {
       bridge.emit(EVENTS.SET_QUICK_SLOTS, next);
     },
     [activeCharacter?.id, quickSlots]
+  );
+
+  // Skills drawn from the F5 tree are dropped onto a numbered slot.
+  const handleAssignSkill = useCallback(
+    (slot, skillId) => {
+      if (!skillId) return;
+      handleAssignQuickSlot(slot, skillBinding(skillId));
+    },
+    [handleAssignQuickSlot]
+  );
+
+  // Mobile arc: tap an empty "+" (or long-press a bound button) to open the picker.
+  const handleOpenMobileSkillPicker = useCallback((index) => {
+    // Close the help overlay without depending on `dismissHelp`, which is
+    // declared later in this component.
+    setIsHelpOpen(false);
+    setMobileSkillPicker(index);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+  }, []);
+
+  const handleCloseMobileSkillPicker = useCallback(() => {
+    setMobileSkillPicker(null);
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+  }, []);
+
+  const handleSelectMobileSkill = useCallback(
+    (skillId) => {
+      if (mobileSkillPicker === null) return;
+      const next = assignMobileSkill(
+        activeCharacter?.id,
+        mobileSkills,
+        mobileSkillPicker,
+        skillId
+      );
+      setMobileSkills(next);
+      setMobileSkillPicker(null);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+    },
+    [activeCharacter?.id, mobileSkills, mobileSkillPicker]
   );
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
@@ -350,14 +370,6 @@ export function App() {
       }
     });
 
-    const unsubSkillSelected = bridge.on(EVENTS.SKILL_SELECTED, (slot) => {
-      if (typeof slot === "number") setSelectedSkillSlot(slot);
-    });
-
-    const unsubLeftSkillSelected = bridge.on(EVENTS.LEFT_SKILL_SELECTED, (slot) => {
-      if (typeof slot === "number") setLeftSkillSlot(slot);
-    });
-
     const unsubShopOpened = bridge.on(EVENTS.SHOP_OPENED, (npc) => {
       if (!npc?.npcId) return;
       setShopNpc(npc);
@@ -386,8 +398,6 @@ export function App() {
       unsubInventory();
       unsubEquipment();
       unsubStarted();
-      unsubSkillSelected();
-      unsubLeftSkillSelected();
       unsubShopOpened();
       unsubShopResult();
       unsubNetwork();
@@ -478,6 +488,7 @@ export function App() {
         isCharacterOpen ||
         isSkillsOpen ||
         isCityMapOpen ||
+        mobileSkillPicker !== null ||
         !!shopNpc ||
         isLoginOpen ||
         (!activeCharacter && !!currentUser);
@@ -540,6 +551,11 @@ export function App() {
 
       if (e.key !== "Escape") return;
 
+      if (mobileSkillPicker !== null) {
+        handleCloseMobileSkillPicker();
+        return;
+      }
+
       if (isCityMapOpen) {
         setIsCityMapOpen(false);
         return;
@@ -579,10 +595,12 @@ export function App() {
     activeCharacter,
     currentUser,
     shopNpc,
+    mobileSkillPicker,
     handleOpenCharacter,
     handleCloseCharacter,
     handleOpenInventory,
     handleCloseInventory,
+    handleCloseMobileSkillPicker,
     handleCloseShop
   ]);
 
@@ -590,45 +608,10 @@ export function App() {
     bridge.emit(EVENTS.ACTION_ATTACK);
   }, []);
 
-  const handleSkill = useCallback(() => {
-    bridge.emit(EVENTS.ACTION_SKILL);
+  const handleCastSkill = useCallback((skillId) => {
+    if (!skillId) return;
+    bridge.emit(EVENTS.ACTION_CAST_SKILL, { skillId });
   }, []);
-
-  const handleCastKey = useCallback((key) => {
-    bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand: key, key });
-    bridge.emit(EVENTS.ACTION_SKILL);
-  }, []);
-
-  const handleOpenSkillPicker = useCallback((hand) => {
-    dismissHelp();
-    setSkillPickerHand(hand);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
-  }, [dismissHelp]);
-
-  const handleCloseSkillPicker = useCallback(() => {
-    setSkillPickerHand(null);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-  }, []);
-
-  const handleEquipSkill = useCallback(
-    (hand, slot) => {
-      const isKey = ["u", "i", "o", "p"].includes(hand?.toLowerCase());
-      const key = isKey ? hand.toLowerCase() : hand === "left" ? "u" : "i";
-      const next = {
-        ...skillLoadout,
-        [key]: slot,
-        left: key === "u" ? slot : skillLoadout.u,
-        right: key === "i" ? slot : skillLoadout.i
-      };
-      setSkillLoadout(next);
-      saveSkillLoadout(activeCharacter?.id, next);
-      bridge.emit(EVENTS.ACTION_EQUIP_SKILL, { hand, key, slot });
-      bridge.emit(EVENTS.SET_SKILL_LOADOUT, next);
-      setSkillPickerHand(null);
-      bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-    },
-    [activeCharacter?.id, skillLoadout]
-  );
 
   const handleUseItem = useCallback((slot) => {
     bridge.emit(EVENTS.ACTION_USE_POTION, slot);
@@ -808,7 +791,6 @@ export function App() {
           items={inventory.quickItems}
           inventoryItems={inventory.inventoryItems}
           quickSlotsMapping={quickSlots}
-          onAssignQuickSlot={handleAssignQuickSlot}
           onClearQuickSlot={handleClearQuickSlot}
           onMoveQuickSlot={handleMoveQuickSlot}
           onUseItem={handleUseItem}
@@ -821,20 +803,16 @@ export function App() {
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
           skills={skillsForSect(activeCharacter?.sect)}
-          selectedSkillSlot={selectedSkillSlot}
-          leftSkillSlot={leftSkillSlot}
-          skillLoadout={skillLoadout}
-          onPickSkill={handleOpenSkillPicker}
         />
 
         <MobileControls
           onMove={handleMove}
           onAttack={handleAttack}
-          onSkill={handleSkill}
-          onCastKey={handleCastKey}
+          onCastSkill={handleCastSkill}
+          onAssignSkill={handleOpenMobileSkillPicker}
           onUseItem={handleUseItem}
           skills={skillsForSect(activeCharacter?.sect)}
-          skillLoadout={skillLoadout}
+          skillSlots={mobileSkills}
         />
       </div>
 
@@ -911,25 +889,22 @@ export function App() {
         skills={skillsForSect(activeCharacter?.sect)}
         sect={activeCharacter?.sect || "thieu-lam"}
         level={stats.level}
-        skillLoadout={skillLoadout}
-        onEquipSkill={handleEquipSkill}
+        quickSlotsMapping={quickSlots}
+        onAssignSkill={handleAssignSkill}
       />
 
-      {/* Choose the skill bound to each mouse button */}
-      <SkillPickerModal
-        isOpen={skillPickerHand !== null}
-        hand={skillPickerHand}
+      {/* Mobile arc skill picker (tap "+" on a mobile skill button) */}
+      <MobileSkillPicker
+        isOpen={mobileSkillPicker !== null}
+        slotIndex={mobileSkillPicker ?? 0}
         skills={skillsForSect(activeCharacter?.sect)}
         level={stats.level}
-        selectedSlot={
-          ["u", "i", "o", "p"].includes(skillPickerHand?.toLowerCase())
-            ? skillLoadout[skillPickerHand.toLowerCase()]
-            : skillPickerHand === "left"
-            ? leftSkillSlot
-            : selectedSkillSlot
+        selectedSkillId={
+          mobileSkillPicker !== null ? mobileSkills[mobileSkillPicker] ?? null : null
         }
-        onSelect={handleEquipSkill}
-        onClose={handleCloseSkillPicker}
+        onSelect={handleSelectMobileSkill}
+        onClear={() => handleSelectMobileSkill(null)}
+        onClose={handleCloseMobileSkillPicker}
       />
 
       {/* GM Command Panel ("Lệnh Bài GM") */}

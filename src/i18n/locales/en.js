@@ -85,6 +85,7 @@ export default {
   },
   hotbar: {
     slotTitle: "Key [{key}]: {name}",
+    skillBindingTitle: "Key [{key}]: {name}",
     skillSlotTitle: "Key [8] or [Q]: Sword Aura ultimate",
     attackTitle: "Basic attack (melee)",
     skillTitle: "Right Click / Key Q: Eight Desolations Sword Aura",
@@ -104,7 +105,7 @@ export default {
     title: "Beginner's Guide",
     move: "Movement: Left-click the map (or hold the mouse to follow the cursor), use Arrow keys (↑ ↓ ← →) or W/A/S/D, or the mobile joystick.",
     combat: "Combat & Interaction: Press [F] near an NPC to talk. Use the Attack button on the dock or mobile.",
-    skill: "Skills: Press keys U, I, O, P to directly cast skills towards cursor or nearest enemy. Click the U, I, O, P slots on the hotbar to assign sect skills.",
+    skill: "Skills: Open the Martial Arts panel [F5] and drag a skill onto hotbar slots 1-9. Press the matching number key to cast towards the cursor or nearest enemy. Right-click a slot to clear it.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
@@ -193,6 +194,13 @@ export default {
       title: "Choose a skill for {hand}",
       locked: "Requires level {level}"
     },
+    mobilePicker: {
+      eyebrow: "Assign skill",
+      title: "Choose a skill for button {index}",
+      empty: "No skill assigned — tap to choose",
+      rebind: "Hold to change skill",
+      clear: "Clear this button"
+    },
     keybind: {
       short: "Keys",
       eyebrow: "Settings",
@@ -207,7 +215,8 @@ export default {
       }
     },
     modalTitle: "Martial Arts",
-    modalHint: "Sect skill tree. Select a tile to see its details and quick-bind keys.",
+    modalHint: "Sect skill tree. Select a skill for details, then drag it onto hotbar slots 1-9 to bind it to that key.",
+    dragHint: "Drag a skill onto hotbar slots 1-9 to bind it to that number key.",
     bindToKey: "Assign to [{key}]",
     bindLeft: "Assign Left Click",
     bindRight: "Assign Right Click",

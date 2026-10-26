@@ -6,9 +6,9 @@ import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
 import { regenPerSecond } from "../../game/passiveRegen.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { useDraggablePanel } from "./useDraggablePanel.js";
+import { beginItemDrag, didItemDragJustEnd } from "./pointerItemDrag.js";
+import { skillBinding } from "../../game/quickSlots.js";
 import "../../styles/skills-modal.css";
-
-const KEY_BINDINGS = ["u", "i", "o", "p"];
 
 const SECT_NAME_KEYS = {
   "thieu-lam": "characterSelect.sectThieuLam",
@@ -32,8 +32,8 @@ export function SkillsModal({
   skills = [],
   sect = "thieu-lam",
   level = 1,
-  skillLoadout = { u: 0, i: 1, o: 2, p: 3, left: 0, right: 1 },
-  onEquipSkill
+  quickSlotsMapping = {},
+  onAssignSkill
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
@@ -49,14 +49,11 @@ export function SkillsModal({
 
   const sectNameKey = SECT_NAME_KEYS[sect] || SECT_NAME_KEYS["thieu-lam"];
 
-  const getBoundSlots = (slot) => {
+  const getBoundSlots = (skillId) => {
     const bound = [];
-    if (skillLoadout.u === slot) bound.push("U");
-    if (skillLoadout.i === slot) bound.push("I");
-    if (skillLoadout.o === slot) bound.push("O");
-    if (skillLoadout.p === slot) bound.push("P");
-    if (skillLoadout.left === slot) bound.push("L");
-    if (skillLoadout.right === slot) bound.push("R");
+    for (let slot = 1; slot <= 9; slot++) {
+      if (quickSlotsMapping?.[slot] === skillBinding(skillId)) bound.push(slot);
+    }
     return bound;
   };
 
@@ -156,9 +153,10 @@ export function SkillsModal({
                   const unlocked = skillUnlocked(skill, level);
                   const lockReason = unlocked ? null : skillLockReason(skill, level);
                   const isSelected = skill.id === selectedId;
-                  const boundSlots = getBoundSlots(skill.slot);
+                  const boundSlots = getBoundSlots(skill.id);
                   const name = t(skill.nameKey, undefined, skill.id);
                   const lockLabel = formatSkillLock(lockReason, t);
+                  const isDraggable = unlocked && !skill.passive;
 
                   return (
                     <button
@@ -172,12 +170,29 @@ export function SkillsModal({
                       aria-pressed={isSelected}
                       aria-label={lockLabel ? `${name} — ${lockLabel}` : name}
                       title={lockLabel ? `${name} — ${lockLabel}` : name}
-                      onClick={() => setPickedId(skill.id)}
+                      onPointerDown={
+                        isDraggable
+                          ? (event) =>
+                              beginItemDrag({
+                                event,
+                                payload: { kind: "hotbar", skillId: skill.id },
+                                ghostImage: skill.icon,
+                                onDrop: (zone) => {
+                                  if (zone?.type === "hotbar") onAssignSkill?.(zone.slot, skill.id);
+                                }
+                              })
+                          : undefined
+                      }
+                      onClick={(event) => {
+                        // A drop already handled the gesture; don't re-select after it.
+                        if (didItemDragJustEnd(event.currentTarget)) return;
+                        setPickedId(skill.id);
+                      }}
                     >
                       <span className="skill-node-face">
                         <SkillIcon skill={skill} className="skill-node-icon" />
                         {boundSlots.length > 0 && (
-                          <span className="skill-node-keys">{boundSlots.join("")}</span>
+                          <span className="skill-node-keys">{boundSlots.join(" ")}</span>
                         )}
                         {!unlocked && (
                           <span className="skill-node-lock" aria-hidden="true">
@@ -252,47 +267,11 @@ export function SkillsModal({
               </div>
 
               {/* An always-on passive art has nothing to bind: it runs without
-                  being cast, so the key/mouse grid is hidden for it. */}
+                  being cast, so the drag hint is hidden for it. */}
               {selectedUnlocked && !selectedSkill.passive && (
                 <div className="skills-detail-bind">
                   <div className="skills-detail-bind-label">{t("skills.picker.eyebrow")}</div>
-                  <div className="skills-bind-grid">
-                    {KEY_BINDINGS.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`skill-action-btn key-btn ${
-                          skillLoadout[key] === selectedSkill.slot ? "active" : ""
-                        }`}
-                        title={t("skills.bindToKey", { key: key.toUpperCase() })}
-                        onClick={() => onEquipSkill?.(key, selectedSkill.slot)}
-                      >
-                        {key.toUpperCase()}
-                      </button>
-                    ))}
-                    {selectedSkill.target !== "self" && (
-                      <button
-                        type="button"
-                        className={`skill-action-btn mouse-btn ${
-                          skillLoadout.left === selectedSkill.slot ? "active" : ""
-                        }`}
-                        title={t("skills.bindLeft")}
-                        onClick={() => onEquipSkill?.("left", selectedSkill.slot)}
-                      >
-                        L
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={`skill-action-btn mouse-btn ${
-                        skillLoadout.right === selectedSkill.slot ? "active" : ""
-                      }`}
-                      title={t("skills.bindRight")}
-                      onClick={() => onEquipSkill?.("right", selectedSkill.slot)}
-                    >
-                      R
-                    </button>
-                  </div>
+                  <p className="skills-drag-hint">{t("skills.dragHint")}</p>
                 </div>
               )}
             </div>

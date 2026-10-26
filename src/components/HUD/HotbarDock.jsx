@@ -5,7 +5,10 @@ import { getItemById, getQuantity } from "../../game/items.js";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { beginItemDrag, didItemDragJustEnd } from "../Modals/pointerItemDrag.js";
-import { DEFAULT_QUICK_SLOTS } from "../../game/quickSlots.js";
+import {
+  DEFAULT_QUICK_SLOTS,
+  skillIdFromBinding
+} from "../../game/quickSlots.js";
 
 export function HotbarDock({
   audioEnabled,
@@ -19,14 +22,9 @@ export function HotbarDock({
   onTogglePk,
   pkEnabled = false,
   skills = [],
-  selectedSkillSlot = 0,
-  leftSkillSlot = 0,
-  skillLoadout = { u: 0, i: 1, o: 2, p: 3 },
-  onPickSkill,
   items = [],
   inventoryItems = [],
   quickSlotsMapping = DEFAULT_QUICK_SLOTS,
-  onAssignQuickSlot,
   onClearQuickSlot,
   onMoveQuickSlot
 }) {
@@ -65,12 +63,6 @@ export function HotbarDock({
 
   const cooldownLeft = (skillId) =>
     skillId ? Math.max(0, (cooldownEnds[skillId] || 0) - clock) : 0;
-  const skillSlots = [
-    { key: "u", slot: skillLoadout?.u ?? leftSkillSlot ?? 0 },
-    { key: "i", slot: skillLoadout?.i ?? selectedSkillSlot ?? 1 },
-    { key: "o", slot: skillLoadout?.o ?? 2 },
-    { key: "p", slot: skillLoadout?.p ?? 3 }
-  ];
 
   /**
    * Items are dragged with pointer events rather than HTML5 drag-and-drop, so
@@ -114,7 +106,17 @@ export function HotbarDock({
   const quickSlots = useMemo(() => {
     return Array.from({ length: 9 }, (_, index) => {
       const useSlot = index + 1;
-      const itemId = quickSlotsMapping?.[useSlot] || null;
+      const binding = quickSlotsMapping?.[useSlot] || null;
+
+      // A slot holds either a sect skill or a consumable item, so the binding
+      // decides which icon and which number-key action it renders.
+      const skillId = skillIdFromBinding(binding);
+      if (skillId) {
+        const skill = skills.find((entry) => entry?.id === skillId) || null;
+        return { useSlot, item: null, skill };
+      }
+
+      const itemId = binding;
       const raw = itemId ? getItemById(itemId) : null;
 
       let qty = 0;
@@ -128,9 +130,9 @@ export function HotbarDock({
       }
 
       const item = raw ? localizeItem({ ...raw, qty }, t) : null;
-      return { useSlot, item };
+      return { useSlot, item, skill: null };
     });
-  }, [quickSlotsMapping, availableItems, t]);
+  }, [quickSlotsMapping, availableItems, skills, t]);
 
   return (
     <section className="bottom-dock" id="bottom-dock">
@@ -139,7 +141,27 @@ export function HotbarDock({
             `data-hotbar-slot` contract is read back by pointerItemDrag.js
             (see HOTBAR_STRIP_ATTR / HOTBAR_SLOT_ATTR). */}
         <div className="hotbar-slots" data-hotbar-strip="">
-          {quickSlots.map(({ useSlot, item }) => {
+          {quickSlots.map(({ useSlot, item, skill }) => {
+            if (skill) {
+              const cd = cooldownLeft(skill.id);
+              const name = t(skill.nameKey, undefined, skill.id);
+              return (
+                <div
+                  className="slot-item skill-binding"
+                  id={`slot-${useSlot}`}
+                  key={`slot-${useSlot}`}
+                  title={t("hotbar.skillBindingTitle", { key: useSlot, name })}
+                  onContextMenu={(e) => handleContextMenu(e, useSlot)}
+                  onClick={(event) => handleSlotClick(event, useSlot)}
+                  data-hotbar-slot={useSlot}
+                  data-skill-id={skill.id}
+                >
+                  <span className="slot-key">{useSlot}</span>
+                  <SkillIcon skill={skill} className="slot-skill-icon" />
+                  {cd > 0 && <span className="slot-cd">{Math.ceil(cd / 1000)}</span>}
+                </div>
+              );
+            }
             if (!item) {
               return (
                 <div
@@ -169,33 +191,6 @@ export function HotbarDock({
                   {item.qty}
                 </span>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Middle: 4 UIOP sect skill slots */}
-        <div className="martial-center">
-          {skillSlots.map(({ key, slot }) => {
-            const assignedSkill = skills.find((entry) => entry.slot === slot) || null;
-            const cd = cooldownLeft(assignedSkill?.id);
-            const keyLabel = key.toUpperCase();
-            return (
-              <button
-                key={key}
-                type="button"
-                className="hand-slot skill-key-slot"
-                id={`skill-slot-${key}`}
-                title={
-                  assignedSkill
-                    ? `${keyLabel}: ${t(assignedSkill.nameKey, undefined, assignedSkill.id)}`
-                    : t("skills.assignKey", { key: keyLabel }, `Gán chiêu [${keyLabel}]`)
-                }
-                onClick={() => onPickSkill?.(key)}
-              >
-                <SkillIcon skill={assignedSkill} className="hand-glyph" />
-                {cd > 0 && <span className="hand-cd">{Math.ceil(cd / 1000)}</span>}
-                <span className="click-badge">{keyLabel}</span>
-              </button>
             );
           })}
         </div>

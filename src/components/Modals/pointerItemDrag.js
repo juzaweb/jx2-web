@@ -162,9 +162,10 @@ const moveGhost = (ghost, x, y) => {
 };
 
 /** A small copy of the item art that follows the pointer. */
-const createGhost = (iconClass, x, y) => {
+const createGhost = (iconClass, x, y, imageSrc) => {
   const ghost = document.createElement("div");
   ghost.className = `${DRAG_GHOST_CLASS}${iconClass ? ` ${iconClass}` : ""}`;
+  if (!iconClass && imageSrc) ghost.style.backgroundImage = `url("${imageSrc}")`;
   ghost.setAttribute("aria-hidden", "true");
   document.body.appendChild(ghost);
   moveGhost(ghost, x, y);
@@ -209,10 +210,11 @@ export function cancelItemDrag() {
  * @param {PointerEvent} options.event pointerdown event that starts the press
  * @param {object} options.payload item description handed back to `onDrop`
  * @param {string} [options.ghostIcon] icon class for the ghost (e.g. `icon-hp-pot`)
+ * @param {string} [options.ghostImage] image URL for the ghost (e.g. a skill icon)
  * @param {(zone: {type: string, slot: number|string}|null, payload: object) => void} [options.onDrop]
  * @returns {boolean} whether the press was accepted
  */
-export function beginItemDrag({ event, payload, ghostIcon, onDrop } = {}) {
+export function beginItemDrag({ event, payload, ghostIcon, ghostImage, onDrop } = {}) {
   // Only the primary button drags; right-click clears a hotbar slot.
   if (!event || (typeof event.button === "number" && event.button !== 0)) return false;
   if (typeof window === "undefined" || typeof document === "undefined") return false;
@@ -223,6 +225,7 @@ export function beginItemDrag({ event, payload, ghostIcon, onDrop } = {}) {
     payload,
     onDrop,
     ghostIcon,
+    ghostImage,
     source: event.currentTarget || event.target || null,
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -245,7 +248,7 @@ export function beginItemDrag({ event, payload, ghostIcon, onDrop } = {}) {
         return;
       }
       drag.dragging = true;
-      drag.ghost = createGhost(drag.ghostIcon, drag.x, drag.y);
+      drag.ghost = createGhost(drag.ghostIcon, drag.x, drag.y, drag.ghostImage);
       drag.source?.classList?.add(DRAG_SOURCE_CLASS);
       document.body.classList.add(BODY_DRAGGING_CLASS);
     }
