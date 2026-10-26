@@ -1703,6 +1703,14 @@ export class JiangHuScene extends Phaser.Scene {
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 
+    // Update interaction prompts for nearby NPCs
+    for (const npc of this.stage?.npcs || []) {
+      const inRange = isInTalkRange(npc, this.player.x, this.player.y);
+      if (npc.promptText) {
+        npc.promptText.setVisible(inRange);
+      }
+    }
+
     // Open a shop once the hero has walked within talking distance.
     if (this.pendingNpc) {
       if (isInTalkRange(this.pendingNpc, this.player.x, this.player.y)) {
