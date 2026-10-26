@@ -393,6 +393,14 @@ export default {
     "lenh-bai-gm": {
       name: "GM令牌",
       desc: "GM总管至高令牌。可打开管理面板获取等级、恢复气血内力、获取药水与地图传送。"
+    },
+    "ao-lang-khach": {
+      name: "浪客青衣",
+      desc: "初入江湖所着交领布衣。轻便透气，利于仗剑天涯。"
+    },
+    "non-lang-khach": {
+      name: "浪客斗笠",
+      desc: "采边境竹篾编制而成的斗笠。遮风避雨，助侠士泰然面对江湖风雨。"
     }
   },
   gm: {

@@ -1,7 +1,7 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
-import { HERO_BODY, bodyFrameForDirection, bodyTextureFor } from "./heroBody.js";
+import { HERO_BODY, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
@@ -43,6 +43,8 @@ export class HeroRigView {
     this.groups = {};
     /** Baked body sprite, used when the gender sheet is loaded. */
     this.bodySprite = null;
+    /** Modular equipment sprites (slot -> sprite). */
+    this.equipSprites = {};
     this.usingSprite = false;
     this.frameIndex = 0;
     /** While an attack pose is playing, the walk cycle must not overwrite it. */
@@ -70,6 +72,7 @@ export class HeroRigView {
     this.pose = poseFor(direction);
     this.usingSprite = usesSprite;
     this.bodySprite = null;
+    this.equipSprites = {};
     this.actionTween?.stop();
     this.actionTween = null;
     this.acting = false;
@@ -84,10 +87,34 @@ export class HeroRigView {
       this.bodySprite.setOrigin(0.5, 1);
       this.bodySprite.setScale(HERO_BODY.scale);
       this.container.add(this.bodySprite);
-      for (const primitive of buildBodyEquipment({ direction, equipment })) {
+
+      const addEquipSprite = (slot, overrideItemId = null) => {
+        const itemId = overrideItemId || equipment?.[slot];
+        if (!itemId) return;
+        const texKey = equipmentTextureKeyFor(slot, itemId, g);
+        if (texKey && this.scene.textures?.exists?.(texKey)) {
+          const sprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, texKey, this.frameIndex);
+          sprite.setOrigin(0.5, 1);
+          sprite.setScale(HERO_BODY.scale);
+          this.equipSprites[slot] = sprite;
+          this.container.add(sprite);
+        }
+      };
+
+      // 1. Lower body & torso sprites
+      const effectivePants = equipment?.pants || (equipment?.armor === "ao-lang-khach" ? "quan-lang-khach" : null);
+      addEquipSprite("pants", effectivePants);
+      addEquipSprite("armor");
+
+      // 2. Procedural vector shapes for any slot not covered by a sprite
+      const excluded = Object.keys(this.equipSprites);
+      for (const primitive of buildBodyEquipment({ direction, equipment, excludeSlots: excluded })) {
         const child = createPrimitive(this.scene, primitive);
         if (child) this.container.add(child);
       }
+
+      // 3. Headgear sprite (crown & veil layer sits above collar)
+      addEquipSprite("helmet");
       return;
     }
 
@@ -118,6 +145,9 @@ export class HeroRigView {
       if (frame !== this.frameIndex) {
         this.frameIndex = frame;
         this.bodySprite?.setFrame(frame);
+        for (const sprite of Object.values(this.equipSprites)) {
+          sprite?.setFrame(frame);
+        }
       }
       return;
     }
@@ -243,6 +273,7 @@ export class HeroRigView {
       this.container = null;
     }
     this.bodySprite = null;
+    this.equipSprites = {};
     this.usingSprite = false;
   }
 }

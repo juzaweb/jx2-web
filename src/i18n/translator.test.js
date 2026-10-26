@@ -4,7 +4,7 @@ import en from "./locales/en.js";
 import vi from "./locales/vi.js";
 import zh from "./locales/zh.js";
 import { detectLanguage, normalizeLanguage, setRuntimeLanguage, translateFor } from "./translator.js";
-import { INVENTORY_ITEMS, QUICK_ITEMS } from "../game/items.js";
+import { EQUIPMENT_ITEMS, INVENTORY_ITEMS, QUICK_ITEMS } from "../game/items.js";
 
 const flattenKeys = (dictionary, prefix = "") =>
   Object.entries(dictionary).flatMap(([key, value]) => {
@@ -74,7 +74,7 @@ describe("locale catalogs", () => {
   });
 
   it("defines a name and description for every item in the catalog", () => {
-    const itemIds = [...QUICK_ITEMS, ...INVENTORY_ITEMS]
+    const itemIds = [...QUICK_ITEMS, ...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS]
       .filter(Boolean)
       .map((item) => item.id);
 

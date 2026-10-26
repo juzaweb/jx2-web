@@ -7,26 +7,65 @@
  * are not aligned to this art yet, so they stay off for now.
  */
 
-import { HERO_PREVIEW_ART } from "./heroBody.js";
+import { HERO_PREVIEW_ART, HERO_PREVIEW_EQUIPMENT_LAYERS } from "./heroBody.js";
 import { normalizeGender } from "./gender.js";
 
 /**
- * Resolve the preview sprite.
- * @param {{gender?:"male"|"female"}} [opts]
+ * Resolve the preview sprite and dynamic equipment layers.
+ * @param {{gender?:"male"|"female", equipment?: Record<string, string>}} [opts]
  * @returns {{
  *   textureUrl: string,
  *   backgroundSize: string,
  *   backgroundPosition: string,
- *   aspectRatio: string
+ *   aspectRatio: string,
+ *   layers: Array<{ key: string, url: string, zIndex: number }>
  * }}
  */
-export function buildCharacterPreview({ gender = "male" } = {}) {
-  const art = HERO_PREVIEW_ART[normalizeGender(gender)];
+export function buildCharacterPreview({ gender = "male", equipment = {} } = {}) {
+  const normalizedGender = normalizeGender(gender);
+  const art = HERO_PREVIEW_ART[normalizedGender];
+
+  const layers = [];
+
+  // 1. Pants layer: explicit pants or paired with ao-lang-khach
+  const pantsItem =
+    equipment?.pants || (equipment?.armor === "ao-lang-khach" ? "quan-lang-khach" : null);
+  if (pantsItem && HERO_PREVIEW_EQUIPMENT_LAYERS?.pants?.[pantsItem]?.[normalizedGender]) {
+    const pantsDef = HERO_PREVIEW_EQUIPMENT_LAYERS.pants[pantsItem][normalizedGender];
+    layers.push({
+      key: "pants",
+      url: `${pantsDef.url}?v=${pantsDef.version}`,
+      zIndex: 2
+    });
+  }
+
+  // 2. Armor layer (Robe)
+  const armorItem = equipment?.armor;
+  if (armorItem && HERO_PREVIEW_EQUIPMENT_LAYERS?.armor?.[armorItem]?.[normalizedGender]) {
+    const armorDef = HERO_PREVIEW_EQUIPMENT_LAYERS.armor[armorItem][normalizedGender];
+    layers.push({
+      key: "armor",
+      url: `${armorDef.url}?v=${armorDef.version}`,
+      zIndex: 3
+    });
+  }
+
+  // 3. Helmet layer (Hat)
+  const helmetItem = equipment?.helmet;
+  if (helmetItem && HERO_PREVIEW_EQUIPMENT_LAYERS?.helmet?.[helmetItem]?.[normalizedGender]) {
+    const helmetDef = HERO_PREVIEW_EQUIPMENT_LAYERS.helmet[helmetItem][normalizedGender];
+    layers.push({
+      key: "helmet",
+      url: `${helmetDef.url}?v=${helmetDef.version}`,
+      zIndex: 4
+    });
+  }
 
   return {
     textureUrl: `${art.url}?v=${art.version}`,
     backgroundSize: "100% 100%",
     backgroundPosition: "center",
-    aspectRatio: `${art.width} / ${art.height}`
+    aspectRatio: `${art.width} / ${art.height}`,
+    layers
   };
 }

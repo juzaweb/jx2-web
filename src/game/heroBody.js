@@ -20,14 +20,94 @@ export const HERO_BODY_TEXTURES = {
 };
 
 /**
+ * Modular equipment textures mapping item IDs and gender variants to spritesheet keys and URLs.
+ * All equipment spritesheets follow the exact same 4x4 (128x160 px/frame) grid geometry as HERO_BODY.
+ */
+export const HERO_EQUIPMENT_TEXTURES = {
+  "non-lang-khach": {
+    male: { key: "hero-hat-non-truc", url: `/hero-hat-non-truc.png?v=${BODY_ASSET_VERSION}` },
+    female: { key: "hero-hat-non-mang", url: `/hero-hat-non-mang.png?v=${BODY_ASSET_VERSION}` }
+  },
+  "non-truc": {
+    male: { key: "hero-hat-non-truc", url: `/hero-hat-non-truc.png?v=${BODY_ASSET_VERSION}` },
+    female: { key: "hero-hat-non-truc", url: `/hero-hat-non-truc.png?v=${BODY_ASSET_VERSION}` }
+  },
+  "non-mang": {
+    male: { key: "hero-hat-non-mang", url: `/hero-hat-non-mang.png?v=${BODY_ASSET_VERSION}` },
+    female: { key: "hero-hat-non-mang", url: `/hero-hat-non-mang.png?v=${BODY_ASSET_VERSION}` }
+  },
+  "ao-lang-khach": {
+    male: { key: "hero-armor-lang-khach-male", url: `/hero-armor-lang-khach-male.png?v=${BODY_ASSET_VERSION}` },
+    female: { key: "hero-armor-lang-khach-female", url: `/hero-armor-lang-khach-female.png?v=${BODY_ASSET_VERSION}` }
+  },
+  "quan-lang-khach": {
+    male: { key: "hero-pants-lang-khach-male", url: `/hero-pants-lang-khach-male.png?v=${BODY_ASSET_VERSION}` },
+    female: { key: "hero-pants-lang-khach-female", url: `/hero-pants-lang-khach-female.png?v=${BODY_ASSET_VERSION}` }
+  }
+};
+
+/**
+ * Resolve the texture definition for an equipped item, taking gender into account.
+ * @param {string} slot - Equipment slot ("helmet", "armor", etc.)
+ * @param {string} itemId - Item ID ("non-truc", "ao-lang-khach", etc.)
+ * @param {"male"|"female"|string} [gender="male"]
+ * @returns {{ key: string, url: string }|null}
+ */
+export function equipmentTextureDef(slot, itemId, gender = "male") {
+  if (!itemId || typeof itemId !== "string") return null;
+  const entry = HERO_EQUIPMENT_TEXTURES[itemId];
+  if (!entry) return null;
+  const g = normalizeGender(gender);
+  if (entry[g]) return entry[g];
+  if (entry.male) return entry.male;
+  if (entry.key && entry.url) return entry;
+  return null;
+}
+
+/**
+ * Resolve the Phaser texture key for an equipped item.
+ * @param {string} slot
+ * @param {string} itemId
+ * @param {"male"|"female"|string} [gender="male"]
+ * @returns {string|null}
+ */
+export function equipmentTextureKeyFor(slot, itemId, gender = "male") {
+  return equipmentTextureDef(slot, itemId, gender)?.key ?? null;
+}
+
+/**
  * Static paper-doll art used by the character sheet (F3). Both files are
  * produced from `public/hero-body-new.png` by `scripts/build_preview_art.py`.
  * These are single idle poses with realistic proportions, so they are not a
  * drop-in replacement for the 4x4 walk sheets above.
  */
 export const HERO_PREVIEW_ART = {
-  male: { url: "/hero-preview-male.png", width: 361, height: 947, version: "1" },
-  female: { url: "/hero-preview-female.png", width: 329, height: 941, version: "1" }
+  male: { url: "/hero-preview-male.png", width: 480, height: 800, version: "2" },
+  female: { url: "/hero-preview-female.png", width: 480, height: 800, version: "2" }
+};
+
+/**
+ * Overlay equipment art used by the modular F3 paper-doll character sheet.
+ */
+export const HERO_PREVIEW_EQUIPMENT_LAYERS = {
+  helmet: {
+    "non-lang-khach": {
+      male: { url: "/hero-preview-hat-non-truc.png", version: "1" },
+      female: { url: "/hero-preview-hat-non-mang.png", version: "1" }
+    }
+  },
+  armor: {
+    "ao-lang-khach": {
+      male: { url: "/hero-preview-armor-lang-khach-male.png", version: "1" },
+      female: { url: "/hero-preview-armor-lang-khach-female.png", version: "1" }
+    }
+  },
+  pants: {
+    "quan-lang-khach": {
+      male: { url: "/hero-preview-pants-lang-khach-male.png", version: "1" },
+      female: { url: "/hero-preview-pants-lang-khach-female.png", version: "1" }
+    }
+  }
 };
 
 /**

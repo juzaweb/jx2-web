@@ -13,7 +13,7 @@
  * repeatedly (for example every frame from `showFormation`) is safe.
  */
 
-import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
+import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef } from "./heroBody.js";
 import { normalizeGender } from "./gender.js";
 
 /**
@@ -108,6 +108,24 @@ export function ensureSectVfx(scene, skills = []) {
  */
 export function ensureHeroBodyTexture(scene, gender) {
   const def = HERO_BODY_TEXTURES[normalizeGender(gender)];
+  if (!def) return false;
+  return ensureSpritesheet(scene, def.key, {
+    url: def.url,
+    frameWidth: HERO_BODY.frameWidth,
+    frameHeight: HERO_BODY.frameHeight
+  });
+}
+
+/**
+ * Queue an equipment spritesheet on demand unless it is already usable.
+ * @param {import("phaser").Scene} scene
+ * @param {string} slot - Equipment slot ("helmet", "armor", etc.)
+ * @param {string} itemId - Item ID ("non-truc", "ao-lang-khach", etc.)
+ * @param {"male"|"female"|string} [gender="male"]
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureEquipmentTexture(scene, slot, itemId, gender = "male") {
+  const def = equipmentTextureDef(slot, itemId, gender);
   if (!def) return false;
   return ensureSpritesheet(scene, def.key, {
     url: def.url,

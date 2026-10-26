@@ -392,6 +392,14 @@ export default {
     "lenh-bai-gm": {
       name: "GM Imperial Token",
       desc: "Supreme authority token of the GM. Opens admin control panel to grant levels, vitals, potions and map travel."
+    },
+    "ao-lang-khach": {
+      name: "Wanderer's Blue Robe",
+      desc: "A cross-collar wuxia robe woven from lightweight fabric, ideal for traveling the martial world."
+    },
+    "non-lang-khach": {
+      name: "Wanderer's Bamboo Hat",
+      desc: "A conical bamboo hat crafted by borderland artisans. Protects against sun and rain on the perilous journey."
     }
   },
   gm: {

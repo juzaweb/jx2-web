@@ -392,6 +392,14 @@ export default {
     "lenh-bai-gm": {
       name: "Lệnh Bài GM",
       desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
+    },
+    "ao-lang-khach": {
+      name: "Lam Y Lãng Khách",
+      desc: "Y phục vạt chéo giang hồ sơ nhập. Dệt từ vải thô nhẹ nhàng, tiện lợi cho việc bôn tẩu hành hiệp."
+    },
+    "non-lang-khach": {
+      name: "Nón Trúc Lãng Khách",
+      desc: "Nón đan từ nan tre trúc vùng biên ải. Che nắng che mưa, giúp hiệp khách giữ vững tâm trí khi phong ba bão táp."
     }
   },
   gm: {
