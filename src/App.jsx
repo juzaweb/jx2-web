@@ -76,7 +76,7 @@ const isGuestSession = (session) =>
  * closed on every entry, so a perfectly healthy handshake also reports "down"
  * for a few frames — without this delay every login would flash "Mất kết nối".
  */
-const CONNECTION_GATE_DELAY_MS = 600;
+const CONNECTION_GATE_DELAY_MS = 3000;
 
 /** True while the user is typing in a chat/modal field, where shortcuts must not fire. */
 const isTypingTarget = (target) => {
@@ -399,13 +399,13 @@ export function App() {
   // so a normal handshake never flashes it. The scene freezes itself at once;
   // this only governs what the player is told.
   useEffect(() => {
-    if (isNetworkConnected) {
+    if (isNetworkConnected || !activeCharacter) {
       setIsConnectionGated(false);
       return undefined;
     }
     const timer = setTimeout(() => setIsConnectionGated(true), CONNECTION_GATE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isNetworkConnected]);
+  }, [isNetworkConnected, activeCharacter]);
 
   // Closing the help overlay also lifts the pause it applied. Opening a docked
   // panel (character / inventory) dismisses help the same way.
@@ -701,6 +701,7 @@ export function App() {
     // player can still close either one with its × button.
     setIsMinimapOpen(true);
     setIsChatOpen(true);
+    setIsConnectionGated(false);
 
     writeSession({
       ...(readSession() || {}),
@@ -733,6 +734,7 @@ export function App() {
       clearSession();
       setCurrentUser(null);
       setActiveCharacter(null);
+      setIsConnectionGated(false);
       StorageManager.setUserId(null);
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
