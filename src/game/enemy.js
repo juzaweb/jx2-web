@@ -17,6 +17,9 @@ const NAME_OFFSET = 29;
  */
 const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
 
+/** Pre-calculated squared bite range for fast collision distance check. */
+const BITE_RANGE_SQ = BITE_TUNING.range * BITE_TUNING.range;
+
 /** Client-driven respawn delay for regular monsters; a boss overrides it. */
 export const OFFLINE_RESPAWN_MS = 9000;
 
@@ -168,13 +171,22 @@ export class Enemy {
     this.nameText.setPosition(iso.x, iso.y - NAME_OFFSET * S);
     this.nameText.setDepth(depth + 3);
 
-    const distance = Phaser.Math.Distance.Between(player.x, player.y, x, y);
-    this.nameText.setVisible(distance <= NAME_VISIBLE_RANGE);
+    // Fast bounding-box pre-checks & squared distance calculations to avoid Math.hypot overhead in loop
+    const dx = player.x - x;
+    const dy = player.y - y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
 
-    if (distance < BITE_TUNING.range && time > this.nextBite) {
-      this.nextBite = time + BITE_TUNING.cooldownMs;
-      if (typeof onBite === "function") {
-        onBite(this);
+    const isNameVisible = absDx <= NAME_VISIBLE_RANGE && absDy <= NAME_VISIBLE_RANGE && (dx * dx + dy * dy) <= NAME_VISIBLE_RANGE * NAME_VISIBLE_RANGE;
+    this.nameText.setVisible(isNameVisible);
+
+    if (absDx < BITE_TUNING.range && absDy < BITE_TUNING.range) {
+      const distSq = dx * dx + dy * dy;
+      if (distSq < BITE_RANGE_SQ && time > this.nextBite) {
+        this.nextBite = time + BITE_TUNING.cooldownMs;
+        if (typeof onBite === "function") {
+          onBite(this);
+        }
       }
     }
   }
@@ -360,6 +372,7 @@ export class EnemyManager {
   constructor(scene) {
     this.scene = scene;
     this.enemies = [];
+    this.enemyMap = new Map(); // O(1) lookup map by enemy id
     this.group = null;
   }
 
@@ -391,6 +404,7 @@ export class EnemyManager {
     const enemy = new Enemy(this.scene, x, y, id, monsterId);
     this.group?.add(enemy.sprite);
     this.enemies.push(enemy);
+    this.enemyMap.set(id, enemy);
     return enemy;
   }
 
@@ -402,6 +416,7 @@ export class EnemyManager {
   clear() {
     this.enemies.forEach((enemy) => enemy.destroy());
     this.enemies = [];
+    this.enemyMap.clear();
     // Each enemy already released its own sprite, so only the group entries go.
     this.group?.clear(false, false);
   }
@@ -436,7 +451,7 @@ export class EnemyManager {
    * @returns {Wolf|null}
    */
   getById(id) {
-    return this.enemies.find((wolf) => wolf.id === id) || null;
+    return this.enemyMap.get(id) || this.enemies.find((wolf) => wolf.id === id) || null;
   }
 
   /**
@@ -467,6 +482,7 @@ export class EnemyManager {
         );
         this.group.add(enemy.sprite);
         this.enemies.push(enemy);
+        this.enemyMap.set(state.id, enemy);
       }
       this.applyEnemyState(state);
     });
@@ -511,7 +527,9 @@ export function isPointOnEnemy(enemy, x, y) {
   }
 
   const fallbackRadius = isBoss ? 140 : 90;
-  return Math.hypot(x - ex, y - ey) <= fallbackRadius;
+  const dx = x - ex;
+  const dy = y - ey;
+  return dx * dx + dy * dy <= fallbackRadius * fallbackRadius;
 }
 
 /**
@@ -528,14 +546,16 @@ export function findEnemyAt(enemies, x, y) {
   }
 
   let best = null;
-  let bestDist = Infinity;
+  let bestDistSq = Infinity;
   for (const enemy of enemies) {
     if (!enemy || enemy.isDead || enemy.active === false) continue;
     if (isPointOnEnemy(enemy, x, y)) {
-      const dist = Math.hypot(x - enemy.x, y - enemy.y);
-      if (dist < bestDist) {
+      const dx = x - enemy.x;
+      const dy = y - enemy.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < bestDistSq) {
         best = enemy;
-        bestDist = dist;
+        bestDistSq = distSq;
       }
     }
   }
