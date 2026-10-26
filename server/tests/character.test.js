@@ -9,6 +9,7 @@ describe("Character API Test Suite", () => {
   let baseUrl;
   let testDataDir;
   let userSeq = 0;
+  let createSessionToken;
 
   const nextUser = () => `user_char_test_${++userSeq}`;
 
@@ -18,6 +19,9 @@ describe("Character API Test Suite", () => {
     // so this suite never contends with the other suites' shared database.
     process.env.DB_PATH = path.join(testDataDir, "characters.sqlite");
     process.env.NODE_ENV = "test";
+
+    const sessionModule = await import("../src/auth/session.js");
+    createSessionToken = sessionModule.createSessionToken;
 
     const { createApp } = await import("../src/app.js");
 
@@ -40,9 +44,28 @@ describe("Character API Test Suite", () => {
     }
   });
 
-  test("GET /users/:id/characters returns an empty list for a fresh account", async () => {
+  test("GET /users/:id/characters returns 401 when unauthenticated", async () => {
     const userId = nextUser();
     const res = await fetch(`${baseUrl}/users/${userId}/characters`);
+    assert.equal(res.status, 401);
+  });
+
+  test("GET /users/:id/characters returns 403 when trying to access another user's characters", async () => {
+    const userId = nextUser();
+    const otherUser = nextUser();
+    const token = createSessionToken(otherUser);
+    const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    assert.equal(res.status, 403);
+  });
+
+  test("GET /users/:id/characters returns an empty list for a fresh account", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     assert.equal(res.status, 200);
     const json = await res.json();
     assert.equal(json.success, true);
@@ -52,9 +75,13 @@ describe("Character API Test Suite", () => {
 
   test("POST /users/:id/characters creates a character", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Tiêu Phong", sect: "nga-my" })
     });
     assert.equal(res.status, 201);
@@ -67,7 +94,9 @@ describe("Character API Test Suite", () => {
     assert.equal(json.data.character.userId, userId);
     assert.ok(json.data.character.id);
 
-    const list = await fetch(`${baseUrl}/users/${userId}/characters`).then((r) => r.json());
+    const list = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((r) => r.json());
     assert.equal(list.data.characters.length, 1);
     assert.equal(list.data.characters[0].sect, "nga-my");
     assert.equal(list.data.characters[0].gender, "female");
@@ -75,9 +104,13 @@ describe("Character API Test Suite", () => {
 
   test("a new character starts with the shared starter kit", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Tân Thủ", sect: "thieu-lam" })
     }).then((r) => r.json());
 
@@ -95,10 +128,14 @@ describe("Character API Test Suite", () => {
   test("an admin account receives the GM item in the starter kit", async () => {
     const { userDb } = await import("../src/data/userDb.js");
     const adminUser = userDb.register("admin_char_test", "123456", "AdminChar");
+    const token = createSessionToken(adminUser.id);
 
     const created = await fetch(`${baseUrl}/users/${adminUser.id}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "AdminHero", sect: "thieu-lam" })
     }).then((r) => r.json());
 
@@ -113,9 +150,13 @@ describe("Character API Test Suite", () => {
   test("the starter kit is never granted twice and never replaces a played bag", async () => {
     const { store } = await import("../src/data/playerDb.js");
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Lão Luyện", sect: "vo-dang" })
     }).then((r) => r.json());
     const characterId = created.data.character.id;
@@ -135,9 +176,13 @@ describe("Character API Test Suite", () => {
 
   test("POST defaults to Thiếu Lâm (male) when sect is omitted", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Vô Danh" })
     }).then((r) => r.json());
     assert.equal(created.data.character.sect, "thieu-lam");
@@ -146,9 +191,13 @@ describe("Character API Test Suite", () => {
 
   test("POST persists the chosen sect and derives its gender (400 on invalid)", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Độc Cô", sect: "ngu-doc" })
     });
     assert.equal(created.status, 201);
@@ -158,7 +207,10 @@ describe("Character API Test Suite", () => {
 
     const female = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Nga My Nữ", sect: "nga-my" })
     }).then((r) => r.json());
     assert.equal(female.data.character.sect, "nga-my");
@@ -166,7 +218,10 @@ describe("Character API Test Suite", () => {
 
     const bad = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Sai Môn Phái", sect: "bogus" })
     });
     assert.equal(bad.status, 400);
@@ -174,14 +229,21 @@ describe("Character API Test Suite", () => {
 
   test("POST rejects a duplicate character name in the same account (409)", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Lệnh Hồ Xung" })
     });
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "lệnh hồ xung" })
     });
     assert.equal(res.status, 409);
@@ -190,16 +252,26 @@ describe("Character API Test Suite", () => {
   });
 
   test("POST rejects a name already used by another account (global uniqueness, 409)", async () => {
-    const first = await fetch(`${baseUrl}/users/${nextUser()}/characters`, {
+    const user1 = nextUser();
+    const token1 = createSessionToken(user1);
+    const first = await fetch(`${baseUrl}/users/${user1}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token1}`
+      },
       body: JSON.stringify({ name: "Tieu Phong" })
     });
     assert.equal(first.status, 201);
 
-    const res = await fetch(`${baseUrl}/users/${nextUser()}/characters`, {
+    const user2 = nextUser();
+    const token2 = createSessionToken(user2);
+    const res = await fetch(`${baseUrl}/users/${user2}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token2}`
+      },
       body: JSON.stringify({ name: "tieu phong" })
     });
     assert.equal(res.status, 409);
@@ -209,9 +281,13 @@ describe("Character API Test Suite", () => {
 
   test("POST rejects an invalid name (400)", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "a" })
     });
     assert.equal(res.status, 400);
@@ -221,17 +297,24 @@ describe("Character API Test Suite", () => {
 
   test("POST enforces the 3-slot limit (409)", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     for (const name of ["Nhân Vật 1", "Nhân Vật 2", "Nhân Vật 3"]) {
       const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({ name })
       });
       assert.equal(res.status, 201);
     }
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Nhân Vật 4" })
     });
     assert.equal(res.status, 409);
@@ -239,16 +322,23 @@ describe("Character API Test Suite", () => {
 
   test("DELETE permanently removes a character and frees its name", async () => {
     const otherUser = nextUser();
+    const otherToken = createSessionToken(otherUser);
     const userId = nextUser();
+    const token = createSessionToken(userId);
+
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({ name: "Vô Kỵ" })
     }).then((r) => r.json());
     const { id } = created.data.character;
 
     const delRes = await fetch(`${baseUrl}/users/${userId}/characters/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
     });
     assert.equal(delRes.status, 200);
     const delJson = await delRes.json();
@@ -257,7 +347,10 @@ describe("Character API Test Suite", () => {
     // The name is released and can be claimed by any account afterwards.
     const recreated = await fetch(`${baseUrl}/users/${otherUser}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${otherToken}`
+      },
       body: JSON.stringify({ name: "Vô Kỵ" })
     });
     assert.equal(recreated.status, 201);
@@ -265,8 +358,10 @@ describe("Character API Test Suite", () => {
 
   test("DELETE returns 404 for an unknown character", async () => {
     const userId = nextUser();
+    const token = createSessionToken(userId);
     const res = await fetch(`${baseUrl}/users/${userId}/characters/char_missing`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
     });
     assert.equal(res.status, 404);
   });
