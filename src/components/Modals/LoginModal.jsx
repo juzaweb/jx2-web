@@ -4,7 +4,6 @@ import { writeSession } from "../../game/session.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 import { LobbyScene } from "../LobbyScene.jsx";
-import { requestLandscapeFullscreen } from "../../game/orientation.js";
 import { SERVER_NAME } from "../../game/serverConfig.js";
 import "../../styles/login.css";
 
@@ -161,7 +160,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         writeSession(session);
 
         setSuccessMsg(t("login.success.login"));
-        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);
@@ -184,7 +182,6 @@ export function LoginModal({ isOpen, onLoginSuccess, onClose }) {
         writeSession(session);
 
         setSuccessMsg(t("login.success.register"));
-        requestLandscapeFullscreen();
         setTimeout(() => {
           onLoginSuccess(session);
         }, 600);

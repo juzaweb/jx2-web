@@ -763,19 +763,21 @@ export function App() {
 
   return (
     <main id="game-shell">
-      {/* Mobile Portrait Orientation Prompt */}
-      <div className="mobile-orientation-hint">
-        <div className="mobile-orientation-icon">📱</div>
-        <div className="mobile-orientation-title">{t("app.rotateDeviceTitle")}</div>
-        <div className="mobile-orientation-desc">{t("app.rotateDeviceDesc")}</div>
-        <button
-          type="button"
-          className="mobile-orientation-btn"
-          onClick={() => requestLandscapeFullscreen(true)}
-        >
-          {t("app.rotateDeviceButton")}
-        </button>
-      </div>
+      {/* Mobile Portrait Orientation Prompt (only after entering the game) */}
+      {activeCharacter && (
+        <div className="mobile-orientation-hint">
+          <div className="mobile-orientation-icon">📱</div>
+          <div className="mobile-orientation-title">{t("app.rotateDeviceTitle")}</div>
+          <div className="mobile-orientation-desc">{t("app.rotateDeviceDesc")}</div>
+          <button
+            type="button"
+            className="mobile-orientation-btn"
+            onClick={() => requestLandscapeFullscreen(true)}
+          >
+            {t("app.rotateDeviceButton")}
+          </button>
+        </div>
+      )}
 
       {/* Phaser Canvas Engine — engine chunk is loaded on demand */}
       <Suspense

@@ -4,7 +4,6 @@ import "../../styles/character-select.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 import { LobbyScene } from "../LobbyScene.jsx";
-import { requestLandscapeFullscreen } from "../../game/orientation.js";
 import { SERVER_NAME } from "../../game/serverConfig.js";
 
 const NAME_MIN = 2;
@@ -187,7 +186,6 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
       setError(t("characterSelect.errors.selectToStart"));
       return;
     }
-    requestLandscapeFullscreen();
     onStart(selected);
   };
 
