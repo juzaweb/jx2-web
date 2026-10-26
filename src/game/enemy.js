@@ -115,7 +115,7 @@ export class Enemy {
    * @param {{x:number, y:number}} player local hero, used for label culling
    */
   update(time, delta, player) {
-    if (!this.sprite.active) return;
+    if (!this.active) return;
 
     // The server owns monster life: it sends `enemy_respawned` when a monster is
     // back, so a dead one simply stops rendering until that snapshot arrives.
@@ -206,7 +206,7 @@ export class Enemy {
    * @param {{x?:number,y?:number,hp?:number,isDead?:boolean}} state
    */
   applyServerState(state = {}) {
-    if (!this.sprite.active) return;
+    if (!this.active) return;
 
     const previousHp = this.hp;
     const next = reconcileEnemyState(
@@ -238,29 +238,33 @@ export class Enemy {
    * Brief white-out on the monster after a landed hit.
    */
   flashHit() {
+    if (!this.wolfVisual) return;
     this.wolfVisual.setAlpha(0.45);
-    this.scene.time.delayedCall(100, () => {
-      if (this.sprite.active && !this.isDead) {
-        this.wolfVisual.setAlpha(1);
-      }
+    this.scene?.time?.delayedCall?.(100, () => {
+      // A maps change / roster reload can destroy this monster inside the flash
+      // window. Touching the torn-down sprite here would throw from Phaser's
+      // clock callback, which kills the game loop and freezes the hero.
+      if (!this.sprite || this.isDead) return;
+      this.wolfVisual?.setAlpha(1);
     });
   }
 
   die() {
+    if (!this.sprite) return;
     this.isDead = true;
-    this.sprite.body.enable = false;
-    this.wolfVisual.setVisible(false);
-    this.hpBack.setVisible(false);
-    this.hpFill.setVisible(false);
-    this.nameText.setVisible(false);
+    if (this.sprite.body) this.sprite.body.enable = false;
+    this.wolfVisual?.setVisible(false);
+    this.hpBack?.setVisible(false);
+    this.hpFill?.setVisible(false);
+    this.nameText?.setVisible(false);
   }
 
   revive() {
-    if (!this.sprite.active) return;
+    if (!this.active) return;
     this.isDead = false;
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
-    this.sprite.body.enable = true;
+    if (this.sprite.body) this.sprite.body.enable = true;
     this.wolfVisual.setVisible(true);
     this.wolfVisual.setAlpha(1);
     this.hpBack.setVisible(true);

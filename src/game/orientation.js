@@ -22,6 +22,26 @@ export function isMobileDevice() {
 }
 
 /**
+ * Whether the on-screen touch controls are in play. Mirrors the media query
+ * that reveals `.mobile-controls` in `src/index.css` (phone/tablet, coarse
+ * pointer, or a viewport too narrow/short for the desktop HUD). There is no
+ * cursor there, which is why gameplay needs auto-targeting.
+ * @returns {boolean}
+ */
+export function usesTouchControls() {
+  if (typeof window === "undefined") return false;
+  if (isMobileDevice()) return true;
+
+  if (typeof window.matchMedia === "function") {
+    if (window.matchMedia("(pointer: coarse)")?.matches) return true;
+    if (window.matchMedia("(max-width: 960px)")?.matches) return true;
+    if (window.matchMedia("(max-height: 500px)")?.matches) return true;
+  }
+
+  return false;
+}
+
+/**
  * Attempts to trigger browser Fullscreen and lock screen orientation to landscape.
  * Must be called within a user gesture (e.g., click or touch event handler).
  * @param {boolean} [force=false] - Whether to request landscape fullscreen regardless of mobile check.

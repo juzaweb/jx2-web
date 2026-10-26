@@ -19,6 +19,9 @@ import { shouldReportPosition } from "./positionSync.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { usesTouchControls } from "./orientation.js";
+import { pickAutoTarget } from "./autoTarget.js";
+import { TargetRing } from "./targetRing.js";
 import { DEFAULT_CURSOR, applyCursor, cursorForGroundPoint } from "./hoverCursor.js";
 import {
   DEFAULT_MAP_ID,
@@ -155,6 +158,11 @@ export class JiangHuScene extends Phaser.Scene {
     this.pvpTarget = null;
     /** Monster locked for combat: walk into range, then strike (see updateEnemyTarget). */
     this.enemyTarget = null;
+    /** Touch layout has no cursor, so a victim is picked and ringed for the player. */
+    this.autoTargetEnabled = usesTouchControls();
+    /** The ringed victim (see updateAutoTarget). Passive: it never moves the hero. */
+    this.autoTarget = null;
+    this.autoTargetRing = new TargetRing(this);
 
     // Seed the name from the cached session; App re-emits SET_PLAYER_NAME once it
     // has refreshed the profile from the backend.
@@ -551,6 +559,9 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_START, () => this.startGame()),
       bridge.on(EVENTS.ACTION_ATTACK, () => {
         if (!this.started || this.isPaused) return;
+        // Touch: the ringed auto-target is the player's intent, so the tap walks
+        // the hero onto it and keeps striking instead of swinging at empty air.
+        if (this.autoTargetEnabled && this.focusAutoTarget()) return;
         // A locked duellist takes priority: press attack to close the gap, not
         // to swing at air when the peer is still across the square.
         if (this.pvpTarget) {
@@ -562,12 +573,8 @@ export class JiangHuScene extends Phaser.Scene {
       bridge.on(EVENTS.ACTION_CAST_SKILL, ({ skillId } = {}) => {
         if (!this.started || this.isPaused || !skillId) return;
         // Same aim the number keys use: the projectile follows the pointer
-        // instead of whatever direction the hero last walked.
-        const pointer = this.input.activePointer;
-        this.combat.castSkillById(
-          skillId,
-          pointer ? fromIso(pointer.worldX, pointer.worldY) : null
-        );
+        // (desktop) or the ringed auto-target (touch), never the last footstep.
+        this.combat.castSkillById(skillId, this.castAimPoint());
       }),
       bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
         if (this.started && quickSlots) {
@@ -861,11 +868,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     const boundSkillId = skillIdFromBinding(binding);
     if (boundSkillId) {
-      const pointer = this.input.activePointer;
-      this.combat.castSkillById(
-        boundSkillId,
-        pointer ? fromIso(pointer.worldX, pointer.worldY) : null
-      );
+      // Same aim as the mobile arc: pointer on desktop, auto-target on touch.
+      this.combat.castSkillById(boundSkillId, this.castAimPoint());
       return;
     }
 
@@ -1659,8 +1663,111 @@ export class JiangHuScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Pick the victim the touch controls aim at and paint the ring under its feet.
+   *
+   * Passive by design: it never walks or strikes on its own, so a player can
+   * cross a monster-infested road without the hero randomly charging. The ring
+   * is the promise that the next attack/skill goes there.
+   */
+  updateAutoTarget() {
+    if (!this.autoTargetEnabled) return;
+
+    // A chase already under way owns the ring: re-picking every frame would make
+    // the halo hop to whichever monster happens to be closer mid-fight.
+    const locked = this.lockedAutoTarget();
+    const next = locked ||
+      pickAutoTarget({
+        player: this.player,
+        selfId: this.combat?.localPlayerId || null,
+        enemies: this.enemyManager?.getAlive?.() || [],
+        peers: this.remotePlayerManager?.getAll?.() || [],
+        // Raising the PK flag is the player saying "a duel is what I want".
+        preferPlayers: this.player?.pkFlag === true
+      });
+
+    this.autoTarget = next;
+
+    if (!next) {
+      this.autoTargetRing?.hide();
+      return;
+    }
+
+    this.autoTargetRing?.show(next.target.x, next.target.y, next.kind);
+  }
+
+  /**
+   * The target an attack press committed to, if it is still worth chasing.
+   * @returns {{target:Object, kind:"player"|"monster"}|null}
+   */
+  lockedAutoTarget() {
+    const peer = this.pvpTarget;
+    if (peer && peer.pkFlag === true && peer.container?.active !== false) {
+      return { target: peer, kind: "player" };
+    }
+
+    const enemy = this.enemyTarget;
+    if (enemy && !enemy.isDead && enemy.active !== false) {
+      return { target: enemy, kind: "monster" };
+    }
+
+    return null;
+  }
+
+  /** Drop the auto-target and its ring (pause, teardown, no victim). */
+  clearAutoTarget() {
+    this.autoTarget = null;
+    this.autoTargetRing?.hide();
+  }
+
+  /**
+   * Commit the attack button to the ringed target: a monster becomes the locked
+   * enemy target and a duellist the PvP target, so the existing chase walks the
+   * hero into reach and keeps striking until the target is gone.
+   * @returns {boolean} whether the auto-target consumed the attack
+   */
+  focusAutoTarget() {
+    const target = this.autoTarget?.target;
+    if (!target) return false;
+
+    if (this.autoTarget.kind === "player") {
+      // The server refuses every hit from a peaceful hero, so fall through to
+      // the normal swing instead of starting a chase that can never land.
+      if (this.player?.pkFlag !== true) return false;
+      this.pvpTarget = target;
+      this.enemyTarget = null;
+      this.updatePvpTarget();
+      return true;
+    }
+
+    this.enemyTarget = target;
+    this.pvpTarget = null;
+    this.updateEnemyTarget();
+    return true;
+  }
+
+  /**
+   * Where a skill cast should fly. The touch layout has no cursor, so the
+   * auto-target is the aim; with nothing to hit the skill follows the hero's
+   * facing (a null aim) instead of a stale finger position on the HUD.
+   * @returns {{x:number,y:number}|null}
+   */
+  castAimPoint() {
+    if (this.autoTargetEnabled) {
+      const target = this.autoTarget?.target;
+      return target ? { x: target.x, y: target.y } : null;
+    }
+
+    const pointer = this.input.activePointer;
+    return pointer ? fromIso(pointer.worldX, pointer.worldY) : null;
+  }
+
   update(time, delta) {
-    if (!this.started || this.isPaused || !this.player) return;
+    if (!this.started || this.isPaused || !this.player) {
+      // A paused scene draws nothing new, so the halo must not linger on screen.
+      this.clearAutoTarget();
+      return;
+    }
 
     // Update player movement and animation
     this.player.update(time, delta);
@@ -1670,6 +1777,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.updatePvpTarget();
     // Close on a targeted enemy and strike once in range.
     this.updateEnemyTarget();
+    // Keep the touch auto-target ring on the best nearby victim.
+    this.updateAutoTarget();
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 
@@ -1778,6 +1887,11 @@ export class JiangHuScene extends Phaser.Scene {
       this.shopFlow.destroy();
       this.shopFlow = null;
     }
+    if (this.autoTargetRing) {
+      this.autoTargetRing.destroy();
+      this.autoTargetRing = null;
+    }
+    this.autoTarget = null;
     if (this.stage) {
       this.stage.destroy();
       this.stage = null;

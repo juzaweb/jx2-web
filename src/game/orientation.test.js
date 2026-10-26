@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { isMobileDevice, requestLandscapeFullscreen } from "./orientation.js";
+import { isMobileDevice, requestLandscapeFullscreen, usesTouchControls } from "./orientation.js";
 
 describe("orientation.js", () => {
   let originalUserAgent;
   let originalInnerWidth;
+  let originalMatchMedia;
 
   beforeEach(() => {
     vi.restoreAllMocks();
     originalUserAgent = window.navigator.userAgent;
     originalInnerWidth = window.innerWidth;
+    originalMatchMedia = window.matchMedia;
   });
 
   afterEach(() => {
@@ -21,11 +23,15 @@ describe("orientation.js", () => {
       value: originalInnerWidth,
       configurable: true
     });
+    Object.defineProperty(window, "matchMedia", {
+      value: originalMatchMedia,
+      configurable: true,
+      writable: true
+    });
   });
 
   describe("isMobileDevice", () => {
-    it("detects mobile user agents (Android, iPhone, iPad)", () => {
-      Object.defineProperty(window.navigator, "userAgent", {
+    it("detects mobile user agents (Android, iPhone, iPad)", () => {      Object.defineProperty(window.navigator, "userAgent", {
         value: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
         configurable: true
       });
@@ -74,8 +80,7 @@ describe("orientation.js", () => {
   });
 
   describe("requestLandscapeFullscreen", () => {
-    it("skips execution on desktop when force is false", async () => {
-      Object.defineProperty(window.navigator, "userAgent", {
+    it("skips execution on desktop when force is false", async () => {      Object.defineProperty(window.navigator, "userAgent", {
         value: "Desktop Chrome",
         configurable: true
       });
@@ -133,6 +138,54 @@ describe("orientation.js", () => {
 
       const result = await requestLandscapeFullscreen(true);
       expect(result).toBe(false);
+    });
+  });
+
+  describe("usesTouchControls", () => {
+    const stubMatchMedia = (matchesByQuery) => {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        writable: true,
+        value: (query) => ({ matches: Boolean(matchesByQuery[query]) })
+      });
+    };
+
+    const setDesktop = () => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        configurable: true
+      });
+      Object.defineProperty(window.navigator, "maxTouchPoints", {
+        value: 0,
+        configurable: true
+      });
+      Object.defineProperty(window, "innerWidth", { value: 1920, configurable: true });
+    };
+
+    it("is true on a mobile device", () => {
+      Object.defineProperty(window.navigator, "userAgent", {
+        value: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)",
+        configurable: true
+      });
+      stubMatchMedia({});
+
+      expect(usesTouchControls()).toBe(true);
+    });
+
+    it("follows the touch-layout media queries on desktop", () => {
+      setDesktop();
+
+      stubMatchMedia({ "(pointer: coarse)": true });
+      expect(usesTouchControls()).toBe(true);
+
+      stubMatchMedia({ "(max-width: 960px)": true });
+      expect(usesTouchControls()).toBe(true);
+
+      stubMatchMedia({ "(max-height: 500px)": true });
+      expect(usesTouchControls()).toBe(true);
+
+      stubMatchMedia({});
+      expect(usesTouchControls()).toBe(false);
     });
   });
 });

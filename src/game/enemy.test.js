@@ -156,6 +156,44 @@ describe("EnemyManager roster lifecycle", () => {
   });
 });
 
+describe("Wolf survives teardown with timers in flight", () => {
+  it("does not crash when the hit flash timer fires after the monster is gone", () => {
+    const scene = createScene();
+    const pending = [];
+    scene.time.delayedCall = (ms, callback) => pending.push(callback);
+    const wolf = new Wolf(scene, 840, 600, 0);
+
+    wolf.flashHit();
+    expect(pending).toHaveLength(1);
+
+    // A map change / roster reload tears the monster down inside the flash
+    // window; the scene clock still fires the callback afterwards.
+    wolf.destroy();
+    expect(wolf.sprite).toBeNull();
+    expect(() => pending.forEach((callback) => callback())).not.toThrow();
+  });
+
+  it("ignores late snapshots and life changes after teardown", () => {
+    const { wolf } = createWolf();
+    wolf.destroy();
+
+    expect(() => wolf.applyServerState({ hp: 1, x: 10, y: 10 })).not.toThrow();
+    expect(() => wolf.die()).not.toThrow();
+    expect(() => wolf.revive()).not.toThrow();
+    expect(() => wolf.update(0, 16, player(840, 600), () => {})).not.toThrow();
+  });
+
+  it("still restores the monster when a respawn lands before teardown", () => {
+    const { wolf } = createWolf();
+    wolf.isDead = true;
+
+    wolf.revive();
+
+    expect(wolf.isDead).toBe(false);
+    expect(wolf.hp).toBe(wolf.maxHp);
+  });
+});
+
 const player = (x, y) => ({ x, y, sprite: { x, y } });
 
 describe("Wolf movement is server-owned", () => {

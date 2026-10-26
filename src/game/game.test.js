@@ -383,3 +383,151 @@ describe("JiangHuScene.handleGmAction", () => {
     expect(addLog).toHaveBeenCalled();
   });
 });
+
+describe("JiangHuScene touch auto-targeting", () => {
+  const wolf = (overrides = {}) => ({
+    id: "wolf",
+    x: 100,
+    y: 0,
+    isDead: false,
+    active: true,
+    ...overrides
+  });
+
+  const rival = (overrides = {}) => ({
+    id: "rival",
+    x: 120,
+    y: 0,
+    pkFlag: true,
+    container: { active: true },
+    ...overrides
+  });
+
+  /** A scene whose prototype methods are the real ones, with stubbed collaborators. */
+  const touchScene = (overrides = {}) =>
+    Object.assign(Object.create(JiangHuScene.prototype), {
+      autoTargetEnabled: true,
+      autoTarget: null,
+      pvpTarget: null,
+      enemyTarget: null,
+      autoTargetRing: { show: vi.fn(), hide: vi.fn() },
+      player: { x: 0, y: 0, pkFlag: false },
+      enemyManager: { getAlive: () => [] },
+      remotePlayerManager: { getAll: () => [] },
+      combat: { localPlayerId: "me" },
+      updateEnemyTarget: vi.fn(),
+      updatePvpTarget: vi.fn(),
+      ...overrides
+    });
+
+  it("rings the closest monster and remembers it", () => {
+    const target = wolf();
+    const scene = touchScene({ enemyManager: { getAlive: () => [wolf({ x: 400 }), target] } });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toEqual({ target, kind: "monster" });
+    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(100, 0, "monster");
+  });
+
+  it("prefers a flagged rival while the hero flies the PK flag", () => {
+    const opponent = rival({ x: 500 });
+    const scene = touchScene({
+      player: { x: 0, y: 0, pkFlag: true },
+      enemyManager: { getAlive: () => [wolf({ x: 30 })] },
+      remotePlayerManager: { getAll: () => [opponent] }
+    });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toEqual({ target: opponent, kind: "player" });
+    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(500, 0, "player");
+  });
+
+  it("keeps the ring on the chase already under way", () => {
+    const locked = wolf({ id: "locked", x: 300 });
+    const closer = wolf({ id: "closer", x: 10 });
+    const scene = touchScene({
+      enemyTarget: locked,
+      enemyManager: { getAlive: () => [closer, locked] }
+    });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget.target).toBe(locked);
+  });
+
+  it("drops the ring and the target when nothing is left", () => {
+    const scene = touchScene({ enemyTarget: wolf({ isDead: true }) });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toBeNull();
+    expect(scene.autoTargetRing.hide).toHaveBeenCalled();
+  });
+
+  it("shows nothing when the layout has a cursor", () => {
+    const scene = touchScene({ autoTargetEnabled: false, enemyManager: { getAlive: () => [wolf()] } });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toBeNull();
+    expect(scene.autoTargetRing.show).not.toHaveBeenCalled();
+  });
+
+  it("aims a cast at the auto-target on touch", () => {
+    const target = wolf();
+    const scene = touchScene({ autoTarget: { target, kind: "monster" } });
+
+    expect(scene.castAimPoint()).toEqual({ x: 100, y: 0 });
+  });
+
+  it("aims a cast nowhere when touch has no target", () => {
+    expect(touchScene().castAimPoint()).toBeNull();
+  });
+
+  it("keeps the pointer aim on desktop", () => {
+    const scene = touchScene({
+      autoTargetEnabled: false,
+      input: { activePointer: { worldX: 42, worldY: 24 } }
+    });
+
+    expect(scene.castAimPoint()).toEqual({ x: 42, y: 24 });
+  });
+
+  it("commits an attack to the ringed monster", () => {
+    const target = wolf();
+    const scene = touchScene({
+      autoTarget: { target, kind: "monster" },
+      pvpTarget: rival()
+    });
+
+    expect(scene.focusAutoTarget()).toBe(true);
+    expect(scene.enemyTarget).toBe(target);
+    expect(scene.pvpTarget).toBeNull();
+    expect(scene.updateEnemyTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits an attack to the ringed rival only while PK is on", () => {
+    const target = rival();
+    const peaceful = touchScene({ autoTarget: { target, kind: "player" } });
+
+    expect(peaceful.focusAutoTarget()).toBe(false);
+    expect(peaceful.pvpTarget).toBeNull();
+    expect(peaceful.updatePvpTarget).not.toHaveBeenCalled();
+
+    const duellist = touchScene({
+      autoTarget: { target, kind: "player" },
+      player: { x: 0, y: 0, pkFlag: true }
+    });
+
+    expect(duellist.focusAutoTarget()).toBe(true);
+    expect(duellist.pvpTarget).toBe(target);
+    expect(duellist.enemyTarget).toBeNull();
+    expect(duellist.updatePvpTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls through when there is nothing ringed", () => {
+    expect(touchScene().focusAutoTarget()).toBe(false);
+  });
+});
