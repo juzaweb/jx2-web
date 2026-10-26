@@ -9,6 +9,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
+// Load variables from .env (if present) so values like VITE_API_BASE are honored.
+// process.loadEnvFile does not override variables already set in the environment.
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(path.join(rootDir, ".env"));
+  } catch (err) {
+    if (err && err.code !== "ENOENT") {
+      console.warn(`[Launcher] Failed to load .env: ${err.message}`);
+    }
+  }
+}
+
 // CLI arguments parsing and forward support for Vite
 const rawArgs = process.argv.slice(2);
 const viteForwardArgs = [];

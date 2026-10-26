@@ -98,7 +98,8 @@ export default {
     help: "Guide",
     pkTitle: "Toggle PK flag",
     pkOn: "PK",
-    pkOff: "Peace"
+    pkOff: "Peace",
+    logout: "Logout"
   },
   help: {
     eyebrow: "TRAVELER'S HANDBOOK",

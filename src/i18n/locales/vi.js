@@ -98,7 +98,8 @@ export default {
     help: "Cẩm Nang",
     pkTitle: "Bật/tắt cờ PK",
     pkOn: "PK",
-    pkOff: "Hòa Bình"
+    pkOff: "Hòa Bình",
+    logout: "Đăng Xuất"
   },
   help: {
     eyebrow: "CẨM NANG HÀNH TẨU",

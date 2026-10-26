@@ -5,6 +5,7 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 import { LobbyScene } from "../LobbyScene.jsx";
 import { SERVER_NAME } from "../../game/serverConfig.js";
+import { readSession } from "../../game/session.js";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
@@ -78,7 +79,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
 
   const reload = useCallback(async () => {
     setLoadError(null);
-    const data = await apiClient.listCharacters(user.id);
+    const data = await apiClient.listCharacters(user.id, user?.token || readSession()?.token);
     applyData(data);
     return data;
   }, [user?.id, applyData]);
@@ -145,7 +146,8 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
       const data = await apiClient.createCharacter(
         user.id,
         cleanName,
-        activeSect.key
+        activeSect.key,
+        user?.token || readSession()?.token
       );
       const createdId = data?.character?.id;
       await reload();
@@ -171,7 +173,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
     setError("");
     setNotice("");
     try {
-      await apiClient.deleteCharacter(user.id, selected.id);
+      await apiClient.deleteCharacter(user.id, selected.id, user?.token || readSession()?.token);
       await reload();
       setNotice(t("characterSelect.notice.deleted", { name: selected.name }));
     } catch (err) {

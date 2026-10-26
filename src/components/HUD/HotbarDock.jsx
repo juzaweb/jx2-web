@@ -201,6 +201,15 @@ export function HotbarDock({
             <span className="sys-ico">⚔️</span>
             <span className="sys-lbl">{pkEnabled ? t("hotbar.pkOn") : t("hotbar.pkOff")}</span>
           </button>
+          <button
+            className="sys-btn"
+            id="logout-btn"
+            title={t("hotbar.logout")}
+            onClick={onLogout}
+          >
+            <span className="sys-ico">🚪</span>
+            <span className="sys-lbl">{t("hotbar.logout")}</span>
+          </button>
         </div>
       </div>
     </section>

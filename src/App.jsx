@@ -275,7 +275,7 @@ export function App() {
 
     (async () => {
       try {
-        const profile = await apiClient.getProfile(sessionUser.id);
+        const profile = await apiClient.getProfile(sessionUser.id, sessionUser.token || readSession()?.token);
         // The cached session may have been replaced (logout, account switch) while
         // the request was in flight; never overwrite a newer session with an older one.
         if (!isMounted || !profile || !isSessionUser(sessionUser.id)) return;
@@ -291,7 +291,7 @@ export function App() {
         }
 
         // Validate that cached activeCharacter still exists on the server
-        const charData = await apiClient.listCharacters(sessionUser.id);
+        const charData = await apiClient.listCharacters(sessionUser.id, sessionUser.token || readSession()?.token);
         if (!isMounted || !isSessionUser(sessionUser.id)) return;
         const serverChars = Array.isArray(charData?.characters) ? charData.characters : [];
         const currentActive = readSession()?.activeCharacter;
@@ -703,7 +703,7 @@ export function App() {
   }, [activeCharacter, currentUser, t]);
 
   const handleLoginSuccess = useCallback((session) => {
-    setCurrentUser(session.user);
+    setCurrentUser({ ...session.user, token: session.token });
     setActiveCharacter(null);
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
