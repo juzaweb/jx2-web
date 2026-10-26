@@ -3,6 +3,8 @@
  * Connects frontend game client to the Node.js backend API service.
  */
 
+import { readSession } from "./session.js";
+
 const getApiBase = () => {
   if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) {
     return import.meta.env.VITE_API_BASE;
@@ -110,8 +112,23 @@ export class ApiClient {
     try {
       return await res.json();
     } catch {
-      throw new Error(`Máy chủ phản hồi không đúng định dạng (HTTP ${res.status})`);
+      const err = new Error(`Máy chủ phản hồi không đúng định dạng (HTTP ${res.status})`);
+      err.status = res.status;
+      throw err;
     }
+  }
+
+  /**
+   * Helper to resolve session authorization header.
+   * Prefers explicitly passed token, falling back to cached session token.
+   * @private
+   * @param {string} [token]
+   * @returns {Record<string, string>}
+   */
+  _getAuthHeaders(token) {
+    const activeToken =
+      token || (typeof window !== "undefined" ? readSession()?.token : null);
+    return activeToken ? { Authorization: `Bearer ${activeToken}` } : {};
   }
 
   /**
@@ -133,10 +150,13 @@ export class ApiClient {
   /**
    * Fetch the authoritative user profile from the backend
    * @param {string} userId
+   * @param {string} [token]
    * @returns {Promise<Object>} User profile (id, username, displayName, ...)
    */
-  async getProfile(userId) {
-    const res = await fetch(`${this.baseUrl}/users/me?userId=${encodeURIComponent(userId)}`);
+  async getProfile(userId, token) {
+    const res = await fetch(`${this.baseUrl}/users/me?userId=${encodeURIComponent(userId)}`, {
+      headers: { ...this._getAuthHeaders(token) }
+    });
     const json = await this._parseJson(res);
     if (!res.ok) {
       const error = new Error(json?.error || `Không tải được thông tin tài khoản (HTTP ${res.status})`);
@@ -188,13 +208,18 @@ export class ApiClient {
   /**
    * List the characters owned by a user account
    * @param {string} userId
+   * @param {string} [token]
    * @returns {Promise<{ characters: Object[], maxSlots: number }>}
    */
-  async listCharacters(userId) {
-    const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`);
+  async listCharacters(userId, token) {
+    const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`, {
+      headers: { ...this._getAuthHeaders(token) }
+    });
     const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(json?.error || `Không tải được danh sách nhân vật (HTTP ${res.status})`);
+      const error = new Error(json?.error || `Không tải được danh sách nhân vật (HTTP ${res.status})`);
+      error.status = res.status;
+      throw error;
     }
     return json.data;
   }
@@ -204,17 +229,23 @@ export class ApiClient {
    * @param {string} userId
    * @param {string} name
    * @param {"thieu-lam"|"nga-my"|"vo-dang"|"ngu-doc"} [sect="thieu-lam"]
+   * @param {string} [token]
    * @returns {Promise<Object>} The created character
    */
-  async createCharacter(userId, name, sect = "thieu-lam") {
+  async createCharacter(userId, name, sect = "thieu-lam", token) {
     const res = await fetch(`${this.baseUrl}/users/${encodeURIComponent(userId)}/characters`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...this._getAuthHeaders(token)
+      },
       body: JSON.stringify({ name, sect }),
     });
     const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(json?.error || `Tạo nhân vật thất bại (HTTP ${res.status})`);
+      const error = new Error(json?.error || `Tạo nhân vật thất bại (HTTP ${res.status})`);
+      error.status = res.status;
+      throw error;
     }
     return json.data;
   }
@@ -223,16 +254,22 @@ export class ApiClient {
    * Permanently delete a character
    * @param {string} userId
    * @param {string} characterId
+   * @param {string} [token]
    * @returns {Promise<{ characters: Object[] }>}
    */
-  async deleteCharacter(userId, characterId) {
+  async deleteCharacter(userId, characterId, token) {
     const res = await fetch(
       `${this.baseUrl}/users/${encodeURIComponent(userId)}/characters/${encodeURIComponent(characterId)}`,
-      { method: "DELETE" }
+      {
+        method: "DELETE",
+        headers: { ...this._getAuthHeaders(token) }
+      }
     );
     const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(json?.error || `Xoá nhân vật thất bại (HTTP ${res.status})`);
+      const error = new Error(json?.error || `Xoá nhân vật thất bại (HTTP ${res.status})`);
+      error.status = res.status;
+      throw error;
     }
     return json.data;
   }

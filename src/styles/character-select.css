@@ -38,6 +38,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 18px;
+  overflow-y: auto;
   background: linear-gradient(180deg, rgba(12, 22, 20, 0.92), rgba(6, 12, 11, 0.96));
   border: 2px solid #4d8f81;
   border-radius: 6px;
@@ -219,6 +220,36 @@
   font-size: 12px;
   color: #7c8c88;
   font-style: italic;
+}
+
+/* Explicit load failure container */
+.jx2-cs-load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 12px;
+  background: rgba(127, 29, 29, 0.25);
+  border: 1px dashed #ef4444;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.jx2-cs-error-text {
+  font-size: 12px;
+  color: #fca5a5;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.jx2-cs-load-error .jx2-btn-action {
+  flex: none;
+  max-width: none;
+  width: auto;
+  min-width: 120px;
+  height: 32px;
+  font-size: 12px;
 }
 
 .jx2-cs-actions {

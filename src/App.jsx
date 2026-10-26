@@ -284,16 +284,32 @@ export function App() {
         const activeName = readSession()?.activeCharacter?.name;
         const nextName = activeName || nextUser.displayName || nextUser.username;
         const prevName = activeName || sessionUser.displayName || sessionUser.username;
-        if (nextName === prevName) return;
+        if (nextName !== prevName) {
+          persistSessionUser(nextUser);
+          setCurrentUser((prev) => (prev?.id === sessionUser.id ? nextUser : prev));
+          bridge.emit(EVENTS.SET_PLAYER_NAME, nextName);
+        }
 
-        persistSessionUser(nextUser);
-        setCurrentUser((prev) => (prev?.id === sessionUser.id ? nextUser : prev));
-        bridge.emit(EVENTS.SET_PLAYER_NAME, nextName);
+        // Validate that cached activeCharacter still exists on the server
+        const charData = await apiClient.listCharacters(sessionUser.id);
+        if (!isMounted || !isSessionUser(sessionUser.id)) return;
+        const serverChars = Array.isArray(charData?.characters) ? charData.characters : [];
+        const currentActive = readSession()?.activeCharacter;
+        if (currentActive?.id && !serverChars.some((c) => c.id === currentActive.id)) {
+          console.warn("[App] Active character no longer exists on server, falling back to selection");
+          setActiveCharacter(null);
+          writeSession({
+            ...(readSession() || {}),
+            activeCharacter: null
+          });
+        }
       } catch (error) {
-        if (error?.status === 404 && isMounted && isSessionUser(sessionUser.id)) {
-          // The account no longer exists: drop the stale session and ask to log in again.
+        if ((error?.status === 401 || error?.status === 404) && isMounted && isSessionUser(sessionUser.id)) {
+          // The account no longer exists or the session token is expired: drop the stale session and ask to log in again.
+          console.warn(`[App] Session invalid (${error.status}), clearing cached session.`);
           clearSession();
           setCurrentUser(null);
+          setActiveCharacter(null);
           setIsLoginOpen(true);
         }
         // Otherwise the backend is unreachable: keep the cached profile.

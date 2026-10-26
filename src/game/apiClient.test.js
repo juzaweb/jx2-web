@@ -139,7 +139,46 @@ describe("ApiClient", () => {
     const res = await client.listCharacters("u1");
     expect(res.characters).toHaveLength(1);
     expect(res.maxSlots).toBe(3);
-    expect(global.fetch).toHaveBeenCalledWith("http://mock-api:5000/api/users/u1/characters");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/u1/characters",
+      { headers: {} }
+    );
+  });
+
+  it("listCharacters attaches Bearer authorization header when token is supplied", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { characters: [{ id: "c1", name: "Tiêu Phong" }], maxSlots: 3 }
+      })
+    });
+
+    await client.listCharacters("u1", "test-token-xyz");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://mock-api:5000/api/users/u1/characters",
+      {
+        headers: {
+          Authorization: "Bearer test-token-xyz"
+        }
+      }
+    );
+  });
+
+  it("listCharacters attaches error.status on failure", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        success: false,
+        error: "Yêu cầu xác thực tài khoản."
+      })
+    });
+
+    await expect(client.listCharacters("u1")).rejects.toMatchObject({
+      message: "Yêu cầu xác thực tài khoản.",
+      status: 401
+    });
   });
 
   it("createCharacter posts the name and returns the created character", async () => {
@@ -153,7 +192,7 @@ describe("ApiClient", () => {
       })
     });
 
-    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "nga-my");
+    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "nga-my", "token-create-123");
     expect(res.character.id).toBe("c1");
     expect(res.character.sect).toBe("nga-my");
     expect(res.character.gender).toBe("female");
@@ -161,6 +200,10 @@ describe("ApiClient", () => {
       "http://mock-api:5000/api/users/u1/characters",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer token-create-123"
+        },
         body: JSON.stringify({ name: "Độc Cô Cầu Bại", sect: "nga-my" })
       })
     );
@@ -173,12 +216,13 @@ describe("ApiClient", () => {
       json: async () => ({ success: false, error: "Tên nhân vật này đã được sử dụng." })
     });
 
-    await expect(client.createCharacter("u1", "Trùng Tên")).rejects.toThrow(
-      "Tên nhân vật này đã được sử dụng."
-    );
+    await expect(client.createCharacter("u1", "Trùng Tên")).rejects.toMatchObject({
+      message: "Tên nhân vật này đã được sử dụng.",
+      status: 409
+    });
   });
 
-  it("deleteCharacter issues a DELETE and returns the updated list", async () => {
+  it("deleteCharacter issues a DELETE with auth header and returns the updated list", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -187,11 +231,16 @@ describe("ApiClient", () => {
       })
     });
 
-    const res = await client.deleteCharacter("u1", "c1");
+    const res = await client.deleteCharacter("u1", "c1", "token-del-456");
     expect(res.characters).toEqual([]);
     expect(global.fetch).toHaveBeenCalledWith(
       "http://mock-api:5000/api/users/u1/characters/c1",
-      expect.objectContaining({ method: "DELETE" })
+      expect.objectContaining({
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer token-del-456"
+        }
+      })
     );
   });
 
@@ -209,7 +258,8 @@ describe("ApiClient", () => {
     const user = await client.getProfile("u1");
     expect(user.displayName).toBe("Hiệp Khách Vô Danh");
     expect(global.fetch).toHaveBeenCalledWith(
-      "http://mock-api:5000/api/users/me?userId=u1"
+      "http://mock-api:5000/api/users/me?userId=u1",
+      { headers: {} }
     );
   });
 

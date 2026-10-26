@@ -61,6 +61,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   const [nameInput, setNameInput] = useState("");
   const [sectKey, setSectKey] = useState(DEFAULT_SECT.key);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -77,6 +78,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   }, []);
 
   const reload = useCallback(async () => {
+    setLoadError(null);
     const data = await apiClient.listCharacters(user.id);
     applyData(data);
     return data;
@@ -88,9 +90,18 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
 
     setLoading(true);
     setError("");
+    setLoadError(null);
     reload()
       .catch((err) => {
-        if (isMounted) setError(err.message || tRef.current("characterSelect.errors.load"));
+        console.error("Failed to load character list:", err);
+        const errObj = {
+          message: err.message || tRef.current("characterSelect.errors.load"),
+          status: err.status
+        };
+        if (isMounted) {
+          setLoadError(errObj);
+          setError(errObj.message);
+        }
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -224,7 +235,13 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                   )}
                 </div>
                 <div className="jx2-cs-stage-name">
-                  {selected ? selected.name : loading ? t("characterSelect.loading") : t("characterSelect.noCharacters")}
+                  {selected
+                    ? selected.name
+                    : loading
+                    ? t("characterSelect.loading")
+                    : loadError
+                    ? t("characterSelect.errors.load")
+                    : t("characterSelect.noCharacters")}
                 </div>
                 {selected && (
                   <div className="jx2-cs-stage-meta">
@@ -293,44 +310,85 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
             ) : (
               <>
                 <div className="jx2-cs-panel-title">{t("characterSelect.characterList")}</div>
-                <div className="jx2-cs-slots">
-                  {slots.map((char, index) => (
-                    <button
-                      key={char ? char.id : `empty-${index}`}
-                      type="button"
-                      className={`jx2-cs-slot ${char ? "filled" : "empty"} ${
-                        char && char.id === selectedId ? "selected" : ""
-                      }`}
-                      onClick={() => {
-                        if (char) {
-                          setSelectedId(char.id);
+                {loadError ? (
+                  <div className="jx2-cs-load-error">
+                    <p className="jx2-cs-error-text">
+                      {loadError.status === 401
+                        ? t("characterSelect.errors.sessionExpired")
+                        : loadError.message || t("characterSelect.errors.loadRetry")}
+                    </p>
+                    {loadError.status === 401 ? (
+                      <button
+                        type="button"
+                        className="jx2-btn-action"
+                        onClick={onLogout}
+                      >
+                        {t("characterSelect.relogin")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="jx2-btn-action"
+                        onClick={() => {
+                          setLoading(true);
                           setError("");
-                        }
-                      }}
-                      disabled={!char || busy}
-                    >
-                      {char ? (
-                        <>
-                          <span className="jx2-cs-slot-name">{char.name}</span>
-                          <span className="jx2-cs-slot-info">
-                            {t((SECT_BY_KEY[char.sect] || DEFAULT_SECT).labelKey)} ·{" "}
-                            {t("common.level")} {char.level}
-                          </span>
-                          <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>
-                        </>
-                      ) : (
-                        <span className="jx2-cs-slot-empty">{t("characterSelect.emptySlot")}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                          setLoadError(null);
+                          reload()
+                            .catch((err) => {
+                              const errObj = {
+                                message: err.message || tRef.current("characterSelect.errors.load"),
+                                status: err.status
+                              };
+                              setLoadError(errObj);
+                              setError(errObj.message);
+                            })
+                            .finally(() => setLoading(false));
+                        }}
+                      >
+                        {t("characterSelect.retry")}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="jx2-cs-slots">
+                    {slots.map((char, index) => (
+                      <button
+                        key={char ? char.id : `empty-${index}`}
+                        type="button"
+                        className={`jx2-cs-slot ${char ? "filled" : "empty"} ${
+                          char && char.id === selectedId ? "selected" : ""
+                        }`}
+                        onClick={() => {
+                          if (char) {
+                            setSelectedId(char.id);
+                            setError("");
+                          }
+                        }}
+                        disabled={!char || busy}
+                      >
+                        {char ? (
+                          <>
+                            <span className="jx2-cs-slot-name">{char.name}</span>
+                            <span className="jx2-cs-slot-info">
+                              {t((SECT_BY_KEY[char.sect] || DEFAULT_SECT).labelKey)} ·{" "}
+                              {t("common.level")} {char.level}
+                            </span>
+                            <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>
+                          </>
+                        ) : (
+                          <span className="jx2-cs-slot-empty">{t("characterSelect.emptySlot")}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="jx2-cs-actions">
                   <button
                     type="button"
                     className="jx2-btn-action"
                     onClick={handleOpenCreate}
-                    disabled={busy || characters.length >= maxSlots}
+                    disabled={busy || !!loadError || characters.length >= maxSlots}
                   >
                     {t("characterSelect.createCharacter")}
                   </button>
