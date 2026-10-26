@@ -1,7 +1,7 @@
 import React from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
-export function HelpModal({ isOpen, onClose, onReset }) {
+export function HelpModal({ isOpen, onClose }) {
   const { t } = useI18n();
   if (!isOpen) return null;
 
@@ -34,9 +34,6 @@ export function HelpModal({ isOpen, onClose, onReset }) {
         </div>
         <button id="resume-btn" className="wuxia-btn-primary" onClick={onClose}>
           {t("help.resume")}
-        </button>
-        <button id="reset-btn" className="wuxia-btn-danger" onClick={onReset}>
-          {t("help.reset")}
         </button>
       </div>
     </div>

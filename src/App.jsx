@@ -666,12 +666,6 @@ export function App() {
     bridge.emit(EVENTS.ACTION_SAVE);
   }, []);
 
-  const handleReset = useCallback(() => {
-    if (window.confirm(t("app.confirmReset"))) {
-      bridge.emit(EVENTS.ACTION_RESET);
-    }
-  }, [t]);
-
   const handleToggleAudio = useCallback(() => {
     bridge.emit(EVENTS.ACTION_TOGGLE_AUDIO);
   }, []);
@@ -876,7 +870,6 @@ export function App() {
       <HelpModal
         isOpen={isHelpOpen}
         onClose={dismissHelp}
-        onReset={handleReset}
       />
 
       {/* Full-city map (M shortcut) */}
