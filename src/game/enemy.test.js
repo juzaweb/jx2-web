@@ -317,6 +317,31 @@ describe("isPointOnEnemy and findEnemyAt mouse targeting", () => {
     expect(isPointOnEnemy(inactiveEnemy, 500, 500)).toBe(false);
   });
 
+  it("EnemyManager maintains O(1) enemyMap lookup on spawn, snapshot and clear", () => {
+    const scene = {
+      ...createScene(),
+      physics: { add: { sprite: createScene().physics.add.sprite, group: () => ({ add() {}, clear() {} }) } }
+    };
+    const manager = new EnemyManager(scene);
+
+    manager.create([
+      { id: 10, x: 100, y: 100, monsterId: "soi-xam" },
+      { id: 20, x: 200, y: 200, monsterId: "soi-xam" }
+    ]);
+
+    expect(manager.getById(10)).toBeDefined();
+    expect(manager.getById(10).id).toBe(10);
+    expect(manager.getById(20).id).toBe(20);
+    expect(manager.getById(99)).toBeNull();
+
+    manager.applyServerSnapshot([{ id: 30, x: 300, y: 300, monsterId: "soi-xam" }]);
+    expect(manager.getById(30).id).toBe(30);
+
+    manager.clear();
+    expect(manager.getById(10)).toBeNull();
+    expect(manager.getById(30)).toBeNull();
+  });
+
   it("findEnemyAt selects the closest enemy among candidates", () => {
     const wolf1 = {
       id: 1,
