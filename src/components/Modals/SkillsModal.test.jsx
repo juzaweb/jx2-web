@@ -103,10 +103,10 @@ describe("SkillsModal Component", () => {
 
   it("reports the prerequisite that still blocks a skill", () => {
     const gated = [
-      skillById("la_han_quyen"),
+      skillById("thieu_lam_tam_phap"),
       {
         ...skillById("dai_tu_di_chuong"),
-        requires: [{ id: "la_han_quyen", level: 5 }]
+        requires: [{ id: "thieu_lam_tam_phap", level: 5 }]
       }
     ];
 
@@ -116,7 +116,7 @@ describe("SkillsModal Component", () => {
       </I18nProvider>
     );
 
-    expect(markup).toContain("Cần La Hán Quyền cấp 5");
+    expect(markup).toContain("Cần Thiếu Lâm Tâm Pháp cấp 5");
     // The tile badge must show the blocking level (5), not the skill's own unlockLevel (1).
     expect(markup).toContain(
       '<span class="skill-node-level" aria-hidden="true">5</span>'

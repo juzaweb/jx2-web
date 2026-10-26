@@ -19,51 +19,40 @@ export const SKILL_SLOTS = 6;
 export const BASIC_ATTACK_ID = "normal";
 
 /**
- * Thiếu Lâm kit is being rebuilt as a palm-technique (chưởng pháp) kit. The old
- * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed. Slots 0-5 all
- * have catalog entries; slots 0-1 still carry their interim names.
+ * Thiếu Lâm kit is a palm-technique (chưởng pháp) kit plus the sect's internal
+ * art. The old Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons are gone.
+ *
+ * Slot 0 is `thieu_lam_tam_phap`: a passive internal art that is always running
+ * (no cast, no MP, no cooldown) and restores `hpPerSecond` health while the hero
+ * is alive. See `passiveRegen.js` for the shared regen maths.
  */
 const THIEU_LAM_SKILLS = [
   {
-    id: "la_han_quyen",
+    id: "thieu_lam_tam_phap",
     sect: "thieu-lam",
     slot: 0,
-    icon: "/skills/la_han_quyen.png",
-    glyph: "拳",
-    nameKey: "skills.thieuLam.laHanQuyen.name",
-    descKey: "skills.thieuLam.laHanQuyen.desc",
+    icon: "/skills/thieu_lam_tam_phap.png",
+    glyph: "心",
+    nameKey: "skills.thieuLam.thieuLamTamPhap.name",
+    descKey: "skills.thieuLam.thieuLamTamPhap.desc",
     unlockLevel: 1,
-    mp: 5,
-    cooldown: 1500,
-    target: "enemy",
-    range: 150,
+    mp: 0,
+    cooldown: 0,
+    target: "self",
+    range: 0,
     radius: 0,
-    mult: 1.2
-  },
-  {
-    id: "thieu_lam_truong_phap",
-    sect: "thieu-lam",
-    slot: 1,
-    icon: "/skills/thieu_lam_truong_phap.png",
-    glyph: "掌",
-    requires: [{ id: "la_han_quyen", level: 1 }],
-    nameKey: "skills.thieuLam.thieuLamTruongPhap.name",
-    descKey: "skills.thieuLam.thieuLamTruongPhap.desc",
-    unlockLevel: 1,
-    mp: 8,
-    cooldown: 2500,
-    target: "enemy",
-    range: 250,
-    radius: 0,
-    mult: 1.25
+    mult: 0,
+    /** Always-on internal art: never cast from the hotbar, never consumes MP. */
+    passive: true,
+    effects: [{ kind: "regen", hpPerSecond: 2 }]
   },
   {
     id: "dai_tu_di_chuong",
     sect: "thieu-lam",
-    slot: 2,
+    slot: 1,
     icon: "/skills/dai_tu_di_chuong.png",
     glyph: "掌",
-    requires: [{ id: "thieu_lam_truong_phap", level: 1 }],
+    requires: [{ id: "thieu_lam_tam_phap", level: 1 }],
     nameKey: "skills.thieuLam.daiTuDiChuong.name",
     descKey: "skills.thieuLam.daiTuDiChuong.desc",
     unlockLevel: 1,
@@ -85,7 +74,7 @@ const THIEU_LAM_SKILLS = [
   {
     id: "la_han_tran",
     sect: "thieu-lam",
-    slot: 3,
+    slot: 2,
     icon: "/skills/la_han_tran.png",
     glyph: "陣",
     requires: [{ id: "dai_tu_di_chuong", level: 1 }],
@@ -117,7 +106,7 @@ const THIEU_LAM_SKILLS = [
   {
     id: "kim_cang_bat_hoai",
     sect: "thieu-lam",
-    slot: 4,
+    slot: 3,
     icon: "/skills/kim_cang_bat_hoai.png",
     glyph: "卍",
     requires: [{ id: "la_han_tran", level: 1 }],
@@ -143,7 +132,7 @@ const THIEU_LAM_SKILLS = [
   {
     id: "nhu_lai_than_chuong",
     sect: "thieu-lam",
-    slot: 5,
+    slot: 4,
     icon: "/skills/nhu_lai_than_chuong.png",
     glyph: "佛",
     requires: [{ id: "la_han_tran", level: 1 }],

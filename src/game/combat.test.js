@@ -18,6 +18,7 @@ import { computeDamage } from "./damage.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 import { PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
+import { skillById } from "./skills.js";
 
 describe("computeDamage", () => {
   const baseAttacker = {
@@ -513,17 +514,17 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
   it("refuses to equip self skills to the left mouse button", () => {
     const { combat, ui } = makeCombat();
 
-    // Slot 3 is La Hán Trận (target: "self")
-    const ok = combat.equipSkill("left", 3);
+    // Slot 2 is La Hán Trận (target: "self")
+    const ok = combat.equipSkill("left", 2);
     expect(ok).toBe(false);
     expect(ui.addLog).toHaveBeenCalledWith("Chiêu thức tự thân không thể gán vào chuột trái.");
 
-    // Slot 3 can be equipped to right hand
-    const okRight = combat.equipSkill("right", 3);
+    // Slot 2 can be equipped to right hand
+    const okRight = combat.equipSkill("right", 2);
     expect(okRight).toBe(true);
 
-    // Slot 2 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
-    const okLeft = combat.equipSkill("left", 2);
+    // Slot 1 is Đại Tu Di Chưởng (target: "enemy"), valid on left hand
+    const okLeft = combat.equipSkill("left", 1);
     expect(okLeft).toBe(true);
   });
 
@@ -827,7 +828,7 @@ describe("skill targeting", () => {
     const near = peer("near", 100, 0);
     const { combat, ui } = makeCombat({ pkFlag: false, peers: [near] });
 
-    combat.hintPeacefulDuelist({ id: "la_han_quyen", nameKey: "skills.thieuLam.laHanQuyen.name" });
+    combat.hintPeacefulDuelist({ id: "thieu_lam_tam_phap", nameKey: "skills.thieuLam.thieuLamTamPhap.name" });
 
     expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("bật cờ PK"));
   });
@@ -836,20 +837,20 @@ describe("skill targeting", () => {
     const near = peer("near", 100, 0);
     const { combat, ui } = makeCombat({ pkFlag: true, peers: [near] });
 
-    combat.hintPeacefulDuelist({ id: "la_han_quyen", nameKey: "skills.thieuLam.laHanQuyen.name" });
+    combat.hintPeacefulDuelist({ id: "thieu_lam_tam_phap", nameKey: "skills.thieuLam.thieuLamTamPhap.name" });
 
     expect(ui.addLog).not.toHaveBeenCalled();
   });
 
   it("checks skill readiness via isSkillReady without logging", () => {
     const { combat, ui } = makeCombat();
-    const skill = { id: "la_han_quyen", unlockLevel: 1 };
+    const skill = { id: "dai_tu_di_chuong", unlockLevel: 1 };
 
     expect(combat.isSkillReady(skill)).toBe(true);
     expect(ui.addLog).not.toHaveBeenCalled();
 
     // On cooldown
-    combat.skillCooldowns.set("la_han_quyen", 2000);
+    combat.skillCooldowns.set("dai_tu_di_chuong", 2000);
     expect(combat.isSkillReady(skill)).toBe(false);
     expect(ui.addLog).not.toHaveBeenCalled();
 
@@ -870,5 +871,101 @@ describe("skill targeting", () => {
 
     scene.enemyTarget = null;
     expect(combat.nearestEnemyInReach()).toBe(wolf2);
+  });
+});
+
+describe("CombatSystem passive regen", () => {
+  const makePlayer = (hp = 50) => ({
+    sect: "thieu-lam",
+    x: 0,
+    y: 0,
+    stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 },
+    heal(amount) {
+      const prev = this.stats.hp;
+      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
+      return this.stats.hp - prev;
+    }
+  });
+
+  const makeCombat = ({ isConnected = true, sect = "thieu-lam", hp = 50 } = {}) => {
+    const player = makePlayer(hp);
+    player.sect = sect;
+    const scene = {
+      time: { now: 0 },
+      networkClient: { isConnected, sendHeal: vi.fn() }
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui);
+    return { combat, player, scene, ui };
+  };
+
+  it("restores 2 HP per second and mirrors each heal to the server", () => {
+    const { combat, player, scene } = makeCombat();
+
+    combat.update(0); // first frame only starts the clock
+    expect(player.stats.hp).toBe(50);
+
+    combat.update(500);
+    expect(player.stats.hp).toBe(51);
+    expect(scene.networkClient.sendHeal).toHaveBeenCalledWith({ amount: 1 });
+
+    combat.update(1000);
+    expect(player.stats.hp).toBe(52);
+  });
+
+  it("heals nothing for a sect without a passive art", () => {
+    const { combat, player, scene } = makeCombat({ sect: "vo-dang" });
+
+    combat.update(0);
+    combat.update(5000);
+
+    expect(player.stats.hp).toBe(50);
+    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
+  });
+
+  it("never heals past the health ceiling", () => {
+    const { combat, player, scene } = makeCombat({ hp: 99 });
+
+    combat.update(0);
+    combat.update(500);
+    expect(player.stats.hp).toBe(100);
+
+    combat.update(2000);
+    expect(player.stats.hp).toBe(100);
+    expect(scene.networkClient.sendHeal).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not bank regeneration while the scene is paused", () => {
+    const { combat, player } = makeCombat();
+
+    combat.update(0);
+    // A minute spent paused must not pay out 120 HP on the resume frame.
+    combat.update(60000);
+    expect(player.stats.hp).toBe(50);
+
+    // Normal ticking resumes on the following frames.
+    combat.update(60500);
+    expect(player.stats.hp).toBe(51);
+  });
+
+  it("leaves a fallen hero at 0 HP for the server to respawn", () => {
+    const { combat, player, scene } = makeCombat({ hp: 0 });
+
+    combat.update(0);
+    combat.update(5000);
+
+    expect(player.stats.hp).toBe(0);
+    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
+  });
+
+  it("refuses to cast the passive art and spends no MP", () => {
+    const { combat, player, ui } = makeCombat();
+
+    expect(combat.castSkill(skillById("thieu_lam_tam_phap"))).toBe(false);
+    expect(player.stats.mp).toBe(60);
+    expect(combat.skillCooldowns.size).toBe(0);
+    expect(ui.addLog).toHaveBeenCalledWith(
+      expect.stringContaining("tự động vận hành")
+    );
   });
 });

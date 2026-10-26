@@ -19,11 +19,10 @@ import {
 } from "./skills.js";
 
 describe("skill catalog", () => {
-  it("exposes the Thiếu Lâm palm skills", () => {
+  it("exposes the Thiếu Lâm palm kit and its passive art", () => {
     expect(Object.keys(SKILLS_BY_SECT)).toEqual(["thieu-lam", "vo-dang", "nga-my", "ngu-doc"]);
     expect(SKILLS.map((skill) => skill.id)).toEqual([
-      "la_han_quyen",
-      "thieu_lam_truong_phap",
+      "thieu_lam_tam_phap",
       "dai_tu_di_chuong",
       "la_han_tran",
       "kim_cang_bat_hoai",
@@ -43,13 +42,29 @@ describe("skill catalog", () => {
     ]);
     expect(SKILL_SLOTS).toBe(6);
 
-    const [laHanQuyen, thieuLamTruongPhap, daiTuDiChuong, laHanTran] = skillsForSect("thieu-lam");
-    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
-    const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 5);
+    const [tamPhap, daiTuDiChuong, laHanTran] = skillsForSect("thieu-lam");
+    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 3);
+    const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
+    expect(tamPhap).toMatchObject({
+      id: "thieu_lam_tam_phap",
+      sect: "thieu-lam",
+      slot: 0,
+      icon: "/skills/thieu_lam_tam_phap.png",
+      glyph: "心",
+      unlockLevel: 1,
+      mp: 0,
+      cooldown: 0,
+      target: "self",
+      range: 0,
+      radius: 0,
+      mult: 0,
+      passive: true,
+      effects: [{ kind: "regen", hpPerSecond: 2 }]
+    });
     expect(daiTuDiChuong).toMatchObject({
       id: "dai_tu_di_chuong",
       sect: "thieu-lam",
-      slot: 2,
+      slot: 1,
       unlockLevel: 1,
       mp: 12,
       cooldown: 6000,
@@ -59,7 +74,7 @@ describe("skill catalog", () => {
     expect(laHanTran).toMatchObject({
       id: "la_han_tran",
       sect: "thieu-lam",
-      slot: 3,
+      slot: 2,
       unlockLevel: 1,
       mp: 18,
       cooldown: 9000,
@@ -76,7 +91,7 @@ describe("skill catalog", () => {
     expect(kimCangBatHoai).toMatchObject({
       id: "kim_cang_bat_hoai",
       sect: "thieu-lam",
-      slot: 4,
+      slot: 3,
       icon: "/skills/kim_cang_bat_hoai.png",
       glyph: "卍",
       unlockLevel: 1,
@@ -97,7 +112,7 @@ describe("skill catalog", () => {
     expect(nhuLaiThanChuong).toMatchObject({
       id: "nhu_lai_than_chuong",
       sect: "thieu-lam",
-      slot: 5,
+      slot: 4,
       unlockLevel: 10,
       mp: 35,
       cooldown: 30000,
@@ -119,8 +134,7 @@ describe("skill catalog", () => {
 
   it("ships the palm icon and VFX sheet", () => {
     for (const file of [
-      "public/skills/la_han_quyen.png",
-      "public/skills/thieu_lam_truong_phap.png",
+      "public/skills/thieu_lam_tam_phap.png",
       "public/skills/dai_tu_di_chuong.png",
       "public/skills/vfx/dai_tu_di_chuong/sheet.png",
       "public/skills/la_han_tran.png",
@@ -145,25 +159,27 @@ describe("skill catalog", () => {
   });
 
   it("resolves skills by id and slot", () => {
-    expect(skillById("dai_tu_di_chuong")?.slot).toBe(2);
-    expect(skillForSlot("thieu-lam", 2)?.id).toBe("dai_tu_di_chuong");
-    expect(skillSlot("dai_tu_di_chuong")).toBe(2);
-    expect(skillById("la_han_tran")?.slot).toBe(3);
-    expect(skillForSlot("thieu-lam", 3)?.id).toBe("la_han_tran");
-    expect(skillSlot("la_han_tran")).toBe(3);
-    expect(skillById("kim_cang_bat_hoai")?.slot).toBe(4);
-    expect(skillForSlot("thieu-lam", 4)?.id).toBe("kim_cang_bat_hoai");
-    expect(skillSlot("kim_cang_bat_hoai")).toBe(4);
-    expect(skillById("la_han_quyen")?.slot).toBe(0);
-    expect(skillForSlot("thieu-lam", 0)?.id).toBe("la_han_quyen");
-    expect(skillById("nhu_lai_than_chuong")?.slot).toBe(5);
-    expect(skillForSlot("thieu-lam", 5)?.id).toBe("nhu_lai_than_chuong");
-    expect(skillSlot("nhu_lai_than_chuong")).toBe(5);
+    expect(skillById("dai_tu_di_chuong")?.slot).toBe(1);
+    expect(skillForSlot("thieu-lam", 1)?.id).toBe("dai_tu_di_chuong");
+    expect(skillSlot("dai_tu_di_chuong")).toBe(1);
+    expect(skillById("la_han_tran")?.slot).toBe(2);
+    expect(skillForSlot("thieu-lam", 2)?.id).toBe("la_han_tran");
+    expect(skillSlot("la_han_tran")).toBe(2);
+    expect(skillById("kim_cang_bat_hoai")?.slot).toBe(3);
+    expect(skillForSlot("thieu-lam", 3)?.id).toBe("kim_cang_bat_hoai");
+    expect(skillSlot("kim_cang_bat_hoai")).toBe(3);
+    expect(skillById("thieu_lam_tam_phap")?.slot).toBe(0);
+    expect(skillForSlot("thieu-lam", 0)?.id).toBe("thieu_lam_tam_phap");
+    expect(skillById("nhu_lai_than_chuong")?.slot).toBe(4);
+    expect(skillForSlot("thieu-lam", 4)?.id).toBe("nhu_lai_than_chuong");
+    expect(skillSlot("nhu_lai_than_chuong")).toBe(4);
     expect(skillById("missing")).toBeUndefined();
     expect(skillSlot("missing")).toBe(-1);
   });
 
   it("reports MP cost and cooldown, treating unknown skills as free", () => {
+    expect(skillMpCost("thieu_lam_tam_phap")).toBe(0);
+    expect(skillCooldown("thieu_lam_tam_phap")).toBe(0);
     expect(skillMpCost("dai_tu_di_chuong")).toBe(12);
     expect(skillCooldown("dai_tu_di_chuong")).toBe(6000);
     expect(skillMpCost("la_han_tran")).toBe(18);
@@ -190,7 +206,8 @@ describe("skill catalog", () => {
   });
 
   it("declares prerequisites that exist inside the same sect", () => {
-    expect(skillRequires("la_han_quyen")).toEqual([]);
+    expect(skillRequires("thieu_lam_tam_phap")).toEqual([]);
+    expect(skillRequires("dai_tu_di_chuong")).toEqual([{ id: "thieu_lam_tam_phap", level: 1 }]);
     expect(skillRequires("la_han_tran")).toEqual([{ id: "dai_tu_di_chuong", level: 1 }]);
     expect(skillRequires("kim_cang_bat_hoai")).toEqual([{ id: "la_han_tran", level: 1 }]);
     expect(skillRequires("nhu_lai_than_chuong")).toEqual([{ id: "la_han_tran", level: 1 }]);
@@ -221,7 +238,7 @@ describe("skill catalog", () => {
   });
 
   it("explains why a skill is still locked", () => {
-    expect(skillLockReason("la_han_quyen", 1)).toBeNull();
+    expect(skillLockReason("thieu_lam_tam_phap", 1)).toBeNull();
     expect(skillLockReason("tam_thanh_kiem_phap", 1)).toEqual({ kind: "level", level: 2 });
 
     const gated = { id: "synthetic", unlockLevel: 1, requires: [{ id: "dai_tu_di_chuong", level: 5 }] };

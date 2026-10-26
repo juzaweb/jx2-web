@@ -6,21 +6,21 @@ import { formatSkillLock, skillLockLabel } from "./skillLockLabel.js";
 const t = (key, params, fallback) => {
   if (key === "skills.tree.requires") return `prereq:${params.name}@${params.level}`;
   if (key === "skills.picker.locked") return `level:${params.level}`;
-  if (key === "skills.thieuLam.laHanQuyen.name") return "La Hán Quyền";
+  if (key === "skills.thieuLam.thieuLamTamPhap.name") return "Thiếu Lâm Tâm Pháp";
   return fallback ?? key;
 };
 
 describe("skillLockLabel", () => {
   it("returns an empty string when the skill is available", () => {
-    expect(skillLockLabel(skillById("la_han_quyen"), 1, t)).toBe("");
+    expect(skillLockLabel(skillById("thieu_lam_tam_phap"), 1, t)).toBe("");
   });
 
   it("formats a pre-computed reason", () => {
     expect(formatSkillLock(null, t)).toBe("");
     expect(formatSkillLock({ kind: "level", level: 4 }, t)).toBe("level:4");
     expect(
-      formatSkillLock({ kind: "prereq", nameKey: "skills.thieuLam.laHanQuyen.name", level: 5 }, t)
-    ).toBe("prereq:La Hán Quyền@5");
+      formatSkillLock({ kind: "prereq", nameKey: "skills.thieuLam.thieuLamTamPhap.name", level: 5 }, t)
+    ).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
   });
 
   it("labels a level gate", () => {
@@ -31,8 +31,8 @@ describe("skillLockLabel", () => {
     const gated = {
       ...skillById("dai_tu_di_chuong"),
       unlockLevel: 1,
-      requires: [{ id: "la_han_quyen", level: 5 }]
+      requires: [{ id: "thieu_lam_tam_phap", level: 5 }]
     };
-    expect(skillLockLabel(gated, 1, t)).toBe("prereq:La Hán Quyền@5");
+    expect(skillLockLabel(gated, 1, t)).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
   });
 });

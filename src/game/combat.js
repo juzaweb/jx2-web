@@ -3,6 +3,7 @@ import { addQuantity, rollDrop, DROP_TABLE_MAP, rollKillReward } from "./items.j
 import { parseEnemyReward } from "./rewardSync.js";
 import { skillById, skillsForSect, skillMpCost, skillLockReason, skillUnlocked } from "./skills.js";
 import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
+import { advanceRegen, billableDeltaMs, passiveRegenRate } from "./passiveRegen.js";
 import {
   playSkillCastVfx,
   playSkillImpactVfx,
@@ -98,6 +99,14 @@ export class CombatSystem {
     this.skillCooldowns = new Map();
     /** Active timed buffs: { stat, amount, until }. */
     this.buffs = [];
+    /** Passive tâm pháp regen: fractional HP carried between frames. */
+    this.regenCarry = 0;
+    /** Timestamp of the last regen tick; a paused scene must not bank time. */
+    this.lastRegenAt = null;
+    /** Cached HP/s for the sect + level the rate was resolved for. */
+    this.regenSect = null;
+    this.regenLevel = null;
+    this.regenRate = 0;
     /** Melee approach in flight: { skill, targetId }. */
     this.pendingCast = null;
     this.lastChaseAt = 0;
@@ -375,6 +384,11 @@ export class CombatSystem {
    */
   castSkill(skill, aim = null) {
     if (!skill) return false;
+    // A tâm pháp is always running: it is never cast and never costs MP.
+    if (skill.passive) {
+      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tự động vận hành.`);
+      return false;
+    }
     if (!this.canCast(skill)) return false;
 
     if (skill.target === "self") {
@@ -703,6 +717,7 @@ export class CombatSystem {
   update(time) {
     const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
     this.updateBuffs(now);
+    this.updatePassiveRegen(now);
 
     const pending = this.pendingCast;
     if (!pending) return;
@@ -726,6 +741,51 @@ export class CombatSystem {
     if (!this.lastChaseAt || time - this.lastChaseAt > 400) {
       this.lastChaseAt = time;
       this.player.moveTo(target.x, target.y);
+    }
+  }
+
+  /**
+   * Apply the sect's passive internal-art regeneration. HP is server-owned, so
+   * the healed amount is mirrored to the server with a `player_heal`, exactly
+   * like a potion; the server clamps it to its own ceiling.
+   *
+   * The rate is cached per (sect, level) because this runs every frame, and the
+   * fractional remainder is carried so a 2 HP/s art heals 2 HP a second rather
+   * than 1 HP every other frame. Time spent paused is never billed: a stall
+   * longer than one frame is dropped instead of healing the hero to full.
+   * @param {number} now
+   */
+  updatePassiveRegen(now) {
+    const stats = this.player?.stats;
+    if (!stats) return;
+
+    const sect = this.player.sect;
+    const level = stats.level;
+    if (sect !== this.regenSect || level !== this.regenLevel) {
+      this.regenSect = sect;
+      this.regenLevel = level;
+      this.regenRate = passiveRegenRate(sect, level);
+      this.regenCarry = 0;
+    }
+
+    const deltaMs = billableDeltaMs(this.lastRegenAt, now);
+    this.lastRegenAt = now;
+
+    // A fallen hero (0 HP) waits for the server's respawn instead of healing up;
+    // a paused frame (deltaMs 0) and a full bar bank nothing either.
+    if (deltaMs <= 0 || this.regenRate <= 0 || stats.hp <= 0 || stats.hp >= stats.maxHp) {
+      this.regenCarry = 0;
+      return;
+    }
+
+    const { carry, amount } = advanceRegen(this.regenCarry, this.regenRate, deltaMs);
+    this.regenCarry = carry;
+    if (amount <= 0) return;
+
+    const healed = this.player.heal(amount);
+    if (healed <= 0) return;
+    if (this.scene?.networkClient?.isConnected) {
+      this.scene.networkClient.sendHeal({ amount: healed });
     }
   }
 

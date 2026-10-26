@@ -214,19 +214,17 @@ export default {
     cooldownSec: "{sec}s",
     rangeTag: "Cự ly: {range}",
     dmgTag: "ST: {pct}%",
+    passiveTag: "Bị động",
+    regenTag: "Hồi {hp} sinh lực/giây",
     tree: {
       requires: "Cần {name} cấp {level}",
       empty: "Môn phái này chưa có chiêu thức.",
       selectHint: "Chọn một ô chiêu thức để xem chi tiết."
     },
     thieuLam: {
-      laHanQuyen: {
-        name: "La Hán Quyền",
-        desc: "Quyền pháp cơ bản Thiếu Lâm, áp sát tấn công mục tiêu."
-      },
-      thieuLamTruongPhap: {
-        name: "Thiếu Lâm Chưởng Pháp",
-        desc: "Chưởng pháp Thiếu Lâm uy lực, gây sát thương cận chiến tầm trung."
+      thieuLamTamPhap: {
+        name: "Thiếu Lâm Tâm Pháp",
+        desc: "Tâm pháp Thiếu Lâm luôn vận hành, tự động hồi phục 2 sinh lực mỗi giây mà không tốn nội lực."
       },
       daiTuDiChuong: {
         name: "Đại Tu Di Chưởng",

@@ -1,11 +1,16 @@
 # Thiếu Lâm chưởng pháp — rebuild plan
 
 Status: **in progress**. The old Thiếu Lâm Võ Tông (TLQ) kit has been removed.
-Row 1 of the supplied palm sheet is wired as **Đại Tu Di Chưởng** (slot 2,
-icon + four-frame VFX); Row 2 is wired as **La Hán Trận** (slot 3,
-icon + four-frame stationary formation VFX); the dedicated
-`docs/example/nhu-lai-than-chuong.png` sheet is wired as **Như Lai Thần Chưởng**
-(slot 5, icon + four-frame impact VFX); slots 0, 1 and 4 are still pending.
+The kit now has **five** skills in slots `0..4`: slot 0 is **Thiếu Lâm Tâm Pháp**
+(`thieu_lam_tam_phap`), an always-on passive internal art that restores 2 HP per
+second; slot 1 is **Đại Tu Di Chưởng** (icon + four-frame VFX), slot 2 **La Hán
+Trận** (icon + four-frame formation VFX), slot 3 **Kim Cang Bất Hoại**, slot 4
+**Như Lai Thần Chưởng** (icon + four-frame impact VFX).
+
+La Hán Chưởng and Vi Đà Chưởng (the interim entry palms) were dropped, and the
+remaining slots were renumbered so the kit has no gaps. `DEFAULT_SKILL_LOADOUT`
+still points at slots 0-3 and `App.jsx` repairs any saved slot that no longer
+exists in the sect kit.
 
 ## 1. What was removed (done)
 
@@ -45,17 +50,30 @@ from the entry move so new characters have a 1 MP-cheap opener.
 
 | Slot | Skill | Id | Lvl | MP | CD (ms) | Target | Effect | VFX cast / impact | Provenance |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | La Hán Chưởng | `la_han_chuong` | 1 | 5 | 1500 | enemy r85 | — | palm / spark | adapted from La Hán Quyền |
-| 1 | Vi Đà Chưởng | `vi_da_chuong` | 1 | 7 | 4000 | enemy r95 | slow 30% / 2s | palm / dust | VLTK2 (Vi Đà Chưởng) |
-| 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
-| 3 | La Hán Trận | `la_han_tran` | 5* | 18 | 9000 | self | **buff** `attackPct` 0.10 + `speedPct` 0.20 + `critRate` 0.05, 180s | sprite row 2 (formation) / — | VLTK2 |
-| 4 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 7 | 15 | 15000 | self | **buff** `defensePct` 0.25, 8s | aura / — | VLTK2 |
-| 5 | Như Lai Thần Chưởng | `nhu_lai_than_chuong` | 10 | 35 | 30000 | enemy r6000 (capped to camera), AoE r900 at impact | stun 1200ms (mult 2.4) | cast at hero / palm drops and blooms on impact | VLTK2 |
+| 0 | Thiếu Lâm Tâm Pháp | `thieu_lam_tam_phap` | 1 | 0 | 0 | self | **passive** `regen` 2 HP/s, always on | none (never cast) | adapted for the new kit |
+| 1 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 1 | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
+| 2 | La Hán Trận | `la_han_tran` | 1 | 18 | 9000 | self | **buff** `attackPct` 0.10 + `speedPct` 0.20 + `critRate` 0.05, 180s | sprite row 2 (formation) / — | VLTK2 |
+| 3 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 1 | 20 | 18000 | self | **buff** `defensePct` 0.30, 30s | aura + 卍 overhead / — | VLTK2 |
+| 4 | Như Lai Thần Chưởng | `nhu_lai_than_chuong` | 10 | 35 | 30000 | enemy r6000 (capped to camera), AoE r900 at impact | stun 1200ms (mult 2.4) | cast at hero / palm drops and blooms on impact | VLTK2 |
 
 Design rules:
 
-- `*` Đại Tu Di Chưởng currently ships with `unlockLevel: 1` because it is the
-  only authored palm skill; restore it to 3 once slots 0–1 land.
+- **Thiếu Lâm Tâm Pháp is a passive, not a cast.** It carries no `mp`, no
+  `cooldown` and no `vfx`; `passive: true` plus an
+  `effects: [{ kind: "regen", hpPerSecond: 2 }]` entry is all the game loop
+  needs. `combat.castSkill()` refuses it with a log line, the hotbar slot binds
+  but pressing it never spends MP, and `passiveRegen.js` sums the unlocked
+  passive arts of the sect every frame.
+- The regen tick mirrors each healed point to the server with `player_heal`
+  (same path as a potion), so HP stays server-authoritative and is clamped to
+  the server's own ceiling. Fractional HP is carried between frames: 2 HP/s at
+  60 fps heals 1 HP every 500 ms instead of being rounded away.
+- Time spent paused is never billed. `billableDeltaMs()` drops any gap longer
+  than `MAX_TICK_MS` (1 s), so opening a modal or backgrounding the tab cannot
+  bank minutes of regen and refill the hero the moment play resumes.
+- `maxHp` is **not** buffed: the ceiling is server-owned (derived from level), so
+  a client-side max-HP buff would desync the health bar. A temporary max-HP
+  component would need a server-side ceiling model first.
 - Known limitation: damage/stun resolve at cast time, while the projectile or
   the Như Lai slam can land later (~0.45 s after the cast gesture plus 0.28 s
   drop). Delaying the authoritative hit needs a projectile lifecycle/impact-time
@@ -77,7 +95,7 @@ Design rules:
   `resolveTargets()` filters enemies around it. `skillReach()` therefore uses
   `range` when present and only falls back to `radius` for radius-only skills.
   Setting `target: "self"` would short-circuit to self buffs and skip damage.
-- Slots 3 and 4 are self buffs; both keep the existing `buff` effect kind, so no
+- Slots 2 and 3 are self buffs; both keep the existing `buff` effect kind, so no
   server change is needed. La Hán Trận is the offensive formation
   (`attackPct` + `critRate`); Kim Cang Bất Hoại is the defensive art
   (`defensePct`).
@@ -100,11 +118,13 @@ Chưởng.** It ships as a 64×64 PNG icon plus a four-frame animated VFX:
   above keys out neutral greys and trims the leftover rim. If a transparent
   source is available later, regenerate the frames from it without changing paths.
 - Catalog `icon` points to `/skills/dai_tu_di_chuong.png`.
-- The remaining slots (0, 1 and 4) still use their interim emblems/glyph until
-  their final palm art is chosen; do not reuse the Như Lai sheet there.
-- Slots 0 (`la_han_quyen`) and 1 (`thieu_lam_truong_phap`) now ship vector
-  emblems instead of glyphs: transparent 128×128 PNGs in the same gold palette,
-  regenerated with `python3 scripts/build_skill_icons.py` (SVG → `rsvg-convert`).
+- Thiếu Lâm Tâm Pháp ships as `public/skills/thieu_lam_tam_phap.png`, a 128×128
+  RGBA icon built from the supplied `docs/example/thieu-lam.png` illustration
+  (full-bleed art, so it is a centred square crop rather than a keyed emblem) by
+  `python3 scripts/build_skill_thieu_lam_tam_phap.py`. It has no VFX of its own:
+  the art is always on, so an aura would misrepresent a permanent state.
+- La Hán Trận and Kim Cang Bất Hoại keep their own icons; no interim glyph or
+  emblem slots remain in the kit.
 - Như Lai Thần Chưởng ships as `public/skills/nhu_lai_than_chuong.png` (64×64
   icon, frame 1) and `public/skills/vfx/nhu_lai_than_chuong/`
   (`frame-1..4.png`, `sheet.png` 1024×256, `sheet.json` fps 12), generated from
@@ -181,38 +201,46 @@ palm rather than sword:
 
 | Layer | File | Change |
 | --- | --- | --- |
-| Catalog | `src/game/skills.js` | Populate `THIEU_LAM_SKILLS` with the six palm skills; ids/slots as above |
-| i18n | `src/i18n/locales/{vi,en,zh}.js` | Re-add `skills.thieuLam.<camelId>.{name,desc}` for all six |
+| Catalog | `src/game/skills.js` | `THIEU_LAM_SKILLS` = Tâm Pháp (slot 0, passive) + four palm skills in slots 1-4 |
+| Regen | `src/game/passiveRegen.js` | `regenPerSecond`, `passiveRegenRate`, `advanceRegen` (pure, shared maths) |
+| Combat | `src/game/combat.js` | `updatePassiveRegen` tick + `castSkill` refusal for passive arts |
+| i18n | `src/i18n/locales/{vi,en,zh}.js` | `skills.thieuLam.<camelId>.{name,desc}` for all five + `skills.passiveTag` / `skills.regenTag` |
+| Icons | `public/skills/thieu_lam_tam_phap.png` | 128×128 icon derived from `docs/example/thieu-lam.png` |
 | Icons | `public/skills/dai_tu_di_chuong.png` | 64×64 icon derived from row 1 |
 | VFX art | `public/skills/vfx/dai_tu_di_chuong/*` | Four 256×256 frames + sheet + json |
 | VFX art | `public/skills/nhu_lai_than_chuong.png` | 64×64 icon derived from the Như Lai sheet |
 | VFX art | `public/skills/vfx/nhu_lai_than_chuong/*` | Four 256×256 frames + sheet + json |
+| Icon tooling | `scripts/build_skill_thieu_lam_tam_phap.py` | Square-crop and resize the supplied art |
 | VFX tooling | `scripts/build_skill_nhu_lai_than_chuong.py` | Extract, normalise and feather the Như Lai sheet |
 | VFX | `src/game/skillVfx.js` | `palm` primitive + sprite playback |
 | Scene | `src/game/game.js` | Preload the Đại Tu Di Chưởng spritesheet |
 | Rig | `src/game/heroRigView.js` | Map `palm` cast to the palm pose |
 | HUD | `src/components/HUD/HotbarDock.jsx` | Already switched to `SkillIcon` so slots render a glyph when `icon` is absent |
-| Client tests | `src/game/skills.test.js` | Restore six-slot invariants for Thiếu Lâm |
+| Modal | `src/components/Modals/SkillsModal.jsx` | Show `skills.passiveTag` / `skills.regenTag` instead of an MP cost for a passive |
+| Client tests | `src/game/skills.test.js` | Five-slot invariants for Thiếu Lâm; passive entry assertions |
+| Client tests | `src/game/passiveRegen.test.js` | Rate sum, level gate and fraction-carry coverage |
+| Client tests | `src/game/combat.test.js` | Passive regen tick, no-regen sects, ceiling clamp, cast refusal |
 | Client tests | `src/game/skillDamage.test.js` | Add one damage + one effect case per new skill |
 | Server | `server/src/websocket/gameSocket.js` | Store the cast impact centre and validate AoE hits around it |
-| Server tests | `server/tests/websocket.test.js` | Remove `SKIP_NO_KIT`; use palm ids for MP/damage authority; cover AoE-centre rejection |
+| Server tests | `server/tests/websocket.test.js` | Remove `SKIP_NO_KIT`; use the new kit ids for MP/damage authority; cover AoE-centre rejection |
 | Docs | `docs/plan/sect-skills.md` | Keep cross-reference; Thiếu Lâm no longer empty |
 
 Do **not** touch sect ids, gender rules, character DB defaults, or the loadout
-schema. `thieu-lam` stays the default sect; saved loadouts `{left,right}` remain
-valid because slot numbers are stable.
+schema. `thieu-lam` stays the default sect; saved loadouts `{left,right}` are
+repaired on mount when a slot no longer exists in the kit.
 
 ## 6. Testing and definition of done
 
-- **Catalog invariants**: `skillsForSect("thieu-lam")` has six entries, slots
-  `0..5` unique, every `unlockLevel` in `{1,3,5,7,10}`, ids unique across all
-  sects, every `icon` file exists.
+- **Catalog invariants**: `skillsForSect("thieu-lam")` has five entries, slots
+  `0..4` unique, ids unique across all sects, every `icon` file exists, and
+  exactly one skill is `passive`.
 - **i18n**: every `nameKey`/`descKey` resolves in `vi`, `en`, and `zh`.
-- **Damage/effects**: one test for a plain strike, one for slow, one for AoE
-  stun, one for the offensive formation buff, one for the defensive buff, one for
-  the ultimate.
+- **Regen**: `passiveRegenRate("thieu-lam", 1) === 2`, an unlocked-gate case,
+  and the fraction-carry cadence (2 HP/s → 1 HP per 500 ms).
+- **Damage/effects**: one test for an AoE stun, one for the offensive formation
+  buff, one for the defensive buff, one for the ultimate.
 - **Server**: MP cost, cooldown, range rejection, recomputed damage, and
-  per-cast hit cap all re-enabled (remove the temporary skip).
+  per-cast hit cap all re-enabled (the temporary skip is gone).
 - **Manual**: pick each hand skill, cast on a wolf from each direction, confirm
   the palm pose, the Đại Tu Di Chưởng four-frame animation (no grey checker
   box), VFX colour, cooldown overlay, and no leftover TLQ name/icon.
@@ -222,10 +250,10 @@ valid because slot numbers are stable.
 
 | Phase | Content | Exit criteria |
 | --- | --- | --- |
-| P1 | Remaining catalog entries + i18n (glyphs for slots 0, 1, 3, 4, 5) | Six slots castable; full-kit server tests un-skipped |
-| P2 | Đại Tu Di Chưởng icon + sprite sheet, glyph fallbacks elsewhere | No missing assets; HUD renders the icon |
+| P1 | Five catalog entries + i18n + renumbered slots | Five slots castable; passive regen live; full-kit server tests un-skipped |
+| P2 | Tâm Pháp icon, Đại Tu Di Chưởng icon + sprite sheet | No missing assets; HUD renders every icon |
 | P3 | `palm` vector VFX, sprite playback, rig mapping | No `slash`/`kick` in the Thiếu Lâm kit |
-| P4 | Balance pass + manual playtest | MP/CD/mult tuned against wolves |
+| P4 | Balance pass + manual playtest | HP/s, MP/CD/mult tuned against wolves |
 
 Each phase is independently shippable and keeps the other three sects untouched.
 
@@ -237,3 +265,7 @@ Each phase is independently shippable and keeps the other three sects untouched.
 3. Spelling: **resolved** — the rebuilt kit uses `Như Lai Thần Chưởng` /
    `nhu_lai_than_chuong`, matching the supplied art. The old
    `nhu_lai_than_thuong` id is gone from the client catalog and server tests.
+4. Thiếu Lâm Tâm Pháp: **resolved** — passive and always on, free of MP, heals a
+   flat 2 HP/s and does not raise the HP ceiling. A `maxHp` buff is deferred
+   until the server owns a buffable ceiling; a party-wide or toggleable variant
+   would need the same engine work as the formation.

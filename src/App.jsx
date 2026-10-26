@@ -191,21 +191,24 @@ export function App() {
   useEffect(() => {
     const loadout = loadSkillLoadout(activeCharacter?.id);
     const kit = activeCharacter?.sect ? skillsForSect(activeCharacter.sect) : [];
-    const validLeftSkills = kit.filter((skill) => skill.target !== "self");
+    // A passive art (tâm pháp) is always on, so it can never be bound to a cast
+    // key or a mouse button: only castable skills are valid assignments.
+    const castableSkills = kit.filter((skill) => !skill.passive);
+    const validLeftSkills = castableSkills.filter((skill) => skill.target !== "self");
     const firstLeftSlot = validLeftSkills[0]?.slot;
-    const firstSlot = kit[0]?.slot;
-    if (Number.isInteger(firstSlot)) {
-      if (!kit.some((skill) => skill.slot === loadout.u)) loadout.u = firstSlot;
-      if (!kit.some((skill) => skill.slot === loadout.i)) loadout.i = firstSlot;
-      if (!kit.some((skill) => skill.slot === loadout.o)) loadout.o = firstSlot;
-      if (!kit.some((skill) => skill.slot === loadout.p)) loadout.p = firstSlot;
+    const firstCastableSlot = castableSkills[0]?.slot;
+    if (Number.isInteger(firstCastableSlot)) {
+      if (!castableSkills.some((skill) => skill.slot === loadout.u)) loadout.u = firstCastableSlot;
+      if (!castableSkills.some((skill) => skill.slot === loadout.i)) loadout.i = firstCastableSlot;
+      if (!castableSkills.some((skill) => skill.slot === loadout.o)) loadout.o = firstCastableSlot;
+      if (!castableSkills.some((skill) => skill.slot === loadout.p)) loadout.p = firstCastableSlot;
       if (Number.isInteger(firstLeftSlot) && !validLeftSkills.some((skill) => skill.slot === loadout.left)) {
         loadout.left = firstLeftSlot;
       } else if (!Number.isInteger(loadout.left)) {
         loadout.left = firstLeftSlot ?? loadout.u;
       }
-      if (!kit.some((skill) => skill.slot === loadout.right)) {
-        loadout.right = loadout.i ?? firstSlot;
+      if (!castableSkills.some((skill) => skill.slot === loadout.right)) {
+        loadout.right = loadout.i ?? firstCastableSlot;
       }
     }
     setSkillLoadout(loadout);

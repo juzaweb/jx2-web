@@ -9,16 +9,17 @@ import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
 import { MARKET_NPCS, MARKET_SPAWN } from "../../src/game/marketLayout.js";
 import { skillById } from "../../src/game/skills.js";
 
-const THIEU_LAM_PALM_IDS = [
-  "la_han_chuong",
-  "vi_da_chuong",
+// Every skill of the Thiếu Lâm kit. `thieu_lam_tam_phap` is a passive internal
+// art (no MP, no cooldown), so only the four active palm skills are cast below.
+const THIEU_LAM_KIT_IDS = [
+  "thieu_lam_tam_phap",
   "dai_tu_di_chuong",
   "la_han_tran",
   "kim_cang_bat_hoai",
   "nhu_lai_than_chuong"
 ];
-const HAS_THIEU_LAM_PALM_KIT = THIEU_LAM_PALM_IDS.every((id) => Boolean(skillById(id)));
-const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
+const HAS_THIEU_LAM_KIT = THIEU_LAM_KIT_IDS.every((id) => Boolean(skillById(id)));
+const SKIP_NO_KIT = HAS_THIEU_LAM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -399,11 +400,9 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     // Each cast spends that skill's MP from the server-owned pool (level 1 -> maxMp 60).
     // Distinct skills are used so their individual cooldowns never block the next cast.
     const casts = [
-      { skill: "la_han_chuong", mp: 55 },
-      { skill: "vi_da_chuong", mp: 48 },
-      { skill: "dai_tu_di_chuong", mp: 36 },
-      { skill: "la_han_tran", mp: 18 },
-      { skill: "kim_cang_bat_hoai", mp: 3 }
+      { skill: "dai_tu_di_chuong", mp: 48 },
+      { skill: "la_han_tran", mp: 30 },
+      { skill: "kim_cang_bat_hoai", mp: 10 }
     ];
     for (const step of casts) {
       client.send({ type: "player_attack", payload: { skill: step.skill, x: 640, y: 620, facingRight: true } });
@@ -416,7 +415,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong", x: 640, y: 620, facingRight: true } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     const lastMp = client.messages.filter((m) => m.type === "player_mp").at(-1);
-    assert.equal(lastMp.payload.mp, 3, "The refused cast spends nothing");
+    assert.equal(lastMp.payload.mp, 10, "The refused cast spends nothing");
 
     // A restore is clamped to the ceiling
     client.send({ type: "player_restore_mp", payload: { amount: 9999 } });
@@ -437,14 +436,16 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
         username: "SkillDmg",
         x: 8400,
         y: 6000,
-        attack: 40,
+        // Weak enough that one palm hit cannot kill the wolf: later subtests
+        // still need enemies 0..2 alive on this map.
+        attack: 12,
         critRate: 0
       }
     });
     await client.waitFor((m) => m.type === "init_world");
 
     // A hit without a preceding cast is ignored: damage cannot be minted freely.
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "dai_tu_di_chuong", damage: 9999 } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(
       client.messages.filter((m) => m.type === "enemy_hit" && m.payload.damage > 0).length,
@@ -453,8 +454,8 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     );
 
     // After a real cast the server recomputes the damage from the catalog.
-    client.send({ type: "player_attack", payload: { skill: "la_han_chuong", x: 8400, y: 6000, facingRight: true } });
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "la_han_chuong", damage: 9999 } });
+    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 8400, y: 6000, facingRight: true } });
+    client.send({ type: "enemy_hit", payload: { id: 0, skill: "dai_tu_di_chuong", damage: 9999 } });
     const hit = await client.waitFor(
       (m) => m.type === "enemy_hit" && m.payload.id === 0 && m.payload.damage > 0
     );

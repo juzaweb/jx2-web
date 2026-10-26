@@ -215,19 +215,17 @@ export default {
     cooldownSec: "{sec}秒",
     rangeTag: "距离: {range}",
     dmgTag: "伤害: {pct}%",
+    passiveTag: "被动",
+    regenTag: "每秒恢复 {hp} 生命",
     tree: {
       requires: "需要 {name} 达到 {level} 级",
       empty: "该门派暂无招式。",
       selectHint: "选择一个招式格查看详情。"
     },
     thieuLam: {
-      laHanQuyen: {
-        name: "罗汉拳",
-        desc: "少林基础拳法，贴身近战攻击目标。"
-      },
-      thieuLamTruongPhap: {
-        name: "少林掌法",
-        desc: "少林刚猛掌法，造成中等近战伤害。"
+      thieuLamTamPhap: {
+        name: "少林心法",
+        desc: "少林心法自动运转，每秒恢复 2 点生命，且不消耗内力。"
       },
       daiTuDiChuong: {
         name: "大须弥掌",

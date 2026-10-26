@@ -3,6 +3,7 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { skillLockReason, skillUnlocked } from "../../game/skills.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
+import { regenPerSecond } from "../../game/passiveRegen.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 import "../../styles/skills-modal.css";
@@ -62,6 +63,8 @@ export function SkillsModal({
   const selectedUnlocked = selectedSkill ? skillUnlocked(selectedSkill, level) : false;
   const selectedLockReason = selectedUnlocked ? null : skillLockReason(selectedSkill, level);
   const selectedLockLabel = formatSkillLock(selectedLockReason, t);
+  /** HP/s an always-on art restores; 0 for every cast skill. */
+  const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill) : 0;
 
   return (
     <div className="skills-modal-overlay" id="skills-modal">
@@ -208,9 +211,11 @@ export function SkillsModal({
                   <span
                     className={`skills-detail-meta ${selectedUnlocked ? "unlocked" : "locked"}`}
                   >
-                    {selectedUnlocked
-                      ? `${selectedSkill.mp} MP`
-                      : selectedLockLabel || t("skills.tree.selectHint")}
+                    {!selectedUnlocked
+                      ? selectedLockLabel || t("skills.tree.selectHint")
+                      : selectedSkill.passive
+                        ? t("skills.passiveTag")
+                        : `${selectedSkill.mp} MP`}
                   </span>
                 </div>
               </div>
@@ -239,9 +244,16 @@ export function SkillsModal({
                     {t("skills.dmgTag", { pct: Math.round(selectedSkill.mult * 100) })}
                   </span>
                 )}
+                {selectedRegen > 0 && (
+                  <span className="skills-stat-chip">
+                    {t("skills.regenTag", { hp: selectedRegen })}
+                  </span>
+                )}
               </div>
 
-              {selectedUnlocked && (
+              {/* An always-on passive art has nothing to bind: it runs without
+                  being cast, so the key/mouse grid is hidden for it. */}
+              {selectedUnlocked && !selectedSkill.passive && (
                 <div className="skills-detail-bind">
                   <div className="skills-detail-bind-label">{t("skills.picker.eyebrow")}</div>
                   <div className="skills-bind-grid">

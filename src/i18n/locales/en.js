@@ -214,19 +214,17 @@ export default {
     cooldownSec: "{sec}s",
     rangeTag: "Range: {range}",
     dmgTag: "Dmg: {pct}%",
+    passiveTag: "Passive",
+    regenTag: "Regen {hp} HP/s",
     tree: {
       requires: "Requires {name} at level {level}",
       empty: "This sect has no skills yet.",
       selectHint: "Select a skill tile to see its details."
     },
     thieuLam: {
-      laHanQuyen: {
-        name: "Arhat Fist",
-        desc: "Basic Shaolin fist strike to engage enemies in melee range."
-      },
-      thieuLamTruongPhap: {
-        name: "Shaolin Palm Technique",
-        desc: "Powerful Shaolin palm strike dealing medium melee damage."
+      thieuLamTamPhap: {
+        name: "Shaolin Internal Art",
+        desc: "An always-active Shaolin internal art that restores 2 health per second at no mana cost."
       },
       daiTuDiChuong: {
         name: "Great Sumeru Palm",
