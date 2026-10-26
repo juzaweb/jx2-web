@@ -9,11 +9,12 @@ const chainable = (methods) => {
   return obj;
 };
 
-const makeScene = () => {
+const makeScene = ({ zoom = 0.5 } = {}) => {
   const container = chainable([
     "setVisible",
     "setDepth",
     "setPosition",
+    "setScale",
     "add",
     "destroy"
   ]);
@@ -34,6 +35,7 @@ const makeScene = () => {
         container: vi.fn(() => container),
         ellipse: vi.fn(() => makeShape())
       },
+      cameras: { main: { zoom } },
       tweens
     }
   };
@@ -49,7 +51,7 @@ describe("TargetRing", () => {
     ring.show(120, 240, "monster");
 
     expect(scene.add.container).toHaveBeenCalledTimes(1);
-    expect(scene.add.ellipse).toHaveBeenCalledTimes(3);
+    expect(scene.add.ellipse).toHaveBeenCalledTimes(1);
   });
 
   it("sits under the target's feet and behind the character", () => {
@@ -74,12 +76,31 @@ describe("TargetRing", () => {
     expect(container.setPosition).toHaveBeenLastCalledWith(160, 300);
   });
 
+  it("scales against the camera zoom so the halo keeps its screen size", () => {
+    // Gameplay zoom is ~0.13 on a phone: a world-sized ring would be invisible.
+    const { scene, container } = makeScene({ zoom: 0.135 });
+    const ring = new TargetRing(scene);
+
+    ring.show(120, 240, "monster");
+
+    expect(container.setScale).toHaveBeenLastCalledWith(1 / 0.135);
+  });
+
+  it("falls back to an unscaled halo without a readable camera zoom", () => {
+    const { scene, container } = makeScene({ zoom: 0 });
+    const ring = new TargetRing(scene);
+
+    ring.show(120, 240, "monster");
+
+    expect(container.setScale).toHaveBeenLastCalledWith(1);
+  });
+
   it("recolors once when the target kind changes", () => {
     const { scene, shapes } = makeScene();
     const ring = new TargetRing(scene);
 
     ring.show(120, 240, "monster");
-    const [, ringShape] = shapes;
+    const [ringShape] = shapes;
     ringShape.setStrokeStyle.mockClear();
 
     ring.show(120, 240, "monster");
@@ -87,7 +108,7 @@ describe("TargetRing", () => {
 
     ring.show(120, 240, "player");
     expect(ringShape.setStrokeStyle).toHaveBeenCalledWith(
-      3,
+      2,
       TARGET_RING_COLORS.player,
       0.95
     );
