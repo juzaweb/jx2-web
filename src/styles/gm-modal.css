@@ -298,3 +298,10 @@
   border: 1px solid #2b8a3e;
 }
 
+@media (max-width: 480px) {
+  .gm-tab {
+    font-size: 11px;
+    padding: 6px 1px;
+  }
+}
+

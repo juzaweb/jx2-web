@@ -248,19 +248,19 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
                 <div className="gm-btn-grid">
                   <button
                     className="gm-btn"
-                    onClick={() => handleAddItems({ "non-lang-khach": 1 }, "Đã nhận nón Lãng Khách!", "Đã nhận Nón Trúc Lãng Khách vào túi đồ.")}
+                    onClick={() => handleAddItems({ "non-lang-khach": 1 })}
                   >
                     👒 {t("gm.equipment.getHat")}
                   </button>
                   <button
                     className="gm-btn"
-                    onClick={() => handleAddItems({ "ao-lang-khach": 1 }, "Đã nhận áo Lãng Khách!", "Đã nhận Lam Y Lãng Khách vào túi đồ.")}
+                    onClick={() => handleAddItems({ "ao-lang-khach": 1 })}
                   >
                     🥋 {t("gm.equipment.getRobe")}
                   </button>
                   <button
                     className="gm-btn"
-                    onClick={() => handleAddItems({ "quan-lang-khach": 1 }, "Đã nhận quần Lãng Khách!", "Đã nhận Quần Lãng Khách vào túi đồ.")}
+                    onClick={() => handleAddItems({ "quan-lang-khach": 1 })}
                   >
                     👖 {t("gm.equipment.getPants")}
                   </button>
@@ -276,7 +276,7 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
                       "non-lang-khach": 1,
                       "ao-lang-khach": 1,
                       "quan-lang-khach": 1
-                    }, "Đã nhận trọn bộ y phục!", "Đã nhận trọn bộ Y Phục Lãng Khách vào túi đồ.")}
+                    })}
                   >
                     🎁 {t("gm.equipment.receiveFullSet")}
                   </button>

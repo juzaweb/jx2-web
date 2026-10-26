@@ -356,6 +356,28 @@ describe("JiangHuScene.handleGmAction", () => {
     expect(onInventoryChanged).toHaveBeenCalledTimes(1);
   });
 
+  it("formats item name automatically when text and log are omitted", () => {
+    setQuantities({ "non-lang-khach": 0 });
+    const addLog = vi.fn();
+    const showFloatText = vi.fn();
+    const onInventoryChanged = vi.fn();
+    const scene = {
+      player: { x: 100, y: 100 },
+      combat: { showFloatText },
+      uiBridge: { addLog },
+      onInventoryChanged
+    };
+
+    JiangHuScene.prototype.handleGmAction.call(scene, {
+      action: "add_items",
+      items: { "non-lang-khach": 1 }
+    });
+
+    expect(getQuantity("non-lang-khach")).toBe(1);
+    expect(showFloatText).toHaveBeenCalledWith(100, 32, "Đã nhận Nón Trúc Lãng Khách!", "#69db7c");
+    expect(addLog).toHaveBeenCalledWith("Đã nhận Nón Trúc Lãng Khách vào túi đồ.", "system");
+  });
+
   it("equips an entire costume set in one action with equip_set", () => {
     const applyEquipment = vi.fn();
     const addLog = vi.fn();
@@ -393,5 +415,33 @@ describe("JiangHuScene.handleGmAction", () => {
     });
     expect(emitEquipment).toHaveBeenCalledTimes(1);
     expect(onInventoryChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-consume items already equipped in equip_set", () => {
+    setQuantities({ "ao-lang-khach": 1 });
+    const applyEquipment = vi.fn();
+    const emitEquipment = vi.fn();
+    const onInventoryChanged = vi.fn();
+    const player = {
+      x: 100,
+      y: 100,
+      equipment: { armor: "ao-lang-khach" },
+      applyEquipment
+    };
+    const scene = {
+      player,
+      combat: { showFloatText: vi.fn() },
+      uiBridge: { addLog: vi.fn() },
+      emitEquipment,
+      onInventoryChanged
+    };
+
+    JiangHuScene.prototype.handleGmAction.call(scene, {
+      action: "equip_set",
+      equipment: { armor: "ao-lang-khach" }
+    });
+
+    // The extra one in bag remains unconsumed because it was already worn
+    expect(getQuantity("ao-lang-khach")).toBe(1);
   });
 });

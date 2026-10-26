@@ -28,7 +28,7 @@ const DOLL_SLOTS = {
   row: [
     { key: "cosHat", labelKey: "character.slots.cosHat", icon: "cosHat" },
     { key: "cosTop", labelKey: "character.slots.cosTop", icon: "cosTop" },
-    { key: "cosPants", labelKey: "character.slots.cosPants", icon: "cosPants" },
+    { key: "cosPants", source: "pants", labelKey: "character.slots.cosPants", icon: "cosPants" },
     { key: "mount", labelKey: "character.slots.mount", icon: "mount" }
   ]
 };
