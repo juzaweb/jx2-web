@@ -8,6 +8,7 @@ import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
 import { ensureVfxTexture } from "./lazyAssets.js";
+import { OverheadSeal } from "./overheadSeal.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_SPEED_SCALE, BASE_WALK_SPEED } from "./worldConfig.js";
 import {
   BASE_ATTACK,
@@ -107,6 +108,7 @@ export class Player {
     this.visual.setDepth(isoDepth(x, y));
     this.visual.setScale(S);
     this.drawHero(this.visual);
+    this.overheadSeal = new OverheadSeal(this.scene, this.visual);
 
     this.nameText = this.scene.add.text(iso.x, iso.y - 60 * S, this.name, {
       fontFamily: "Arial, Tahoma, sans-serif",
@@ -268,6 +270,7 @@ export class Player {
     this.nameText.setPosition(iso.x, iso.y - 60 * S + this.body.y * 0.35);
     this.nameText.setDepth(depth + 100);
     this.updateHealthBar(iso.x, iso.y + this.body.y * 0.35, depth);
+    this.overheadSeal?.update(this.body?.y || 0);
   }
 
   spawnFootstepDust(x, y, vx, vy) {
@@ -533,6 +536,7 @@ export class Player {
     this.setPosition(this.spawnX, this.spawnY);
     this.sprite.setVelocity(0, 0);
     this.hideFormation();
+    this.hideOverhead();
   }
 
   /**
@@ -681,11 +685,30 @@ export class Player {
     }
   }
 
+  /**
+   * Float a buff seal above the hero's head (e.g. the 卍 of Kim Cang Bất Hoại).
+   * @param {string} key Phaser texture key
+   * @param {number} [scale] scale in rig units
+   * @param {number} [offsetY] rig-space height above the feet
+   */
+  showOverhead(key, scale, offsetY) {
+    this.overheadSeal?.show(key, scale, offsetY);
+  }
+
+  /**
+   * Hide the overhead buff seal when its buff expires or is cleared.
+   */
+  hideOverhead() {
+    this.overheadSeal?.hide();
+  }
+
   destroy() {
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;
     }
+    this.overheadSeal?.destroy();
+    this.overheadSeal = null;
     if (this.keys && this.scene?.input?.keyboard?.removeKey) {
       Object.values(this.keys).forEach((key) => {
         try {

@@ -112,7 +112,8 @@ export class CombatSystem {
    */
   getEffectiveStats() {
     const now = this.scene?.time?.now ?? 0;
-    this.buffs = this.buffs.filter((buff) => buff.until > now);
+    // Do not prune here: `updateBuffs` owns the buff lifecycle so an expired
+    // buff's formation ring or overhead seal is still visible to hide.
     return applyBuffsToStats(this.player.stats, this.buffs, now);
   }
 
@@ -929,12 +930,16 @@ export class CombatSystem {
    * @param {number} now
    */
   applySelfEffects(skill, now) {
+    const overheadSprite = skill.vfx?.type === "overhead" ? skill.vfx.overhead : null;
     for (const effect of skill.effects || []) {
       if (effect.kind === "buff") {
         this.buffs.push({
           skillId: skill.id,
           formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
           formationScale: skill.vfx?.type === "formation" && typeof skill.vfx.scale === "number" ? skill.vfx.scale : undefined,
+          overheadSprite,
+          overheadScale: overheadSprite && typeof skill.vfx.overheadScale === "number" ? skill.vfx.overheadScale : undefined,
+          overheadOffsetY: overheadSprite && typeof skill.vfx.overheadOffsetY === "number" ? skill.vfx.overheadOffsetY : undefined,
           stat: effect.stat,
           amount: effect.amount,
           until: now + effect.duration
@@ -956,6 +961,9 @@ export class CombatSystem {
       } else {
         this.player.showFormation?.(skill.vfx.sprite);
       }
+    }
+    if (overheadSprite) {
+      this.player.showOverhead?.(overheadSprite, skill.vfx.overheadScale, skill.vfx.overheadOffsetY);
     }
   }
 
@@ -988,14 +996,26 @@ export class CombatSystem {
     } else {
       this.player.hideFormation?.();
     }
+
+    const activeOverhead = this.buffs.find((buff) => buff.overheadSprite);
+    if (activeOverhead) {
+      this.player.showOverhead?.(
+        activeOverhead.overheadSprite,
+        activeOverhead.overheadScale,
+        activeOverhead.overheadOffsetY
+      );
+    } else {
+      this.player.hideOverhead?.();
+    }
   }
 
   /**
-   * Clear all active buffs and hide any buff formation rings.
+   * Clear all active buffs and hide any buff formation rings or overhead seals.
    */
   clearBuffs() {
     this.buffs = [];
     this.player.hideFormation?.();
+    this.player.hideOverhead?.();
   }
 
   /**

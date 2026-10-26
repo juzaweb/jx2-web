@@ -26,6 +26,7 @@ describe("skill catalog", () => {
       "thieu_lam_truong_phap",
       "dai_tu_di_chuong",
       "la_han_tran",
+      "kim_cang_bat_hoai",
       "nhu_lai_than_chuong",
       "thieu_duong_kiem_phap",
       "thai_cuc_quyen",
@@ -43,6 +44,7 @@ describe("skill catalog", () => {
     expect(SKILL_SLOTS).toBe(6);
 
     const [laHanQuyen, thieuLamTruongPhap, daiTuDiChuong, laHanTran] = skillsForSect("thieu-lam");
+    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
     const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 5);
     expect(daiTuDiChuong).toMatchObject({
       id: "dai_tu_di_chuong",
@@ -70,6 +72,27 @@ describe("skill catalog", () => {
         { kind: "buff", stat: "speedPct", amount: 0.2, duration: 180000 },
         { kind: "buff", stat: "critRate", amount: 0.05, duration: 180000 }
       ]
+    });
+    expect(kimCangBatHoai).toMatchObject({
+      id: "kim_cang_bat_hoai",
+      sect: "thieu-lam",
+      slot: 4,
+      icon: "/skills/kim_cang_bat_hoai.png",
+      glyph: "卍",
+      unlockLevel: 1,
+      mp: 20,
+      cooldown: 18000,
+      target: "self",
+      range: 0,
+      radius: 0,
+      mult: 0,
+      effects: [{ kind: "buff", stat: "defensePct", amount: 0.3, duration: 30000 }],
+      vfx: {
+        type: "overhead",
+        overhead: "buff-phat-an",
+        overheadScale: 0.05,
+        overheadOffsetY: -80
+      }
     });
     expect(nhuLaiThanChuong).toMatchObject({
       id: "nhu_lai_than_chuong",
@@ -102,6 +125,7 @@ describe("skill catalog", () => {
       "public/skills/vfx/dai_tu_di_chuong/sheet.png",
       "public/skills/la_han_tran.png",
       "public/skills/vfx/la_han_tran/sheet.png",
+      "public/skills/kim_cang_bat_hoai.png",
       "public/skills/nhu_lai_than_chuong.png",
       "public/skills/vfx/nhu_lai_than_chuong/sheet.png"
     ]) {
@@ -127,6 +151,9 @@ describe("skill catalog", () => {
     expect(skillById("la_han_tran")?.slot).toBe(3);
     expect(skillForSlot("thieu-lam", 3)?.id).toBe("la_han_tran");
     expect(skillSlot("la_han_tran")).toBe(3);
+    expect(skillById("kim_cang_bat_hoai")?.slot).toBe(4);
+    expect(skillForSlot("thieu-lam", 4)?.id).toBe("kim_cang_bat_hoai");
+    expect(skillSlot("kim_cang_bat_hoai")).toBe(4);
     expect(skillById("la_han_quyen")?.slot).toBe(0);
     expect(skillForSlot("thieu-lam", 0)?.id).toBe("la_han_quyen");
     expect(skillById("nhu_lai_than_chuong")?.slot).toBe(5);
@@ -141,6 +168,8 @@ describe("skill catalog", () => {
     expect(skillCooldown("dai_tu_di_chuong")).toBe(6000);
     expect(skillMpCost("la_han_tran")).toBe(18);
     expect(skillCooldown("la_han_tran")).toBe(9000);
+    expect(skillMpCost("kim_cang_bat_hoai")).toBe(20);
+    expect(skillCooldown("kim_cang_bat_hoai")).toBe(18000);
     expect(skillMpCost("nhu_lai_than_chuong")).toBe(35);
     expect(skillCooldown("nhu_lai_than_chuong")).toBe(30000);
     expect(skillMpCost("normal")).toBe(0);
@@ -153,6 +182,8 @@ describe("skill catalog", () => {
     expect(skillUnlocked("dai_tu_di_chuong", 0)).toBe(false);
     expect(skillUnlocked("la_han_tran", 1)).toBe(true);
     expect(skillUnlocked("la_han_tran", 0)).toBe(false);
+    expect(skillUnlocked("kim_cang_bat_hoai", 1)).toBe(true);
+    expect(skillUnlocked("kim_cang_bat_hoai", 0)).toBe(false);
     expect(skillUnlocked("nhu_lai_than_chuong", 10)).toBe(true);
     expect(skillUnlocked("nhu_lai_than_chuong", 9)).toBe(false);
     expect(skillUnlocked("bogus", 99)).toBe(false);
@@ -161,6 +192,7 @@ describe("skill catalog", () => {
   it("declares prerequisites that exist inside the same sect", () => {
     expect(skillRequires("la_han_quyen")).toEqual([]);
     expect(skillRequires("la_han_tran")).toEqual([{ id: "dai_tu_di_chuong", level: 1 }]);
+    expect(skillRequires("kim_cang_bat_hoai")).toEqual([{ id: "la_han_tran", level: 1 }]);
     expect(skillRequires("nhu_lai_than_chuong")).toEqual([{ id: "la_han_tran", level: 1 }]);
 
     for (const sect of Object.keys(SKILLS_BY_SECT)) {

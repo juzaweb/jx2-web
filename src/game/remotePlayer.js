@@ -6,6 +6,7 @@ import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
 import { createHeroShadow } from "./heroShadow.js";
 import { normalizeGender } from "./gender.js";
 import { ensureVfxTexture } from "./lazyAssets.js";
+import { OverheadSeal } from "./overheadSeal.js";
 import { WORLD_POSITION_SCALE, WORLD_SCALE } from "./worldConfig.js";
 
 const S = WORLD_SCALE;
@@ -55,6 +56,7 @@ export class RemotePlayer {
     this.container = this.scene.add.container(iso.x, iso.y);
     this.container.setDepth(isoDepth(this.x, this.y));
     this.container.setScale(S);
+    this.overheadSeal = new OverheadSeal(this.scene, this.container);
 
     // 1. Soft contact shadow under the feet, matching the local hero.
     this.shadow = createHeroShadow(this.scene, HERO_FOOT_Y);
@@ -267,6 +269,7 @@ export class RemotePlayer {
     }
 
     this.updateHealthBar(iso.x, iso.y + (this.body?.y || 0) * 0.35);
+    this.overheadSeal?.update(this.body?.y || 0);
   }
 
   /**
@@ -332,15 +335,38 @@ export class RemotePlayer {
     }
   }
 
+  /**
+   * Float a buff seal above the peer's head (e.g. Kim Cang Bất Hoại's 卍).
+   * @param {string} key Phaser texture key
+   * @param {number} [scale] scale in rig units
+   * @param {number} [offsetY] rig-space height above the feet
+   */
+  showOverhead(key, scale, offsetY) {
+    this.overheadSeal?.show(key, scale, offsetY);
+  }
+
+  /**
+   * Hide the overhead buff seal when its buff expires or the peer leaves.
+   */
+  hideOverhead() {
+    this.overheadSeal?.hide();
+  }
+
   destroy() {
     if (this.formationTimer) {
       this.formationTimer.remove?.();
       this.formationTimer = null;
     }
+    if (this.overheadTimer) {
+      this.overheadTimer.remove?.();
+      this.overheadTimer = null;
+    }
     if (this.formationSprite) {
       this.formationSprite.destroy?.();
       this.formationSprite = null;
     }
+    this.overheadSeal?.destroy();
+    this.overheadSeal = null;
     if (this.container) {
       this.container.destroy();
       this.container = null;

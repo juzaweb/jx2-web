@@ -362,6 +362,34 @@ describe("Player movement controls", () => {
     expect(formationSprite.destroy).toHaveBeenCalled();
     expect(player.formationSprite).toBeNull();
   });
+
+  it("floats a buff seal above the head and hides it on demand", () => {
+    const overheadSprite = {
+      setOrigin: vi.fn().mockReturnThis(),
+      setScale: vi.fn().mockReturnThis(),
+      setVisible: vi.fn().mockReturnThis(),
+      setPosition: vi.fn().mockReturnThis(),
+      setTexture: vi.fn().mockReturnThis(),
+      destroy: vi.fn()
+    };
+    mockScene.add.sprite = vi.fn(() => overheadSprite);
+    mockScene.textures = { exists: vi.fn(() => true) };
+    player.visual.add = vi.fn();
+
+    player.showOverhead("buff-phat-an", 0.05, -80);
+
+    expect(mockScene.add.sprite).toHaveBeenCalledWith(0, -80, "buff-phat-an");
+    expect(player.visual.add).toHaveBeenCalledWith(overheadSprite);
+    expect(overheadSprite.setScale).toHaveBeenCalledWith(0.05);
+    expect(overheadSprite.setVisible).toHaveBeenCalledWith(true);
+
+    player.hideOverhead();
+    expect(overheadSprite.setVisible).toHaveBeenCalledWith(false);
+
+    player.destroy();
+    expect(overheadSprite.destroy).toHaveBeenCalled();
+    expect(player.overheadSeal).toBeNull();
+  });
 });
 
 describe("Player equipment bonuses", () => {

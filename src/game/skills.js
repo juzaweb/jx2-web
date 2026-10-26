@@ -20,9 +20,8 @@ export const BASIC_ATTACK_ID = "normal";
 
 /**
  * Thiếu Lâm kit is being rebuilt as a palm-technique (chưởng pháp) kit. The old
- * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed. Slots 0-3 and
- * the ultimate (slot 5) have catalog entries; slot 4 is still to be authored,
- * and slots 0-1 still carry their interim names.
+ * Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons were removed. Slots 0-5 all
+ * have catalog entries; slots 0-1 still carry their interim names.
  */
 const THIEU_LAM_SKILLS = [
   {
@@ -113,6 +112,32 @@ const THIEU_LAM_SKILLS = [
       shake: 0,
       scale: 0.6,
       fps: 12
+    }
+  },
+  {
+    id: "kim_cang_bat_hoai",
+    sect: "thieu-lam",
+    slot: 4,
+    icon: "/skills/kim_cang_bat_hoai.png",
+    glyph: "卍",
+    requires: [{ id: "la_han_tran", level: 1 }],
+    nameKey: "skills.thieuLam.kimCangBatHoai.name",
+    descKey: "skills.thieuLam.kimCangBatHoai.desc",
+    unlockLevel: 1,
+    mp: 20,
+    cooldown: 18000,
+    target: "self",
+    range: 0,
+    radius: 0,
+    mult: 0,
+    effects: [{ kind: "buff", stat: "defensePct", amount: 0.3, duration: 30000 }],
+    vfx: {
+      type: "overhead",
+      overhead: "buff-phat-an",
+      cast: "aura",
+      color: 0xffd166,
+      overheadScale: 0.05,
+      overheadOffsetY: -80
     }
   },
   {

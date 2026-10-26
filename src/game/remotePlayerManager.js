@@ -1,4 +1,5 @@
 import { RemotePlayer } from "./remotePlayer.js";
+import { skillById } from "./skills.js";
 
 /**
  * RemotePlayerManager
@@ -144,6 +145,22 @@ export class RemotePlayerManager {
         player.formationTimer = this.scene?.time?.delayedCall?.(180000, () => {
           player.hideFormation?.();
           player.formationTimer = null;
+        });
+      } else if (payload.skill === "kim_cang_bat_hoai") {
+        const skill = skillById("kim_cang_bat_hoai");
+        const duration = skill?.effects?.find((effect) => effect.kind === "buff")?.duration ?? 30000;
+        player.showOverhead?.(
+          skill?.vfx?.overhead ?? "buff-phat-an",
+          skill?.vfx?.overheadScale,
+          skill?.vfx?.overheadOffsetY
+        );
+        if (player.overheadTimer) {
+          player.overheadTimer.remove?.();
+          player.overheadTimer = null;
+        }
+        player.overheadTimer = this.scene?.time?.delayedCall?.(duration, () => {
+          player.hideOverhead?.();
+          player.overheadTimer = null;
         });
       } else if (payload.skill === "kiem_khi") {
         player.playSkill();

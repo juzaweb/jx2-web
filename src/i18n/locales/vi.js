@@ -236,6 +236,10 @@ export default {
         name: "La Hán Trận",
         desc: "Trận pháp hộ thể La Hán, tăng 10% lực tấn công, 20% tốc độ di chuyển và 5% tỉ lệ chí mạng trong 3 phút."
       },
+      kimCangBatHoai: {
+        name: "Kim Cang Bất Hoại",
+        desc: "Kim cang hộ thể, tăng 30% phòng ngự trong 30 giây. Ấn 卍 hiện trên đầu khi hiệu lực."
+      },
       nhuLaiThanChuong: {
         name: "Như Lai Thần Chưởng",
         desc: "Tuyệt kỹ Thiếu Lâm, chưởng khí Như Lai giáng xuống gây sát thương diện rộng và đánh choáng kẻ địch xung quanh."

@@ -18,6 +18,12 @@ vi.mock("./remotePlayer.js", () => {
       update(time, delta) {
         this.lastUpdate = { time, delta };
       }
+      showOverhead(...args) {
+        this.shownOverhead = args;
+      }
+      hideOverhead() {
+        this.hiddenOverhead = true;
+      }
     }
   };
 });
@@ -72,6 +78,34 @@ describe("RemotePlayerManager", () => {
     expect(manager.players.has("my-id")).toBe(false);
     expect(manager.players.has("peer-1")).toBe(true);
     expect(manager.players.has("peer-2")).toBe(true);
+  });
+
+  it("shows the overhead seal when a peer casts Kim Cang Bất Hoại", () => {
+    const timers = [];
+    const scene = {
+      time: {
+        delayedCall: vi.fn((delay, callback) => {
+          const timer = {
+            delay,
+            callback,
+            remove: vi.fn()
+          };
+          timers.push(timer);
+          return timer;
+        })
+      }
+    };
+    const manager = new RemotePlayerManager(scene, null);
+    manager.handlePlayerJoined({ player: { id: "remote-buff" } });
+
+    manager.handlePlayerAttacked({ id: "remote-buff", skill: "kim_cang_bat_hoai" });
+
+    const peer = manager.players.get("remote-buff");
+    expect(peer.shownOverhead).toEqual(["buff-phat-an", 0.05, -80]);
+    expect(scene.time.delayedCall).toHaveBeenCalledWith(30000, expect.any(Function));
+
+    timers[0].callback();
+    expect(peer.hiddenOverhead).toBe(true);
   });
 
   it("destroys all remote players on destroy()", () => {

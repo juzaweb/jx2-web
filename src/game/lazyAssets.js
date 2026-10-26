@@ -38,6 +38,11 @@ export const VFX_SPRITES = {
   }
 };
 
+/** Static images that hover above a buffed character (not sprite sheets). */
+export const OVERHEAD_IMAGES = {
+  "buff-phat-an": "/skills/kim_cang_bat_hoai.png"
+};
+
 /**
  * Add a spritesheet to the scene loader without starting it. Starting is a
  * separate step so a batch of sheets can be queued and downloaded together.
@@ -58,6 +63,25 @@ function queueSpritesheet(scene, key, def) {
     frameWidth: def.frameWidth,
     frameHeight: def.frameHeight
   });
+  return "queued";
+}
+
+/**
+ * Add a static image to the scene loader without starting it.
+ * @param {import("phaser").Scene} scene
+ * @param {string} key Phaser texture key
+ * @param {string} [url]
+ * @returns {"ready"|"queued"|"unavailable"}
+ */
+function queueImage(scene, key, url) {
+  if (!key || !url) return "unavailable";
+  if (typeof scene?.textures?.exists !== "function") return "unavailable";
+  if (scene.textures.exists(key)) return "ready";
+  if (typeof scene.load?.image !== "function" || typeof scene.load.start !== "function") {
+    return "unavailable";
+  }
+
+  scene.load.image(key, url);
   return "queued";
 }
 
@@ -85,21 +109,42 @@ export function ensureVfxTexture(scene, key) {
 }
 
 /**
- * Queue every VFX sheet a sect can cast, so the first cast already has art.
- * All sheets go out in one loader batch; sects without sprite VFX queue nothing.
+ * Queue the static overhead image for a buff (e.g. the 卍 seal of Kim Cang Bất Hoại).
+ * @param {import("phaser").Scene} scene
+ * @param {string} key
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureOverheadTexture(scene, key) {
+  const state = queueImage(scene, key, OVERHEAD_IMAGES[key]);
+  if (state === "queued") scene.load.start();
+  return state === "ready";
+}
+
+/**
+ * Queue every VFX sheet and overhead buff image a sect can use, so the first
+ * cast already has art. All assets go out in one loader batch; skills without
+ * sprite/overhead art queue nothing.
  * @param {import("phaser").Scene} scene
  * @param {Object[]} [skills]
- * @returns {boolean} `true` when every sheet is usable right now
+ * @returns {boolean} `true` when every asset is usable right now
  */
 export function ensureSectVfx(scene, skills = []) {
   let allReady = true;
   let queued = false;
   for (const skill of skills) {
     const sprite = skill?.vfx?.sprite;
-    if (!sprite) continue;
-    const state = queueSpritesheet(scene, sprite, VFX_SPRITES[sprite]);
-    if (state === "queued") queued = true;
-    if (state !== "ready") allReady = false;
+    if (sprite) {
+      const state = queueSpritesheet(scene, sprite, VFX_SPRITES[sprite]);
+      if (state === "queued") queued = true;
+      if (state !== "ready") allReady = false;
+    }
+
+    const overhead = skill?.vfx?.overhead;
+    if (overhead) {
+      const state = queueImage(scene, overhead, OVERHEAD_IMAGES[overhead]);
+      if (state === "queued") queued = true;
+      if (state !== "ready") allReady = false;
+    }
   }
   if (queued) scene.load.start();
   return allReady;

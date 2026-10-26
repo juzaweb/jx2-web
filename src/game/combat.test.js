@@ -578,6 +578,53 @@ describe("CombatSystem hand assignments and self-skill gating", () => {
     expect(combat.buffs).toHaveLength(0);
     expect(combat.player.hideFormation).toHaveBeenCalled();
   });
+
+  it("floats the overhead seal on cast and hides it on expire or clear", () => {
+    const { combat } = makeCombat();
+    combat.buffs = [];
+    combat.player.showOverhead = vi.fn();
+    combat.player.hideOverhead = vi.fn();
+
+    const kimCang = {
+      id: "kim_cang_bat_hoai",
+      target: "self",
+      effects: [{ kind: "buff", stat: "defensePct", amount: 0.3, duration: 180000 }],
+      vfx: {
+        type: "overhead",
+        overhead: "buff-phat-an",
+        overheadScale: 0.05,
+        overheadOffsetY: -80
+      }
+    };
+
+    combat.applySelfEffects(kimCang, 1000);
+    expect(combat.buffs).toHaveLength(1);
+    expect(combat.buffs[0]).toMatchObject({
+      skillId: "kim_cang_bat_hoai",
+      overheadSprite: "buff-phat-an",
+      until: 181000
+    });
+    expect(combat.player.showOverhead).toHaveBeenCalledWith("buff-phat-an", 0.05, -80);
+
+    combat.update(50000);
+    expect(combat.player.hideOverhead).not.toHaveBeenCalled();
+
+    // Reading effective stats must not prune the buff before the visual cleanup.
+    combat.scene.time.now = 182000;
+    combat.getEffectiveStats();
+    expect(combat.buffs).toHaveLength(1);
+
+    combat.update(182000);
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideOverhead).toHaveBeenCalled();
+
+    combat.applySelfEffects(kimCang, 200000);
+    expect(combat.buffs).toHaveLength(1);
+    combat.player.hideOverhead.mockClear();
+    combat.clearBuffs();
+    expect(combat.buffs).toHaveLength(0);
+    expect(combat.player.hideOverhead).toHaveBeenCalled();
+  });
 });
 
 describe("attack speed coefficient", () => {

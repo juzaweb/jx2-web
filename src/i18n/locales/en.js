@@ -236,6 +236,10 @@ export default {
         name: "Arhat Formation",
         desc: "Protective Buddhist formation that boosts attack power by 10%, movement speed by 20%, and critical rate by 5% for 3 minutes."
       },
+      kimCangBatHoai: {
+        name: "Vajra Indestructible",
+        desc: "Vajra body protection, increasing defense by 30% for 30 seconds. A 卍 seal appears above the head while active."
+      },
       nhuLaiThanChuong: {
         name: "Tathagata Divine Palm",
         desc: "Shaolin ultimate: a divine palm descends to strike all nearby foes, stunning them."

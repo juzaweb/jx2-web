@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  OVERHEAD_IMAGES,
   VFX_SPRITES,
   ensureHeroBodyTexture,
+  ensureOverheadTexture,
   ensureSectVfx,
   ensureSpritesheet,
   ensureVfxTexture
@@ -18,6 +20,7 @@ const makeScene = ({ loaded = [], hasLoader = true } = {}) => {
   if (hasLoader) {
     scene.load = {
       spritesheet: (...args) => calls.push(["spritesheet", ...args]),
+      image: (...args) => calls.push(["image", ...args]),
       start: () => calls.push(["start"])
     };
   }
@@ -87,6 +90,25 @@ describe("ensureVfxTexture", () => {
   });
 });
 
+describe("ensureOverheadTexture", () => {
+  it("queues the overhead image when missing", () => {
+    const scene = makeScene();
+
+    expect(ensureOverheadTexture(scene, "buff-phat-an")).toBe(false);
+    expect(scene.calls).toEqual([
+      ["image", "buff-phat-an", OVERHEAD_IMAGES["buff-phat-an"]],
+      ["start"]
+    ]);
+  });
+
+  it("is a no-op for an unknown overhead key", () => {
+    const scene = makeScene();
+
+    expect(ensureOverheadTexture(scene, "buff-missing")).toBe(false);
+    expect(scene.calls).toEqual([]);
+  });
+});
+
 describe("ensureSectVfx", () => {
   it("queues only skills that carry a sprite, in a single loader batch", () => {
     const scene = makeScene();
@@ -104,6 +126,17 @@ describe("ensureSectVfx", () => {
       "vfx-nhu-lai-than-chuong"
     ]);
     expect(scene.calls.filter(([name]) => name === "start")).toHaveLength(1);
+  });
+
+  it("queues an overhead buff image together with the sect sheets", () => {
+    const scene = makeScene();
+
+    ensureSectVfx(scene, [{ id: "kim-cang", vfx: { type: "overhead", overhead: "buff-phat-an" } }]);
+
+    expect(scene.calls).toEqual([
+      ["image", "buff-phat-an", OVERHEAD_IMAGES["buff-phat-an"]],
+      ["start"]
+    ]);
   });
 
   it("returns true when every sect sheet is already loaded", () => {
