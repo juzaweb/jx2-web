@@ -70,6 +70,7 @@ export class MapStage {
     this.npcs.forEach((npc) => {
       npc.sprite?.destroy();
       npc.nameText?.destroy();
+      npc.promptText?.destroy();
     });
     this.npcs = [];
   }

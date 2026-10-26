@@ -142,12 +142,27 @@ export function createPharmacyNpc(scene, def) {
     .setScale(S)
     .setDepth(isoDepth(def.x, def.y) + 100);
 
+  const promptText = scene.add
+    .text(iso.x, iso.y - (nameOffsetUnits + 16) * S, "Nhấn F để trò chuyện", {
+      fontFamily: "Arial, Tahoma, sans-serif",
+      fontSize: "11px",
+      color: "#5cfc5c",
+      stroke: "#1b1408",
+      strokeThickness: 2,
+      fontStyle: "bold"
+    })
+    .setOrigin(0.5)
+    .setScale(S)
+    .setDepth(isoDepth(def.x, def.y) + 101)
+    .setVisible(false);
+
   return {
     id: def.id,
     name: def.name,
     gx: def.x,
     gy: def.y,
     sprite,
-    nameText
+    nameText,
+    promptText
   };
 }
