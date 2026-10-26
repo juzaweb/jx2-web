@@ -21,13 +21,13 @@ let audioEnabled = true;
 let audioContext = null;
 
 /**
- * A monster takes local damage through `takeHit`; a peer (RemotePlayer) does not,
- * because the server owns every player's HP. That difference is the only thing
- * that tells the two target kinds apart in a cast.
+ * Monsters carry a catalog id; a peer (RemotePlayer) does not. That difference is
+ * what tells the two target kinds apart in a cast — a monster is drawn locally,
+ * while a peer's HP is server-owned.
  * @param {*} target
  * @returns {boolean}
  */
-const isPeerTarget = (target) => Boolean(target) && typeof target.takeHit !== "function";
+const isPeerTarget = (target) => Boolean(target) && typeof target.monsterId !== "string";
 
 export function isAudioEnabled() {
   return audioEnabled;
@@ -371,11 +371,10 @@ export class CombatSystem {
   executeSkill(skill, target, aimPoint = null) {
     if (!this.canCast(skill)) return;
     const now = this.scene.time?.now ?? 0;
-    const cost = skillMpCost(skill.id);
 
+    // Cooldown is a local pacing hint; MP is only mirrored from the server's
+    // `player_mp`, so the client never spends a pool it does not own.
     this.skillCooldowns.set(skill.id, now + skill.cooldown);
-    if (cost > 0) this.player.stats.mp -= cost;
-
     // Turn toward the target before the motion starts so the body, the VFX and
     // the packet that peers replay all agree on the direction.
     this.aimAt(target || aimPoint);

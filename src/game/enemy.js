@@ -200,17 +200,6 @@ export class Enemy {
     }
   }
 
-  takeHit(damage) {
-    if (this.isDead) return;
-    this.hp -= damage;
-    this.wolfVisual.setAlpha(0.45);
-    this.scene.time.delayedCall(100, () => {
-      if (this.sprite.active && !this.isDead) {
-        this.wolfVisual.setAlpha(1);
-      }
-    });
-  }
-
   /**
    * Apply an authoritative server snapshot: health always, position by the
    * server's lead (a warp is applied at once, anything smaller is smoothed).
@@ -219,6 +208,7 @@ export class Enemy {
   applyServerState(state = {}) {
     if (!this.sprite.active) return;
 
+    const previousHp = this.hp;
     const next = reconcileEnemyState(
       { x: this.x, y: this.y, hp: this.hp, maxHp: this.maxHp, isDead: this.isDead },
       state
@@ -233,11 +223,27 @@ export class Enemy {
 
     if (this.isDead) this.revive();
 
+    // A snapshot that lowers HP is a landed hit: flash the sprite briefly so the
+    // authoritative number also reads as impact.
+    if (next.hp < previousHp) this.flashHit();
+
     if (Number.isFinite(state.x) && Number.isFinite(state.y)) {
       this.targetX = state.x;
       this.targetY = state.y;
       if (next.snap) this.placeAt(state.x, state.y);
     }
+  }
+
+  /**
+   * Brief white-out on the monster after a landed hit.
+   */
+  flashHit() {
+    this.wolfVisual.setAlpha(0.45);
+    this.scene.time.delayedCall(100, () => {
+      if (this.sprite.active && !this.isDead) {
+        this.wolfVisual.setAlpha(1);
+      }
+    });
   }
 
   die() {

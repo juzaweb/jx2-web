@@ -24,7 +24,10 @@ const createScene = ({ isConnected = false } = {}) => {
         node.visible = value;
         return node;
       },
-      setAlpha: () => node,
+      setAlpha: (value) => {
+        node.alpha = value;
+        return node;
+      },
       setOrigin: () => node,
       setStrokeStyle: () => node,
       setLineWidth: () => node,
@@ -204,6 +207,22 @@ describe("Wolf movement is server-owned", () => {
 
     expect(wolf.hp).toBe(30);
     expect(scene.sprite.x).toBe(840);
+  });
+
+  it("flashes the sprite when an authoritative snapshot lowers HP", () => {
+    const { wolf } = createWolf();
+
+    wolf.applyServerState({ hp: 30 });
+
+    expect(wolf.hp).toBe(30);
+    expect(wolf.wolfVisual.alpha).toBe(0.45);
+  });
+
+  it("does not flash when a snapshot reports the same or higher HP", () => {
+    const { wolf } = createWolf();
+
+    wolf.applyServerState({ hp: wolf.maxHp });
+    expect(wolf.wolfVisual.alpha).not.toBe(0.45);
   });
 
   it("holds still until the first authoritative snapshot arrives", () => {
