@@ -244,6 +244,10 @@ export default {
         name: "Đại Tu Di Chưởng",
         desc: "Chưởng pháp tầm xa, đánh choáng mục tiêu từ xa."
       },
+      laHanQuyen: {
+        name: "La Hán Quyền",
+        desc: "Thân pháp xông tới mục tiêu rồi liên hoàn xuất quyền trong 5 giây, mỗi quyền có 25% cơ hội làm choáng 0,7 giây."
+      },
       laHanTran: {
         name: "La Hán Trận",
         desc: "Trận pháp hộ thể La Hán, tăng 10% lực tấn công, 20% tốc độ di chuyển và 5% tỉ lệ chí mạng trong 3 phút."

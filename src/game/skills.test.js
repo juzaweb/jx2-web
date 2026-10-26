@@ -24,6 +24,7 @@ describe("skill catalog", () => {
     expect(SKILLS.map((skill) => skill.id)).toEqual([
       "thieu_lam_tam_phap",
       "dai_tu_di_chuong",
+      "la_han_quyen",
       "la_han_tran",
       "kim_cang_bat_hoai",
       "nhu_lai_than_chuong",
@@ -42,9 +43,10 @@ describe("skill catalog", () => {
     ]);
     expect(SKILL_SLOTS).toBe(6);
 
-    const [tamPhap, daiTuDiChuong, laHanTran] = skillsForSect("thieu-lam");
-    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 3);
-    const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
+    const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForSect("thieu-lam");
+    const laHanTran = skillsForSect("thieu-lam").find((skill) => skill.slot === 3);
+    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
+    const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 5);
     expect(tamPhap).toMatchObject({
       id: "thieu_lam_tam_phap",
       sect: "thieu-lam",
@@ -71,10 +73,26 @@ describe("skill catalog", () => {
       range: 6000,
       radius: 0
     });
+    expect(laHanQuyen).toMatchObject({
+      id: "la_han_quyen",
+      sect: "thieu-lam",
+      slot: 2,
+      icon: "/skills/la_han_quyen.png",
+      glyph: "拳",
+      unlockLevel: 1,
+      mp: 20,
+      cooldown: 8000,
+      target: "enemy",
+      range: 300,
+      radius: 0,
+      mult: 0.45,
+      channel: { durationMs: 5000, intervalMs: 500 },
+      effects: [{ kind: "stun", duration: 700, chance: 0.25 }]
+    });
     expect(laHanTran).toMatchObject({
       id: "la_han_tran",
       sect: "thieu-lam",
-      slot: 2,
+      slot: 3,
       unlockLevel: 1,
       mp: 18,
       cooldown: 9000,
@@ -91,7 +109,7 @@ describe("skill catalog", () => {
     expect(kimCangBatHoai).toMatchObject({
       id: "kim_cang_bat_hoai",
       sect: "thieu-lam",
-      slot: 3,
+      slot: 4,
       icon: "/skills/kim_cang_bat_hoai.png",
       glyph: "卍",
       unlockLevel: 1,
@@ -112,7 +130,7 @@ describe("skill catalog", () => {
     expect(nhuLaiThanChuong).toMatchObject({
       id: "nhu_lai_than_chuong",
       sect: "thieu-lam",
-      slot: 4,
+      slot: 5,
       unlockLevel: 10,
       mp: 35,
       cooldown: 30000,
@@ -148,6 +166,7 @@ describe("skill catalog", () => {
   });
 
   it("returns authored kit for all valid sects", () => {
+    expect(skillsForSect("thieu-lam").length).toBe(6);
     expect(skillsForSect("vo-dang").length).toBe(4);
     expect(skillsForSect("nga-my").length).toBe(4);
     expect(skillsForSect("ngu-doc").length).toBe(4);
@@ -162,17 +181,20 @@ describe("skill catalog", () => {
     expect(skillById("dai_tu_di_chuong")?.slot).toBe(1);
     expect(skillForSlot("thieu-lam", 1)?.id).toBe("dai_tu_di_chuong");
     expect(skillSlot("dai_tu_di_chuong")).toBe(1);
-    expect(skillById("la_han_tran")?.slot).toBe(2);
-    expect(skillForSlot("thieu-lam", 2)?.id).toBe("la_han_tran");
-    expect(skillSlot("la_han_tran")).toBe(2);
-    expect(skillById("kim_cang_bat_hoai")?.slot).toBe(3);
-    expect(skillForSlot("thieu-lam", 3)?.id).toBe("kim_cang_bat_hoai");
-    expect(skillSlot("kim_cang_bat_hoai")).toBe(3);
+    expect(skillById("la_han_quyen")?.slot).toBe(2);
+    expect(skillForSlot("thieu-lam", 2)?.id).toBe("la_han_quyen");
+    expect(skillSlot("la_han_quyen")).toBe(2);
+    expect(skillById("la_han_tran")?.slot).toBe(3);
+    expect(skillForSlot("thieu-lam", 3)?.id).toBe("la_han_tran");
+    expect(skillSlot("la_han_tran")).toBe(3);
+    expect(skillById("kim_cang_bat_hoai")?.slot).toBe(4);
+    expect(skillForSlot("thieu-lam", 4)?.id).toBe("kim_cang_bat_hoai");
+    expect(skillSlot("kim_cang_bat_hoai")).toBe(4);
     expect(skillById("thieu_lam_tam_phap")?.slot).toBe(0);
     expect(skillForSlot("thieu-lam", 0)?.id).toBe("thieu_lam_tam_phap");
-    expect(skillById("nhu_lai_than_chuong")?.slot).toBe(4);
-    expect(skillForSlot("thieu-lam", 4)?.id).toBe("nhu_lai_than_chuong");
-    expect(skillSlot("nhu_lai_than_chuong")).toBe(4);
+    expect(skillById("nhu_lai_than_chuong")?.slot).toBe(5);
+    expect(skillForSlot("thieu-lam", 5)?.id).toBe("nhu_lai_than_chuong");
+    expect(skillSlot("nhu_lai_than_chuong")).toBe(5);
     expect(skillById("missing")).toBeUndefined();
     expect(skillSlot("missing")).toBe(-1);
   });
@@ -182,6 +204,8 @@ describe("skill catalog", () => {
     expect(skillCooldown("thieu_lam_tam_phap")).toBe(0);
     expect(skillMpCost("dai_tu_di_chuong")).toBe(12);
     expect(skillCooldown("dai_tu_di_chuong")).toBe(6000);
+    expect(skillMpCost("la_han_quyen")).toBe(20);
+    expect(skillCooldown("la_han_quyen")).toBe(8000);
     expect(skillMpCost("la_han_tran")).toBe(18);
     expect(skillCooldown("la_han_tran")).toBe(9000);
     expect(skillMpCost("kim_cang_bat_hoai")).toBe(20);
@@ -196,6 +220,8 @@ describe("skill catalog", () => {
   it("gates skills by level", () => {
     expect(skillUnlocked("dai_tu_di_chuong", 1)).toBe(true);
     expect(skillUnlocked("dai_tu_di_chuong", 0)).toBe(false);
+    expect(skillUnlocked("la_han_quyen", 1)).toBe(true);
+    expect(skillUnlocked("la_han_quyen", 0)).toBe(false);
     expect(skillUnlocked("la_han_tran", 1)).toBe(true);
     expect(skillUnlocked("la_han_tran", 0)).toBe(false);
     expect(skillUnlocked("kim_cang_bat_hoai", 1)).toBe(true);
@@ -208,6 +234,7 @@ describe("skill catalog", () => {
   it("declares prerequisites that exist inside the same sect", () => {
     expect(skillRequires("thieu_lam_tam_phap")).toEqual([]);
     expect(skillRequires("dai_tu_di_chuong")).toEqual([{ id: "thieu_lam_tam_phap", level: 1 }]);
+    expect(skillRequires("la_han_quyen")).toEqual([]);
     expect(skillRequires("la_han_tran")).toEqual([{ id: "dai_tu_di_chuong", level: 1 }]);
     expect(skillRequires("kim_cang_bat_hoai")).toEqual([{ id: "la_han_tran", level: 1 }]);
     expect(skillRequires("nhu_lai_than_chuong")).toEqual([{ id: "la_han_tran", level: 1 }]);

@@ -88,6 +88,50 @@ describe("applyEnemyControlEffects", () => {
     expect(enemy.stunUntil).toBe(MAX_CONTROL_MS);
   });
 
+  it("rolls an optional chance per effect with the supplied rng", () => {
+    const proc = makeEnemy();
+    applyEnemyControlEffects(
+      proc,
+      { effects: [{ kind: "stun", duration: 700, chance: 0.25 }] },
+      0,
+      () => 0.1
+    );
+    expect(proc.stunUntil).toBe(700);
+
+    const miss = makeEnemy();
+    applyEnemyControlEffects(
+      miss,
+      { effects: [{ kind: "stun", duration: 700, chance: 0.25 }] },
+      0,
+      () => 0.9
+    );
+    expect(miss.stunUntil).toBe(0);
+  });
+
+  it("treats a missing chance as always-on and a zero chance as never", () => {
+    const defaulted = makeEnemy();
+    applyEnemyControlEffects(defaulted, { effects: [{ kind: "stun", duration: 700 }] }, 0, () => 0.99);
+    expect(defaulted.stunUntil).toBe(700);
+
+    const never = makeEnemy();
+    applyEnemyControlEffects(
+      never,
+      { effects: [{ kind: "stun", duration: 700, chance: 0 }] },
+      0,
+      () => 0
+    );
+    expect(never.stunUntil).toBe(0);
+
+    const corrupt = makeEnemy();
+    applyEnemyControlEffects(
+      corrupt,
+      { effects: [{ kind: "stun", duration: 700, chance: "not-a-number" }] },
+      0,
+      () => 0
+    );
+    expect(corrupt.stunUntil).toBe(0);
+  });
+
   it("tolerates a missing skill or enemy", () => {
     const enemy = makeEnemy();
     expect(applyEnemyControlEffects(enemy, null)).toBe(enemy);

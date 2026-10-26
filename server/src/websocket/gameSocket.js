@@ -20,6 +20,7 @@ import {
   MAX_HITS_PER_CAST as SHARED_MAX_HITS_PER_CAST,
   MELEE_REACH,
   attackIntervalFor,
+  consumeCastHit,
   maxTravelDistance
 } from "../../../src/game/combatRules.js";
 import { advanceRegen, billableDeltaMs, passiveRegenRate } from "../../../src/game/passiveRegen.js";
@@ -1529,10 +1530,7 @@ export class GameSocketManager {
     const skill = requestedSkill ? skillById(requestedSkill) : null;
     if (skill) {
       if (skill.sect !== attacker.sect) return null;
-      const cast = attacker.lastCast;
-      if (!cast || cast.skillId !== skill.id || now - cast.at > CAST_HIT_WINDOW_MS) return null;
-      if (cast.hits >= MAX_HITS_PER_CAST) return null;
-      cast.hits += 1;
+      if (!consumeCastHit(attacker.lastCast, skill, now)) return null;
       return computeSkillDamage(
         skill,
         { attack: attackerStats.attack, critRate: attackerStats.critRate, critDamage: attackerStats.critDamage },
@@ -2047,10 +2045,7 @@ export class GameSocketManager {
       // Only a hit that follows a validated cast is accepted; otherwise a client
       // could mint damage without paying MP or cooldown.
       const cast = player.lastCast;
-      if (!cast || cast.skillId !== skill.id || now - cast.at > CAST_HIT_WINDOW_MS) return;
-      // Cap follow-up hits per cast (an AoE may legitimately hit a handful).
-      if (cast.hits >= MAX_HITS_PER_CAST) return;
-      cast.hits += 1;
+      if (!consumeCastHit(cast, skill, now)) return;
 
       // Skill hits are authoritative: the server recomputes the damage from the
       // catalog and the player's own derived stats, never from the client.
@@ -2100,8 +2095,9 @@ export class GameSocketManager {
       this.scheduleEnemyRespawn(enemy);
     } else if (skill) {
       // A landed skill applies its control effects here, where movement and
-      // bites are decided. The client only renders the resulting positions.
-      applyEnemyControlEffects(enemy, skill, now);
+      // bites are decided. The client only renders the resulting positions. The
+      // server RNG rolls any per-hit chance (e.g. La Hán Quyền's stun).
+      applyEnemyControlEffects(enemy, skill, now, this.random);
     }
 
     this.broadcastToMap(enemy.mapId, {

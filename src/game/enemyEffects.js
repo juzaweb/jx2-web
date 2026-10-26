@@ -39,14 +39,38 @@ const toSlowPct = (value) => {
 };
 
 /**
+ * Roll an effect's optional proc chance. A missing chance means the effect always
+ * applies; a chance at or above 1 also always applies; a non-numeric, zero or
+ * negative chance never applies, so corrupt catalog data cannot grant a free
+ * unconditional stun.
+ * @param {*} chance
+ * @param {Function} rng
+ * @returns {boolean}
+ */
+const rollChance = (chance, rng) => {
+  if (chance === undefined || chance === null) return true;
+  const value = Number(chance);
+  if (!Number.isFinite(value) || value <= 0) return false;
+  if (value >= 1) return true;
+  const random = typeof rng === "function" ? rng : Math.random;
+  return random() < value;
+};
+
+/**
  * Apply a skill's control effects to a monster. Effects never shorten one that
  * is already active: a second cast can only extend the stun or deepen the slow.
+ *
+ * An effect may declare `chance` (0..1) so a multi-hit skill rolls for it on
+ * every landed strike (e.g. La Hán Quyền's stun). Effects without a chance
+ * always apply.
+ *
  * @param {Object} enemy authoritative enemy state (mutated in place)
- * @param {{effects?: Array<{kind:string, duration?:number, pct?:number}>}} skill
+ * @param {{effects?: Array<{kind:string, duration?:number, pct?:number, chance?:number}>}} skill
  * @param {number} [now=Date.now()]
+ * @param {Function} [rng=Math.random] server RNG, so the chance roll is authoritative
  * @returns {Object} the same enemy, for chaining
  */
-export function applyEnemyControlEffects(enemy, skill, now = Date.now()) {
+export function applyEnemyControlEffects(enemy, skill, now = Date.now(), rng = Math.random) {
   if (!enemy || !skill || !Array.isArray(skill.effects)) return enemy;
 
   for (const effect of skill.effects) {
@@ -55,12 +79,14 @@ export function applyEnemyControlEffects(enemy, skill, now = Date.now()) {
     if (duration === 0) continue;
 
     if (effect.kind === "stun") {
+      if (!rollChance(effect.chance, rng)) continue;
       enemy.stunUntil = Math.max(enemy.stunUntil || 0, now + duration);
     } else if (effect.kind === "slow") {
       const pct = toSlowPct(effect.pct);
       // A zero or missing percentage is not a slow at all: applying a timer for
       // it would report a debuff that does nothing.
       if (pct <= 0) continue;
+      if (!rollChance(effect.chance, rng)) continue;
       enemy.slowUntil = Math.max(enemy.slowUntil || 0, now + duration);
       enemy.slowPct = Math.max(enemy.slowPct || 0, pct);
     }

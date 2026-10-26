@@ -24,6 +24,92 @@ export const MAX_HITS_PER_CAST = 8;
 /** Extra radius (px) allowed around a skill's own area when validating a hit. */
 export const HIT_RADIUS_SLACK = 40;
 
+/** Upper bound of hits a single channelled cast may land (guards a forged client). */
+export const MAX_CHANNEL_HITS = 40;
+
+/** Extra time (ms) after a channel's nominal duration to accept a laggy final hit. */
+export const CHANNEL_HIT_SLACK_MS = 400;
+
+/**
+ * Duration (ms) of a channelled skill, or 0 when it is a one-shot cast.
+ * @param {Object} skill
+ * @returns {number}
+ */
+export function channelDurationMs(skill) {
+  const duration = Number(skill?.channel?.durationMs);
+  return Number.isFinite(duration) && duration > 0 ? duration : 0;
+}
+
+/**
+ * Milliseconds between two strikes of a channelled skill, or 0 when it is not channelled.
+ * @param {Object} skill
+ * @returns {number}
+ */
+export function channelIntervalMs(skill) {
+  const interval = Number(skill?.channel?.intervalMs);
+  return Number.isFinite(interval) && interval > 0 ? interval : 0;
+}
+
+/**
+ * Whether a skill holds the caster in a repeating multi-hit channel.
+ * @param {Object} skill
+ * @returns {boolean}
+ */
+export function isChannelSkill(skill) {
+  return channelDurationMs(skill) > 0 && channelIntervalMs(skill) > 0;
+}
+
+/**
+ * Number of strikes a channelled skill lands over its duration.
+ * @param {Object} skill
+ * @returns {number} 0 for a one-shot skill
+ */
+export function channelHitCount(skill) {
+  if (!isChannelSkill(skill)) return 0;
+  return Math.max(1, Math.ceil(channelDurationMs(skill) / channelIntervalMs(skill)));
+}
+
+/**
+ * How long after a cast its hits are still accepted. A channel needs the whole
+ * flurry plus a little slack; one-shot casts keep the tuned two-second window.
+ * @param {Object} skill
+ * @returns {number}
+ */
+export function castHitWindowMs(skill) {
+  return isChannelSkill(skill) ? channelDurationMs(skill) + CHANNEL_HIT_SLACK_MS : HIT_WINDOW_MS;
+}
+
+/**
+ * Cap on hits one cast may land. A channel derives it from its own tick count so
+ * a forged client cannot mint strikes beyond the flurry it paid for.
+ * @param {Object} skill
+ * @returns {number}
+ */
+export function maxHitsPerCast(skill) {
+  if (!isChannelSkill(skill)) return MAX_HITS_PER_CAST;
+  return Math.min(MAX_CHANNEL_HITS, channelHitCount(skill) + 2);
+}
+
+/**
+ * Consume one authorized follow-up hit from an accepted cast.
+ *
+ * Returns false when the hit does not belong to that cast, arrives outside the
+ * cast's hit window, or exceeds the cast's hit cap. On success the cast's hit
+ * counter is incremented so one cast can never authorize more hits than allowed.
+ *
+ * @param {{ skillId: string, at: number, hits: number }|null} cast server-side `lastCast`
+ * @param {Object} skill the accepted skill, from the catalog
+ * @param {number} now
+ * @returns {boolean}
+ */
+export function consumeCastHit(cast, skill, now) {
+  if (!cast || cast.skillId !== skill?.id) return false;
+  if (now - cast.at > castHitWindowMs(skill)) return false;
+  if (cast.hits >= maxHitsPerCast(skill)) return false;
+  cast.hits += 1;
+  return true;
+}
+
 /** Position tolerance multiplier on top of the walk speed. */
 export const MOVE_SPEED_TOLERANCE = 1.75;
 

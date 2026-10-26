@@ -12,7 +12,7 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
-import { MELEE_REACH } from "./combatRules.js";
+import { MELEE_REACH, channelDurationMs, channelHitCount, channelIntervalMs, isChannelSkill } from "./combatRules.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { translate } from "../i18n/translator.js";
@@ -89,6 +89,8 @@ export class CombatSystem {
     this.buffs = [];
     /** Melee approach in flight: { skill, targetId }. */
     this.pendingCast = null;
+    /** Active flurry: { skill, targetId, nextAt, endsAt, hitsLeft, intervalMs, chasing }. */
+    this.channel = null;
     this.lastChaseAt = 0;
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
@@ -219,6 +221,7 @@ export class CombatSystem {
    */
   performAttack() {
     if (!this.attackReady) return;
+    if (this.channel) return;
 
     const targetEnemy = this.nearestEnemyInReach();
     if (targetEnemy) {
@@ -344,6 +347,10 @@ export class CombatSystem {
    */
   canCast(skill) {
     const now = this.scene.time?.now ?? 0;
+    if (this.channel) {
+      this.ui.addLog("Đang thi triển liên hoàn chiêu thức, hãy chờ đánh xong.");
+      return false;
+    }
     const readyAt = this.skillCooldowns.get(skill.id) || 0;
     if (now < readyAt) {
       this.ui.addLog(
@@ -558,6 +565,7 @@ export class CombatSystem {
   update(time) {
     const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
     this.updateBuffs(now);
+    this.updateChannel(now);
 
     const pending = this.pendingCast;
     if (!pending) return;
@@ -603,6 +611,7 @@ export class CombatSystem {
    * Cancel a pending approach (left-click movement, joystick, skill change).
    */
   cancelPendingCast() {
+    this.endChannel();
     if (!this.pendingCast) return;
     this.pendingCast = null;
     this.player.stopMovement?.();
@@ -653,6 +662,11 @@ export class CombatSystem {
       return;
     }
 
+    if (isChannelSkill(skill)) {
+      this.startChannel(skill, targets[0], now);
+      return;
+    }
+
     let hits = 0;
 
     for (const wolf of targets) {
@@ -664,6 +678,89 @@ export class CombatSystem {
     this.ui.addLog(
       `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!`
     );
+  }
+
+  /**
+   * Begin a channelled flurry. The hero plants in place and strikes the target
+   * every `intervalMs` until the duration elapses or the player cancels it by
+   * moving. Each strike is an ordinary `enemy_hit` that the server re-validates
+   * against the accepted cast, so the client never mints damage.
+   * @param {Object} skill
+   * @param {Object} target
+   * @param {number} now
+   */
+  startChannel(skill, target, now) {
+    this.player.stopMovement?.();
+    this.channel = {
+      skill,
+      targetId: target.id,
+      nextAt: now,
+      endsAt: now + channelDurationMs(skill),
+      hitsLeft: channelHitCount(skill),
+      intervalMs: channelIntervalMs(skill),
+      chasing: false
+    };
+    this.ui.addLog(
+      `${translate(skill.nameKey, undefined, skill.id)}: liên hoàn ${this.channel.hitsLeft} quyền!`
+    );
+  }
+
+  /**
+   * Drive the active flurry. Re-resolves the target every strike so a moving
+   * monster is chased instead of being punched at a stale position.
+   * @param {number} now
+   */
+  updateChannel(now) {
+    const channel = this.channel;
+    if (!channel) return;
+
+    if (now >= channel.endsAt || channel.hitsLeft <= 0) {
+      this.endChannel();
+      return;
+    }
+    if (now < channel.nextAt) return;
+
+    const target = this.findPendingTarget(channel.targetId);
+    if (!target) {
+      this.endChannel("Mục tiêu đã biến mất.");
+      return;
+    }
+
+    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+    if (distance > this.castReach(channel.skill, target)) {
+      // The target stepped away: chase it and retry the same strike shortly.
+      channel.nextAt = now + 150;
+      channel.chasing = true;
+      this.player.moveTo(target.x, target.y);
+      return;
+    }
+
+    if (channel.chasing) {
+      channel.chasing = false;
+      this.player.stopMovement?.();
+      this.syncPosition();
+    }
+
+    this.aimAt(target);
+    this.player.playSkillMotion?.(channel.skill.vfx?.cast);
+    playTone(200, 0.05, "square", 0.018);
+    playTargetMarker(this.scene, target.x, target.y, channel.skill.vfx?.color);
+    this.damageEnemy(target, { skill: channel.skill.id });
+
+    channel.hitsLeft -= 1;
+    channel.nextAt = now + channel.intervalMs;
+    if (channel.hitsLeft <= 0) this.endChannel();
+  }
+
+  /**
+   * Stop the active flurry and release movement.
+   * @param {string} [message] log line shown when the channel ended early
+   */
+  endChannel(message) {
+    if (!this.channel) return;
+    this.channel = null;
+    this.player.stopMovement?.();
+    if (message) this.ui.addLog(message);
   }
 
   /**
@@ -862,6 +959,7 @@ export class CombatSystem {
    */
   performPvpAttack(target) {
     if (!this.attackReady) return;
+    if (this.channel) return;
     if (!this.scene.networkClient?.isConnected) {
       this.ui.addLog("Cần kết nối máy chủ để tỷ thí cùng cao thủ.");
       return;

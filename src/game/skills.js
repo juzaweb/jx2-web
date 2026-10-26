@@ -20,7 +20,8 @@ export const BASIC_ATTACK_ID = "normal";
 
 /**
  * Thiếu Lâm kit is a palm-technique (chưởng pháp) kit plus the sect's internal
- * art. The old Thiếu Lâm Võ Tông (TLQ) fist/kick skills and icons are gone.
+ * art and one fist flurry. The old Thiếu Lâm Võ Tông (TLQ) fist/kick skills and
+ * icons are gone.
  *
  * Slot 0 is `thieu_lam_tam_phap`: a passive internal art that is always running
  * (no cast, no MP, no cooldown) and restores `hpPerSecond` health while the hero
@@ -72,9 +73,36 @@ const THIEU_LAM_SKILLS = [
     }
   },
   {
-    id: "la_han_tran",
+    id: "la_han_quyen",
     sect: "thieu-lam",
     slot: 2,
+    icon: "/skills/la_han_quyen.png",
+    glyph: "拳",
+    nameKey: "skills.thieuLam.laHanQuyen.name",
+    descKey: "skills.thieuLam.laHanQuyen.desc",
+    unlockLevel: 1,
+    mp: 20,
+    cooldown: 8000,
+    target: "enemy",
+    range: 300,
+    radius: 0,
+    mult: 0.45,
+    /**
+     * Rush to the target, then land a five-second punching flurry: one strike
+     * every 500ms, ten in total, each with its own stun roll.
+     */
+    channel: { durationMs: 5000, intervalMs: 500 },
+    effects: [{ kind: "stun", duration: 700, chance: 0.25 }],
+    vfx: {
+      cast: "slash",
+      impact: "spark",
+      color: 0xffc94d
+    }
+  },
+  {
+    id: "la_han_tran",
+    sect: "thieu-lam",
+    slot: 3,
     icon: "/skills/la_han_tran.png",
     glyph: "陣",
     requires: [{ id: "dai_tu_di_chuong", level: 1 }],
@@ -106,7 +134,7 @@ const THIEU_LAM_SKILLS = [
   {
     id: "kim_cang_bat_hoai",
     sect: "thieu-lam",
-    slot: 3,
+    slot: 4,
     icon: "/skills/kim_cang_bat_hoai.png",
     glyph: "卍",
     requires: [{ id: "la_han_tran", level: 1 }],
@@ -132,7 +160,7 @@ const THIEU_LAM_SKILLS = [
   {
     id: "nhu_lai_than_chuong",
     sect: "thieu-lam",
-    slot: 4,
+    slot: 5,
     icon: "/skills/nhu_lai_than_chuong.png",
     glyph: "佛",
     requires: [{ id: "la_han_tran", level: 1 }],

@@ -888,3 +888,121 @@ describe("CombatSystem passive art ownership", () => {
     );
   });
 });
+
+describe("CombatSystem channelled flurry", () => {
+  const makeWolf = (x = 100) => ({
+    id: 9,
+    monsterId: "soi-xam",
+    x,
+    y: 0,
+    hp: 500,
+    maxHp: 500,
+    isDead: false
+  });
+
+  const makeCombat = ({ wolves = [] } = {}) => {
+    const player = {
+      sect: "thieu-lam",
+      x: 0,
+      y: 0,
+      visual: { scaleX: 1 },
+      faceDirection: vi.fn(),
+      moveTo: vi.fn(),
+      stopMovement: vi.fn(),
+      playSkillMotion: vi.fn(),
+      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100, attack: 24, critRate: 0.1, critDamage: 1.5 }
+    };
+    const fx = { setStrokeStyle: () => fx, setDepth: () => fx, destroy: vi.fn() };
+    const scene = {
+      time: { now: 0 },
+      cameras: { main: { width: 1000, height: 1000, zoom: 1 } },
+      add: { circle: () => fx, arc: () => fx, ellipse: () => fx },
+      tweens: { add: vi.fn() },
+      networkClient: {
+        isConnected: true,
+        sendEnemyHit: vi.fn(),
+        sendMove: vi.fn(),
+        sendAttack: vi.fn(),
+        sendPlayerHit: vi.fn()
+      }
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn() };
+    const combat = new CombatSystem(scene, player, { getAlive: () => wolves }, ui);
+    return { combat, player, scene, ui };
+  };
+
+  it("starts a ten-punch channel instead of a single hit", () => {
+    const wolf = makeWolf();
+    const { combat } = makeCombat({ wolves: [wolf] });
+    const skill = skillById("la_han_quyen");
+
+    combat.applySkill(skill, 0, wolf);
+
+    expect(combat.channel).toMatchObject({
+      targetId: 9,
+      hitsLeft: 10,
+      intervalMs: 500,
+      endsAt: 5000
+    });
+  });
+
+  it("lands one punch every 500ms and ends after five seconds", () => {
+    const wolf = makeWolf();
+    const { combat, scene } = makeCombat({ wolves: [wolf] });
+    const skill = skillById("la_han_quyen");
+    combat.applySkill(skill, 0, wolf);
+
+    for (let t = 0; t <= 5000; t += 500) combat.updateChannel(t);
+
+    expect(scene.networkClient.sendEnemyHit).toHaveBeenCalledTimes(10);
+    expect(scene.networkClient.sendEnemyHit).toHaveBeenCalledWith({
+      id: 9,
+      skill: "la_han_quyen"
+    });
+    expect(combat.channel).toBeNull();
+  });
+
+  it("chases a target that stepped out of reach instead of punching air", () => {
+    const wolf = makeWolf();
+    const { combat, player, scene } = makeCombat({ wolves: [wolf] });
+    combat.applySkill(skillById("la_han_quyen"), 0, wolf);
+
+    wolf.x = 5000;
+    combat.updateChannel(0);
+
+    expect(player.moveTo).toHaveBeenCalledWith(5000, 0);
+    expect(scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
+    expect(combat.channel?.hitsLeft).toBe(10);
+  });
+
+  it("stops when the target disappears", () => {
+    const wolf = makeWolf();
+    const { combat, ui } = makeCombat({ wolves: [] });
+    combat.startChannel(skillById("la_han_quyen"), wolf, 0);
+
+    combat.updateChannel(0);
+
+    expect(combat.channel).toBeNull();
+    expect(ui.addLog).toHaveBeenCalledWith("Mục tiêu đã biến mất.");
+  });
+
+  it("is cancelled by a movement command", () => {
+    const wolf = makeWolf();
+    const { combat, player } = makeCombat({ wolves: [wolf] });
+    combat.applySkill(skillById("la_han_quyen"), 0, wolf);
+
+    combat.cancelPendingCast();
+
+    expect(combat.channel).toBeNull();
+    expect(player.stopMovement).toHaveBeenCalled();
+  });
+
+  it("refuses other skills while the flurry is running", () => {
+    const wolf = makeWolf();
+    const { combat, ui } = makeCombat({ wolves: [wolf] });
+    combat.applySkill(skillById("la_han_quyen"), 0, wolf);
+
+    expect(combat.castSkill(skillById("dai_tu_di_chuong"))).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("liên hoàn chiêu thức"));
+  });
+});
