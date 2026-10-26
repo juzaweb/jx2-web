@@ -377,9 +377,10 @@ test("WebSocket server-authority suite", async (t) => {
 
   await t.test("Stun is applied by the server and holds the monster still", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    // Wolf 6 lives at (10500, 8200). A hero 600 units away is inside its aggro
-    // range (1050) but well outside its stop distance (260), so it keeps walking.
-    await join(client, { characterId: "char_stun", x: 9900, y: 8200 });
+    // Wolf 6 lives at (10500, 8200). A hero 900 units away is inside its aggro
+    // range (1050) but well outside its stop distance (260), leaving enough
+    // runway that it is still walking when the stun expires.
+    await join(client, { characterId: "char_stun", x: 9600, y: 8200 });
 
     const movesWolf6 = (m) =>
       m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 6);

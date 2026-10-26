@@ -57,8 +57,12 @@ export function applyEnemyControlEffects(enemy, skill, now = Date.now()) {
     if (effect.kind === "stun") {
       enemy.stunUntil = Math.max(enemy.stunUntil || 0, now + duration);
     } else if (effect.kind === "slow") {
+      const pct = toSlowPct(effect.pct);
+      // A zero or missing percentage is not a slow at all: applying a timer for
+      // it would report a debuff that does nothing.
+      if (pct <= 0) continue;
       enemy.slowUntil = Math.max(enemy.slowUntil || 0, now + duration);
-      enemy.slowPct = Math.max(enemy.slowPct || 0, toSlowPct(effect.pct));
+      enemy.slowPct = Math.max(enemy.slowPct || 0, pct);
     }
   }
 
@@ -76,7 +80,8 @@ export function enemyMoveScale(enemy, now = Date.now()) {
   if (!enemy) return 1;
   if (now < (enemy.stunUntil || 0)) return 0;
   if (now < (enemy.slowUntil || 0)) {
-    return Math.max(MIN_SLOW_SCALE, 1 - (enemy.slowPct || 0));
+    // Clamp both ends: corrupt state can neither freeze nor speed up a monster.
+    return Math.min(1, Math.max(MIN_SLOW_SCALE, 1 - (enemy.slowPct || 0)));
   }
   return 1;
 }

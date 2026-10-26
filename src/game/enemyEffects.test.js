@@ -29,9 +29,39 @@ describe("applyEnemyControlEffects", () => {
     );
 
     expect(enemy.slowUntil).toBe(2000);
-    expect(enemy.slowPct).toBeLessThanOrEqual(0.85);
-    expect(enemyMoveScale(enemy, 1000)).toBeGreaterThanOrEqual(MIN_SLOW_SCALE);
+    expect(enemy.slowPct).toBe(0.85);
+    expect(enemyMoveScale(enemy, 1000)).toBeCloseTo(MIN_SLOW_SCALE);
     expect(enemyMoveScale(enemy, 2000)).toBe(1);
+  });
+
+  it("scales movement linearly for a normal slow", () => {
+    const enemy = makeEnemy();
+    applyEnemyControlEffects(
+      enemy,
+      { effects: [{ kind: "slow", duration: 1000, pct: 0.4 }] },
+      0
+    );
+
+    expect(enemyMoveScale(enemy, 500)).toBeCloseTo(0.6);
+  });
+
+  it("ignores a slow without a usable percentage", () => {
+    const enemy = makeEnemy();
+    applyEnemyControlEffects(
+      enemy,
+      {
+        effects: [
+          { kind: "slow", duration: 1000 },
+          { kind: "slow", duration: 1000, pct: 0 },
+          { kind: "slow", duration: 1000, pct: -0.5 }
+        ]
+      },
+      0
+    );
+
+    expect(enemy.slowUntil).toBe(0);
+    expect(enemy.slowPct).toBe(0);
+    expect(enemyMoveScale(enemy, 500)).toBe(1);
   });
 
   it("never shortens an effect that is already active", () => {
