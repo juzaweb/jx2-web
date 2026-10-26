@@ -7,6 +7,7 @@
  * nothing is kept alive between casts.
  */
 
+import { clampToRange } from "./aim.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionVector } from "./heroDirections.js";
 import { ensureVfxTexture } from "./lazyAssets.js";
@@ -63,26 +64,122 @@ function cameraEdgeDistance(scene, player, direction, maxDistance) {
 }
 
 /**
- * Clamp a cast point to the skill's reach so a cursor far off-screen does not
- * stretch the projectile across the whole map.
- * @param {{x:number,y:number}} player
- * @param {{x:number,y:number}} point
+ * Where a cast should land: the target, the aimed point, or the camera edge in
+ * the facing direction when neither is supplied.
+ * @param {Phaser.Scene} scene
+ * @param {{x:number,y:number,facingDirection:number}} player
+ * @param {{x:number,y:number}|null} target
+ * @param {{x:number,y:number}|null} aimPoint
  * @param {number} maxRange
  * @returns {{x:number,y:number}}
  */
-function clampedAimPoint(player, point, maxRange) {
-  const dx = point.x - player.x;
-  const dy = point.y - player.y;
-  const distance = Math.hypot(dx, dy);
-  if (!distance || distance <= maxRange) return { x: point.x, y: point.y };
-  const scale = maxRange / distance;
-  return { x: player.x + dx * scale, y: player.y + dy * scale };
+function resolveAimPoint(scene, player, target, aimPoint, maxRange) {
+  const aimedAt = target || aimPoint;
+  const aimDistance = aimedAt ? Math.hypot(aimedAt.x - player.x, aimedAt.y - player.y) : 0;
+  if (aimedAt && aimDistance > 1) return clampToRange(player, aimedAt, maxRange);
+
+  const direction = directionVector(player.facingDirection);
+  const distance = cameraEdgeDistance(scene, player, direction, maxRange);
+  return {
+    x: player.x + direction.x * distance,
+    y: player.y + direction.y * distance
+  };
 }
 
 /**
- * Play a catalog skill's sprite-sheet animation as a projectile that travels
- * from the caster toward the target (or the aimed point, or the camera edge when
- * there is neither).
+ * Play a slam sheet: the first frames are the cast gesture at the hero, then the
+ * remaining frames drop from above onto the strike area and fade on impact.
+ * @param {Phaser.Scene} scene
+ * @param {Object} skill
+ * @param {import("./player.js").Player} player
+ * @param {Object|null} target
+ * @param {{x:number,y:number}|null} aimPoint
+ * @param {{key:string,frameCount:number,start:Object,scale:number,size:number}} art
+ * @returns {boolean} true when the sprite actually played
+ */
+function playSlamSpriteVfx(scene, skill, player, target, aimPoint, art) {
+  const { key, frameCount, start, scale, size } = art;
+  const castFrameCount = Math.min(2, frameCount);
+  const impactStart = castFrameCount;
+  const impactEnd = frameCount - 1;
+  if (castFrameCount < 1 || impactStart > impactEnd) return false;
+
+  const fps = Number(skill.vfx?.fps) || 12;
+  const castKey = `${key}-slam-cast`;
+  if (!scene.anims.exists(castKey)) {
+    const frames = scene.anims.generateFrameNumbers(key, { start: 0, end: castFrameCount - 1 });
+    if (!frames.length) return false;
+    scene.anims.create({ key: castKey, frames, frameRate: fps, repeat: 0 });
+  }
+
+  const castSprite = scene.add
+    .sprite(start.x, start.y - 26, key)
+    .setOrigin(0.5, 0.62)
+    .setDepth(start.depth + DEPTH_BONUS)
+    .setScale(scale);
+  castSprite.play(castKey);
+  castSprite.once("animationcomplete", () => castSprite.destroy());
+
+  const maxRange = Number(skill.range) || Number(skill.radius) || 90;
+  const aimedAt = target || aimPoint;
+  // A slam with nothing to aim at lands on the hero (its AoE centre) instead of
+  // flying to the camera edge like a projectile.
+  const aim = aimedAt && Math.hypot(aimedAt.x - player.x, aimedAt.y - player.y) > 1
+    ? resolveAimPoint(scene, player, target, aimPoint, maxRange)
+    : { x: player.x, y: player.y };
+  const end = baseAt(aim.x, aim.y);
+  const dropHeight = Number(skill.vfx?.dropHeight) || Math.max(140, size * 0.8);
+  const dropDuration = Number(skill.vfx?.dropDuration) || 280;
+  // The landing frame blooms wider than the falling one so the ground impact
+  // visually covers the AoE it resolves.
+  const impactScale = Number(skill.vfx?.impactScale) || 1.4;
+
+  const spawnImpact = () => {
+    const impact = scene.add
+      .sprite(end.x, end.y - 26 - dropHeight, key)
+      .setOrigin(0.5, 0.62)
+      .setDepth(end.depth + DEPTH_BONUS + 1)
+      .setScale(scale)
+      .setFrame(impactStart);
+
+    scene.tweens.add({
+      targets: impact,
+      y: end.y - 26,
+      duration: dropDuration,
+      ease: "Quad.easeIn",
+      onComplete: () => {
+        impact.setFrame(impactEnd);
+        impact.setScale(scale * impactScale * 0.85);
+        scene.tweens.add({
+          targets: impact,
+          scale: scale * impactScale,
+          duration: 140,
+          ease: "Quad.easeOut"
+        });
+        scene.tweens.add({
+          targets: impact,
+          alpha: 0,
+          delay: 140,
+          duration: 240,
+          onComplete: () => impact.destroy()
+        });
+      }
+    });
+  };
+
+  // Let the cast gesture read before the palm descends.
+  if (typeof scene.time?.delayedCall === "function") {
+    scene.time.delayedCall((castFrameCount / fps) * 1000, spawnImpact);
+  } else {
+    spawnImpact();
+  }
+  return true;
+}
+
+/**
+ * Play a catalog skill's sprite-sheet animation. Travelling sheets fly from the
+ * caster toward the target (or the aimed point, or the camera edge when there is
+ * neither); `type: "slam"` sheets cast in place and then drop onto that point.
  * @param {Phaser.Scene} scene
  * @param {Object} skill
  * @param {import("./player.js").Player} player
@@ -100,6 +197,22 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
 
   const frameCount = Math.max(1, (texture.frameTotal || 1) - 1);
   const start = baseAt(player.x, player.y);
+  const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
+  const visualRadius = Number(skill.vfx?.size) || Number(skill.radius) || 90;
+  const size = Math.max(120, visualRadius * 1.8) * (Number(skill.vfx?.scale) || 1);
+  const scale = size / frameWidth;
+
+  // Slam skills play the first two frames as the cast gesture, then drop the
+  // remaining frames from above onto the strike area (e.g. Như Lai Thần Chưởng).
+  if (skill.vfx?.type === "slam") {
+    return playSlamSpriteVfx(scene, skill, player, target, aimPoint, {
+      key,
+      frameCount,
+      start,
+      scale,
+      size
+    });
+  }
 
   const isStationary =
     skill.vfx?.type === "stationary" ||
@@ -117,14 +230,11 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
       });
     }
 
-    const visualRadius = Number(skill.vfx?.size) || Number(skill.radius) || 90;
-    const size = Math.max(120, visualRadius * 1.8) * (Number(skill.vfx?.scale) || 1);
-    const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
     const sprite = scene.add
       .sprite(start.x, start.y, key)
       .setOrigin(0.5, 0.9)
       .setDepth(start.depth + DEPTH_BONUS - 1)
-      .setScale(size / frameWidth);
+      .setScale(scale);
 
     sprite.play(playKey);
     sprite.once("animationcomplete", () => sprite.destroy());
@@ -162,27 +272,13 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
   }
 
   const maxRange = Number(skill.range) || Number(skill.radius) || 90;
-  const aimedAt = target || aimPoint;
-  const aimDistance = aimedAt ? Math.hypot(aimedAt.x - player.x, aimedAt.y - player.y) : 0;
-  const aim = aimedAt && aimDistance > 1
-    ? clampedAimPoint(player, aimedAt, maxRange)
-    : (() => {
-        const direction = directionVector(player.facingDirection);
-        const distance = cameraEdgeDistance(scene, player, direction, maxRange);
-        return {
-          x: player.x + direction.x * distance,
-          y: player.y + direction.y * distance
-        };
-      })();
+  const aim = resolveAimPoint(scene, player, target, aimPoint, maxRange);
   const end = baseAt(aim.x, aim.y);
   const worldDistance = Math.hypot(aim.x - player.x, aim.y - player.y);
   const travelDuration = Math.max(220, Math.min(1200, worldDistance / 3));
 
   // Visual size is independent of travel range: a long-range strike must not
   // render a giant palm. `vfx.size` overrides the radius-derived default.
-  const visualRadius = Number(skill.vfx?.size) || Number(skill.radius) || 90;
-  const size = Math.max(120, visualRadius * 1.8) * (Number(skill.vfx?.scale) || 1);
-  const frameWidth = firstFrame.width || firstFrame.cutWidth || 256;
   const sprite = scene.add
     .sprite(start.x, start.y - 26, key)
     .setOrigin(0.5, 0.62)

@@ -310,6 +310,41 @@ describe("CombatSystem kill rewards", () => {
     expect(combat.skillReach({ radius: 110, range: 0 })).toBe(110);
   });
 
+  it("uses the cast range, not the radius, for a ranged AoE", () => {
+    const { combat } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    expect(combat.skillReach({ radius: 140, range: 600 })).toBe(600);
+    expect(combat.skillReach({ radius: 140, range: 0 })).toBe(140);
+    expect(combat.skillReach({ radius: 300, range: 6000 })).toBeCloseTo(
+      Math.hypot(5700 / 2, 3200 / 2)
+    );
+  });
+
+  it("centres an AoE on the cursor and clamps it to the cast range", () => {
+    const { combat } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    const skill = { radius: 140, range: 600 };
+
+    // Player starts at (100, 200).
+    expect(combat.resolveCastCenter(skill, null, { x: 400, y: 200 })).toEqual({ x: 400, y: 200 });
+    expect(combat.resolveCastCenter(skill, null, { x: 1000, y: 200 })).toEqual({ x: 700, y: 200 });
+    expect(combat.resolveCastCenter(skill, { x: 300, y: 200 })).toEqual({ x: 300, y: 200 });
+    expect(combat.resolveCastCenter(skill)).toEqual({ x: 100, y: 200 });
+  });
+
+  it("resolves AoE targets around the impact point, not the hero", () => {
+    const { combat } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+    const wolves = [
+      { id: "near", x: 400, y: 200 },
+      { id: "edge", x: 550, y: 200 },
+      { id: "far", x: 900, y: 200 }
+    ];
+    combat.enemyManager = { getAlive: () => wolves };
+
+    const targets = combat.resolveTargets({ radius: 140, range: 600 }, { x: 500, y: 200 });
+
+    expect(targets.map((wolf) => wolf.id)).toEqual(["edge", "near"]);
+  });
+
   it("uses the farthest camera corner when the player is not centred", () => {
     const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
     combat.scene.cameras.main.worldView = { left: 0, top: 0, right: 1000, bottom: 600, width: 1000 };
@@ -660,6 +695,39 @@ describe("skill targeting", () => {
     expect(combat.castReach(skill, peer("p", 0, 0))).toBe(
       Math.min(combat.skillReach(skill), PVP_CAST_DISTANCE)
     );
+  });
+
+  it("sends the resolved AoE impact centre with the cast", () => {
+    const { combat, scene } = makeCombat();
+    const skill = {
+      id: "nhu_lai_than_chuong",
+      sect: "thieu-lam",
+      slot: 5,
+      nameKey: "skills.thieuLam.nhuLaiThanChuong.name",
+      unlockLevel: 10,
+      mp: 35,
+      cooldown: 30000,
+      radius: 300,
+      range: 6000,
+      mult: 2.4,
+      vfx: { cast: "shockwave" }
+    };
+    combat.applySkill = vi.fn();
+    combat.showFloatText = vi.fn();
+
+    combat.executeSkill(skill, null, { x: 500, y: 0 });
+
+    expect(scene.networkClient.sendAttack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skill: "nhu_lai_than_chuong",
+        aimX: 500,
+        aimY: 0
+      })
+    );
+    expect(combat.applySkill).toHaveBeenCalledWith(skill, expect.any(Number), null, {
+      x: 500,
+      y: 0
+    });
   });
 
   it("resolves a pending approach against a peer and drops it when the flag falls", () => {

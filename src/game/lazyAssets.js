@@ -30,6 +30,11 @@ export const VFX_SPRITES = {
     url: "/skills/vfx/dai_tu_di_chuong/sheet.png",
     frameWidth: 256,
     frameHeight: 256
+  },
+  "vfx-nhu-lai-than-chuong": {
+    url: "/skills/vfx/nhu_lai_than_chuong/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
   }
 };
 

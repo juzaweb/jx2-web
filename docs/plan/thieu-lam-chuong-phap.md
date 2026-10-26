@@ -3,7 +3,9 @@
 Status: **in progress**. The old Thiếu Lâm Võ Tông (TLQ) kit has been removed.
 Row 1 of the supplied palm sheet is wired as **Đại Tu Di Chưởng** (slot 2,
 icon + four-frame VFX); Row 2 is wired as **La Hán Trận** (slot 3,
-icon + four-frame stationary formation VFX); slots 0, 1, 4 and 5 are still pending.
+icon + four-frame stationary formation VFX); the dedicated
+`docs/example/nhu-lai-than-chuong.png` sheet is wired as **Như Lai Thần Chưởng**
+(slot 5, icon + four-frame impact VFX); slots 0, 1 and 4 are still pending.
 
 ## 1. What was removed (done)
 
@@ -38,7 +40,7 @@ offensive formation and a defensive internal art.
 
 Names are taken from the VLTK2 Thiếu Lâm Võ Tông tree where a canonical palm/hand
 name exists (`Vi Đà Chưởng`, `Đại Tu Di Chưởng`, `La Hán Trận`,
-`Kim Cang Bất Hoại`, `Như Lai Thần Thưởng`). Slot 0 is the entry palm, adapted
+`Kim Cang Bất Hoại`, `Như Lai Thần Chưởng`). Slot 0 is the entry palm, adapted
 from the entry move so new characters have a 1 MP-cheap opener.
 
 | Slot | Skill | Id | Lvl | MP | CD (ms) | Target | Effect | VFX cast / impact | Provenance |
@@ -48,15 +50,16 @@ from the entry move so new characters have a 1 MP-cheap opener.
 | 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
 | 3 | La Hán Trận | `la_han_tran` | 5* | 18 | 9000 | self | **buff** `attackPct` 0.10 + `speedPct` 0.20 + `critRate` 0.05, 180s | sprite row 2 (formation) / — | VLTK2 |
 | 4 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 7 | 15 | 15000 | self | **buff** `defensePct` 0.25, 8s | aura / — | VLTK2 |
-| 5 | Như Lai Thần Thưởng | `nhu_lai_than_thuong` | 10 | 35 | 30000 | enemy, AoE r140 | stun 1200ms (mult 2.4) | shockwave / burst | VLTK2 |
+| 5 | Như Lai Thần Chưởng | `nhu_lai_than_chuong` | 10 | 35 | 30000 | enemy r6000 (capped to camera), AoE r300 at impact | stun 1200ms (mult 2.4) | cast at hero / palm drops and blooms on impact | VLTK2 |
 
 Design rules:
 
 - `*` Đại Tu Di Chưởng currently ships with `unlockLevel: 1` because it is the
   only authored palm skill; restore it to 3 once slots 0–1 land.
-- Known limitation: damage/stun resolve at cast time, while the projectile can
-  arrive up to 1.2 s later. Delaying the authoritative hit needs a projectile
-  lifecycle/impact-time model; keep that as a separate change.
+- Known limitation: damage/stun resolve at cast time, while the projectile or
+  the Như Lai slam can land later (~0.45 s after the cast gesture plus 0.28 s
+  drop). Delaying the authoritative hit needs a projectile lifecycle/impact-time
+  model; keep that as a separate change.
 - Đại Tu Di Chưởng is a ranged single-target strike (`radius: 0`, `range: 6000`,
   a max that comfortably covers the visible camera edge). The client caps the
   effective range at the camera's half-diagonal (`screenCastRange`) so it never
@@ -67,8 +70,12 @@ Design rules:
   or `skillReach` will drop back to the radius and the cast will require melee
   distance.
 
-- All damaging palm skills use `target: "enemy"`, including AoE ones: a cast with
-  `radius > 0` is resolved as an area centred on the caster by `resolveTargets()`.
+- All damaging palm skills use `target: "enemy"`, including AoE ones. A cast
+  with `radius > 0` resolves its area around the chosen impact point (clicked
+  target, cursor, or the hero when there is neither), not around the caster:
+  `resolveCastCenter()` clamps that point to the skill's `range` and
+  `resolveTargets()` filters enemies around it. `skillReach()` therefore uses
+  `range` when present and only falls back to `radius` for radius-only skills.
   Setting `target: "self"` would short-circuit to self buffs and skip damage.
 - Slots 3 and 4 are self buffs; both keep the existing `buff` effect kind, so no
   server change is needed. La Hán Trận is the offensive formation
@@ -93,12 +100,19 @@ Chưởng.** It ships as a 64×64 PNG icon plus a four-frame animated VFX:
   above keys out neutral greys and trims the leftover rim. If a transparent
   source is available later, regenerate the frames from it without changing paths.
 - Catalog `icon` points to `/skills/dai_tu_di_chuong.png`.
-- The remaining five skills start with glyph fallbacks; assign rows 2–4 of the
-  sheet when their art direction is confirmed (row 2 is the spiral/beam set,
-  rows 3–4 are impact variants).
+- The remaining slots (0, 1 and 4) still use their interim emblems/glyph until
+  their final palm art is chosen; do not reuse the Như Lai sheet there.
 - Slots 0 (`la_han_quyen`) and 1 (`thieu_lam_truong_phap`) now ship vector
   emblems instead of glyphs: transparent 128×128 PNGs in the same gold palette,
   regenerated with `python3 scripts/build_skill_icons.py` (SVG → `rsvg-convert`).
+- Như Lai Thần Chưởng ships as `public/skills/nhu_lai_than_chuong.png` (64×64
+  icon, frame 1) and `public/skills/vfx/nhu_lai_than_chuong/`
+  (`frame-1..4.png`, `sheet.png` 1024×256, `sheet.json` fps 12), generated from
+  `docs/example/nhu-lai-than-chuong.png` with
+  `python3 scripts/build_skill_nhu_lai_than_chuong.py`. The four panels are
+  normalised to one scale, and the baked cream backdrop on panels 2–4 is
+  feathered at the straight cut edges so no beige rectangle shows on the dark
+  ground.
 - Verify no 404s in `npm run build` and in the running HUD.
 
 ## 4. VFX and rig animation
@@ -126,6 +140,28 @@ Two VFX tracks are needed:
   `Phaser.BlendModes.ADD`. Verify the keyed edges do not show a grey box on the
   dark ground.
 
+### 4a-bis. Sprite VFX for Như Lai Thần Chưởng
+
+- `lazyAssets.js` registers `vfx-nhu-lai-than-chuong` (256×256, same sheet
+  contract as Đại Tu Di Chưởng), so `ensureSectVfx` downloads it with the rest of
+  the Thiếu Lâm sheets.
+- Frames 0–1 play once at the hero as the cast gesture. Frames 2–3 then drop
+  from above onto the strike area (`type: "slam"`): frame 2 falls with the arm
+  and frame 3 lands as the ground impact, followed by a short fade. The drop is
+  delayed until the cast gesture finishes so the two beats read separately.
+- The catalog sets `size: 260`, `impactScale: 1.4` and `type: "slam"`. The
+  landing frame starts at 85% of the impact scale and blooms to 140% over
+  140ms, so the ground palm visibly grows to cover the r300 AoE.
+  `dropHeight`/`dropDuration` are optional overrides (default
+  `max(140, size*0.8)` and 280ms).
+- `impact: null` on purpose: damage resolves at cast time, so an extra burst
+  would fire before the palm lands. The landing frames carry the hit.
+- The client sends the resolved impact centre (`aimX`/`aimY`) with the cast.
+  The server clamps it to the skill range from its own player position, stores
+  it on `lastCast`, and validates every AoE `enemy_hit` against that centre
+  (±40 units). A forged hit far from the palm is dropped even when it is inside
+  the nominal 6000 cast range.
+
 ### 4b. Vector VFX for the rest of the kit
 
 `heroRigView.attack()` already maps `shockwave → palm`. To make the kit read as
@@ -147,13 +183,17 @@ palm rather than sword:
 | i18n | `src/i18n/locales/{vi,en,zh}.js` | Re-add `skills.thieuLam.<camelId>.{name,desc}` for all six |
 | Icons | `public/skills/dai_tu_di_chuong.png` | 64×64 icon derived from row 1 |
 | VFX art | `public/skills/vfx/dai_tu_di_chuong/*` | Four 256×256 frames + sheet + json |
+| VFX art | `public/skills/nhu_lai_than_chuong.png` | 64×64 icon derived from the Như Lai sheet |
+| VFX art | `public/skills/vfx/nhu_lai_than_chuong/*` | Four 256×256 frames + sheet + json |
+| VFX tooling | `scripts/build_skill_nhu_lai_than_chuong.py` | Extract, normalise and feather the Như Lai sheet |
 | VFX | `src/game/skillVfx.js` | `palm` primitive + sprite playback |
 | Scene | `src/game/game.js` | Preload the Đại Tu Di Chưởng spritesheet |
 | Rig | `src/game/heroRigView.js` | Map `palm` cast to the palm pose |
 | HUD | `src/components/HUD/HotbarDock.jsx` | Already switched to `SkillIcon` so slots render a glyph when `icon` is absent |
 | Client tests | `src/game/skills.test.js` | Restore six-slot invariants for Thiếu Lâm |
 | Client tests | `src/game/skillDamage.test.js` | Add one damage + one effect case per new skill |
-| Server tests | `server/tests/websocket.test.js` | Remove `SKIP_NO_KIT`; use palm ids for MP/damage authority |
+| Server | `server/src/websocket/gameSocket.js` | Store the cast impact centre and validate AoE hits around it |
+| Server tests | `server/tests/websocket.test.js` | Remove `SKIP_NO_KIT`; use palm ids for MP/damage authority; cover AoE-centre rejection |
 | Docs | `docs/plan/sect-skills.md` | Keep cross-reference; Thiếu Lâm no longer empty |
 
 Do **not** touch sect ids, gender rules, character DB defaults, or the loadout
@@ -192,5 +232,6 @@ Each phase is independently shippable and keeps the other three sects untouched.
 1. La Hán Trận: **resolved** — stays self-only (buffs only the caster, no party-wide sharing, and restricted from Left Hand).
 2. Kim Cang Bất Hoại: keep it as pure `defensePct`, or add a small
    `heal`/`pctMaxHp` component so the defensive art also restores HP?
-3. Is the official spelling `Như Lai Thần Thưởng` (current VLTK2 copy) or
-   `Như Lai Thần Chưởng` preferred for the rebuilt kit?
+3. Spelling: **resolved** — the rebuilt kit uses `Như Lai Thần Chưởng` /
+   `nhu_lai_than_chuong`, matching the supplied art. The old
+   `nhu_lai_than_thuong` id is gone from the client catalog and server tests.

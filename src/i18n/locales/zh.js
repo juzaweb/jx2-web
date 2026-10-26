@@ -236,6 +236,10 @@ export default {
       laHanTran: {
         name: "罗汉阵",
         desc: "罗汉护体法阵，提升 10% 攻击力、20% 移动速度与 5% 会心一击率，持续 3 分钟。"
+      },
+      nhuLaiThanChuong: {
+        name: "如来神掌",
+        desc: "少林绝学，如来掌力从天而降，对周围敌人造成范围伤害并使其眩晕。"
       }
     },
     voDang: {

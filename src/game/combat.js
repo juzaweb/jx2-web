@@ -9,6 +9,7 @@ import {
   playRangeIndicator,
   playTargetMarker
 } from "./skillVfx.js";
+import { clampToRange } from "./aim.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
@@ -532,10 +533,18 @@ export class CombatSystem {
     );
 
     const aimed = target || aimPoint;
+    // Send the AoE centre so the server can validate each hit against the area
+    // the palm actually lands on instead of the whole cast range.
+    const aimCenter = skill.radius > 0
+      ? this.resolveCastCenter(skill, target, aimPoint)
+      : aimed;
     this.scene.networkClient?.sendAttack?.({
       skill: skill.id,
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
+      ...(aimCenter
+        ? { aimX: Math.round(aimCenter.x), aimY: Math.round(aimCenter.y) }
+        : {}),
       facingRight: aimed ? aimed.x >= this.player.x : this.player.facingDirection !== 6
     });
 
@@ -551,13 +560,15 @@ export class CombatSystem {
   }
 
   /**
-   * Distance at which a skill can release.
+   * Distance at which a skill can release. For an AoE the cast range is how far
+   * the centre can be placed, while `radius` only sizes the area; a radius-only
+   * skill (`range: 0`) still releases from its own radius.
    * @param {Object} skill
    * @returns {number}
    */
   skillReach(skill) {
-    if (skill.radius > 0) return skill.radius;
-    return Math.min(skill.range, this.screenCastRange());
+    const reach = Number(skill.range) > 0 ? Number(skill.range) : Number(skill.radius) || 0;
+    return Math.min(reach, this.screenCastRange());
   }
 
   /**
@@ -757,14 +768,22 @@ export class CombatSystem {
       return;
     }
 
+    // An AoE lands on the chosen point (target, cursor, or the hero when neither
+    // was supplied); a single-target skill resolves around the hero as before.
+    const center = skill.radius > 0
+      ? this.resolveCastCenter(skill, preferredTarget, aimPoint)
+      : null;
     const targets = skill.radius > 0
-      ? this.resolveTargets(skill)
+      ? this.resolveTargets(skill, center)
       : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill));
     const primary = targets[0] || null;
-    this.aimAt(primary || aimPoint);
-    playSkillCastVfx(this.scene, this.player, skill, primary, aimPoint);
-    if (skill.radius > 0) {
-      playRangeIndicator(this.scene, this.player.x, this.player.y, skill.radius, skill.vfx?.color);
+    // An AoE's art must land on the same centre the damage is resolved around,
+    // even when the nearest victim is offset inside the radius.
+    const vfxTarget = skill.radius > 0 ? center : primary;
+    this.aimAt(vfxTarget || aimPoint);
+    playSkillCastVfx(this.scene, this.player, skill, vfxTarget, aimPoint);
+    if (center) {
+      playRangeIndicator(this.scene, center.x, center.y, skill.radius, skill.vfx?.color);
     }
 
     // A peer's HP lives on the server, so that branch only reports the roll.
@@ -848,26 +867,46 @@ export class CombatSystem {
   }
 
   /**
-   * Enemies this cast can hit: everything inside the AoE radius, or the nearest
-   * enemy inside the single-target range. Extracted so aiming and hit resolution
-   * use exactly the same target set.
+   * Centre of an AoE cast: the clicked target, the cursor point, or the hero.
+   * A point beyond the skill's cast range is pulled back to its edge so the
+   * resolved area matches the VFX.
    * @param {Object} skill
+   * @param {Object|null} preferredTarget
+   * @param {{x:number,y:number}|null} aimPoint
+   * @returns {{x:number,y:number}}
+   */
+  resolveCastCenter(skill, preferredTarget = null, aimPoint = null) {
+    const aimedAt = preferredTarget || aimPoint;
+    if (!aimedAt) return { x: this.player.x, y: this.player.y };
+    return clampToRange(this.player, aimedAt, this.skillReach(skill));
+  }
+
+  /**
+   * Enemies this cast can hit: everything inside the AoE radius around `center`
+   * (defaults to the hero), or the nearest enemy inside the single-target range.
+   * Extracted so aiming and hit resolution use exactly the same target set.
+   * @param {Object} skill
+   * @param {{x:number,y:number}|null} [center] AoE centre
    * @returns {Object[]}
    */
-  resolveTargets(skill) {
+  resolveTargets(skill, center = null) {
     const alive = this.enemyManager.getAlive();
-    const distanceTo = (wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
 
     if (skill.radius > 0) {
+      const origin = center || { x: this.player.x, y: this.player.y };
+      const distanceToCenter = (wolf) =>
+        Phaser.Math.Distance.Between(origin.x, origin.y, wolf.x, wolf.y);
       return alive
-        .filter((wolf) => distanceTo(wolf) <= skill.radius)
-        .sort((a, b) => distanceTo(a) - distanceTo(b));
+        .filter((wolf) => distanceToCenter(wolf) <= skill.radius)
+        .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));
     }
 
+    const playerDistanceTo = (wolf) =>
+      Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
     const range = this.skillReach(skill);
     const nearest = alive
-      .filter((wolf) => distanceTo(wolf) <= range)
-      .sort((a, b) => distanceTo(a) - distanceTo(b))[0];
+      .filter((wolf) => playerDistanceTo(wolf) <= range)
+      .sort((a, b) => playerDistanceTo(a) - playerDistanceTo(b))[0];
     return nearest ? [nearest] : [];
   }
 

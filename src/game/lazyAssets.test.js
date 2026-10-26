@@ -94,12 +94,14 @@ describe("ensureSectVfx", () => {
     ensureSectVfx(scene, [
       { id: "no-vfx" },
       { id: "palm", vfx: { sprite: "vfx-dai-tu-di-chuong" } },
-      { id: "ring", vfx: { sprite: "vfx-la-han-tran" } }
+      { id: "ring", vfx: { sprite: "vfx-la-han-tran" } },
+      { id: "ultimate", vfx: { sprite: "vfx-nhu-lai-than-chuong" } }
     ]);
 
     expect(scene.calls.filter(([name]) => name === "spritesheet").map((call) => call[1])).toEqual([
       "vfx-dai-tu-di-chuong",
-      "vfx-la-han-tran"
+      "vfx-la-han-tran",
+      "vfx-nhu-lai-than-chuong"
     ]);
     expect(scene.calls.filter(([name]) => name === "start")).toHaveLength(1);
   });

@@ -10,6 +10,7 @@ const makeSprite = () => {
     setStrokeStyle: vi.fn(() => sprite),
     play: vi.fn(() => sprite),
     once: vi.fn(() => sprite),
+    setFrame: vi.fn(() => sprite),
     destroy: vi.fn()
   };
   return sprite;
@@ -17,7 +18,9 @@ const makeSprite = () => {
 
 const makeScene = ({ frameTotal = 5 } = {}) => {
   const animConfigs = [];
+  const tweenConfigs = [];
   const tweenConfig = { value: null };
+  const timers = [];
   const scene = {
     cameras: { main: { width: 5700, height: 3200, zoom: 1 } },
     textures: {
@@ -41,11 +44,17 @@ const makeScene = ({ frameTotal = 5 } = {}) => {
     tweens: {
       add: (config) => {
         tweenConfig.value = config;
+        tweenConfigs.push(config);
+      }
+    },
+    time: {
+      delayedCall: (ms, callback) => {
+        timers.push({ ms, callback });
       }
     },
     add: { sprite: () => makeSprite() }
   };
-  return { scene, animConfigs, tweenConfig };
+  return { scene, animConfigs, tweenConfig, tweenConfigs, timers };
 };
 
 const makePlayer = () => ({
@@ -235,5 +244,68 @@ describe("playSkillCastVfx sprite playback", () => {
     expect(scene.add.sprite).not.toHaveBeenCalled();
     // Baseline circle pulse and shockwave circle were created
     expect(scene.add.circle).toHaveBeenCalled();
+  });
+
+  it("plays cast frames at the hero, then drops the palm onto the strike area", () => {
+    const { scene, animConfigs, tweenConfigs, timers } = makeScene({ frameTotal: 5 });
+    const castSprite = makeSprite();
+    const impactSprite = makeSprite();
+    scene.add.sprite = vi
+      .fn()
+      .mockReturnValueOnce(castSprite)
+      .mockReturnValueOnce(impactSprite);
+    const player = makePlayer();
+
+    playSkillCastVfx(
+      scene,
+      player,
+      {
+        range: 0,
+        radius: 140,
+        vfx: { sprite: "palm", type: "slam", size: 260, impactScale: 1.4, fps: 12 }
+      },
+      { x: 140, y: 100 }
+    );
+
+    // Frames 0-1 are the cast gesture at the hero only.
+    expect(animConfigs).toHaveLength(1);
+    expect(animConfigs[0]).toMatchObject({ key: "palm-slam-cast", repeat: 0, frameRate: 12 });
+    expect(animConfigs[0].frames).toHaveLength(2);
+    expect(castSprite.play).toHaveBeenCalledWith("palm-slam-cast");
+    expect(scene.add.sprite).toHaveBeenCalledTimes(1);
+
+    // The impact starts after the cast gesture.
+    expect(timers).toHaveLength(1);
+    expect(timers[0].ms).toBeCloseTo((2 / 12) * 1000);
+    timers[0].callback();
+
+    expect(scene.add.sprite).toHaveBeenCalledTimes(2);
+    expect(impactSprite.setFrame).toHaveBeenCalledWith(2);
+
+    const end = toIso(140, 100);
+    const [x, y, key] = scene.add.sprite.mock.calls[1];
+    expect(key).toBe("palm");
+    expect(x).toBe(end.x);
+    expect(y).toBeLessThan(end.y - 26);
+
+    // Frame 2 descends, frame 3 is the ground impact, then the sprite fades.
+    const drop = tweenConfigs[0];
+    expect(drop.targets).toBe(impactSprite);
+    expect(drop).toMatchObject({ duration: 280, ease: "Quad.easeIn" });
+    expect(drop.y).toBe(end.y - 26);
+    drop.onComplete();
+    expect(impactSprite.setFrame).toHaveBeenLastCalledWith(3);
+
+    const baseScale = (260 * 1.8) / 256;
+    const impactScale = baseScale * 1.4;
+    expect(impactSprite.setScale).toHaveBeenLastCalledWith(impactScale * 0.85);
+
+    // The landing frame blooms out to cover the AoE, then fades.
+    const bloom = tweenConfigs[1];
+    expect(bloom).toMatchObject({ targets: impactSprite, scale: impactScale, duration: 140 });
+    const fade = tweenConfigs[2];
+    expect(fade).toMatchObject({ targets: impactSprite, alpha: 0, delay: 140, duration: 240 });
+    fade.onComplete();
+    expect(impactSprite.destroy).toHaveBeenCalled();
   });
 });

@@ -235,6 +235,10 @@ export default {
       laHanTran: {
         name: "La Hán Trận",
         desc: "Trận pháp hộ thể La Hán, tăng 10% lực tấn công, 20% tốc độ di chuyển và 5% tỉ lệ chí mạng trong 3 phút."
+      },
+      nhuLaiThanChuong: {
+        name: "Như Lai Thần Chưởng",
+        desc: "Tuyệt kỹ Thiếu Lâm, chưởng khí Như Lai giáng xuống gây sát thương diện rộng và đánh choáng kẻ địch xung quanh."
       }
     },
     voDang: {

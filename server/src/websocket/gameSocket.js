@@ -4,6 +4,7 @@ import { store } from "../data/playerDb.js";
 import { characterDb } from "../data/characterDb.js";
 import { userDb } from "../data/userDb.js";
 import { verifySessionToken } from "../auth/session.js";
+import { clampToRange } from "../../../src/game/aim.js";
 import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, clampPvpDamage, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
@@ -48,6 +49,26 @@ const sanitizeStr = (val, maxLen = 32) => {
 const clampNum = (val, min, max, fallback) => {
   if (typeof val !== "number" || !Number.isFinite(val)) return fallback;
   return Math.min(Math.max(val, min), max);
+};
+
+/**
+ * Clamp a client-reported impact point to the map and the skill's cast range.
+ * The point authorizes AoE hits; a missing aim falls back to the caster so the
+ * old caster-centred behaviour still works.
+ * @param {Object} skill
+ * @param {number} x caster X
+ * @param {number} y caster Y
+ * @param {Object} payload
+ * @param {{x0:number,y0:number,x1:number,y1:number}} bounds
+ * @returns {{x:number,y:number}}
+ */
+const clampCastAim = (skill, x, y, payload, bounds) => {
+  const aim = {
+    x: clampNum(payload.aimX, bounds.x0, bounds.x1, x),
+    y: clampNum(payload.aimY, bounds.y0, bounds.y1, y)
+  };
+  const reach = Number(skill.range) > 0 ? Number(skill.range) : Number(skill.radius) || 0;
+  return clampToRange({ x, y }, aim, reach);
 };
 
 /** Equipment slots the client renders (see src/game/equipment.js). */
@@ -674,7 +695,7 @@ export class GameSocketManager {
       nextHitAt: 0,
       /** skill id -> timestamp the next cast is allowed. */
       skillReadyAt: Object.create(null),
-      /** { skillId, at } of the most recent accepted cast, used to authorize its hit. */
+      /** { skillId, at, hits, aim } of the last accepted cast, used to authorize hits. */
       lastCast: null
     };
 
@@ -1086,14 +1107,17 @@ export class GameSocketManager {
       this.broadcastMp(player);
     }
 
-    // A successful cast authorizes the skill's follow-up hit. `enemy_hit` refuses
-    // a skill the player did not just cast, so damage cannot be minted freely.
-    if (skill) player.lastCast = { skillId, at: now, hits: 0 };
-
     const aimBounds = getMap(player.mapId).bounds;
     const x = clampNum(payload.x, aimBounds.x0, aimBounds.x1, player.x);
     const y = clampNum(payload.y, aimBounds.y0, aimBounds.y1, player.y);
+    // Range-clamp against the server-owned position, not the client-reported
+    // broadcast coordinates, so a forged x/y cannot widen the aim.
+    const aim = skill ? clampCastAim(skill, player.x, player.y, payload, aimBounds) : null;
     const facingRight = payload.facingRight !== false;
+
+    // A successful cast authorizes the skill's follow-up hit. `enemy_hit` refuses
+    // a skill the player did not just cast, so damage cannot be minted freely.
+    if (skill) player.lastCast = { skillId, at: now, hits: 0, aim };
 
     this.broadcastPlayerState(
       player,
@@ -1618,8 +1642,16 @@ export class GameSocketManager {
 
       // Skill hits are authoritative: the server recomputes the damage from the
       // catalog and the player's own attack stat instead of trusting the client.
-      const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-      if (distance > skill.range + skill.radius + 40) return;
+      // An AoE hit must land inside the cast's own impact area; older clients
+      // without an aim point keep the caster-centred fallback.
+      if (skill.radius > 0) {
+        const center = cast.aim || { x: player.x, y: player.y };
+        const distanceToCenter = Math.hypot(center.x - enemy.x, center.y - enemy.y);
+        if (distanceToCenter > skill.radius + 40) return;
+      } else {
+        const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+        if (distance > skill.range + skill.radius + 40) return;
+      }
       damage = computeSkillDamage(
         skill,
         { attack: player.attack, critRate: player.critRate, critDamage: 1.5 },

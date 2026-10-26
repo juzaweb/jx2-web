@@ -15,7 +15,7 @@ const THIEU_LAM_PALM_IDS = [
   "dai_tu_di_chuong",
   "la_han_tran",
   "kim_cang_bat_hoai",
-  "nhu_lai_than_thuong"
+  "nhu_lai_than_chuong"
 ];
 const HAS_THIEU_LAM_PALM_KIT = THIEU_LAM_PALM_IDS.every((id) => Boolean(skillById(id)));
 const SKIP_NO_KIT = HAS_THIEU_LAM_PALM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
@@ -413,7 +413,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     }
 
     // An unaffordable ultimate is refused: MP never goes negative
-    client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_thuong", x: 640, y: 620, facingRight: true } });
+    client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong", x: 640, y: 620, facingRight: true } });
     await new Promise((resolve) => setTimeout(resolve, 80));
     const lastMp = client.messages.filter((m) => m.type === "player_mp").at(-1);
     assert.equal(lastMp.payload.mp, 3, "The refused cast spends nothing");
@@ -1259,6 +1259,73 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
 
     await traveller.close();
     await marketObserver.close();
+  });
+
+  await t.test("AoE hits are validated against the cast impact centre", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    client.send({
+      type: "player_join",
+      payload: {
+        id: "usr_aoe_center",
+        token: "test-token",
+        characterId: "char_eco_1",
+        username: "AoeCenter",
+        x: 8400,
+        y: 6000
+      }
+    });
+    const init = await client.waitFor((m) => m.type === "init_world");
+    const alive = init.payload.enemies.filter((enemy) => !enemy.isDead);
+
+    let target = null;
+    let outside = null;
+    for (const candidate of alive) {
+      const other = alive.find(
+        (enemy) =>
+          enemy.id !== candidate.id &&
+          Math.hypot(enemy.x - candidate.x, enemy.y - candidate.y) > 700
+      );
+      if (other) {
+        target = candidate;
+        outside = other;
+        break;
+      }
+    }
+    assert.ok(target && outside, "two separated enemies are available for the AoE check");
+
+    client.send({
+      type: "player_attack",
+      payload: {
+        skill: "nhu_lai_than_chuong",
+        x: 8400,
+        y: 6000,
+        aimX: target.x,
+        aimY: target.y,
+        facingRight: true
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    // A hit inside the palm's r300 area is accepted; one 700+ units away from the
+    // impact centre is dropped even though it is still inside the cast range.
+    client.send({ type: "enemy_hit", payload: { id: target.id, skill: "nhu_lai_than_chuong", damage: 9999 } });
+    client.send({ type: "enemy_hit", payload: { id: outside.id, skill: "nhu_lai_than_chuong", damage: 9999 } });
+
+    const hit = await client.waitFor(
+      (m) => m.type === "enemy_hit" && m.payload.id === target.id && m.payload.damage > 0
+    );
+    assert.ok(hit.payload.damage < 9999, "the server recomputes the skill damage");
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(
+      client.messages.filter(
+        (m) => m.type === "enemy_hit" && m.payload.id === outside.id && m.payload.damage > 0
+      ).length,
+      0,
+      "a hit outside the impact centre is dropped"
+    );
+
+    await client.close();
   });
 
   await t.test("Teardown test server", async () => {
