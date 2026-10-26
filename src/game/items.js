@@ -164,6 +164,28 @@ export function getItemById(id) {
 }
 
 /**
+ * Server-owned effects of the usable consumables. The client renders the number
+ * the server broadcasts; it never applies these amounts itself.
+ * @type {Readonly<Record<string, { hp?: number, mp?: number, teleport?: "spawn" }>>}
+ */
+export const CONSUMABLE_EFFECTS = Object.freeze({
+  "kim-sang-duoc": Object.freeze({ hp: 35 }),
+  "dai-hoan-dan": Object.freeze({ mp: 25 }),
+  "nu-nhi-hong": Object.freeze({ hp: 50, mp: 30 }),
+  "hoi-thanh-phu": Object.freeze({ teleport: "spawn" })
+});
+
+/**
+ * Effect of one consumable, or null when the item is not usable.
+ * @param {string} id
+ * @returns {{ hp?: number, mp?: number, teleport?: "spawn" }|null}
+ */
+export function getConsumableEffect(id) {
+  if (typeof id !== "string" || id.length === 0) return null;
+  return CONSUMABLE_EFFECTS[id] || null;
+}
+
+/**
  * The kit every newly created regular character receives: health potions, mana potions
  * and return-city talismans. Only the server grants it (see
  * PlayerDatabase.grantStarterItems), so the client never seeds a bag on its own.
@@ -347,51 +369,6 @@ export function consumeQuantity(id, amount = 1) {
   const next = current - Math.floor(amount);
   currentQuantities[id] = next;
   return { ok: true, quantity: next };
-}
-
-/**
- * Weighted loot table for enemy drops. Every `id` exists in the catalog.
- * `weight` is relative (higher = more common); `qty` is the stack size granted.
- * @type {Array<{id:string, name:string, weight:number, qty:number}>}
- */
-export const DROP_TABLE = [
-  { id: "tui-bac", name: "Túi Bạc", weight: 50, qty: 1 },
-  { id: "linh-duong", name: "Thịt Rừng", weight: 30, qty: 2 },
-  { id: "yeu-dan", name: "Yêu Đan", weight: 15, qty: 1 },
-  { id: "huyen-kim-thach", name: "Huyễn Kim Thạch", weight: 5, qty: 1 }
-];
-
-/**
- * Fast O(1) lookup Map for DROP_TABLE entries by item id.
- * @type {Map<string, {id:string, name:string, weight:number, qty:number}>}
- */
-export const DROP_TABLE_MAP = new Map(
-  DROP_TABLE.map((item) => [item.id, item])
-);
-
-/**
- * Pick a loot entry from DROP_TABLE with a weighted roll. Pure and deterministic:
- * the same rng value always yields the same entry, and the final bucket is
- * clamped so floating-point drift or a roll of 1 can never return an unknown id.
- * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
- * @returns {{ id: string, qty: number }}
- */
-export function rollDrop(rng = Math.random) {
-  const totalWeight = DROP_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
-  const drawn = typeof rng === "function" ? rng() : rng;
-  const roll = typeof drawn === "number" && Number.isFinite(drawn) ? drawn : 0;
-  const target = Math.min(Math.max(roll, 0), 1) * totalWeight;
-
-  let cursor = 0;
-  for (let i = 0; i < DROP_TABLE.length; i++) {
-    cursor += DROP_TABLE[i].weight;
-    if (target < cursor) {
-      return { id: DROP_TABLE[i].id, qty: DROP_TABLE[i].qty };
-    }
-  }
-
-  const last = DROP_TABLE[DROP_TABLE.length - 1];
-  return { id: last.id, qty: last.qty };
 }
 
 /**

@@ -394,31 +394,6 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it("freezes progression offline and drops nothing", () => {
-    const { combat, player } = makeCombat({ isConnected: false });
-    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
-
-    combat.handleWolfKill(wolf);
-
-    expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(combat.drops).toBeUndefined();
-    expect(player.stats.kills).toBe(0);
-    expect(player.stats.exp).toBe(900);
-    expect(player.stats.coins).toBe(10);
-  });
-
-  it("leaves the payout to the server while connected", () => {
-    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
-    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
-
-    combat.handleWolfKill(wolf);
-
-    expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(player.stats.kills).toBe(0);
-    expect(player.stats.exp).toBe(900);
-    expect(player.stats.coins).toBe(10);
-  });
-
   it("mirrors the server ledger onto the local stats", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
 
@@ -655,7 +630,7 @@ describe("skill targeting", () => {
     return { combat, scene, ui };
   };
 
-  const wolf = (id, x, y) => ({ id, x, y, takeHit: vi.fn(), hp: 50, maxHp: 50, defense: 0 });
+  const wolf = (id, x, y) => ({ id, monsterId: "soi-xam", x, y, hp: 50, maxHp: 50, defense: 0 });
 
   it("prefers the locked PvP target over a closer monster", () => {
     const locked = peer("locked", 200, 0);
@@ -697,12 +672,16 @@ describe("skill targeting", () => {
   it("clamps a peer cast inside the server's PvP range but not a monster cast", () => {
     const skill = { radius: 0, range: 5000 };
     const { combat } = makeCombat();
-    const monsterReach = combat.castReach(skill, wolf("w", 0, 0));
+    // A camera wider than the PvP radius makes the two limits distinguishable;
+    // at the default size the monster reach is already below the PvP clamp.
+    combat.scene.cameras.main = { width: 5700, height: 3200, zoom: 1 };
 
-    expect(monsterReach).toBe(combat.skillReach(skill));
-    expect(combat.castReach(skill, peer("p", 0, 0))).toBe(
-      Math.min(combat.skillReach(skill), PVP_CAST_DISTANCE)
-    );
+    const monsterReach = combat.castReach(skill, wolf("w", 0, 0));
+    const peerReach = combat.castReach(skill, peer("p", 0, 0));
+
+    expect(monsterReach).toBeCloseTo(combat.skillReach(skill));
+    expect(monsterReach).toBeGreaterThan(PVP_CAST_DISTANCE);
+    expect(peerReach).toBe(PVP_CAST_DISTANCE);
   });
 
   it("sends the resolved AoE impact centre with the cast", () => {
@@ -738,6 +717,32 @@ describe("skill targeting", () => {
     });
   });
 
+  it("never spends MP locally — the server's player_mp is authoritative", () => {
+    const { combat, scene } = makeCombat();
+    const skill = {
+      id: "dai_tu_di_chuong",
+      sect: "thieu-lam",
+      slot: 1,
+      nameKey: "skills.thieuLam.daiTuDiChuong.name",
+      unlockLevel: 1,
+      mp: 12,
+      cooldown: 6000,
+      radius: 0,
+      range: 6000,
+      mult: 1.3,
+      vfx: {}
+    };
+    combat.applySkill = vi.fn();
+    combat.showFloatText = vi.fn();
+    const before = combat.player.stats.mp;
+
+    combat.executeSkill(skill, null);
+
+    expect(scene.networkClient.sendAttack).toHaveBeenCalled();
+    // MP is only mirrored from the server; a cast must not spend it locally.
+    expect(combat.player.stats.mp).toBe(before);
+  });
+
   it("resolves a pending approach against a peer and drops it when the flag falls", () => {
     const locked = peer("locked", 200, 0);
     const peaceful = peer("peaceful", 200, 0, { pkFlag: false });
@@ -760,7 +765,7 @@ describe("skill targeting", () => {
 
     expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
       targetId: "locked",
-      damage: expect.any(Number)
+      skill: "kiem_khi"
     });
     expect(locked.hp).toBe(100);
 
@@ -834,88 +839,42 @@ describe("skill targeting", () => {
   });
 });
 
-describe("CombatSystem passive regen", () => {
-  const makePlayer = (hp = 50) => ({
-    sect: "thieu-lam",
+describe("CombatSystem passive art ownership", () => {
+  const makePlayer = (sect = "thieu-lam", hp = 50) => ({
+    sect,
     x: 0,
     y: 0,
-    stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 },
-    heal(amount) {
-      const prev = this.stats.hp;
-      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
-      return this.stats.hp - prev;
-    }
+    stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 }
   });
 
-  const makeCombat = ({ isConnected = true, sect = "thieu-lam", hp = 50 } = {}) => {
-    const player = makePlayer(hp);
-    player.sect = sect;
+  const makeCombat = ({ sect = "thieu-lam", hp = 50 } = {}) => {
+    const player = makePlayer(sect, hp);
     const scene = {
       time: { now: 0 },
-      networkClient: { isConnected, sendHeal: vi.fn() }
+      networkClient: { isConnected: true }
     };
     const ui = { addLog: vi.fn(), updateHud: vi.fn() };
     const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui);
-    return { combat, player, scene, ui };
+    return { combat, player, ui };
   };
 
-  it("restores 2 HP per second and mirrors each heal to the server", () => {
-    const { combat, player, scene } = makeCombat();
-
-    combat.update(0); // first frame only starts the clock
-    expect(player.stats.hp).toBe(50);
-
-    combat.update(500);
-    expect(player.stats.hp).toBe(51);
-    expect(scene.networkClient.sendHeal).toHaveBeenCalledWith({ amount: 1 });
-
-    combat.update(1000);
-    expect(player.stats.hp).toBe(52);
-  });
-
-  it("heals nothing for a sect without a passive art", () => {
-    const { combat, player, scene } = makeCombat({ sect: "vo-dang" });
-
-    combat.update(0);
-    combat.update(5000);
-
-    expect(player.stats.hp).toBe(50);
-    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
-  });
-
-  it("never heals past the health ceiling", () => {
-    const { combat, player, scene } = makeCombat({ hp: 99 });
-
-    combat.update(0);
-    combat.update(500);
-    expect(player.stats.hp).toBe(100);
-
-    combat.update(2000);
-    expect(player.stats.hp).toBe(100);
-    expect(scene.networkClient.sendHeal).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not bank regeneration while the scene is paused", () => {
+  it("leaves passive regeneration to the server", () => {
     const { combat, player } = makeCombat();
 
     combat.update(0);
-    // A minute spent paused must not pay out 120 HP on the resume frame.
-    combat.update(60000);
-    expect(player.stats.hp).toBe(50);
+    combat.update(500);
+    combat.update(1000);
 
-    // Normal ticking resumes on the following frames.
-    combat.update(60500);
-    expect(player.stats.hp).toBe(51);
+    expect(player.stats.hp).toBe(50);
   });
 
-  it("leaves a fallen hero at 0 HP for the server to respawn", () => {
-    const { combat, player, scene } = makeCombat({ hp: 0 });
+  it("also leaves a fallen hero at 0 HP for the server to respawn", () => {
+    const { combat, player } = makeCombat({ hp: 0 });
 
     combat.update(0);
     combat.update(5000);
 
     expect(player.stats.hp).toBe(0);
-    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
   });
 
   it("refuses to cast the passive art and spends no MP", () => {

@@ -19,8 +19,9 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  * Bumped when a stored inventory must be discarded or back-filled by a migration.
  *  2 — clears the hard-coded demo bags that every character used to start with.
  *  3 — hands the starter kit to characters left with an empty bag.
+ *  4 — adds server-owned equipment, persisted HP/MP and the one-time state-import flag.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /**
  * Recursively drop prototype-polluting keys from untrusted input.
@@ -95,6 +96,10 @@ export class PlayerDatabase {
         exp             INTEGER NOT NULL DEFAULT 0,
         quest_rewarded  INTEGER NOT NULL DEFAULT 0,
         inventory       TEXT NOT NULL DEFAULT '{}',
+        equipment       TEXT NOT NULL DEFAULT '{}',
+        hp              INTEGER,
+        mp              INTEGER,
+        state_imported  INTEGER NOT NULL DEFAULT 0,
         starter_granted INTEGER NOT NULL DEFAULT 0,
         updated_at      INTEGER NOT NULL
       );
@@ -107,11 +112,16 @@ export class PlayerDatabase {
     // Databases created before the flag existed need the column added, because
     // `CREATE TABLE IF NOT EXISTS` never alters an existing table.
     const saveColumns = this.db.prepare("PRAGMA table_info(saves)").all();
-    if (!saveColumns.some((column) => column.name === "starter_granted")) {
-      this.db.exec(
-        "ALTER TABLE saves ADD COLUMN starter_granted INTEGER NOT NULL DEFAULT 0"
-      );
-    }
+    const addColumn = (name, definition) => {
+      if (saveColumns.some((column) => column.name === name)) return;
+      this.db.exec(`ALTER TABLE saves ADD COLUMN ${name} ${definition}`);
+      saveColumns.push({ name });
+    };
+    addColumn("starter_granted", "INTEGER NOT NULL DEFAULT 0");
+    addColumn("equipment", "TEXT NOT NULL DEFAULT '{}'");
+    addColumn("hp", "INTEGER");
+    addColumn("mp", "INTEGER");
+    addColumn("state_imported", "INTEGER NOT NULL DEFAULT 0");
 
     this._migrate();
 
@@ -139,6 +149,15 @@ export class PlayerDatabase {
     this.stmtSetQuestRewarded = this.db.prepare(
       "UPDATE saves SET quest_rewarded = ?, updated_at = ? WHERE player_id = ?"
     );
+    this.stmtUpdateVitals = this.db.prepare(
+      "UPDATE saves SET hp = ?, mp = ?, updated_at = ? WHERE player_id = ?"
+    );
+    this.stmtUpdateEquipment = this.db.prepare(
+      "UPDATE saves SET equipment = ?, updated_at = ? WHERE player_id = ?"
+    );
+    this.stmtMarkStateImported = this.db.prepare(
+      "UPDATE saves SET state_imported = 1, updated_at = ? WHERE player_id = ?"
+    );
     // One prepared ranking query per sortable column (whitelisted, so the
     // interpolated column name can never be attacker-controlled).
     this.stmtLeaderboard = Object.fromEntries(
@@ -152,8 +171,9 @@ export class PlayerDatabase {
     );
     this.stmtUpsert = this.db.prepare(`
       INSERT INTO saves (
-        player_id, player_name, level, kills, coins, exp, quest_rewarded, inventory, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        player_id, player_name, level, kills, coins, exp, quest_rewarded, inventory,
+        equipment, hp, mp, state_imported, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(player_id) DO UPDATE SET
         player_name = excluded.player_name,
         level = excluded.level,
@@ -162,6 +182,10 @@ export class PlayerDatabase {
         exp = excluded.exp,
         quest_rewarded = excluded.quest_rewarded,
         inventory = excluded.inventory,
+        equipment = excluded.equipment,
+        hp = excluded.hp,
+        mp = excluded.mp,
+        state_imported = excluded.state_imported,
         updated_at = excluded.updated_at
     `);
   }
@@ -213,6 +237,10 @@ export class PlayerDatabase {
    * Version 3 back-fills those emptied bags with the starter kit, so characters
    * created before the kit existed are not left empty-handed.
    *
+   * Version 4 adds the server-owned equipment, vitals and state-import columns;
+   * the ALTER TABLE guard above already created them, so the bump only records
+   * that the schema is current.
+   *
    * Running once is enforced by the version check, so real items acquired later
    * are never touched again.
    */
@@ -248,10 +276,46 @@ export class PlayerDatabase {
     }
   }
 
+  _parseEquipment(raw) {
+    try {
+      const parsed = JSON.parse(raw || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      return sanitizeData(parsed) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Read the ledger row, creating it when the character has never played so a
+   * later vitals/equipment write always has a row to target.
+   * @param {string} playerId
+   * @returns {Object|undefined}
+   */
+  _ensureRow(playerId) {
+    const existing = this.stmtGet.get(playerId);
+    if (existing) return existing;
+    const now = Date.now();
+    this._writeRow({
+      playerId,
+      playerName: "",
+      ...DEFAULT_LEDGER,
+      questRewarded: 0,
+      inventory: {},
+      equipment: {},
+      hp: null,
+      mp: null,
+      stateImported: 0,
+      updatedAt: now
+    });
+    return this.stmtGet.get(playerId);
+  }
+
   /**
    * Insert or replace a whole row from already-normalized column values.
    * @param {{playerId:string, playerName:string, level:number, kills:number, coins:number,
-   *   exp:number, questRewarded:number, inventory:Object, updatedAt:number}} row
+   *   exp:number, questRewarded:number, inventory:Object, equipment?:Object,
+   *   hp?:number|null, mp?:number|null, stateImported?:number, updatedAt:number}} row
    */
   _writeRow(row) {
     this.stmtUpsert.run(
@@ -263,6 +327,10 @@ export class PlayerDatabase {
       row.exp,
       row.questRewarded,
       JSON.stringify(row.inventory || {}),
+      JSON.stringify(row.equipment || {}),
+      row.hp ?? null,
+      row.mp ?? null,
+      row.stateImported ?? 0,
       row.updatedAt
     );
   }
@@ -330,6 +398,82 @@ export class PlayerDatabase {
    */
   setQuestRewarded(playerId, rewarded) {
     this.stmtSetQuestRewarded.run(rewarded ? 1 : 0, Date.now(), playerId);
+  }
+
+  // --- Server-owned vitals ---
+
+  /**
+   * Persisted HP/MP for a character, or null when it has never been stored.
+   * @param {string} playerId
+   * @returns {{hp:number|null, mp:number|null}|null}
+   */
+  getVitals(playerId) {
+    const row = this.stmtGet.get(playerId);
+    if (!row) return null;
+    return {
+      hp: Number.isFinite(row.hp) ? Math.max(0, Math.floor(row.hp)) : null,
+      mp: Number.isFinite(row.mp) ? Math.max(0, Math.floor(row.mp)) : null
+    };
+  }
+
+  /**
+   * Persist the current HP/MP pools. The caller has already clamped them to the
+   * character's ceilings.
+   * @param {string} playerId
+   * @param {{hp:number, mp:number}} vitals
+   * @returns {{hp:number|null, mp:number|null}|null}
+   */
+  setVitals(playerId, vitals = {}) {
+    this._ensureRow(playerId);
+    const hp = asCount(vitals.hp, 0);
+    const mp = asCount(vitals.mp, 0);
+    this.stmtUpdateVitals.run(hp, mp, Date.now(), playerId);
+    return this.getVitals(playerId);
+  }
+
+  // --- Server-owned equipment ---
+
+  /**
+   * Worn equipment as a slot -> item id map, or an empty map when nothing is
+   * stored. Callers sanitize the ids against the catalog.
+   * @param {string} playerId
+   * @returns {Record<string, string>}
+   */
+  getEquipment(playerId) {
+    const row = this.stmtGet.get(playerId);
+    return row ? this._parseEquipment(row.equipment) : {};
+  }
+
+  /**
+   * Persist the worn equipment map.
+   * @param {string} playerId
+   * @param {Record<string, string|null>} equipment
+   * @returns {Record<string, string>}
+   */
+  setEquipment(playerId, equipment = {}) {
+    this._ensureRow(playerId);
+    const clean = sanitizeData(equipment) || {};
+    this.stmtUpdateEquipment.run(JSON.stringify(clean), Date.now(), playerId);
+    return this.getEquipment(playerId);
+  }
+
+  /**
+   * Whether this character has already imported a legacy local save.
+   * @param {string} playerId
+   * @returns {boolean}
+   */
+  isStateImported(playerId) {
+    const row = this.stmtGet.get(playerId);
+    return Boolean(row && row.state_imported);
+  }
+
+  /**
+   * Mark the one-time legacy import as done, so a client cannot replay it.
+   * @param {string} playerId
+   */
+  markStateImported(playerId) {
+    this._ensureRow(playerId);
+    this.stmtMarkStateImported.run(Date.now(), playerId);
   }
 
   // --- Inventory ---

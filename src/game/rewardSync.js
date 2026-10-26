@@ -5,8 +5,6 @@
  * object and rejects anything malformed before stats are touched.
  */
 
-import { DROP_TABLE_MAP } from "./items.js";
-
 /**
  * @typedef {Object} EnemyReward
  * @property {number|string|undefined} enemyId
@@ -41,15 +39,8 @@ export function parseEnemyReward(payload = {}) {
   const coins = toCount(payload.coins);
   if (exp === null || coins === null) return null;
 
-  // Ignore any stale or forged loot payload. Kills pay EXP + bạc only, and the
-  // reward object must stay free of item data that could be replayed into the bag.
-  if (payload.drop && typeof payload.drop === "object") {
-    const dropId = payload.drop.id;
-    if (typeof dropId === "string" && !DROP_TABLE_MAP.has(dropId)) {
-      // no-op: formatted reward remains item-free even when a forged drop arrives.
-    }
-  }
-
+  // Kills pay EXP + bạc only: the reward object stays item-free so a forged loot
+  // payload can never be replayed into the bag.
   const reward = {
     enemyId: payload.enemyId,
     attackerId: typeof payload.attackerId === "string" ? payload.attackerId : null,

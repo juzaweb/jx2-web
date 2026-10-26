@@ -1,8 +1,8 @@
 /**
- * Enemy AI for the wolf roster, shared by both runtimes:
- * - online: the server steps it on a fixed tick (`server/src/websocket/gameSocket.js`)
- *   and ships positions, so every player sees the same monsters move the same way;
- * - offline: the client steps it itself with the local player as the only target.
+ * Enemy AI for the wolf roster. The server steps it on a fixed tick
+ * (`server/src/websocket/gameSocket.js`) and ships positions, so every player
+ * sees the same monsters move the same way; the client only interpolates the
+ * snapshots it receives.
  *
  * Tuning mirrors the AI that used to live in src/game/enemy.js. Kept free of
  * Phaser/transport so the rules can be unit tested.
@@ -33,7 +33,7 @@ export const WOLF_COMBAT = {
   critDamage: 1.5
 };
 
-/** How close a wolf must be to bite, and how often it may (both client & server). */
+/** How close a wolf must be to bite, and how often it may (server-owned). */
 export const BITE_TUNING = {
   range: 55 * WORLD_SCALE,
   cooldownMs: 1400

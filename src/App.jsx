@@ -98,8 +98,8 @@ const isTypingTarget = (target) => {
 
 /**
  * Point the persisted bag and the shared in-memory store at one character, and
- * return the render-ready inventory for the HUD. `characterId` may be null
- * (no character chosen), which falls back to the account-scoped guest bag.
+ * return the render-ready inventory for the HUD. The bag is character-scoped
+ * locally because it is the source for the one-time legacy import.
  * @param {string|null} characterId
  * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
  */
@@ -705,7 +705,7 @@ export function App() {
     setIsLoginOpen(false);
   }, []);
 
-  const handleCharacterStart = useCallback((character) => {
+  const handleCharacterStart = useCallback(async (character) => {
     requestLandscapeFullscreen();
     // Entering the world opens the map and the chat channel by default; the
     // player can still close either one with its × button.
@@ -723,8 +723,31 @@ export function App() {
     // Switch the shared bag store to this character's own inventory before the
     // scene enters the world, so the server fallback can never leak another
     // character's items.
-    setInventory(loadCharacterInventory(character.id));
-    setEquipment(StorageManager.loadEquipment());
+    const localInventory = loadCharacterInventory(character.id);
+    const localEquipment = StorageManager.loadEquipment();
+    setInventory(localInventory);
+    setEquipment(localEquipment);
+
+    // One-time migration of a bag/gear saved before the server owned them. The
+    // server gates this on `state_imported`, so calling it on every entry is
+    // safe; a successful import becomes the canonical state and the local
+    // copies are dropped.
+    const token = readSession()?.token;
+    const legacyBag = StorageManager.loadInventory();
+    const hasLegacy =
+      Object.keys(legacyBag).length > 0 ||
+      Object.values(localEquipment).some((id) => typeof id === "string");
+    if (token && hasLegacy) {
+      try {
+        const state = await apiClient.importState(character.id, legacyBag, localEquipment, token);
+        setInventory(applyQuantities(rememberQuantities(state.inventory)));
+        setEquipment(state.equipment);
+        StorageManager.clearInventory();
+        StorageManager.clearEquipment();
+      } catch {
+        // A refused import is not fatal: the server bag stays authoritative.
+      }
+    }
 
     // Set the gender before the name: the name change triggers a re-join, so the
     // join snapshot then already carries the correct gender (peers redraw from it).

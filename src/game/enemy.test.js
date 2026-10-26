@@ -11,7 +11,6 @@ vi.mock("phaser", () => ({
 
 import { EnemyManager, Wolf, isPointOnEnemy, findEnemyAt } from "./enemy.js";
 import { POSITION_SNAP_THRESHOLD } from "./enemySync.js";
-import { ENEMY_TUNING } from "./enemyAi.js";
 
 /** Minimal Phaser scene stub: the wolf only needs sprites, containers and a clock. */
 const createScene = ({ isConnected = false } = {}) => {
@@ -25,7 +24,10 @@ const createScene = ({ isConnected = false } = {}) => {
         node.visible = value;
         return node;
       },
-      setAlpha: () => node,
+      setAlpha: (value) => {
+        node.alpha = value;
+        return node;
+      },
       setOrigin: () => node,
       setStrokeStyle: () => node,
       setLineWidth: () => node,
@@ -169,23 +171,6 @@ describe("Wolf movement is server-owned", () => {
     expect(scene.sprite.body.velocity).toEqual({ x: 0, y: 0 });
   });
 
-  it("chases the player itself when no server owns the roster", () => {
-    const { scene, wolf } = createWolf({ isConnected: false });
-    const target = player(840 + ENEMY_TUNING.stopDistance + 120, 600);
-    const bites = vi.fn();
-
-    for (let frame = 0; frame < 240; frame++) {
-      wolf.update(frame * 16, 16, target, bites);
-    }
-
-    // 43 px/s closes the gap and then holds at the stop distance
-    const distance = Math.hypot(scene.sprite.x - target.x, scene.sprite.y - target.y);
-    expect(scene.sprite.x).toBeGreaterThan(840);
-    expect(distance).toBeLessThanOrEqual(ENEMY_TUNING.stopDistance + 1);
-    expect(distance).toBeGreaterThanOrEqual(ENEMY_TUNING.stopDistance - 1);
-    expect(bites).toHaveBeenCalled();
-  });
-
   it("follows the authoritative position smoothly and settles exactly on it", () => {
     const { scene, wolf } = createWolf();
     wolf.applyServerState({ x: 880, y: 600 });
@@ -224,41 +209,36 @@ describe("Wolf movement is server-owned", () => {
     expect(scene.sprite.x).toBe(840);
   });
 
-  it("does not slide back to its spawn when the server takes over", () => {
-    const { scene, wolf } = createWolf({ isConnected: false });
-    const target = player(840 + ENEMY_TUNING.stopDistance + 120, 600);
+  it("flashes the sprite when an authoritative snapshot lowers HP", () => {
+    const { wolf } = createWolf();
 
-    for (let frame = 0; frame < 240; frame++) {
-      wolf.update(frame * 16, 16, target, () => {});
-    }
-    const offlineX = scene.sprite.x;
-    expect(offlineX).toBeGreaterThan(900);
+    wolf.applyServerState({ hp: 30 });
 
-    // The socket comes up before the first roster snapshot arrives: the wolf must
-    // hold still rather than slide back to a position the server never claimed
-    scene.networkClient.isConnected = true;
-    wolf.update(4000, 16, target, () => {});
-    expect(scene.sprite.x).toBe(offlineX);
-
-    // The first authoritative position is what it follows from then on
-    wolf.applyServerState({ x: offlineX + 40, y: 600 });
-    wolf.update(4016, 16, target, () => {});
-    expect(scene.sprite.x).toBeGreaterThan(offlineX);
+    expect(wolf.hp).toBe(30);
+    expect(wolf.wolfVisual.alpha).toBe(0.45);
   });
 
-  it("keeps biting whoever is in range, throttled by the bite cooldown", () => {
+  it("does not flash when a snapshot reports the same or higher HP", () => {
     const { wolf } = createWolf();
-    const bites = vi.fn();
 
-    wolf.update(1000, 16, player(2000, 2000), bites);
-    expect(bites).not.toHaveBeenCalled();
+    wolf.applyServerState({ hp: wolf.maxHp });
+    expect(wolf.wolfVisual.alpha).not.toBe(0.45);
+  });
 
-    wolf.update(1000, 16, player(880, 600), bites);
-    wolf.update(1100, 16, player(880, 600), bites);
-    expect(bites).toHaveBeenCalledTimes(1);
+  it("holds still until the first authoritative snapshot arrives", () => {
+    const { scene, wolf } = createWolf();
+    const target = player(2000, 2000);
 
-    wolf.update(2600, 16, player(880, 600), bites);
-    expect(bites).toHaveBeenCalledTimes(2);
+    // No snapshot yet: the render must not invent a position of its own.
+    for (let frame = 0; frame < 60; frame++) {
+      wolf.update(frame * 16, 16, target, () => {});
+    }
+    expect(scene.sprite.x).toBe(840);
+
+    // The first authoritative position is what it follows from then on
+    wolf.applyServerState({ x: 880, y: 600 });
+    wolf.update(4016, 16, target, () => {});
+    expect(scene.sprite.x).toBeGreaterThan(840);
   });
 });
 

@@ -5,22 +5,9 @@ import { StorageManager } from "./storage.js";
 const STORAGE_KEY = "giang_ho_game_save_v1";
 
 const SAMPLE = {
-  stats: {
-    level: 3,
-    hp: 80,
-    maxHp: 100,
-    mp: 30,
-    maxMp: 60,
-    exp: 40,
-    nextExp: 200,
-    coins: 120,
-    kills: 7,
-    sta: 90,
-    maxSta: 100
-  },
   position: { x: 128, y: 256 },
-  questRewarded: true,
-  audioEnabled: false
+  audioEnabled: false,
+  pkFlag: true
 };
 
 describe("StorageManager", () => {
@@ -35,11 +22,18 @@ describe("StorageManager", () => {
 
     const loaded = StorageManager.load();
     expect(loaded).not.toBeNull();
-    expect(loaded.stats).toEqual(SAMPLE.stats);
     expect(loaded.position).toEqual(SAMPLE.position);
-    expect(loaded.questRewarded).toBe(true);
     expect(loaded.audioEnabled).toBe(false);
+    expect(loaded.pkFlag).toBe(true);
     expect(typeof loaded.savedAt).toBe("number");
+  });
+
+  it("never persists server-owned gameplay state", () => {
+    StorageManager.save({ ...SAMPLE, stats: { level: 9 }, questRewarded: true });
+
+    const loaded = StorageManager.load();
+    expect(loaded.stats).toBeUndefined();
+    expect(loaded.questRewarded).toBeUndefined();
   });
 
   it("round-trips the map the hero was standing on", () => {
@@ -77,18 +71,16 @@ describe("StorageManager", () => {
     warn.mockRestore();
   });
 
-  it("returns null when the payload has no stats", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ foo: 1 }));
+  it("returns null for a non-object payload", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([1, 2, 3]));
     expect(StorageManager.load()).toBeNull();
   });
 
-  it("coerces questRewarded to a boolean on save", () => {
-    StorageManager.save({ ...SAMPLE, questRewarded: undefined });
-    expect(StorageManager.load().questRewarded).toBe(false);
-  });
-
-  it("round-trips persisted stack quantities", () => {
-    StorageManager.saveInventory({ "kim-sang-duoc": 42, "tui-bac": 7 });
+  it("reads persisted stack quantities", () => {
+    localStorage.setItem(
+      StorageManager.getInventoryKey(),
+      JSON.stringify({ "kim-sang-duoc": 42, "tui-bac": 7 })
+    );
 
     expect(StorageManager.loadInventory()).toEqual({
       "kim-sang-duoc": 42,
@@ -96,15 +88,18 @@ describe("StorageManager", () => {
     });
   });
 
-  it("sanitizes invalid inventory entries on save", () => {
-    StorageManager.saveInventory({
-      good: 3,
-      neg: -1,
-      str: "5",
-      nan: NaN,
-      inf: Infinity,
-      ["__proto__"]: 9
-    });
+  it("sanitizes invalid inventory entries when loading", () => {
+    localStorage.setItem(
+      StorageManager.getInventoryKey(),
+      JSON.stringify({
+        good: 3,
+        neg: -1,
+        str: "5",
+        nan: NaN,
+        inf: Infinity,
+        ["__proto__"]: 9
+      })
+    );
 
     expect(StorageManager.loadInventory()).toEqual({ good: 3 });
   });
@@ -128,7 +123,7 @@ describe("StorageManager", () => {
 
   it("keeps each character's bag separate", () => {
     StorageManager.setCharacterId("char_a");
-    StorageManager.saveInventory({ "tui-bac": 5 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 5 }));
 
     StorageManager.setCharacterId("char_b");
     expect(StorageManager.loadInventory()).toEqual({});
@@ -140,7 +135,7 @@ describe("StorageManager", () => {
   it("falls back to the account key when no character is active", () => {
     StorageManager.setUserId("user_x");
     StorageManager.setCharacterId(null);
-    StorageManager.saveInventory({ "tui-bac": 9 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 9 }));
 
     StorageManager.setUserId("user_y");
     expect(StorageManager.loadInventory()).toEqual({});
@@ -148,7 +143,7 @@ describe("StorageManager", () => {
 
   it("clearInventory removes only the active character's bag", () => {
     StorageManager.setCharacterId("char_a");
-    StorageManager.saveInventory({ "tui-bac": 5 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 5 }));
     StorageManager.clearInventory();
     expect(StorageManager.loadInventory()).toEqual({});
   });

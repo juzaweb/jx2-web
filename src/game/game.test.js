@@ -16,7 +16,6 @@ vi.mock("phaser", () => ({
 }));
 
 import { NetworkClient } from "./networkClient.js";
-import { MARKET_SPAWN } from "./marketLayout.js";
 import { JiangHuScene } from "./game.js";
 import { setQuantities, getQuantity } from "./items.js";
 import { bridge, EVENTS } from "./bridge.js";
@@ -206,80 +205,77 @@ describe("JiangHuScene connection gate", () => {
 });
 
 /** Minimal scene scope that satisfies useItem() without Phaser. */
-const makeUseScene = ({ hp = 10, maxHp = 100, mp = 10, maxMp = 100 } = {}) => {
+const makeUseScene = () => {
   const addLog = vi.fn();
   const updateInventory = vi.fn();
-  const heal = vi.fn((amount) => amount);
-  const restoreMp = vi.fn((amount) => amount);
-  const setPosition = vi.fn();
+  const useItem = vi.fn();
   const scene = {
     started: true,
-    player: { stats: { hp, maxHp, mp, maxMp }, heal, restoreMp, setPosition },
-    combat: { showFloatText: vi.fn() },
+    player: { stats: { hp: 10, maxHp: 100, mp: 10, maxMp: 100 } },
     uiBridge: { addLog, updateHud: vi.fn(), updateInventory },
-    saveGame: vi.fn(),
+    networkClient: { isConnected: true, useItem },
     quickSlots: { 1: "kim-sang-duoc", 2: "dai-hoan-dan", 3: "nu-nhi-hong", 4: "hoi-thanh-phu" }
   };
   // The stubbed scope still needs the sibling prototype methods useItem calls.
   scene.applyItemEffect = JiangHuScene.prototype.applyItemEffect;
   scene.applyConsumableEffect = JiangHuScene.prototype.applyConsumableEffect;
   scene.onInventoryChanged = JiangHuScene.prototype.onInventoryChanged;
-  return { scene, addLog, updateInventory, heal, restoreMp, setPosition };
+  return { scene, addLog, updateInventory, useItem };
 };
 
-describe("JiangHuScene.useItem quantity", () => {
-  it("deducts one unit and refreshes the HUD after a successful use", () => {
+describe("JiangHuScene.useItem", () => {
+  it("asks the server to consume a bound hotbar item", () => {
     setQuantities({ "kim-sang-duoc": 3 });
-    const { scene, updateInventory } = makeUseScene();
+    const { scene, useItem } = makeUseScene();
 
     JiangHuScene.prototype.useItem.call(scene, 1);
 
-    expect(getQuantity("kim-sang-duoc")).toBe(2);
-    expect(updateInventory).toHaveBeenCalledTimes(1);
-    expect(scene.saveGame).toHaveBeenCalledTimes(1);
+    expect(useItem).toHaveBeenCalledWith("kim-sang-duoc");
+    // The bag is server-owned: the client never decrements it optimistically.
+    expect(getQuantity("kim-sang-duoc")).toBe(3);
   });
 
   it("uses the clicked bag item directly, even when no slot is bound", () => {
     setQuantities({ "dai-hoan-dan": 2 });
-    const { scene, restoreMp } = makeUseScene({ mp: 10, maxMp: 100 });
+    const { scene, useItem } = makeUseScene();
     scene.quickSlots = {};
 
     JiangHuScene.prototype.useItem.call(scene, "dai-hoan-dan");
 
-    expect(restoreMp).toHaveBeenCalled();
-    expect(getQuantity("dai-hoan-dan")).toBe(1);
+    expect(useItem).toHaveBeenCalledWith("dai-hoan-dan");
+    expect(getQuantity("dai-hoan-dan")).toBe(2);
   });
 
-  it("does not deduct when the effect is refused (health already full)", () => {
-    setQuantities({ "kim-sang-duoc": 3 });
-    const { scene, heal } = makeUseScene({ hp: 100, maxHp: 100 });
-
-    JiangHuScene.prototype.useItem.call(scene, 1);
-
-    expect(heal).not.toHaveBeenCalled();
-    expect(getQuantity("kim-sang-duoc")).toBe(3);
-    expect(scene.saveGame).not.toHaveBeenCalled();
-  });
-
-  it("refuses a depleted stack before running the effect", () => {
+  it("refuses a depleted stack before asking the server", () => {
     setQuantities({ "kim-sang-duoc": 0 });
-    const { scene, heal, addLog } = makeUseScene({ hp: 10, maxHp: 100 });
+    const { scene, addLog, useItem } = makeUseScene();
 
     JiangHuScene.prototype.useItem.call(scene, 1);
 
-    expect(heal).not.toHaveBeenCalled();
-    expect(getQuantity("kim-sang-duoc")).toBe(0);
+    expect(useItem).not.toHaveBeenCalled();
     expect(addLog).toHaveBeenCalled();
   });
 
-  it("consumes the teleport scroll and moves the player", () => {
+  it("requires a live connection to use a consumable", () => {
+    setQuantities({ "kim-sang-duoc": 1 });
+    const { scene, addLog, useItem } = makeUseScene();
+    scene.networkClient.isConnected = false;
+
+    JiangHuScene.prototype.useItem.call(scene, 1);
+
+    expect(useItem).not.toHaveBeenCalled();
+    expect(addLog).toHaveBeenCalled();
+  });
+
+  it("sends the teleport scroll to the server instead of moving locally", () => {
     setQuantities({ "hoi-thanh-phu": 1 });
-    const { scene, setPosition } = makeUseScene();
+    const { scene, useItem } = makeUseScene();
+    scene.player.setPosition = vi.fn();
 
     JiangHuScene.prototype.useItem.call(scene, 4);
 
-    expect(setPosition).toHaveBeenCalledWith(MARKET_SPAWN.x, MARKET_SPAWN.y);
-    expect(getQuantity("hoi-thanh-phu")).toBe(0);
+    expect(useItem).toHaveBeenCalledWith("hoi-thanh-phu");
+    expect(scene.player.setPosition).not.toHaveBeenCalled();
   });
 });
 
@@ -328,120 +324,62 @@ describe("JiangHuScene.interactWithNearbyNpc", () => {
   });
 });
 
+
 describe("JiangHuScene.handleGmAction", () => {
-  it("adds equipment items to the bag with custom text and logs", () => {
-    setQuantities({ "ao-lang-khach": 0, "non-lang-khach": 0, "quan-lang-khach": 0 });
+  const makeGmScene = () => {
     const addLog = vi.fn();
-    const showFloatText = vi.fn();
-    const onInventoryChanged = vi.fn();
+    const sendGmAction = vi.fn();
     const scene = {
       player: { x: 100, y: 100 },
-      combat: { showFloatText },
+      combat: { showFloatText: vi.fn() },
       uiBridge: { addLog },
-      onInventoryChanged
+      networkClient: { isConnected: true, sendGmAction }
     };
+    return { scene, addLog, sendGmAction };
+  };
 
-    JiangHuScene.prototype.handleGmAction.call(scene, {
+  it("relays add_items to the authoritative server", () => {
+    setQuantities({ "ao-lang-khach": 0, "non-lang-khach": 0, "quan-lang-khach": 0 });
+    const { scene, addLog, sendGmAction } = makeGmScene();
+    const payload = {
       action: "add_items",
       items: { "ao-lang-khach": 1, "non-lang-khach": 1, "quan-lang-khach": 1 },
-      text: "Đã nhận trọn bộ y phục!",
       log: "Đã nhận trọn bộ Y Phục Lãng Khách vào túi đồ."
-    });
+    };
 
-    expect(getQuantity("ao-lang-khach")).toBe(1);
-    expect(getQuantity("non-lang-khach")).toBe(1);
-    expect(getQuantity("quan-lang-khach")).toBe(1);
-    expect(showFloatText).toHaveBeenCalledWith(100, 32, "Đã nhận trọn bộ y phục!", "#69db7c");
-    expect(addLog).toHaveBeenCalledWith("Đã nhận trọn bộ Y Phục Lãng Khách vào túi đồ.", "system");
-    expect(onInventoryChanged).toHaveBeenCalledTimes(1);
+    JiangHuScene.prototype.handleGmAction.call(scene, payload);
+
+    expect(sendGmAction).toHaveBeenCalledWith(payload);
+    expect(addLog).toHaveBeenCalledWith(payload.log, "system");
+    // The bag is server-owned: nothing is minted locally.
+    expect(getQuantity("ao-lang-khach")).toBe(0);
+    expect(getQuantity("non-lang-khach")).toBe(0);
   });
 
-  it("formats item name automatically when text and log are omitted", () => {
+  it("formats the item name when the log is omitted", () => {
     setQuantities({ "non-lang-khach": 0 });
-    const addLog = vi.fn();
-    const showFloatText = vi.fn();
-    const onInventoryChanged = vi.fn();
-    const scene = {
-      player: { x: 100, y: 100 },
-      combat: { showFloatText },
-      uiBridge: { addLog },
-      onInventoryChanged
-    };
+    const { scene, addLog, sendGmAction } = makeGmScene();
 
     JiangHuScene.prototype.handleGmAction.call(scene, {
       action: "add_items",
       items: { "non-lang-khach": 1 }
     });
 
-    expect(getQuantity("non-lang-khach")).toBe(1);
-    expect(showFloatText).toHaveBeenCalledWith(100, 32, "Đã nhận Nón Trúc Lãng Khách!", "#69db7c");
+    expect(sendGmAction).toHaveBeenCalled();
     expect(addLog).toHaveBeenCalledWith("Đã nhận Nón Trúc Lãng Khách vào túi đồ.", "system");
+    expect(getQuantity("non-lang-khach")).toBe(0);
   });
 
-  it("equips an entire costume set in one action with equip_set", () => {
-    const applyEquipment = vi.fn();
-    const addLog = vi.fn();
-    const showFloatText = vi.fn();
-    const emitEquipment = vi.fn();
-    const onInventoryChanged = vi.fn();
-    const player = {
-      x: 100,
-      y: 100,
-      equipment: { weapon: null, armor: null, helmet: null, pants: null },
-      applyEquipment
-    };
-    const scene = {
-      player,
-      combat: { showFloatText },
-      uiBridge: { addLog },
-      emitEquipment,
-      onInventoryChanged
-    };
-
-    JiangHuScene.prototype.handleGmAction.call(scene, {
+  it("relays a costume set equip to the server", () => {
+    const { scene, addLog, sendGmAction } = makeGmScene();
+    const payload = {
       action: "equip_set",
-      equipment: {
-        helmet: "non-lang-khach",
-        armor: "ao-lang-khach",
-        pants: "quan-lang-khach"
-      }
-    });
-
-    expect(applyEquipment).toHaveBeenCalledWith({
-      weapon: null,
-      helmet: "non-lang-khach",
-      armor: "ao-lang-khach",
-      pants: "quan-lang-khach"
-    });
-    expect(emitEquipment).toHaveBeenCalledTimes(1);
-    expect(onInventoryChanged).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not re-consume items already equipped in equip_set", () => {
-    setQuantities({ "ao-lang-khach": 1 });
-    const applyEquipment = vi.fn();
-    const emitEquipment = vi.fn();
-    const onInventoryChanged = vi.fn();
-    const player = {
-      x: 100,
-      y: 100,
-      equipment: { armor: "ao-lang-khach" },
-      applyEquipment
-    };
-    const scene = {
-      player,
-      combat: { showFloatText: vi.fn() },
-      uiBridge: { addLog: vi.fn() },
-      emitEquipment,
-      onInventoryChanged
+      equipment: { helmet: "non-lang-khach", armor: "ao-lang-khach", pants: "quan-lang-khach" }
     };
 
-    JiangHuScene.prototype.handleGmAction.call(scene, {
-      action: "equip_set",
-      equipment: { armor: "ao-lang-khach" }
-    });
+    JiangHuScene.prototype.handleGmAction.call(scene, payload);
 
-    // The extra one in bag remains unconsumed because it was already worn
-    expect(getQuantity("ao-lang-khach")).toBe(1);
+    expect(sendGmAction).toHaveBeenCalledWith(payload);
+    expect(addLog).toHaveBeenCalled();
   });
 });

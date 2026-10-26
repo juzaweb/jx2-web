@@ -159,20 +159,28 @@ export class NetworkClient {
   }
 
   /**
-   * Report the worn equipment slots so peers can redraw the player's rig.
-   * @param {Record<string, string|null>} equipment
+   * Ask the server to consume one bag item (potion, return talisman). The effect,
+   * the decrement and the resulting pools are all server-owned.
+   * @param {string} itemId
    */
-  sendEquipment(equipment) {
-    this.send("player_equipment", { equipment });
+  useItem(itemId) {
+    this.send("use_item", { itemId });
   }
 
   /**
-   * Report the parts of the player block the client still owns (defense). Level,
-   * the HP ceiling and current HP are all server-owned now.
-   * @param {{defense:number}} statsData
+   * Ask the server to equip one bag item.
+   * @param {string} itemId
    */
-  sendStats(statsData) {
-    this.send("player_stats", statsData);
+  equipItem(itemId) {
+    this.send("equip_item", { itemId });
+  }
+
+  /**
+   * Ask the server to take off whatever is worn in `slot`.
+   * @param {string} slot
+   */
+  unequipSlot(slot) {
+    this.send("unequip_slot", { slot });
   }
 
   /**
@@ -181,22 +189,6 @@ export class NetworkClient {
    */
   sendQuestClaim() {
     this.send("quest_claim", {});
-  }
-
-  /**
-   * Request a heal (potion, level-up). The server clamps it to the HP ceiling.
-   * @param {{amount:number}} healData
-   */
-  sendHeal(healData) {
-    this.send("player_heal", healData);
-  }
-
-  /**
-   * Request an MP restore (potion, pickup). The server clamps it to the MP ceiling.
-   * @param {{amount:number}} restoreData
-   */
-  sendRestoreMp(restoreData) {
-    this.send("player_restore_mp", restoreData);
   }
 
   /**
@@ -225,16 +217,16 @@ export class NetworkClient {
   }
 
   /**
-   * Report a PvP hit on another player
-   * @param {{targetId:string, damage:number}} hitData
+   * Report a PvP hit on another player. Damage is recomputed server-side.
+   * @param {{targetId:string, skill?:string}} hitData
    */
   sendPlayerHit(hitData) {
     this.send("player_hit", hitData);
   }
 
   /**
-   * Report damage dealt to an enemy
-   * @param {Object} hitData
+   * Report a hit on an enemy. Damage is recomputed server-side.
+   * @param {{id:number|string, skill?:string}} hitData
    */
   sendEnemyHit(hitData) {
     this.send("enemy_hit", hitData);

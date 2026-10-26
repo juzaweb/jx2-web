@@ -115,107 +115,55 @@ describe("Giang Ho Backend API Test Suite", () => {
     }
   });
 
-  test("Inventory endpoints: GET and PUT", async () => {
-    // Update inventory
+  test("Inventory REST is read-only and authenticated", async () => {
+    // The bag is written only over the WebSocket now, so the old PUT is gone.
     const putRes = await fetch(`${baseUrl}/inventory/player_test_01`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        inventory: {
-          potion_hp: 20,
-          potion_mp: 12,
-          scroll_teleport: 2
-        }
-      })
+      body: JSON.stringify({ inventory: { potion_hp: 20 } })
     });
+    assert.equal(putRes.status, 404);
 
-    assert.equal(putRes.status, 200);
-    const putJson = await putRes.json();
-    assert.equal(putJson.success, true);
-    assert.equal(putJson.data.inventory.scroll_teleport, 2);
-
-    // Retrieve inventory
+    // Reading a bag requires a verified session token.
     const getRes = await fetch(`${baseUrl}/inventory/player_test_01`);
-    assert.equal(getRes.status, 200);
+    assert.equal(getRes.status, 401);
     const getJson = await getRes.json();
-    assert.equal(getJson.data.inventory.potion_hp, 20);
-    assert.equal(getJson.data.inventory.scroll_teleport, 2);
+    assert.equal(getJson.success, false);
   });
 
-  test("Inventory validation: rejects negative quantities", async () => {
-    const res = await fetch(`${baseUrl}/inventory/player_test_01`, {
-      method: "PUT",
+  test("State import is the only bag write path and requires authentication", async () => {
+    const res = await fetch(`${baseUrl}/state/import`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        inventory: {
-          potion_hp: -5
-        }
-      })
+      body: JSON.stringify({ characterId: "char_x", inventory: { potion_hp: -5 } })
     });
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 401);
     const json = await res.json();
     assert.equal(json.success, false);
   });
 
-  test("Leaderboard: Submit score and sort options", async () => {
-    const submitRes = await fetch(`${baseUrl}/leaderboard/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerId: "master_swordsman",
-        playerName: "Tây Môn Xuy Tuyết",
-        level: 60,
-        kills: 500,
-        coins: 200000,
-        exp: 300000
-      })
-    });
-
-    assert.equal(submitRes.status, 200);
-    const submitJson = await submitRes.json();
-    assert.equal(submitJson.success, true);
-
-    // Check sorted by level
+  test("Leaderboard reads from persisted saves", async () => {
     const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=5`);
+    assert.equal(lbRes.status, 200);
     const lbJson = await lbRes.json();
-    assert.equal(lbJson.data.rankings[0].playerName, "Tây Môn Xuy Tuyết");
-    assert.equal(lbJson.data.rankings[0].level, 60);
-
-    // Check sorted by kills
-    const killLbRes = await fetch(`${baseUrl}/leaderboard?sortBy=kills&limit=5`);
-    const killLbJson = await killLbRes.json();
-    assert.equal(killLbJson.data.rankings[0].kills, 500);
-  });
-
-  test("Leaderboard validation: rejects negative stats", async () => {
-    const res = await fetch(`${baseUrl}/leaderboard/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerId: "bad_player",
-        level: -10
-      })
-    });
-    assert.equal(res.status, 400);
-    const json = await res.json();
-    assert.equal(json.success, false);
+    assert.equal(lbJson.success, true);
+    assert.ok(Array.isArray(lbJson.data.rankings));
   });
 
   test("Validation: rejects invalid playerId", async () => {
+    // requireAuth runs before the id validator, so an anonymous request is 401.
     const res = await fetch(`${baseUrl}/inventory/invalid@id!`);
-    assert.equal(res.status, 400);
-    const json = await res.json();
-    assert.equal(json.success, false);
+    assert.equal(res.status, 401);
   });
 
-  test("Validation: prevents prototype pollution attacks", async () => {
+  test("Validation: legacy inventory writes cannot pollute prototypes", async () => {
     const evilPayload = JSON.parse('{"__proto__": {"admin": true}, "inventory": {"potion_hp": 3}}');
     const res = await fetch(`${baseUrl}/inventory/safe_player`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(evilPayload)
     });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 404);
     assert.equal(({}).admin, undefined, "Prototype pollution must be neutralized");
   });
 
@@ -239,75 +187,6 @@ describe("Giang Ho Backend API Test Suite", () => {
     // Ensure password_hash and salt are not exposed in response
     assert.equal(json.data.user.password_hash, undefined);
     assert.equal(json.data.user.salt, undefined);
-  });
-
-  test("Users: renaming display_name propagates to the leaderboard", async () => {
-    const registerRes = await fetch(`${baseUrl}/users/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: "theanh",
-        password: "secretpassword123",
-        displayName: "theanh"
-      })
-    });
-    assert.equal(registerRes.status, 201);
-    const registerJson = await registerRes.json();
-    const userId = registerJson.data.user.id;
-
-    const firstSubmit = await fetch(`${baseUrl}/leaderboard/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: userId, playerName: "theanh", level: 12, kills: 4, coins: 30, exp: 200 })
-    });
-    const firstJson = await firstSubmit.json();
-    assert.equal(firstJson.data.playerName, "theanh");
-
-    // Simulate an out-of-band rename straight in the users table
-    userDb.db.prepare("UPDATE users SET display_name = ? WHERE id = ?").run("Hiệp Khách Vô Danh", userId);
-
-    await fetch(`${baseUrl}/leaderboard/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: userId, playerName: "theanh", level: 13, kills: 5, coins: 40, exp: 260 })
-    });
-
-    const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=50`);
-    const lbJson = await lbRes.json();
-    const entry = lbJson.data.rankings.find((r) => r.playerId === userId);
-    assert.ok(entry, "Renamed player should appear in the leaderboard");
-    assert.equal(entry.playerName, "Hiệp Khách Vô Danh");
-    assert.equal(entry.level, 13);
-  });
-
-  test("Leaderboard: submit uses the registered display name over the payload name", async () => {
-    const registerRes = await fetch(`${baseUrl}/users/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: "bx_hiep_si",
-        password: "secretpassword123",
-        displayName: "Bạch Y Hiệp Sĩ"
-      })
-    });
-    const registerJson = await registerRes.json();
-    const userId = registerJson.data.user.id;
-
-    const submitRes = await fetch(`${baseUrl}/leaderboard/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerId: userId,
-        playerName: "Tên Giả",
-        level: 42,
-        kills: 120,
-        coins: 5000,
-        exp: 21000
-      })
-    });
-    assert.equal(submitRes.status, 200);
-    const submitJson = await submitRes.json();
-    assert.equal(submitJson.data.playerName, "Bạch Y Hiệp Sĩ");
   });
 
   test("Users: Register rejects duplicate username", async () => {
@@ -415,29 +294,6 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(res.status, 401);
     const json = await res.json();
     assert.equal(json.success, false);
-  });
-
-  test("Concurrency: handles concurrent inventory updates without corruption", async () => {
-    const promises = Array.from({ length: 10 }, (_, i) =>
-      fetch(`${baseUrl}/inventory/concurrent_player_${i}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inventory: { potion_hp: i + 1 } })
-      })
-    );
-
-    const responses = await Promise.all(promises);
-    for (const res of responses) {
-      assert.equal(res.status, 200);
-    }
-
-    // Verify all 10 inventories are intact
-    for (let i = 0; i < 10; i++) {
-      const getRes = await fetch(`${baseUrl}/inventory/concurrent_player_${i}`);
-      assert.equal(getRes.status, 200);
-      const json = await getRes.json();
-      assert.equal(json.data.inventory.potion_hp, i + 1);
-    }
   });
 
   test("Error handling: masks 500 error messages in production environment", async () => {
