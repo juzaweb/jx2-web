@@ -401,6 +401,10 @@ export default {
     "non-lang-khach": {
       name: "浪客斗笠",
       desc: "采边境竹篾编制而成的斗笠。遮风避雨，助侠士泰然面对江湖风雨。"
+    },
+    "quan-lang-khach": {
+      name: "浪客劲装裤",
+      desc: "利落布裤搭配绑腿护膝，便利用于施展轻功与闯荡江湖。"
     }
   },
   gm: {

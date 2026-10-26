@@ -81,6 +81,18 @@ export const nonLangKhach = {
   desc: "Nón đan từ nan tre trúc vùng biên ải. Che nắng che mưa, giúp hiệp khách giữ vững tâm trí khi phong ba bão táp."
 };
 
+/**
+ * Starter wuxia trousers & boots equipment (shared between male and female).
+ */
+export const quanLangKhach = {
+  id: "quan-lang-khach",
+  name: "Quần Lãng Khách",
+  icon: "icon-pants-lang-khach",
+  slot: "pants",
+  bonuses: { defense: 4, movementSpeed: 10 },
+  desc: "Quần thô gọn gàng kết hợp xà cạp bọc chân, tiện lợi cho việc khinh công và phiêu bạt giang hồ."
+};
+
 /** Number of slots the inventory grid renders (5 columns x 6 rows). */
 export const INVENTORY_GRID_SIZE = 30;
 
@@ -109,7 +121,7 @@ const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 /**
  * Standalone equipment items (not included in the starting inventory grid).
  */
-export const EQUIPMENT_ITEMS = [aoLangKhach, nonLangKhach];
+export const EQUIPMENT_ITEMS = [aoLangKhach, nonLangKhach, quanLangKhach];
 
 /**
  * The bag grid contents. Every entry is an item the player can actually obtain and

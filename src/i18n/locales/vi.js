@@ -400,6 +400,10 @@ export default {
     "non-lang-khach": {
       name: "Nón Trúc Lãng Khách",
       desc: "Nón đan từ nan tre trúc vùng biên ải. Che nắng che mưa, giúp hiệp khách giữ vững tâm trí khi phong ba bão táp."
+    },
+    "quan-lang-khach": {
+      name: "Quần Lãng Khách",
+      desc: "Quần thô gọn gàng kết hợp xà cạp bọc chân, tiện lợi cho việc khinh công và phiêu bạt giang hồ."
     }
   },
   gm: {

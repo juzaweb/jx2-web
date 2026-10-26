@@ -400,6 +400,10 @@ export default {
     "non-lang-khach": {
       name: "Wanderer's Bamboo Hat",
       desc: "A conical bamboo hat crafted by borderland artisans. Protects against sun and rain on the perilous journey."
+    },
+    "quan-lang-khach": {
+      name: "Wanderer's Trousers",
+      desc: "Sturdy travel trousers wrapped with leg gaiters, designed for light footwork and wandering the rivers and lakes."
     }
   },
   gm: {

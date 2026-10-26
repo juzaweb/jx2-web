@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "3";
+const BODY_ASSET_VERSION = "4";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -42,7 +42,7 @@ export const HERO_EQUIPMENT_TEXTURES = {
   },
   "quan-lang-khach": {
     male: { key: "hero-pants-lang-khach-male", url: `/hero-pants-lang-khach-male.png?v=${BODY_ASSET_VERSION}` },
-    female: { key: "hero-pants-lang-khach-female", url: `/hero-pants-lang-khach-female.png?v=${BODY_ASSET_VERSION}` }
+    female: { key: "hero-pants-lang-khach-male", url: `/hero-pants-lang-khach-male.png?v=${BODY_ASSET_VERSION}` }
   }
 };
 

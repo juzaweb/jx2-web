@@ -53,6 +53,14 @@ describe("heroBody", () => {
     it("resolves headgear texture keys for plain conical hat and veiled hat", () => {
       expect(equipmentTextureKeyFor("helmet", "non-truc", "male")).toBe("hero-hat-non-truc");
       expect(equipmentTextureKeyFor("helmet", "non-mang", "female")).toBe("hero-hat-non-mang");
+      expect(equipmentTextureKeyFor("helmet", "non-lang-khach", "male")).toBe("hero-hat-non-truc");
+      expect(equipmentTextureKeyFor("helmet", "non-lang-khach", "female")).toBe("hero-hat-non-mang");
+    });
+
+    it("shares male pants texture for female characters", () => {
+      expect(equipmentTextureKeyFor("pants", "quan-lang-khach", "male")).toBe("hero-pants-lang-khach-male");
+      expect(equipmentTextureKeyFor("pants", "quan-lang-khach", "female")).toBe("hero-pants-lang-khach-male");
+      expect(equipmentTextureDef("pants", "quan-lang-khach", "female").url).toContain("hero-pants-lang-khach-male.png");
     });
 
     it("returns null for unregistered items, empty strings or invalid slots", () => {
