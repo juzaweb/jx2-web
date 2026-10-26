@@ -375,6 +375,44 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
+  await t.test("Stun is applied by the server and holds the monster still", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    // Wolf 6 lives at (10500, 8200). A hero 600 units away is inside its aggro
+    // range (1050) but well outside its stop distance (260), so it keeps walking.
+    await join(client, { characterId: "char_stun", x: 9900, y: 8200 });
+
+    const movesWolf6 = (m) =>
+      m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 6);
+
+    // Confirm the server is actively moving that wolf before we stun it.
+    await client.waitFor(movesWolf6, 3000);
+
+    // `dai_tu_di_chuong` carries an 800ms stun; the hit must survive the blow.
+    client.send({
+      type: "player_attack",
+      payload: { skill: "dai_tu_di_chuong", x: 10500, y: 8200, facingRight: true }
+    });
+    client.send({ type: "enemy_hit", payload: { id: 6, skill: "dai_tu_di_chuong", damage: 9999 } });
+    const hit = await client.waitFor(
+      (m) => m.type === "enemy_hit" && m.payload.id === 6 && m.payload.damage > 0
+    );
+    assert.ok(hit.payload.hp > 0, "the stun skill does not kill the wolf");
+
+    const before = client.messages.length;
+    await sleep(500);
+    assert.equal(
+      client.messages.slice(before).filter(movesWolf6).length,
+      0,
+      "a stunned monster holds position"
+    );
+
+    // Once the stun expires the AI resumes and the wolf walks again.
+    const resumed = await client.waitFor(movesWolf6, 2000);
+    assert.ok(resumed);
+
+    await client.close();
+  });
+
   await t.test("Kill rewards credit the server-owned ledger", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_kill", x: 11050, y: 5900 });

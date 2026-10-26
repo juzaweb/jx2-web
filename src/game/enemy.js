@@ -57,10 +57,6 @@ export class Enemy {
     this.visualScale = S * (this.monster.visual?.scale || 1);
 
     this.isDead = false;
-    // Skill control state: a stunned monster holds still, a slowed one moves slower.
-    this.stunUntil = 0;
-    this.slowUntil = 0;
-    this.slowPct = 0;
     // Where the server last reported this monster (see applyServerState). Left
     // null until then, so it never slides toward a position nobody has claimed.
     this.targetX = null;
@@ -112,9 +108,9 @@ export class Enemy {
 
   /**
    * Render one frame: follow the server's position lead and redraw the labels.
-   * Monster life, damage and respawns are server-owned; bites are ticked on the
-   * server too, so nothing here can change HP.
-   * @param {number} time scene clock (ms)
+   * Monster life, damage, control effects and respawns are server-owned; the
+   * server already holds a stunned monster still, so this only interpolates.
+   * @param {number} time scene clock (ms), unused but part of the update contract
    * @param {number} delta ms since the previous frame
    * @param {{x:number, y:number}} player local hero, used for label culling
    */
@@ -125,17 +121,9 @@ export class Enemy {
     // back, so a dead one simply stops rendering until that snapshot arrives.
     if (this.isDead) return;
 
-    // A stunned monster holds position; a slowed one advances its clock slower.
-    const stunned = time < this.stunUntil;
-    const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
-
     // The server steps the AI and this render follows its lead. With no snapshot
     // yet the monster holds still rather than guessing a position.
-    if (stunned) {
-      this.sprite.setVelocity(0, 0);
-    } else {
-      this.followServerPosition(delta * slowFactor);
-    }
+    this.followServerPosition(delta);
 
     const x = this.sprite.x;
     const y = this.sprite.y;

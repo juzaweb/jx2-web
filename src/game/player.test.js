@@ -415,17 +415,3 @@ describe("Player equipment bonuses", () => {
     expect(player.stats.maxHp).toBe(baseMaxHp);
   });
 });
-
-describe("Player saved stats", () => {
-  it("never restores derived combat stats from disk", () => {
-    const player = new Player(createMockScene(), 100, 100);
-    player.loadStats({ level: 5, attack: 999, defense: 999, critRate: 1, critDamage: 9, coins: 12 });
-
-    expect(player.stats.level).toBe(5);
-    expect(player.stats.coins).toBe(12);
-    expect(player.stats.attack).toBe(24);
-    expect(player.stats.defense).toBe(6);
-    expect(player.stats.critRate).toBe(0.12);
-    expect(player.stats.critDamage).toBe(1.5);
-  });
-});

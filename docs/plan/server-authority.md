@@ -28,6 +28,10 @@ Deviations from the original sketch:
   gear are never persisted client-side.
 - The client keeps an in-memory copy of the bag/gear for rendering; every change
   originates from a server `inventory_sync` / `equipment_sync`.
+- Monster control effects (stun/slow) are server-owned too: `src/game/enemyEffects.js`
+  is applied on an accepted skill hit and honoured by the AI tick and the bite
+  tick, so a stunned monster cannot move or bite. The client only follows the
+  resulting positions (`Enemy` no longer keeps local stun/slow timers).
 
 ## 1. Why
 

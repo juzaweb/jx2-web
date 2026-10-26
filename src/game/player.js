@@ -21,9 +21,6 @@ import {
 const S = WORLD_SCALE;
 const POS = WORLD_POSITION_SCALE;
 
-/** Stats that are always derived from base values + worn gear, never persisted. */
-const DERIVED_STATS = new Set(["attack", "defense", "attackSpeed", "critRate", "critDamage"]);
-
 export class Player {
   /**
    * @param {Phaser.Scene} scene
@@ -535,36 +532,8 @@ export class Player {
     this.touchDirection = direction;
   }
 
-  /**
-   * Restore anything persisted about the character. Combat stats are derived
-   * (base + worn gear), so they are never restored from disk — otherwise the
-   * saved gear bonus would be applied a second time by `applyEquipment`.
-   * @param {object} [savedStats]
-   */
-  loadStats(savedStats) {
-    if (!savedStats || typeof savedStats !== "object") return;
-    const persisted = Object.fromEntries(
-      Object.entries(savedStats).filter(([key]) => !DERIVED_STATS.has(key))
-    );
-    this.stats = {
-      ...this.stats,
-      ...persisted
-    };
-  }
 
-  heal(amount) {
-    const prev = this.stats.hp;
-    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
-    return this.stats.hp - prev;
-  }
-
-  restoreMp(amount) {
-    const prev = this.stats.mp;
-    this.stats.mp = Math.min(this.stats.maxMp, this.stats.mp + amount);
-    return this.stats.mp - prev;
-  }
-
-  get x() {
+   get x() {
     return this.sprite ? this.sprite.x : this.spawnX;
   }
 

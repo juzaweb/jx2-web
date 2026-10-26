@@ -660,7 +660,6 @@ export class CombatSystem {
       playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
       this.damageEnemy(wolf, { skill: skill.id });
       hits++;
-      this.applySkillEffectsToEnemy(wolf, skill, now);
     }
 
     this.ui.addLog(
@@ -854,23 +853,6 @@ export class CombatSystem {
     this.buffs = [];
     this.player.hideFormation?.();
     this.player.hideOverhead?.();
-  }
-
-  /**
-   * Apply a skill's timed effects to a struck enemy (slow, stun).
-   * @param {Object} wolf
-   * @param {Object} skill
-   * @param {number} now
-   */
-  applySkillEffectsToEnemy(wolf, skill, now) {
-    for (const effect of skill.effects || []) {
-      if (effect.kind === "slow") {
-        wolf.slowPct = effect.pct;
-        wolf.slowUntil = now + effect.duration;
-      } else if (effect.kind === "stun") {
-        wolf.stunUntil = now + effect.duration;
-      }
-    }
   }
 
   /**

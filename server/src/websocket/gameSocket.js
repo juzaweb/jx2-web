@@ -9,6 +9,12 @@ import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
 import { canPvpAttack, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import {
+  applyEnemyControlEffects,
+  clearEnemyControlEffects,
+  enemyMoveScale,
+  isEnemyStunned
+} from "../../../src/game/enemyEffects.js";
+import {
   HIT_RADIUS_SLACK,
   HIT_WINDOW_MS,
   MAX_HITS_PER_CAST as SHARED_MAX_HITS_PER_CAST,
@@ -281,6 +287,10 @@ export const createEnemyState = (
       coinsMax: monster.coinsMax,
       tuning: monster.ai || null,
       respawnMs: Number.isFinite(monster.respawnMs) ? monster.respawnMs : null,
+      // Server-owned control effects: a skill may stun or slow this monster.
+      stunUntil: 0,
+      slowUntil: 0,
+      slowPct: 0,
       isDead: false
     };
   });
@@ -2088,6 +2098,10 @@ export class GameSocketManager {
       enemy.isDead = true;
       this.gridFor(enemy.mapId).remove(enemy);
       this.scheduleEnemyRespawn(enemy);
+    } else if (skill) {
+      // A landed skill applies its control effects here, where movement and
+      // bites are decided. The client only renders the resulting positions.
+      applyEnemyControlEffects(enemy, skill, now);
     }
 
     this.broadcastToMap(enemy.mapId, {
@@ -2219,10 +2233,16 @@ export class GameSocketManager {
         ? { x0: WORLD_MIN_X, y0: WORLD_MIN_Y, x1: WORLD_MAX_X, y1: WORLD_MAX_Y }
         : map.bounds;
 
+      const now = Date.now();
       roster.forEach((enemy) => {
         if (enemy.isDead) return;
 
-        const next = stepEnemy(enemy, mapPlayers, this.enemyTickMs);
+        // A stunned monster holds position; a slowed one advances its AI clock
+        // slower, so the same step logic produces a shorter move.
+        const scale = enemyMoveScale(enemy, now);
+        if (scale <= 0) return;
+
+        const next = stepEnemy(enemy, mapPlayers, this.enemyTickMs * scale);
         const x = clampNum(Math.round(next.x), bounds.x0, bounds.x1, enemy.x);
         const y = clampNum(Math.round(next.y), bounds.y0, bounds.y1, enemy.y);
         if (x === enemy.x && y === enemy.y) return;
@@ -2256,7 +2276,7 @@ export class GameSocketManager {
 
       const candidates = grid
         .getNear(player.x, player.y, BITE_TUNING.range)
-        .filter((enemy) => !enemy.isDead);
+        .filter((enemy) => !enemy.isDead && !isEnemyStunned(enemy, now));
       let nearest = null;
       let nearestDistance = Infinity;
       candidates.forEach((enemy) => {
@@ -2317,6 +2337,7 @@ export class GameSocketManager {
     enemy.x = enemy.homeX;
     enemy.y = enemy.homeY;
     enemy.isDead = false;
+    clearEnemyControlEffects(enemy);
     this.gridFor(mapId).add(enemy);
 
     this.broadcastToMap(mapId, { type: "enemy_respawned", payload: this.enemySnapshot(enemy) });
