@@ -654,6 +654,26 @@ describe("skill targeting", () => {
     expect(combat.findTarget({ x: 500, y: 0 })).toBe(clicked);
   });
 
+  it("keeps the monster under the aim even when a duellist is in PvP range", () => {
+    // The auto-target ring points at this monster; a flagged peer standing closer
+    // than PVP_ATTACK_RANGE but *not* under the aim must not steal the cast.
+    const near = peer("near", PVP_ATTACK_RANGE - 100, 0);
+    const underAim = wolf("wolf", 600, 0);
+    const { combat } = makeCombat({ peers: [near], wolves: [underAim] });
+
+    expect(combat.findTarget({ x: 600, y: 0 })).toBe(underAim);
+  });
+
+  it("lets the duellist win when both bodies cover the aim", () => {
+    // Raising the PK flag is the player's intent, so a duellist under the same
+    // point outranks the monster standing on it.
+    const peerUnderAim = peer("peer-under-aim", 560, 0);
+    const wolfUnderAim = wolf("wolf", 600, 0);
+    const { combat } = makeCombat({ peers: [peerUnderAim], wolves: [wolfUnderAim] });
+
+    expect(combat.findTarget({ x: 600, y: 0 })).toBe(peerUnderAim);
+  });
+
   it("auto-acquires a flagged peer already inside PvP range when nothing is locked", () => {
     const near = peer("near", PVP_ATTACK_RANGE - 100, 0);
     const { combat } = makeCombat({ peers: [near], wolves: [wolf("wolf", 30, 0)] });

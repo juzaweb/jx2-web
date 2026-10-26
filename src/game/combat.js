@@ -502,32 +502,58 @@ export class CombatSystem {
   }
 
   /**
-   * Pick the target of a cast: a locked or clicked duellist first, then the enemy
-   * nearest to the clicked point (or to the hero when no point was supplied).
+   * Pick the target of a cast. Whatever sits under the aim wins — monster or
+   * duellist alike — so the ring the player sees is the body the skill lands on.
+   * When both bodies cover the aim, the duellist takes it: a duel is the choice
+   * the player already made by raising the PK flag.
+   *
+   * With nothing under the aim, a locked/auto-acquired duellist still takes the
+   * cast (legacy PvP behaviour); an aim on empty ground carries no target and the
+   * projectile simply flies there.
    * @param {{x:number,y:number}|null} aim
    * @returns {Object|null}
    */
   findTarget(aim) {
+    const peer = aim ? this.aimedPlayerTarget(aim) : null;
+    const monster = aim ? this.aimedEnemyTarget(aim) : null;
+
+    // Duellist first: checked before the monster so it also wins when both bodies
+    // cover the aim.
+    if (peer) return peer;
+    if (monster) return monster;
+
     const duellist = this.findPlayerTarget(aim);
     if (duellist) return duellist;
 
-    const alive = this.enemyManager.getAlive();
-    if (!alive.length) return null;
+    return aim ? null : this.nearestEnemyTarget();
+  }
 
-    if (aim) {
-      // Only treat a click as a target when it is actually near a wolf, instead
-      // of chasing whichever wolf happens to be closest to an empty click.
-      const clicked = alive
-        .filter((wolf) => Phaser.Math.Distance.Between(aim.x, aim.y, wolf.x, wolf.y) <= 150)
-        .sort(
-          (a, b) =>
-            Phaser.Math.Distance.Between(aim.x, aim.y, a.x, a.y) -
-            Phaser.Math.Distance.Between(aim.x, aim.y, b.x, b.y)
-        );
-      return clicked[0] || null;
-    }
+  /**
+   * The living monster whose body sits under `aim`. Only a point that actually
+   * lands on a monster counts, instead of chasing whichever one happens to be
+   * closest to an empty click.
+   * @param {{x:number,y:number}} aim
+   * @returns {Object|null}
+   */
+  aimedEnemyTarget(aim) {
+    const clicked = this.enemyManager
+      .getAlive()
+      .filter((wolf) => Phaser.Math.Distance.Between(aim.x, aim.y, wolf.x, wolf.y) <= 150)
+      .sort(
+        (a, b) =>
+          Phaser.Math.Distance.Between(aim.x, aim.y, a.x, a.y) -
+          Phaser.Math.Distance.Between(aim.x, aim.y, b.x, b.y)
+      );
+    return clicked[0] || null;
+  }
 
-    const nearest = alive
+  /**
+   * The living monster nearest to the hero, for a cast that was given no aim.
+   * @returns {Object|null}
+   */
+  nearestEnemyTarget() {
+    const nearest = this.enemyManager
+      .getAlive()
       .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) <= 600)
       .sort(
         (a, b) =>
@@ -548,11 +574,8 @@ export class CombatSystem {
   findPlayerTarget(aim) {
     if (this.player.pkFlag !== true) return null;
 
-    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
-    if (aim) {
-      const clicked = findPlayerAt(peers, aim.x, aim.y);
-      if (clicked?.pkFlag === true) return clicked;
-    }
+    const underAim = this.aimedPlayerTarget(aim);
+    if (underAim) return underAim;
 
     const locked = this.scene.pvpTarget;
     if (isPeerTarget(locked) && locked.pkFlag === true && locked.container?.active !== false) {
@@ -562,7 +585,22 @@ export class CombatSystem {
     // Nothing picked: an opponent already inside striking range is still the most
     // relevant target. Without this a skill cast next to a duellist flies past
     // them and does nothing, which reads as "skill hits but no HP loss".
+    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
     return findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE);
+  }
+
+  /**
+   * The flagged duellist whose drawn body covers `aim`, if any. A peaceful hero
+   * never acquires one — the server would refuse the hit.
+   * @param {{x:number,y:number}|null} aim
+   * @returns {Object|null}
+   */
+  aimedPlayerTarget(aim) {
+    if (!aim || this.player.pkFlag !== true) return null;
+
+    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
+    const clicked = findPlayerAt(peers, aim.x, aim.y);
+    return clicked?.pkFlag === true ? clicked : null;
   }
 
   /**
