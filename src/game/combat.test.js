@@ -809,29 +809,23 @@ describe("skill targeting", () => {
   });
 });
 
-describe("CombatSystem passive regen", () => {
-  const makePlayer = (hp = 50) => ({
-    sect: "thieu-lam",
+describe("CombatSystem passive art ownership", () => {
+  const makePlayer = (sect = "thieu-lam", hp = 50) => ({
+    sect,
     x: 0,
     y: 0,
-    stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 },
-    heal(amount) {
-      const prev = this.stats.hp;
-      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
-      return this.stats.hp - prev;
-    }
+    stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 }
   });
 
-  const makeCombat = ({ isConnected = true, sect = "thieu-lam", hp = 50 } = {}) => {
-    const player = makePlayer(hp);
-    player.sect = sect;
+  const makeCombat = ({ sect = "thieu-lam", hp = 50 } = {}) => {
+    const player = makePlayer(sect, hp);
     const scene = {
       time: { now: 0 },
-      networkClient: { isConnected, sendHeal: vi.fn() }
+      networkClient: { isConnected: true }
     };
     const ui = { addLog: vi.fn(), updateHud: vi.fn() };
     const combat = new CombatSystem(scene, player, { getAlive: () => [] }, ui);
-    return { combat, player, scene, ui };
+    return { combat, player, ui };
   };
 
   it("leaves passive regeneration to the server", () => {
@@ -844,24 +838,13 @@ describe("CombatSystem passive regen", () => {
     expect(player.stats.hp).toBe(50);
   });
 
-  it("heals nothing for a sect without a passive art", () => {
-    const { combat, player, scene } = makeCombat({ sect: "vo-dang" });
-
-    combat.update(0);
-    combat.update(5000);
-
-    expect(player.stats.hp).toBe(50);
-    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
-  });
-
-  it("leaves a fallen hero at 0 HP for the server to respawn", () => {
-    const { combat, player, scene } = makeCombat({ hp: 0 });
+  it("also leaves a fallen hero at 0 HP for the server to respawn", () => {
+    const { combat, player } = makeCombat({ hp: 0 });
 
     combat.update(0);
     combat.update(5000);
 
     expect(player.stats.hp).toBe(0);
-    expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
   });
 
   it("refuses to cast the passive art and spends no MP", () => {

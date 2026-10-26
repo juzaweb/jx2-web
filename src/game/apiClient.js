@@ -81,31 +81,6 @@ export class ApiClient {
   }
 
   /**
-   * Get player inventory
-   * @param {string} playerId
-   * @returns {Promise<Record<string, number>>}
-   */
-  async getInventory(playerId) {
-    const res = await fetch(`${this.baseUrl}/inventory/${encodeURIComponent(playerId)}`);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch inventory: HTTP ${res.status}`);
-    }
-    const json = await res.json();
-    return json.data.inventory;
-  }
-
-  /**
-   * Update player inventory
-   * @deprecated The server owns the bag now; buy/use/equip over the WebSocket.
-   * @param {string} playerId
-   * @param {Record<string, number>} inventory
-   * @returns {Promise<Record<string, number>>}
-   */
-  async updateInventory(playerId, inventory) {
-    throw new Error("Inventory is server-owned; use the WebSocket actions instead.");
-  }
-
-  /**
    * Helper to safely parse JSON response
    * @private
    */

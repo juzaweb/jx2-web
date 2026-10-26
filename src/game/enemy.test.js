@@ -221,21 +221,6 @@ describe("Wolf movement is server-owned", () => {
     wolf.update(4016, 16, target, () => {});
     expect(scene.sprite.x).toBeGreaterThan(840);
   });
-
-  it("keeps biting whoever is in range, throttled by the bite cooldown", () => {
-    const { wolf } = createWolf();
-    const bites = vi.fn();
-
-    wolf.update(1000, 16, player(2000, 2000), bites);
-    expect(bites).not.toHaveBeenCalled();
-
-    wolf.update(1000, 16, player(880, 600), bites);
-    wolf.update(1100, 16, player(880, 600), bites);
-    expect(bites).toHaveBeenCalledTimes(1);
-
-    wolf.update(2600, 16, player(880, 600), bites);
-    expect(bites).toHaveBeenCalledTimes(2);
-  });
 });
 
 describe("isPointOnEnemy and findEnemyAt mouse targeting", () => {

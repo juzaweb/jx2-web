@@ -117,4 +117,23 @@ describe("State import API", () => {
     assert.equal(secondJson.imported, false, "an import can never run twice");
     assert.equal(secondJson.data.inventory["nu-nhi-hong"], 12, "the second bag is ignored");
   });
+
+  test("an import without gear never unequips gear the server already owns", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const characterId = await createCharacter(userId, token, "Giữ Trang Bị");
+
+    const { store } = await import("../src/data/playerDb.js");
+    store.setEquipment(characterId, { armor: "ao-lang-khach" });
+
+    const res = await fetch(`${baseUrl}/state/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ characterId, inventory: {} })
+    });
+    assert.equal(res.status, 200);
+    const json = await res.json();
+    assert.equal(json.imported, true);
+    assert.equal(json.data.equipment.armor, "ao-lang-khach", "empty imported slots are ignored");
+  });
 });

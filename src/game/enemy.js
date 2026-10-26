@@ -1,5 +1,4 @@
 import * as Phaser from "phaser";
-import { BITE_TUNING } from "./enemyAi.js";
 import { getMonster } from "./enemyCatalog.js";
 import { drawMonster } from "./enemyVisuals.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
@@ -16,9 +15,6 @@ const NAME_OFFSET = 29;
  * screen while the monster does and is skipped once it is far outside the view.
  */
 const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
-
-/** Pre-calculated squared bite range for fast collision distance check. */
-const BITE_RANGE_SQ = BITE_TUNING.range * BITE_TUNING.range;
 
 /**
  * One monster instance. Its numbers come from the catalogue
@@ -57,13 +53,10 @@ export class Enemy {
       critRate: this.critRate,
       critDamage: this.critDamage
     };
-    /** Per-species AI tuning; the server's shared AI falls back to the defaults. */
-    this.tuning = this.monster.ai || null;
 
     this.visualScale = S * (this.monster.visual?.scale || 1);
 
     this.isDead = false;
-    this.nextBite = 0;
     // Skill control state: a stunned monster holds still, a slowed one moves slower.
     this.stunUntil = 0;
     this.slowUntil = 0;
@@ -117,7 +110,15 @@ export class Enemy {
     this.nameText.setScale(S);
   }
 
-  update(time, delta, player, onBite) {
+  /**
+   * Render one frame: follow the server's position lead and redraw the labels.
+   * Monster life, damage and respawns are server-owned; bites are ticked on the
+   * server too, so nothing here can change HP.
+   * @param {number} time scene clock (ms)
+   * @param {number} delta ms since the previous frame
+   * @param {{x:number, y:number}} player local hero, used for label culling
+   */
+  update(time, delta, player) {
     if (!this.sprite.active) return;
 
     // The server owns monster life: it sends `enemy_respawned` when a monster is
@@ -164,16 +165,6 @@ export class Enemy {
 
     const isNameVisible = absDx <= NAME_VISIBLE_RANGE && absDy <= NAME_VISIBLE_RANGE && (dx * dx + dy * dy) <= NAME_VISIBLE_RANGE * NAME_VISIBLE_RANGE;
     this.nameText.setVisible(isNameVisible);
-
-    if (absDx < BITE_TUNING.range && absDy < BITE_TUNING.range) {
-      const distSq = dx * dx + dy * dy;
-      if (distSq < BITE_RANGE_SQ && time > this.nextBite) {
-        this.nextBite = time + BITE_TUNING.cooldownMs;
-        if (typeof onBite === "function") {
-          onBite(this);
-        }
-      }
-    }
   }
 
   /**
@@ -369,9 +360,9 @@ export class EnemyManager {
     this.group?.clear(false, false);
   }
 
-  update(time, delta, player, onBite) {
+  update(time, delta, player) {
     this.enemies.forEach((enemy) => {
-      enemy.update(time, delta, player, onBite);
+      enemy.update(time, delta, player);
     });
   }
 

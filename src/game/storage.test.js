@@ -76,8 +76,11 @@ describe("StorageManager", () => {
     expect(StorageManager.load()).toBeNull();
   });
 
-  it("round-trips persisted stack quantities", () => {
-    StorageManager.saveInventory({ "kim-sang-duoc": 42, "tui-bac": 7 });
+  it("reads persisted stack quantities", () => {
+    localStorage.setItem(
+      StorageManager.getInventoryKey(),
+      JSON.stringify({ "kim-sang-duoc": 42, "tui-bac": 7 })
+    );
 
     expect(StorageManager.loadInventory()).toEqual({
       "kim-sang-duoc": 42,
@@ -85,15 +88,18 @@ describe("StorageManager", () => {
     });
   });
 
-  it("sanitizes invalid inventory entries on save", () => {
-    StorageManager.saveInventory({
-      good: 3,
-      neg: -1,
-      str: "5",
-      nan: NaN,
-      inf: Infinity,
-      ["__proto__"]: 9
-    });
+  it("sanitizes invalid inventory entries when loading", () => {
+    localStorage.setItem(
+      StorageManager.getInventoryKey(),
+      JSON.stringify({
+        good: 3,
+        neg: -1,
+        str: "5",
+        nan: NaN,
+        inf: Infinity,
+        ["__proto__"]: 9
+      })
+    );
 
     expect(StorageManager.loadInventory()).toEqual({ good: 3 });
   });
@@ -117,7 +123,7 @@ describe("StorageManager", () => {
 
   it("keeps each character's bag separate", () => {
     StorageManager.setCharacterId("char_a");
-    StorageManager.saveInventory({ "tui-bac": 5 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 5 }));
 
     StorageManager.setCharacterId("char_b");
     expect(StorageManager.loadInventory()).toEqual({});
@@ -129,7 +135,7 @@ describe("StorageManager", () => {
   it("falls back to the account key when no character is active", () => {
     StorageManager.setUserId("user_x");
     StorageManager.setCharacterId(null);
-    StorageManager.saveInventory({ "tui-bac": 9 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 9 }));
 
     StorageManager.setUserId("user_y");
     expect(StorageManager.loadInventory()).toEqual({});
@@ -137,7 +143,7 @@ describe("StorageManager", () => {
 
   it("clearInventory removes only the active character's bag", () => {
     StorageManager.setCharacterId("char_a");
-    StorageManager.saveInventory({ "tui-bac": 5 });
+    localStorage.setItem(StorageManager.getInventoryKey(), JSON.stringify({ "tui-bac": 5 }));
     StorageManager.clearInventory();
     expect(StorageManager.loadInventory()).toEqual({});
   });

@@ -1453,41 +1453,19 @@ export class JiangHuScene extends Phaser.Scene {
   sendNetworkJoin() {
     if (!this.player || !this.networkClient?.isConnected) return;
 
-    let tabId = "";
-    if (typeof window !== "undefined") {
-      if (!window.__jx2TabSessionId) {
-        window.__jx2TabSessionId = Math.random().toString(36).slice(2, 8);
-      }
-      tabId = window.__jx2TabSessionId;
-    }
-
-    let playerId = `guest_${tabId || Math.random().toString(36).slice(2, 8)}`;
-    let username = this.player.name || "Lãng Khách";
-    let displayName = username;
-
+    // The server identifies a player by their verified character id, so adopt
+    // that identity locally too: kill attribution and hit rejections carry it,
+    // and guest sessions are no longer a thing.
     const session = readSession();
-    if (session?.user?.id) {
-      playerId = `${session.user.id}_${tabId}`;
-      username = session.user.username || username;
-      displayName =
-        session.activeCharacter?.name ||
-        session.user.displayName ||
-        username;
-    }
+    const characterId = session?.activeCharacter?.id || null;
 
-    // The server owns identity, level, stats, vitals and gear: the join packet
-    // names only the verified session + character, so a forged payload cannot
-    // seed any gameplay value.
-    this.remotePlayerManager.setLocalPlayerId(playerId);
-    this.combat.setLocalPlayerId(playerId);
+    this.remotePlayerManager.setLocalPlayerId(characterId);
+    this.combat.setLocalPlayerId(characterId);
     this.networkClient.join({
-      id: playerId,
       token: session?.token || null,
-      characterId: session?.activeCharacter?.id || null,
+      characterId,
       // The server restores the hero on the map the client is standing on.
       mapId: this.currentMapId,
-      username,
-      displayName,
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
       vx: 0,

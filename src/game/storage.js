@@ -69,12 +69,11 @@ export class StorageManager {
   }
 
   /**
-   * Save account progress to localStorage. The bag is persisted separately via
-   * {@link StorageManager.saveInventory} under the character key.
+   * Save local settings to localStorage. Gameplay state (stats, bag, gear,
+   * quests) is server-owned and is deliberately not written here.
    * @param {Object} data
-   * @param {Object} data.stats Player stats (level, hp, mp, exp, coins, kills)
+   * @param {string} [data.mapId] Map the saved position belongs to
    * @param {{ x: number, y: number }} [data.position] Player coordinates
-   * @param {boolean} [data.questRewarded] Quest completion state
    * @param {boolean} [data.audioEnabled] Sound setting
    * @param {boolean} [data.pkFlag] PK opt-in flag, restored on the next boot
    * @returns {boolean} Success status
@@ -143,7 +142,9 @@ export class StorageManager {
 
   /**
    * Load the active character's persisted bag. Nothing is merged in: a character
-   * only owns the stacks saved under its own key.
+   * only owns the stacks saved under its own key. This is read-only: the bag is
+   * written only by the server now, and this copy exists solely as the source for
+   * the one-time legacy import (`POST /api/state/import`).
    * @returns {Record<string, number>}
    */
   static loadInventory() {
@@ -157,23 +158,9 @@ export class StorageManager {
   }
 
   /**
-   * Persist the active character's bag.
-   * @param {Record<string, number>} quantities
-   * @returns {boolean} Success status
-   */
-  static saveInventory(quantities) {
-    try {
-      localStorage.setItem(this.getInventoryKey(), JSON.stringify(sanitizeInventory(quantities)));
-      return true;
-    } catch (error) {
-      console.warn("StorageManager: Failed to save inventory:", error);
-      return false;
-    }
-  }
-
-  /**
    * Load the active character's persisted equipment, merged over empty defaults
-   * so every slot is always present.
+   * so every slot is always present. Read-only for the same reason as
+   * {@link StorageManager.loadInventory}.
    * @returns {Record<string, string|null>}
    */
   static loadEquipment() {
@@ -183,21 +170,6 @@ export class StorageManager {
     } catch (error) {
       console.warn("StorageManager: Failed to parse saved equipment:", error);
       return defaultEquipment();
-    }
-  }
-
-  /**
-   * Persist the active character's equipment.
-   * @param {Record<string, string|null>} equipment
-   * @returns {boolean} Success status
-   */
-  static saveEquipment(equipment) {
-    try {
-      localStorage.setItem(this.getEquipmentKey(), JSON.stringify(sanitizeEquipment(equipment)));
-      return true;
-    } catch (error) {
-      console.warn("StorageManager: Failed to save equipment:", error);
-      return false;
     }
   }
 

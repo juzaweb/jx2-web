@@ -56,17 +56,21 @@ export const importState = async (req, res, next) => {
     const importedEquipment = sanitizeEquipment(req.body?.equipment);
 
     const inventory = writeBag(characterId, mergeBags(readBag(characterId), importedBag));
-    const equipment = writeEquipment(characterId, {
-      ...readEquipment(characterId),
-      ...importedEquipment
-    });
+    // Only slots the legacy save actually filled may win: `sanitizeEquipment`
+    // returns every slot (null when absent), so spreading it wholesale would
+    // unequip gear the server already had.
+    const equipment = { ...readEquipment(characterId) };
+    for (const [slot, itemId] of Object.entries(importedEquipment)) {
+      if (typeof itemId === "string") equipment[slot] = itemId;
+    }
+    const writtenEquipment = writeEquipment(characterId, equipment);
 
     store.markStateImported(characterId);
 
     res.json({
       success: true,
       imported: true,
-      data: { characterId, inventory, equipment }
+      data: { characterId, inventory, equipment: writtenEquipment }
     });
   } catch (err) {
     next(err);

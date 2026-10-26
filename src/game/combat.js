@@ -874,9 +874,9 @@ export class CombatSystem {
   }
 
   /**
-   * Strike another player. Both fighters must fly the PK flag. The damage is
-   * computed here as an optimistic estimate, but the server re-validates it and
-   * applies it to the target's authoritative HP — this client only reports intent.
+   * Strike another player. Both fighters must fly the PK flag. The client only
+   * reports the intent; the server recomputes the damage from its own stats and
+   * applies it to the target's authoritative HP.
    * @param {import("./remotePlayer.js").RemotePlayer} target
    */
   performPvpAttack(target) {

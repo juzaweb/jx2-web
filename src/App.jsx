@@ -98,8 +98,8 @@ const isTypingTarget = (target) => {
 
 /**
  * Point the persisted bag and the shared in-memory store at one character, and
- * return the render-ready inventory for the HUD. `characterId` may be null
- * (no character chosen), which falls back to the account-scoped guest bag.
+ * return the render-ready inventory for the HUD. The bag is character-scoped
+ * locally because it is the source for the one-time legacy import.
  * @param {string|null} characterId
  * @returns {{ quickItems: Array<object>, inventoryItems: Array<object|null> }}
  */
