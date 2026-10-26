@@ -169,8 +169,12 @@ export default {
     createCharacter: "创建角色",
     deleteCharacter: "删除角色",
     start: "开始",
+    retry: "重试",
+    relogin: "重新登录",
     errors: {
       load: "无法加载角色列表。",
+      loadRetry: "无法加载角色列表，请重试！",
+      sessionExpired: "登录会话已过期或无效，请重新登录。",
       nameLength: "角色名称必须为 {min}-{max} 个字符。",
       create: "无法创建角色，请重试！",
       delete: "无法删除角色。",

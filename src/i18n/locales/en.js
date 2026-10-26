@@ -168,8 +168,12 @@ export default {
     createCharacter: "Create character",
     deleteCharacter: "Delete character",
     start: "Start",
+    retry: "Retry",
+    relogin: "Log in again",
     errors: {
       load: "Could not load the character list.",
+      loadRetry: "Could not load the character list. Please try again!",
+      sessionExpired: "Your login session has expired or is invalid. Please log in again.",
       nameLength: "Character name must be {min}-{max} characters.",
       create: "Could not create the character. Please try again!",
       delete: "Could not delete the character.",

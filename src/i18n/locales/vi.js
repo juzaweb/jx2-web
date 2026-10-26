@@ -168,8 +168,12 @@ export default {
     createCharacter: "Tạo mới nhân vật",
     deleteCharacter: "Xoá nhân vật",
     start: "Bắt đầu",
+    retry: "Thử lại",
+    relogin: "Đăng nhập lại",
     errors: {
       load: "Không tải được danh sách nhân vật.",
+      loadRetry: "Không tải được danh sách nhân vật. Vui lòng thử lại!",
+      sessionExpired: "Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.",
       nameLength: "Tên nhân vật phải gồm {min}-{max} ký tự.",
       create: "Không thể tạo nhân vật. Vui lòng thử lại!",
       delete: "Không thể xoá nhân vật.",

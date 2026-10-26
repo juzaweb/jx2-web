@@ -19,6 +19,7 @@ import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { DEFAULT_CURSOR, applyCursor, cursorForGroundPoint } from "./hoverCursor.js";
 import {
   DEFAULT_MAP_ID,
   getMap,
@@ -35,6 +36,10 @@ import { ShopFlow } from "./shopFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
+
+/** DOM regions painted over the canvas that must swallow game input. */
+const HUD_BLOCK_SELECTOR =
+  ".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay";
 
 /** Why the server refused a PvP hit, in the player's language. */
 const HIT_REJECT_MESSAGES = {
@@ -390,7 +395,7 @@ export class JiangHuScene extends Phaser.Scene {
 
       // Do not handle when clicking on interactive HUD elements or React overlays
       const target = pointer.event.target;
-      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay")) {
+      if (target?.closest?.(HUD_BLOCK_SELECTOR)) {
         return;
       }
 
@@ -450,8 +455,11 @@ export class JiangHuScene extends Phaser.Scene {
       this.showClickIndicator(worldX, worldY, 0xffdd59);
     });
 
-    // Hold-to-move continuous cursor tracking
+    // Cursor feedback + hold-to-move tracking. The cursor is refreshed on every
+    // move (even when idle) so hovering a monster advertises the attack.
     this.input.on("pointermove", (pointer) => {
+      this.updateHoverCursor(pointer);
+
       if (
         !this.started ||
         this.isPaused ||
@@ -464,7 +472,7 @@ export class JiangHuScene extends Phaser.Scene {
       }
 
       const target = pointer.event.target;
-      if (target?.closest?.(".metal-card, .top-left-panel, .bottom-dock, .mobile-controls, button, input, .overlay")) {
+      if (target?.closest?.(HUD_BLOCK_SELECTOR)) {
         return;
       }
 
@@ -476,9 +484,16 @@ export class JiangHuScene extends Phaser.Scene {
       this.player.moveTo(ground.x, ground.y);
     });
 
-    this.input.on("pointerup", () => {
+    this.input.on("pointerup", (pointer) => {
       this.isPointerMoving = false;
+      // The release ends the drag, so the saber comes back under the pointer
+      // without waiting for the next mouse move.
+      this.updateHoverCursor(pointer);
     });
+
+    // Leaving the viewport drops the saber: the pointer is no longer aiming at
+    // anything inside the world.
+    this.input.on("gameout", () => applyCursor(this.game?.canvas, DEFAULT_CURSOR));
 
     // Allow standard typing in HTML form inputs (e.g. login form, chat)
     this.input.keyboard.preventDefault = false;
@@ -1196,6 +1211,9 @@ export class JiangHuScene extends Phaser.Scene {
       if (this.player?.sprite?.body) {
         this.player.sprite.setVelocity(0, 0);
       }
+      // A frozen world cannot be attacked, so a saber left under the pointer
+      // would promise an action the click no longer performs.
+      applyCursor(this.game?.canvas, DEFAULT_CURSOR);
     } else if (this.started) {
       this.physics.resume();
     }
@@ -1652,6 +1670,33 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
+   * Mirror the left-click targeting rules in the mouse cursor: a living monster
+   * or a PK-flagged peer under the pointer shows the saber, so the player knows
+   * the next click attacks instead of walking.
+   * @param {Phaser.Input.Pointer} pointer
+   */
+  updateHoverCursor(pointer) {
+    const canvas = this.game?.canvas;
+    if (!canvas) return;
+
+    // A held button is steering the hero along the ground, so the release will
+    // not attack — the cursor must not advertise one while dragging.
+    const steering = this.isPointerMoving && pointer.isDown;
+    const overHud = pointer.event?.target?.closest?.(HUD_BLOCK_SELECTOR);
+    let cursor = DEFAULT_CURSOR;
+    if (this.started && !this.isPaused && !overHud && !steering) {
+      const ground = fromIso(pointer.worldX, pointer.worldY);
+      cursor = cursorForGroundPoint(
+        this.enemyManager?.getAlive() || [],
+        this.remotePlayerManager?.getAll?.() || [],
+        ground.x,
+        ground.y
+      );
+    }
+    applyCursor(canvas, cursor);
+  }
+
+  /**
    * Chase and attack a locked monster target: close the gap into reach, then strike
    * using the left-hand skill or normal physical attack on every attack cooldown.
    * Drops when the monster dies, is despawned, or the player moves manually.
@@ -1837,6 +1882,8 @@ export class JiangHuScene extends Phaser.Scene {
       this.input.keyboard.off("keydown", this.skillKeyHandler);
       this.skillKeyHandler = null;
     }
+    // The canvas outlives the scene on a restart, so hand the cursor back.
+    applyCursor(this.game?.canvas, DEFAULT_CURSOR);
   }
 }
 
