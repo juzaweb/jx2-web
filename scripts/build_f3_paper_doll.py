@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-ROOT = Path(".")
+ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 EXAMPLE = ROOT / "docs" / "example"
 

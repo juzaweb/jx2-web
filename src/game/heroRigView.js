@@ -3,6 +3,7 @@ import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
 import { HERO_BODY, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
+import { ensureEquipmentTexture } from "./lazyAssets.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
 export const HERO_FOOT_Y = 41;
@@ -98,6 +99,16 @@ export class HeroRigView {
           sprite.setScale(HERO_BODY.scale);
           this.equipSprites[slot] = sprite;
           this.container.add(sprite);
+        } else if (texKey && this.scene) {
+          ensureEquipmentTexture(this.scene, slot, itemId, g);
+          if (typeof this.scene.load?.once === "function") {
+            this.scene.load.once(`filecomplete-spritesheet-${texKey}`, () => {
+              if (this.key === key && this.container) {
+                this.key = null;
+                this.set(direction, equipment, gender);
+              }
+            });
+          }
         }
       };
 
@@ -280,7 +291,9 @@ export class HeroRigView {
 
 /** Change key for the equipped slots; item ids matter because the rig draws them. */
 function slotSignature(equipment = {}) {
-  return EQUIPMENT_SLOT_KEYS.map((slot) => equipment[slot] || "").join("|");
+  const safeEquip = equipment && typeof equipment === "object" ? equipment : {};
+  const base = EQUIPMENT_SLOT_KEYS.map((slot) => safeEquip[slot] || "").join("|");
+  return `${base}|${safeEquip.pants || ""}`;
 }
 
 function createPrimitive(scene, p) {

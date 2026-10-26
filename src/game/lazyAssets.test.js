@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   VFX_SPRITES,
+  ensureEquipmentTexture,
   ensureHeroBodyTexture,
   ensureSectVfx,
   ensureSpritesheet,
@@ -140,5 +141,51 @@ describe("ensureHeroBodyTexture", () => {
 
     expect(ensureHeroBodyTexture(scene, "nope")).toBe(true);
     expect(scene.calls).toEqual([]);
+  });
+});
+
+describe("ensureEquipmentTexture", () => {
+  it("queues the equipment spritesheet when texture is not loaded", () => {
+    const scene = makeScene();
+
+    expect(ensureEquipmentTexture(scene, "armor", "ao-lang-khach", "male")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-armor-lang-khach-male",
+        expect.stringContaining("/hero-armor-lang-khach-male.png"),
+        { frameWidth: 128, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("returns true immediately when the equipment texture is already loaded", () => {
+    const scene = makeScene({ loaded: ["hero-armor-lang-khach-male"] });
+
+    expect(ensureEquipmentTexture(scene, "armor", "ao-lang-khach", "male")).toBe(true);
+    expect(scene.calls).toEqual([]);
+  });
+
+  it("returns false for unknown equipment items without queuing", () => {
+    const scene = makeScene();
+
+    expect(ensureEquipmentTexture(scene, "armor", "unknown-item", "male")).toBe(false);
+    expect(scene.calls).toEqual([]);
+  });
+
+  it("handles female variants correctly", () => {
+    const scene = makeScene();
+
+    expect(ensureEquipmentTexture(scene, "helmet", "non-lang-khach", "female")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-hat-non-mang",
+        expect.stringContaining("/hero-hat-non-mang.png"),
+        { frameWidth: 128, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
   });
 });

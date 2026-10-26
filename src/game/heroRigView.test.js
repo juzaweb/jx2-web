@@ -295,4 +295,17 @@ describe("HeroRigView baked body", () => {
     expect(view.equipSprites).toEqual({});
     expect(view.bodySprite).toBeNull();
   });
+
+  it("rebuilds equipment when independent pants slot changes", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-pants-lang-khach-male"
+    ]);
+    const view = new HeroRigView(scene);
+    view.set(0, { pants: "quan-lang-khach" }, "male");
+    expect(view.equipSprites.pants).toBeDefined();
+
+    view.set(0, { pants: null }, "male");
+    expect(view.equipSprites.pants).toBeUndefined();
+  });
 });
