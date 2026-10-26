@@ -82,12 +82,10 @@ export class StorageManager {
   static save(data) {
     try {
       const payload = {
-        stats: data.stats,
         // Which map the saved position belongs to (see src/game/maps). Older
         // saves have no mapId and simply fall back to the default map.
         mapId: typeof data.mapId === "string" ? data.mapId : undefined,
         position: data.position,
-        questRewarded: !!data.questRewarded,
         audioEnabled: data.audioEnabled,
         // The PK flag is a player choice, not session state: it has to survive a
         // reload or the HUD and the server disagree about who is flagged.
@@ -103,15 +101,16 @@ export class StorageManager {
   }
 
   /**
-   * Load saved account progress from localStorage.
-   * @returns {Object|null} Saved progress payload or null
+   * Load saved local settings from localStorage. Gameplay progress (stats, bag,
+   * gear) is server-owned; only map/position/audio/PK are stored here.
+   * @returns {Object|null} Saved payload or null
    */
   static load() {
     try {
       const raw = localStorage.getItem(this.getKey());
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (!data || typeof data !== "object" || !data.stats) {
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
         return null;
       }
       return data;

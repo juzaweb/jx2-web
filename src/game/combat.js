@@ -87,14 +87,6 @@ export class CombatSystem {
     this.skillCooldowns = new Map();
     /** Active timed buffs: { stat, amount, until }. */
     this.buffs = [];
-    /** Passive tâm pháp regen: fractional HP carried between frames. */
-    this.regenCarry = 0;
-    /** Timestamp of the last regen tick; a paused scene must not bank time. */
-    this.lastRegenAt = null;
-    /** Cached HP/s for the sect + level the rate was resolved for. */
-    this.regenSect = null;
-    this.regenLevel = null;
-    this.regenRate = 0;
     /** Melee approach in flight: { skill, targetId }. */
     this.pendingCast = null;
     this.lastChaseAt = 0;
@@ -1017,15 +1009,6 @@ export class CombatSystem {
   }
 
   /**
-   * True while a multiplayer connection owns enemy state; the reward then comes
-   * from the server instead of a local roll.
-   * @returns {boolean}
-   */
-  usesServerRewards() {
-    return this.scene?.networkClient?.isConnected === true;
-  }
-
-  /**
    * @param {string|null} playerId
    */
   setLocalPlayerId(playerId) {
@@ -1042,13 +1025,11 @@ export class CombatSystem {
 
   /**
    * The quest payout is server-owned: ask the server to grant it (idempotent via
-   * the persisted `quest_rewarded` flag). Offline, nothing is paid. The resulting
-   * `player_progress` arrives through applyServerProgress().
+   * the persisted `quest_rewarded` flag). The resulting `player_progress` arrives
+   * through applyServerProgress().
    */
   handleQuestReward() {
-    if (this.usesServerRewards()) {
-      this.scene.networkClient?.sendQuestClaim?.();
-    }
+    this.scene.networkClient?.sendQuestClaim?.();
     this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
   }
 

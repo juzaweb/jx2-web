@@ -372,51 +372,6 @@ export function consumeQuantity(id, amount = 1) {
 }
 
 /**
- * Weighted loot table for enemy drops. Every `id` exists in the catalog.
- * `weight` is relative (higher = more common); `qty` is the stack size granted.
- * @type {Array<{id:string, name:string, weight:number, qty:number}>}
- */
-export const DROP_TABLE = [
-  { id: "tui-bac", name: "Túi Bạc", weight: 50, qty: 1 },
-  { id: "linh-duong", name: "Thịt Rừng", weight: 30, qty: 2 },
-  { id: "yeu-dan", name: "Yêu Đan", weight: 15, qty: 1 },
-  { id: "huyen-kim-thach", name: "Huyễn Kim Thạch", weight: 5, qty: 1 }
-];
-
-/**
- * Fast O(1) lookup Map for DROP_TABLE entries by item id.
- * @type {Map<string, {id:string, name:string, weight:number, qty:number}>}
- */
-export const DROP_TABLE_MAP = new Map(
-  DROP_TABLE.map((item) => [item.id, item])
-);
-
-/**
- * Pick a loot entry from DROP_TABLE with a weighted roll. Pure and deterministic:
- * the same rng value always yields the same entry, and the final bucket is
- * clamped so floating-point drift or a roll of 1 can never return an unknown id.
- * @param {Function|number} [rng=Math.random] - RNG returning [0, 1), or a static value
- * @returns {{ id: string, qty: number }}
- */
-export function rollDrop(rng = Math.random) {
-  const totalWeight = DROP_TABLE.reduce((sum, entry) => sum + entry.weight, 0);
-  const drawn = typeof rng === "function" ? rng() : rng;
-  const roll = typeof drawn === "number" && Number.isFinite(drawn) ? drawn : 0;
-  const target = Math.min(Math.max(roll, 0), 1) * totalWeight;
-
-  let cursor = 0;
-  for (let i = 0; i < DROP_TABLE.length; i++) {
-    cursor += DROP_TABLE[i].weight;
-    if (target < cursor) {
-      return { id: DROP_TABLE[i].id, qty: DROP_TABLE[i].qty };
-    }
-  }
-
-  const last = DROP_TABLE[DROP_TABLE.length - 1];
-  return { id: last.id, qty: last.qty };
-}
-
-/**
  * Kill-reward tuning shared with the server, which rolls the reward from its own
  * authoritative enemy health (see server/src/rewards.js). Kills pay EXP and
  * bạc only: no loot table exists, so nothing is ever dropped on the ground.

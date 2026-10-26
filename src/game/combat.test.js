@@ -394,31 +394,6 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it("freezes progression offline and drops nothing", () => {
-    const { combat, player } = makeCombat({ isConnected: false });
-    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
-
-    combat.handleWolfKill(wolf);
-
-    expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(combat.drops).toBeUndefined();
-    expect(player.stats.kills).toBe(0);
-    expect(player.stats.exp).toBe(900);
-    expect(player.stats.coins).toBe(10);
-  });
-
-  it("leaves the payout to the server while connected", () => {
-    const { combat, player } = makeCombat({ isConnected: true, playerId: "usr_hero" });
-    const wolf = { x: 50, y: 60, hp: 0, die: vi.fn(), revive: vi.fn() };
-
-    combat.handleWolfKill(wolf);
-
-    expect(wolf.die).toHaveBeenCalledTimes(1);
-    expect(player.stats.kills).toBe(0);
-    expect(player.stats.exp).toBe(900);
-    expect(player.stats.coins).toBe(10);
-  });
-
   it("mirrors the server ledger onto the local stats", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_hero" });
 
@@ -760,7 +735,7 @@ describe("skill targeting", () => {
 
     expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
       targetId: "locked",
-      damage: expect.any(Number)
+      skill: "kiem_khi"
     });
     expect(locked.hp).toBe(100);
 
@@ -859,18 +834,14 @@ describe("CombatSystem passive regen", () => {
     return { combat, player, scene, ui };
   };
 
-  it("restores 2 HP per second and mirrors each heal to the server", () => {
-    const { combat, player, scene } = makeCombat();
+  it("leaves passive regeneration to the server", () => {
+    const { combat, player } = makeCombat();
 
-    combat.update(0); // first frame only starts the clock
-    expect(player.stats.hp).toBe(50);
-
+    combat.update(0);
     combat.update(500);
-    expect(player.stats.hp).toBe(51);
-    expect(scene.networkClient.sendHeal).toHaveBeenCalledWith({ amount: 1 });
-
     combat.update(1000);
-    expect(player.stats.hp).toBe(52);
+
+    expect(player.stats.hp).toBe(50);
   });
 
   it("heals nothing for a sect without a passive art", () => {
@@ -881,31 +852,6 @@ describe("CombatSystem passive regen", () => {
 
     expect(player.stats.hp).toBe(50);
     expect(scene.networkClient.sendHeal).not.toHaveBeenCalled();
-  });
-
-  it("never heals past the health ceiling", () => {
-    const { combat, player, scene } = makeCombat({ hp: 99 });
-
-    combat.update(0);
-    combat.update(500);
-    expect(player.stats.hp).toBe(100);
-
-    combat.update(2000);
-    expect(player.stats.hp).toBe(100);
-    expect(scene.networkClient.sendHeal).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not bank regeneration while the scene is paused", () => {
-    const { combat, player } = makeCombat();
-
-    combat.update(0);
-    // A minute spent paused must not pay out 120 HP on the resume frame.
-    combat.update(60000);
-    expect(player.stats.hp).toBe(50);
-
-    // Normal ticking resumes on the following frames.
-    combat.update(60500);
-    expect(player.stats.hp).toBe(51);
   });
 
   it("leaves a fallen hero at 0 HP for the server to respawn", () => {

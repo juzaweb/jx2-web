@@ -5,22 +5,9 @@ import { StorageManager } from "./storage.js";
 const STORAGE_KEY = "giang_ho_game_save_v1";
 
 const SAMPLE = {
-  stats: {
-    level: 3,
-    hp: 80,
-    maxHp: 100,
-    mp: 30,
-    maxMp: 60,
-    exp: 40,
-    nextExp: 200,
-    coins: 120,
-    kills: 7,
-    sta: 90,
-    maxSta: 100
-  },
   position: { x: 128, y: 256 },
-  questRewarded: true,
-  audioEnabled: false
+  audioEnabled: false,
+  pkFlag: true
 };
 
 describe("StorageManager", () => {
@@ -35,11 +22,18 @@ describe("StorageManager", () => {
 
     const loaded = StorageManager.load();
     expect(loaded).not.toBeNull();
-    expect(loaded.stats).toEqual(SAMPLE.stats);
     expect(loaded.position).toEqual(SAMPLE.position);
-    expect(loaded.questRewarded).toBe(true);
     expect(loaded.audioEnabled).toBe(false);
+    expect(loaded.pkFlag).toBe(true);
     expect(typeof loaded.savedAt).toBe("number");
+  });
+
+  it("never persists server-owned gameplay state", () => {
+    StorageManager.save({ ...SAMPLE, stats: { level: 9 }, questRewarded: true });
+
+    const loaded = StorageManager.load();
+    expect(loaded.stats).toBeUndefined();
+    expect(loaded.questRewarded).toBeUndefined();
   });
 
   it("round-trips the map the hero was standing on", () => {
@@ -77,14 +71,9 @@ describe("StorageManager", () => {
     warn.mockRestore();
   });
 
-  it("returns null when the payload has no stats", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ foo: 1 }));
+  it("returns null for a non-object payload", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([1, 2, 3]));
     expect(StorageManager.load()).toBeNull();
-  });
-
-  it("coerces questRewarded to a boolean on save", () => {
-    StorageManager.save({ ...SAMPLE, questRewarded: undefined });
-    expect(StorageManager.load().questRewarded).toBe(false);
   });
 
   it("round-trips persisted stack quantities", () => {

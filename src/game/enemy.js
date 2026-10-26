@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { stepEnemy, BITE_TUNING } from "./enemyAi.js";
+import { BITE_TUNING } from "./enemyAi.js";
 import { getMonster } from "./enemyCatalog.js";
 import { drawMonster } from "./enemyVisuals.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
@@ -19,9 +19,6 @@ const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
 
 /** Pre-calculated squared bite range for fast collision distance check. */
 const BITE_RANGE_SQ = BITE_TUNING.range * BITE_TUNING.range;
-
-/** Client-driven respawn delay for regular monsters; a boss overrides it. */
-export const OFFLINE_RESPAWN_MS = 9000;
 
 /**
  * One monster instance. Its numbers come from the catalogue
@@ -60,13 +57,8 @@ export class Enemy {
       critRate: this.critRate,
       critDamage: this.critDamage
     };
-    /** Per-species AI tuning; `stepEnemy` falls back to the shared defaults. */
+    /** Per-species AI tuning; the server's shared AI falls back to the defaults. */
     this.tuning = this.monster.ai || null;
-    /** Bosses must not pop back up on the regular ten-second timer. */
-    this.respawnMs = Number.isFinite(this.monster.respawnMs)
-      ? this.monster.respawnMs
-      : OFFLINE_RESPAWN_MS;
-    this.respawnAt = 0;
 
     this.visualScale = S * (this.monster.visual?.scale || 1);
 
@@ -128,27 +120,20 @@ export class Enemy {
   update(time, delta, player, onBite) {
     if (!this.sprite.active) return;
 
-    // Client-owned rosters bring monsters back on their own timer; the server
-    // owns respawns whenever it is connected (see scheduleEnemyRespawn).
-    if (this.isDead) {
-      if (!this.usesServerMovement() && this.respawnAt && time >= this.respawnAt) {
-        this.revive();
-      }
-      return;
-    }
+    // The server owns monster life: it sends `enemy_respawned` when a monster is
+    // back, so a dead one simply stops rendering until that snapshot arrives.
+    if (this.isDead) return;
 
     // A stunned monster holds position; a slowed one advances its clock slower.
     const stunned = time < this.stunUntil;
     const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
 
-    // Online the server steps the AI and this render follows its lead; offline the
-    // client steps the same shared AI with the local player as the only target
+    // The server steps the AI and this render follows its lead. With no snapshot
+    // yet the monster holds still rather than guessing a position.
     if (stunned) {
       this.sprite.setVelocity(0, 0);
-    } else if (this.usesServerMovement()) {
-      this.followServerPosition(delta * slowFactor);
     } else {
-      this.stepLocally(delta * slowFactor, player);
+      this.followServerPosition(delta * slowFactor);
     }
 
     const x = this.sprite.x;
@@ -192,16 +177,7 @@ export class Enemy {
   }
 
   /**
-   * True while a server owns the roster; movement then arrives as snapshots
-   * instead of being simulated here.
-   * @returns {boolean}
-   */
-  usesServerMovement() {
-    return this.scene?.networkClient?.isConnected === true;
-  }
-
-  /**
-   * Online: render the position the server is leading towards.
+   * Render the position the server is leading towards.
    * @param {number} deltaMs
    */
   followServerPosition(deltaMs) {
@@ -214,27 +190,6 @@ export class Enemy {
         deltaMs
       )
     );
-  }
-
-  /**
-   * Offline: step the shared AI (src/game/enemyAi.js) against the local player.
-   * @param {number} deltaMs
-   * @param {{x:number, y:number}} player
-   */
-  stepLocally(deltaMs, player) {
-    const next = stepEnemy(
-      {
-        x: this.x,
-        y: this.y,
-        homeX: this.homeX,
-        homeY: this.homeY,
-        tuning: this.tuning
-      },
-      [{ x: player.x, y: player.y }],
-      deltaMs
-    );
-
-    this.applyStep(next);
   }
 
   /**
@@ -313,18 +268,11 @@ export class Enemy {
     this.hpBack.setVisible(false);
     this.hpFill.setVisible(false);
     this.nameText.setVisible(false);
-
-    // Only the client-owned roster schedules its own return; the server sends
-    // `enemy_respawned` when it decides the monster is back.
-    if (!this.usesServerMovement()) {
-      this.respawnAt = (this.scene?.time?.now || 0) + this.respawnMs;
-    }
   }
 
   revive() {
     if (!this.sprite.active) return;
     this.isDead = false;
-    this.respawnAt = 0;
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
     this.sprite.body.enable = true;
@@ -424,17 +372,6 @@ export class EnemyManager {
   update(time, delta, player, onBite) {
     this.enemies.forEach((enemy) => {
       enemy.update(time, delta, player, onBite);
-    });
-  }
-
-  /**
-   * Client-owned respawn sweep. Each monster carries its own timer, so this just
-   * revives whoever is due (kept for callers that still poke it directly).
-   */
-  respawnEnemies() {
-    const now = this.scene?.time?.now || 0;
-    this.enemies.forEach((enemy) => {
-      if (enemy.isDead && enemy.respawnAt && now >= enemy.respawnAt) enemy.revive();
     });
   }
 

@@ -198,17 +198,12 @@ export class JiangHuScene extends Phaser.Scene {
       () => this.saveGame(false)
     );
 
-    // Restore the saved stats/position on the map resolved above.
+    // Restore the local position and settings. Gameplay state (stats, bag, gear,
+    // quest progress) is server-owned and arrives over the socket instead.
     if (this.savedData) {
-      if (this.savedData.stats) {
-        this.player.loadStats(this.savedData.stats);
-      }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
         const { x, y } = this.savedData.position;
         if (isInsideMap(this.map, x, y)) this.player.setPosition(x, y);
-      }
-      if (this.savedData.questRewarded !== undefined) {
-        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
       }
       if (this.savedData.audioEnabled !== undefined) {
         setAudioEnabled(this.savedData.audioEnabled);
@@ -1480,7 +1475,9 @@ export class JiangHuScene extends Phaser.Scene {
         username;
     }
 
-    const effective = this.combat?.getEffectiveStats?.() || this.player.stats;
+    // The server owns identity, level, stats, vitals and gear: the join packet
+    // names only the verified session + character, so a forged payload cannot
+    // seed any gameplay value.
     this.remotePlayerManager.setLocalPlayerId(playerId);
     this.combat.setLocalPlayerId(playerId);
     this.networkClient.join({
@@ -1496,13 +1493,6 @@ export class JiangHuScene extends Phaser.Scene {
       vx: 0,
       vy: 0,
       direction: this.player.facing,
-      equipment: { ...this.player.equipment },
-      gender: normalizeGender(this.player.gender),
-      hp: this.player.stats?.hp || 100,
-      mp: this.player.stats?.mp || 0,
-      defense: effective.defense ?? 6,
-      attack: effective.attack ?? 24,
-      critRate: effective.critRate ?? 0.12,
       pkFlag: this.player.pkFlag === true
     });
   }

@@ -93,6 +93,5 @@ src/
     ├── mobileItems.js    # Two per-character mobile consumable bindings
     ├── slotBindings.js   # Shared per-character slot storage (used by both)
     ├── skillVfx.js       # Skill cast/impact visual effects
-    ├── inventorySync.js  # Mirrors the bag with the server
-    └── storage.js        # Progress persistence
+    └── storage.js        # Local settings/position persistence (gameplay is server-owned)
 ```
