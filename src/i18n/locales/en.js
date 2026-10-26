@@ -246,7 +246,7 @@ export default {
       },
       laHanQuyen: {
         name: "Arhat Fist",
-        desc: "Rush to the target and unleash a five-second punching flurry; each punch has a 25% chance to stun for 0.7 seconds."
+        desc: "Rush to the target and unleash a five-second punching flurry; each punch has a 10% chance to stun for 0.6 seconds and splashes damage onto nearby foes."
       },
       laHanTran: {
         name: "Arhat Formation",

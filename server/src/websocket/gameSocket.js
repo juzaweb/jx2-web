@@ -21,7 +21,10 @@ import {
   MELEE_REACH,
   attackIntervalFor,
   consumeCastHit,
-  maxTravelDistance
+  hasSplash,
+  maxTravelDistance,
+  splashMultiplier,
+  splashVictims
 } from "../../../src/game/combatRules.js";
 import { advanceRegen, billableDeltaMs, passiveRegenRate } from "../../../src/game/passiveRegen.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
@@ -220,8 +223,8 @@ export { PLAYER_IFRAME_MS };
 /**
  * Minimum gap (ms) between a player's combat actions. Each action fans out to
  * every client, so this caps amplification: a spamming client can't turn one
- * socket into thousands of broadcast messages. Matches the client's own ~330ms
- * attack cadence, so it never throttles legitimate play.
+ * socket into thousands of broadcast messages. Sits below the client's own
+ * ~400ms attack cadence, so it never throttles legitimate play.
  */
 export const ACTION_COOLDOWN_MS = 300;
 
@@ -2039,6 +2042,7 @@ export class GameSocketManager {
 
     const now = Date.now();
     let damage = 0;
+    let attackerStats = null;
     const skill = payload.skill ? skillById(payload.skill) : null;
 
     if (skill && skill.sect === player.sect) {
@@ -2060,8 +2064,8 @@ export class GameSocketManager {
         if (distance > skill.range + skill.radius + HIT_RADIUS_SLACK) return;
       }
 
-      const stats = this.effectiveStats(player, now);
-      damage = computeSkillDamage(skill, stats, { defense: enemy.defense }, this.random).damage;
+      attackerStats = this.effectiveStats(player, now);
+      damage = computeSkillDamage(skill, attackerStats, { defense: enemy.defense }, this.random).damage;
     } else {
       // A plain sword hit must follow an accepted swing, land inside melee reach,
       // and consumes that swing: the client cannot choose its own damage, hit
@@ -2083,6 +2087,43 @@ export class GameSocketManager {
       this.send(ws, { type: "enemy_hit", payload: { ...this.enemySnapshot(enemy), damage: 0 } });
       return;
     }
+
+    // Splash victims are chosen before the primary can die, so a killing blow
+    // still carries the strike's radius to the monsters standing around it.
+    const splashTargets = skill && hasSplash(skill)
+      ? splashVictims(enemy, Array.from(this.rosterFor(enemy.mapId).values()), skill)
+      : [];
+
+    if (this.applyEnemyDamage(player, enemy, damage, skill, now)) {
+      this.rewardKill(ws, player, enemy);
+    }
+
+    for (const victim of splashTargets) {
+      const splashDamage = computeSkillDamage(
+        skill,
+        attackerStats,
+        { defense: victim.defense },
+        this.random,
+        splashMultiplier(skill)
+      ).damage;
+      if (this.applyEnemyDamage(player, victim, splashDamage, skill, now)) {
+        this.rewardKill(ws, player, victim);
+      }
+    }
+  }
+
+  /**
+   * Apply one authoritative damage packet to a monster and broadcast the result.
+   * Shared by the primary hit and each splash victim of a channelled strike.
+   * @param {Object} player attacker
+   * @param {Object} enemy target monster (mutated in place)
+   * @param {number} damage
+   * @param {Object|null} skill the accepted skill, or null for a plain swing
+   * @param {number} now
+   * @returns {boolean} whether this hit killed the monster
+   */
+  applyEnemyDamage(player, enemy, damage, skill, now) {
+    if (!enemy || enemy.isDead || damage <= 0) return false;
 
     // Position stays server-owned: a hit only applies damage, so a client cannot
     // drag the monster around the map by reporting the spot it rendered
@@ -2108,18 +2149,24 @@ export class GameSocketManager {
         attackerId: player.id
       }
     });
+    return killed;
+  }
 
-    if (killed) {
-      // Rolled from the server's own health pool and attributed to the killing
-      // blow, so the client that landed it cannot mint its own payout
-      const reward = rollEnemyReward(player.id, enemy);
-      this.broadcastToMap(enemy.mapId, { type: "enemy_reward", payload: reward });
+  /**
+   * Roll and credit a monster kill. Rolled from the server's own health pool and
+   * attributed to the killing blow, so the client cannot mint its own payout.
+   * @param {WebSocket} ws
+   * @param {Object} player credited killer
+   * @param {Object} enemy the defeated monster
+   */
+  rewardKill(ws, player, enemy) {
+    const reward = rollEnemyReward(player.id, enemy);
+    this.broadcastToMap(enemy.mapId, { type: "enemy_reward", payload: reward });
 
-      // The credited killer's ledger is updated here, on the server. The reward
-      // broadcast above is only for rendering (drop + float text).
-      this.creditReward(ws, player, { exp: reward.exp, coins: reward.coins, kills: 1 });
-      this.persistProgress(player);
-    }
+    // The credited killer's ledger is updated here, on the server. The reward
+    // broadcast above is only for rendering (drop + float text).
+    this.creditReward(ws, player, { exp: reward.exp, coins: reward.coins, kills: 1 });
+    this.persistProgress(player);
   }
 
   /**

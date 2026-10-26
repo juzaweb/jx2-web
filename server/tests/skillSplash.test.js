@@ -1,0 +1,91 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { GameSocketManager } from "../src/websocket/gameSocket.js";
+
+/**
+ * Build a bare manager with only the collaborators `handleEnemyHit` touches, so
+ * the authoritative splash path can be exercised without a live socket.
+ */
+function makeManager({ enemies, castSkillId, playerSect = "thieu-lam" }) {
+  const now = Date.now();
+  const roster = new Map(enemies.map((enemy) => [enemy.id, enemy]));
+  const player = {
+    id: "player-1",
+    sect: playerSect,
+    mapId: "city",
+    x: 0,
+    y: 0,
+    characterId: null,
+    lastCast: { skillId: castSkillId, at: now, hits: 0, aim: null }
+  };
+  const broadcasts = [];
+
+  const manager = Object.create(GameSocketManager.prototype);
+  Object.assign(manager, {
+    players: new Map([["ws", player]]),
+    rosterFor: () => roster,
+    effectiveStats: () => ({ attack: 100, critRate: 0, critDamage: 1.5 }),
+    random: () => 0.5,
+    send: () => {},
+    broadcastToMap: (_mapId, message) => broadcasts.push(message),
+    gridFor: () => ({ remove: () => {} }),
+    scheduleEnemyRespawn: () => {},
+    creditReward: () => {},
+    persistProgress: () => {},
+    enemySnapshot: (enemy) => ({
+      id: enemy.id,
+      hp: enemy.hp,
+      x: enemy.x,
+      y: enemy.y,
+      isDead: enemy.isDead
+    })
+  });
+
+  return { manager, player, broadcasts, roster };
+}
+
+const wolf = (id, x) => ({
+  id,
+  mapId: "city",
+  x,
+  y: 0,
+  hp: 1000,
+  maxHp: 1000,
+  defense: 0,
+  isDead: false
+});
+
+test("La Hán Quyền splashes a landed punch onto nearby monsters", () => {
+  const primary = wolf("primary", 100);
+  const nearby = wolf("nearby", 200);
+  const far = wolf("far", 1000);
+  const { manager, broadcasts } = makeManager({
+    enemies: [primary, nearby, far],
+    castSkillId: "la_han_quyen"
+  });
+
+  manager.handleEnemyHit("ws", { id: "primary", skill: "la_han_quyen" });
+
+  assert.ok(primary.hp < 1000, "the primary target is damaged");
+  assert.ok(nearby.hp < 1000, "a monster inside the splash radius is damaged");
+  assert.equal(far.hp, 1000, "a monster outside the splash radius is untouched");
+  assert.equal(
+    broadcasts.filter((message) => message.type === "enemy_hit").length,
+    2,
+    "one enemy_hit broadcast per damaged monster"
+  );
+});
+
+test("a single-target skill does not splash", () => {
+  const primary = wolf("primary", 100);
+  const nearby = wolf("nearby", 200);
+  const { manager } = makeManager({
+    enemies: [primary, nearby],
+    castSkillId: "dai_tu_di_chuong"
+  });
+
+  manager.handleEnemyHit("ws", { id: "primary", skill: "dai_tu_di_chuong" });
+
+  assert.ok(primary.hp < 1000);
+  assert.equal(nearby.hp, 1000);
+});

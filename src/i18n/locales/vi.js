@@ -246,7 +246,7 @@ export default {
       },
       laHanQuyen: {
         name: "La Hán Quyền",
-        desc: "Thân pháp xông tới mục tiêu rồi liên hoàn xuất quyền trong 5 giây, mỗi quyền có 25% cơ hội làm choáng 0,7 giây."
+        desc: "Thân pháp xông tới mục tiêu rồi liên hoàn xuất quyền trong 5 giây, mỗi quyền có 10% cơ hội làm choáng 0,6 giây và lan sát thương sang kẻ địch gần đó."
       },
       laHanTran: {
         name: "La Hán Trận",

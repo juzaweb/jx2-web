@@ -12,7 +12,14 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
-import { MELEE_REACH, channelDurationMs, channelHitCount, channelIntervalMs, isChannelSkill } from "./combatRules.js";
+import {
+  MELEE_REACH,
+  channelDurationMs,
+  channelHitCount,
+  channelIntervalMs,
+  isChannelSkill,
+  splashRadius
+} from "./combatRules.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { translate } from "../i18n/translator.js";
@@ -745,6 +752,12 @@ export class CombatSystem {
     this.player.playSkillMotion?.(channel.skill.vfx?.cast);
     playTone(200, 0.05, "square", 0.018);
     playTargetMarker(this.scene, target.x, target.y, channel.skill.vfx?.color);
+    const splash = splashRadius(channel.skill);
+    if (splash > 0) {
+      // The server resolves the spread damage; this ring shows the area each
+      // punch reaches so the player can read why nearby monsters lose HP.
+      playRangeIndicator(this.scene, target.x, target.y, splash, channel.skill.vfx?.color);
+    }
     this.damageEnemy(target, { skill: channel.skill.id });
 
     channel.hitsLeft -= 1;

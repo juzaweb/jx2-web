@@ -86,13 +86,15 @@ const THIEU_LAM_SKILLS = [
     target: "enemy",
     range: 300,
     radius: 0,
-    mult: 0.45,
+    mult: 0.22,
     /**
      * Rush to the target, then land a five-second punching flurry: one strike
-     * every 500ms, ten in total, each with its own stun roll.
+     * every 250ms, twenty in total, each with its own stun roll. Every strike
+     * also splashes onto nearby monsters around the primary target.
      */
-    channel: { durationMs: 5000, intervalMs: 500 },
-    effects: [{ kind: "stun", duration: 700, chance: 0.25 }],
+    channel: { durationMs: 5000, intervalMs: 250 },
+    splash: { radius: 160, mult: 0.6, maxTargets: 4 },
+    effects: [{ kind: "stun", duration: 600, chance: 0.1 }],
     vfx: {
       cast: "slash",
       impact: "spark",

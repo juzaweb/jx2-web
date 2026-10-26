@@ -85,9 +85,10 @@ describe("skill catalog", () => {
       target: "enemy",
       range: 300,
       radius: 0,
-      mult: 0.45,
-      channel: { durationMs: 5000, intervalMs: 500 },
-      effects: [{ kind: "stun", duration: 700, chance: 0.25 }]
+      mult: 0.22,
+      channel: { durationMs: 5000, intervalMs: 250 },
+      splash: { radius: 160, mult: 0.6, maxTargets: 4 },
+      effects: [{ kind: "stun", duration: 600, chance: 0.1 }]
     });
     expect(laHanTran).toMatchObject({
       id: "la_han_tran",

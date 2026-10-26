@@ -110,6 +110,75 @@ export function consumeCastHit(cast, skill, now) {
   return true;
 }
 
+/** Hard cap on extra monsters one splash strike may hit. */
+export const MAX_SPLASH_TARGETS = 8;
+
+/**
+ * World radius (px) around the primary target that a splash strike covers.
+ * @param {Object} skill
+ * @returns {number} 0 when the skill does not splash
+ */
+export function splashRadius(skill) {
+  const radius = Number(skill?.splash?.radius);
+  return Number.isFinite(radius) && radius > 0 ? radius : 0;
+}
+
+/**
+ * Fraction of the primary strike's damage dealt to each splash victim.
+ * @param {Object} skill
+ * @returns {number} 0..1, or 0 when the skill does not splash
+ */
+export function splashMultiplier(skill) {
+  const mult = Number(skill?.splash?.mult);
+  return Number.isFinite(mult) && mult > 0 ? Math.min(1, mult) : 0;
+}
+
+/**
+ * Most splash victims one strike may damage.
+ * @param {Object} skill
+ * @returns {number}
+ */
+export function splashMaxTargets(skill) {
+  const max = Number(skill?.splash?.maxTargets);
+  if (!Number.isFinite(max) || max <= 0) return MAX_SPLASH_TARGETS;
+  return Math.min(MAX_SPLASH_TARGETS, Math.floor(max));
+}
+
+/**
+ * Whether a skill's strikes splash onto nearby monsters.
+ * @param {Object} skill
+ * @returns {boolean}
+ */
+export function hasSplash(skill) {
+  return splashRadius(skill) > 0 && splashMultiplier(skill) > 0;
+}
+
+/**
+ * Monsters caught by a splash strike centred on `primary`, nearest first.
+ * Excludes the primary itself and dead monsters, and caps the list so one
+ * strike cannot damage an entire map.
+ *
+ * @param {Object} primary monster the strike landed on
+ * @param {Object[]} enemies every monster on the same map
+ * @param {Object} skill
+ * @returns {Object[]} up to `splashMaxTargets(skill)` monsters
+ */
+export function splashVictims(primary, enemies, skill) {
+  const radius = splashRadius(skill);
+  if (!primary || radius <= 0 || !Array.isArray(enemies)) return [];
+
+  return enemies
+    .filter((enemy) => enemy && enemy !== primary && !enemy.isDead)
+    .map((enemy) => ({
+      enemy,
+      distance: Math.hypot(enemy.x - primary.x, enemy.y - primary.y)
+    }))
+    .filter(({ distance }) => distance <= radius)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, splashMaxTargets(skill))
+    .map(({ enemy }) => enemy);
+}
+
 /** Position tolerance multiplier on top of the walk speed. */
 export const MOVE_SPEED_TOLERANCE = 1.75;
 

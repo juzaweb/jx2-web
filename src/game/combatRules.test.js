@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   HIT_WINDOW_MS,
   MAX_HITS_PER_CAST,
+  MAX_SPLASH_TARGETS,
   MELEE_REACH,
   MOVE_SLACK_PX,
   MOVE_SPEED_TOLERANCE,
@@ -12,9 +13,14 @@ import {
   channelHitCount,
   channelIntervalMs,
   consumeCastHit,
+  hasSplash,
   isChannelSkill,
   maxHitsPerCast,
   maxTravelDistance,
+  splashMaxTargets,
+  splashMultiplier,
+  splashRadius,
+  splashVictims,
   walkSpeedFor
 } from "./combatRules.js";
 import { BASE_WALK_SPEED, WORLD_POSITION_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
@@ -24,18 +30,18 @@ const BASE_SPEED = BASE_WALK_SPEED * WORLD_POSITION_SCALE * WORLD_SPEED_SCALE;
 
 describe("attackIntervalFor", () => {
   it("returns the base cadence at speed 1", () => {
-    expect(attackIntervalFor(1)).toBe(330);
+    expect(attackIntervalFor(1)).toBe(400);
   });
 
   it("shortens the interval as attack speed grows", () => {
-    expect(attackIntervalFor(2)).toBe(165);
-    expect(attackIntervalFor(1.5)).toBe(220);
+    expect(attackIntervalFor(2)).toBe(200);
+    expect(attackIntervalFor(1.5)).toBeCloseTo(400 / 1.5);
   });
 
   it("falls back to the base cadence for invalid speeds", () => {
-    expect(attackIntervalFor(0)).toBe(330);
-    expect(attackIntervalFor(Number.NaN)).toBe(330);
-    expect(attackIntervalFor(undefined)).toBe(330);
+    expect(attackIntervalFor(0)).toBe(400);
+    expect(attackIntervalFor(Number.NaN)).toBe(400);
+    expect(attackIntervalFor(undefined)).toBe(400);
   });
 });
 
@@ -83,12 +89,12 @@ describe("shared hit limits", () => {
 });
 
 describe("channelled skill rules", () => {
-  const flurry = { channel: { durationMs: 5000, intervalMs: 500 } };
+  const flurry = { channel: { durationMs: 5000, intervalMs: 250 } };
 
   it("reads a channel's duration, interval and strike count", () => {
     expect(channelDurationMs(flurry)).toBe(5000);
-    expect(channelIntervalMs(flurry)).toBe(500);
-    expect(channelHitCount(flurry)).toBe(10);
+    expect(channelIntervalMs(flurry)).toBe(250);
+    expect(channelHitCount(flurry)).toBe(20);
     expect(isChannelSkill(flurry)).toBe(true);
   });
 
@@ -112,8 +118,53 @@ describe("channelled skill rules", () => {
   });
 
   it("raises the per-cast hit cap for a channel only", () => {
-    expect(maxHitsPerCast(flurry)).toBe(12);
+    expect(maxHitsPerCast(flurry)).toBe(22);
     expect(maxHitsPerCast({})).toBe(MAX_HITS_PER_CAST);
+  });
+});
+
+describe("splash rules", () => {
+  const skill = { splash: { radius: 160, mult: 0.6, maxTargets: 4 } };
+
+  it("reads splash radius and multiplier, clamping invalid data", () => {
+    expect(splashRadius(skill)).toBe(160);
+    expect(splashMultiplier(skill)).toBe(0.6);
+    expect(splashMaxTargets(skill)).toBe(4);
+    expect(hasSplash(skill)).toBe(true);
+
+    expect(splashMultiplier({ splash: { radius: 160, mult: 5 } })).toBe(1);
+    expect(splashRadius({})).toBe(0);
+    expect(splashMultiplier({})).toBe(0);
+    expect(hasSplash({})).toBe(false);
+    expect(splashMaxTargets({ splash: { radius: 160, mult: 0.5 } })).toBe(MAX_SPLASH_TARGETS);
+    expect(
+      splashMaxTargets({ splash: { radius: 160, mult: 0.5, maxTargets: 999 } })
+    ).toBe(MAX_SPLASH_TARGETS);
+  });
+
+  it("picks the nearest living monsters inside the radius, excluding the primary", () => {
+    const primary = { id: "p", x: 0, y: 0 };
+    const near = { id: "near", x: 100, y: 0 };
+    const far = { id: "far", x: 1000, y: 0 };
+    const dead = { id: "dead", x: 50, y: 0, isDead: true };
+    // Exactly on the 160 radius: included. Anything beyond it stays untouched.
+    const edge = { id: "edge", x: 0, y: 160 };
+    const justOutside = { id: "outside", x: 0, y: 161 };
+
+    expect(
+      splashVictims(primary, [primary, near, far, dead, edge, justOutside], skill).map(
+        (enemy) => enemy.id
+      )
+    ).toEqual(["near", "edge"]);
+  });
+
+  it("caps splash victims and tolerates empty input", () => {
+    const primary = { x: 0, y: 0 };
+    const crowd = Array.from({ length: 10 }, (_, i) => ({ id: String(i), x: i + 1, y: 0 }));
+
+    expect(splashVictims(primary, crowd, skill)).toHaveLength(4);
+    expect(splashVictims(primary, null, skill)).toEqual([]);
+    expect(splashVictims(primary, crowd, {})).toEqual([]);
   });
 });
 
@@ -148,13 +199,13 @@ describe("consumeCastHit", () => {
   });
 
   it("lets a channel land its whole flurry and rejects hits past its window", () => {
-    const skill = { id: "la_han_quyen", channel: { durationMs: 5000, intervalMs: 500 } };
+    const skill = { id: "la_han_quyen", channel: { durationMs: 5000, intervalMs: 250 } };
     const cast = { skillId: "la_han_quyen", at: 1000, hits: 0 };
 
-    for (let strike = 0; strike < 10; strike += 1) {
-      expect(consumeCastHit(cast, skill, 1000 + strike * 500)).toBe(true);
+    for (let strike = 0; strike < 20; strike += 1) {
+      expect(consumeCastHit(cast, skill, 1000 + strike * 250)).toBe(true);
     }
-    expect(cast.hits).toBe(10);
+    expect(cast.hits).toBe(20);
     // 5s flurry + 0.4s slack = 5.4s window, so a hit at 6.5s is too late.
     expect(consumeCastHit(cast, skill, 6500)).toBe(false);
   });

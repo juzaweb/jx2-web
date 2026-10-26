@@ -28,6 +28,17 @@ describe("computeSkillDamage", () => {
     const result = computeSkillDamage({ mult: 0 }, attacker, defender, () => 0.5);
     expect(result.damage).toBe(0);
   });
+
+  it("scales the skill multiplier for splash damage", () => {
+    // Same roll as above: 18 * 1.1 * 0.5 = 9.9 -> 10.
+    const result = computeSkillDamage({ mult: 1.1 }, attacker, defender, () => 0.5, 0.5);
+    expect(result.damage).toBe(10);
+  });
+
+  it("treats a non-positive scale as zero damage", () => {
+    expect(computeSkillDamage({ mult: 1.1 }, attacker, defender, () => 0.5, 0).damage).toBe(0);
+    expect(computeSkillDamage({ mult: 1.1 }, attacker, defender, () => 0.5, -1).damage).toBe(0);
+  });
 });
 
 describe("applyBuffsToStats", () => {

@@ -17,14 +17,21 @@ export function skillMultiplier(skill) {
 
 /**
  * Compute a skill hit against a defender.
+ *
+ * `multScale` scales the skill's own multiplier, so a splash strike can deal a
+ * fraction of the primary hit's damage without duplicating the damage maths.
+ *
  * @param {Object} skill
  * @param {Object} attacker
  * @param {Object} defender
  * @param {Function|number} [rng=Math.random]
+ * @param {number} [multScale=1] positive fraction of the skill multiplier
  * @returns {{ damage: number, crit: boolean }}
  */
-export function computeSkillDamage(skill, attacker, defender, rng = Math.random) {
-  const mult = skillMultiplier(skill);
+export function computeSkillDamage(skill, attacker, defender, rng = Math.random, multScale = 1) {
+  const scale = Number(multScale);
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 0;
+  const mult = skillMultiplier(skill) * safeScale;
   if (mult <= 0) return { damage: 0, crit: false };
   return computeDamage(attacker, defender, rng, { skillMult: mult });
 }

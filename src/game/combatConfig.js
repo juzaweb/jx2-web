@@ -12,6 +12,6 @@ export const BASE_CRIT_RATE = 0.12;
 /** Damage multiplier applied on a critical strike (1.5 = +50%). */
 export const BASE_CRIT_DAMAGE = 1.5;
 /** Milliseconds between two normal attacks (see Combat.performAttack). */
-export const ATTACK_INTERVAL_MS = 330;
+export const ATTACK_INTERVAL_MS = 400;
 /** Attack-speed multiplier: 1 = base cadence, 1.5 = 50% faster. */
 export const BASE_ATTACK_SPEED = 1;

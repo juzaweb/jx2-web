@@ -576,14 +576,14 @@ describe("attack speed coefficient", () => {
   };
 
   it("turns the coefficient into a shorter interval", () => {
-    expect(makeCombat(1).attackIntervalMs()).toBe(330);
-    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(275);
-    expect(makeCombat(1.5).attackIntervalMs()).toBe(220);
+    expect(makeCombat(1).attackIntervalMs()).toBe(400);
+    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(400 / 1.2);
+    expect(makeCombat(1.5).attackIntervalMs()).toBeCloseTo(400 / 1.5);
   });
 
   it("falls back to the base cadence for a missing or invalid coefficient", () => {
-    expect(makeCombat(undefined).attackIntervalMs()).toBe(330);
-    expect(makeCombat(0).attackIntervalMs()).toBe(330);
+    expect(makeCombat(undefined).attackIntervalMs()).toBe(400);
+    expect(makeCombat(0).attackIntervalMs()).toBe(400);
   });
 
   it("paces PvP strikes to the server's i-frame instead of the melee cadence", () => {
@@ -916,7 +916,7 @@ describe("CombatSystem channelled flurry", () => {
     const scene = {
       time: { now: 0 },
       cameras: { main: { width: 1000, height: 1000, zoom: 1 } },
-      add: { circle: () => fx, arc: () => fx, ellipse: () => fx },
+      add: { circle: () => fx, arc: () => fx, ellipse: vi.fn(() => fx) },
       tweens: { add: vi.fn() },
       networkClient: {
         isConnected: true,
@@ -931,7 +931,7 @@ describe("CombatSystem channelled flurry", () => {
     return { combat, player, scene, ui };
   };
 
-  it("starts a ten-punch channel instead of a single hit", () => {
+  it("starts a twenty-punch channel instead of a single hit", () => {
     const wolf = makeWolf();
     const { combat } = makeCombat({ wolves: [wolf] });
     const skill = skillById("la_han_quyen");
@@ -940,25 +940,27 @@ describe("CombatSystem channelled flurry", () => {
 
     expect(combat.channel).toMatchObject({
       targetId: 9,
-      hitsLeft: 10,
-      intervalMs: 500,
+      hitsLeft: 20,
+      intervalMs: 250,
       endsAt: 5000
     });
   });
 
-  it("lands one punch every 500ms and ends after five seconds", () => {
+  it("lands one punch every 250ms and ends after five seconds", () => {
     const wolf = makeWolf();
     const { combat, scene } = makeCombat({ wolves: [wolf] });
     const skill = skillById("la_han_quyen");
     combat.applySkill(skill, 0, wolf);
 
-    for (let t = 0; t <= 5000; t += 500) combat.updateChannel(t);
+    for (let t = 0; t <= 5000; t += 250) combat.updateChannel(t);
 
-    expect(scene.networkClient.sendEnemyHit).toHaveBeenCalledTimes(10);
+    expect(scene.networkClient.sendEnemyHit).toHaveBeenCalledTimes(20);
     expect(scene.networkClient.sendEnemyHit).toHaveBeenCalledWith({
       id: 9,
       skill: "la_han_quyen"
     });
+    // One splash ring per punch marks the area the spread damage covers.
+    expect(scene.add.ellipse).toHaveBeenCalledTimes(20);
     expect(combat.channel).toBeNull();
   });
 
@@ -972,7 +974,7 @@ describe("CombatSystem channelled flurry", () => {
 
     expect(player.moveTo).toHaveBeenCalledWith(5000, 0);
     expect(scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
-    expect(combat.channel?.hitsLeft).toBe(10);
+    expect(combat.channel?.hitsLeft).toBe(20);
   });
 
   it("stops when the target disappears", () => {
