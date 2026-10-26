@@ -1677,7 +1677,7 @@ export class JiangHuScene extends Phaser.Scene {
     // A chase already under way owns the ring: re-picking every frame would make
     // the halo hop to whichever monster happens to be closer mid-fight.
     const locked = this.lockedAutoTarget();
-    const next = locked || this.pickTouchTarget();
+    const next = locked || this.pickTouchTarget(this.touchTargetRange());
 
     this.autoTarget = next;
 
@@ -1690,6 +1690,19 @@ export class JiangHuScene extends Phaser.Scene {
     // to be pushed down to sit on the ground; monster art is anchored at the feet.
     const footOffset = next.kind === "player" ? HERO_FOOT_Y * WORLD_SCALE : 0;
     this.autoTargetRing?.show(next.target.x, next.target.y, next.kind, footOffset);
+  }
+
+  /**
+   * How far the auto-target looks. It follows the camera instead of a fixed
+   * radius, so a body the player can see — and cast at — is never silently out of
+   * ring range. `screenCastRange` is the same cap skills use, which keeps the ring
+   * and the cast in agreement. Falls back to {@link AUTO_TARGET_RANGE} before the
+   * camera exists (tests, the first frames).
+   * @returns {number}
+   */
+  touchTargetRange() {
+    const reach = Number(this.combat?.screenCastRange?.());
+    return Number.isFinite(reach) && reach > 0 ? Math.max(AUTO_TARGET_RANGE, reach) : AUTO_TARGET_RANGE;
   }
 
   /**
@@ -1783,7 +1796,7 @@ export class JiangHuScene extends Phaser.Scene {
 
     const skill = skillId ? skillById(skillId) : null;
     const reach = Math.max(
-      AUTO_TARGET_RANGE,
+      this.touchTargetRange(),
       Number(skill?.range) || 0,
       Number(skill?.radius) || 0
     );

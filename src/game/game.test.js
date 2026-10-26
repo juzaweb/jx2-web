@@ -21,6 +21,7 @@ import { setQuantities, getQuantity } from "./items.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { HERO_FOOT_Y } from "./heroRigView.js";
 import { WORLD_SCALE } from "./worldConfig.js";
+import { AUTO_TARGET_RANGE } from "./autoTarget.js";
 
 /** Registers the scene lifecycle hooks the way Phaser's event emitter does. */
 const bindTeardown = () => {
@@ -444,6 +445,29 @@ describe("JiangHuScene touch auto-targeting", () => {
 
     expect(scene.autoTarget).toEqual({ target: opponent, kind: "player" });
     expect(scene.autoTargetRing.show).toHaveBeenCalledWith(120, 0, "player", HERO_FOOT_Y * WORLD_SCALE);
+  });
+
+  it("rings a body that is only visible at the camera's edge", () => {
+    // The ring radius follows the camera, so a body the player can see and cast
+    // at is never silently out of range.
+    const far = wolf({ x: AUTO_TARGET_RANGE + 300 });
+    const scene = touchScene({
+      enemyManager: { getAll: () => [far] },
+      combat: { localPlayerId: "me", screenCastRange: () => 3500 }
+    });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toEqual({ target: far, kind: "monster" });
+  });
+
+  it("keeps the plain radius when the camera cannot report a reach", () => {
+    const outside = wolf({ x: AUTO_TARGET_RANGE + 300 });
+    const scene = touchScene({ enemyManager: { getAll: () => [outside] } });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toBeNull();
   });
 
   it("never rings a rival while the hero is peaceful", () => {
