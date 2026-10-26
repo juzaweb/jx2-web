@@ -1,11 +1,11 @@
 # Game Feature Proposals
 
-- **Date:** 2025-05-18
-- **Project / engine:** React 18, Vite, Phaser 3 (Arcade Physics), Node.js / WebSocket server authority
+- **Date:** 2026-03-31
+- **Project / engine:** React 18, Vite, Phaser 3.80 (Arcade Physics), Node.js / WebSocket server authority
 - **Genre / target platform:** Browser-playable isometric 2.5D wuxia RPG (PC desktop & mobile web browser)
-- **Development stage:** Playable Alpha / Content Expansion (2 functional maps, 6-slot skill architecture, server-authoritative combat)
+- **Development stage:** Playable Alpha / Content Expansion (2 functional maps: Biện Kinh & Đông Môn Thành, 6-slot skill architecture, server-authoritative combat)
 - **Audit scope:** `src/game/` (progression, equipment, items, skills, shop, combat, maps, worldManager), `src/components/` (HUD, Modals, MobileControls), `server/src/` (gameSocket, rewards, enemy loop), and `docs/`
-- **Limitations:** Live high-concurrency multiplayer latency (>200ms) was not benchmarked in real network conditions; art assets are constrained to programmatically generated vector graphics and existing sprite sheets.
+- **Limitations:** Live high-concurrency multiplayer latency (>200ms) was not benchmarked in real network conditions; visual assets are constrained to programmatically generated vector graphics and existing sprite sheets.
 
 ## Executive summary
 
@@ -14,7 +14,7 @@ Giang Hồ is a React and Phaser 3 browser wuxia RPG inspired by classic Vietnam
 While core combat and navigation are functional, current playability faces four distinct design gaps:
 1. **Economic Sink & Upgrading Void:** Monsters drop silver coins and rare materials like Huyễn Kim Thạch (`DROP_TABLE` in `src/game/items.js`), but coins are only spent on basic potions at Dược Sư and Huyễn Kim Thạch has no usage.
 2. **Combat Usability in Dense Camps:** Đông Môn Thành features 18 camps with 15 monsters each (270 total). Target selection lacks a visual lock indicator and range preview ring, leading to ambiguous target selection during dense fights.
-3. **Incomplete Skill Kits:** Thiếu Lâm has a rebuilt 6-slot palm kit (`thieu-lam-chuong-phap.md`), but Võ Đang, Nga My, and Ngũ Độc remain on 4-skill placeholder catalogs without full 6-slot progression.
+3. **Incomplete Skill Kits:** Thiếu Lâm has a rebuilt 6-slot palm kit (`thieu-lam-chuong-phap.md`), but Võ Đang, Nga My, and Ngũ Độc remain on placeholder catalogs without full 6-slot progression.
 4. **Short-Term Goal Absence:** Aside from grinding monster camps for EXP, players lack structured daily objectives. The HUD minimap has a Quest Tracker stub (`MinimapPanel.jsx`), but no repeatable quest engine exists.
 
 This document proposes 5 prioritized, evidence-backed features designed to deepen the core loop without introducing feature bloat or scope creep.
@@ -110,7 +110,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Status:** Proposed
 - **Confidence:** High
 - **Player value:** Fulfills core wuxia class fantasy for all four playable sects. Players choosing Võ Đang (Taoist sword), Nga My (healing/support sword), or Ngũ Độc (poison/debuff) receive complete 6-slot skill trees matching Thiếu Lâm's standard.
-- **Design summary:** Expand `VO_DANG_SKILLS`, `NGA_MY_SKILLS`, and `NGU_DOC_SKILLS` in `src/game/skills.js` from 4 temporary skills to 6 fully defined skills per sect (slots 0-5, unlock levels 1/1/3/5/7/10). Implement sector-specific skill effects (`slow`, `stun`, `heal`, `buff`).
+- **Design summary:** Expand `VO_DANG_SKILLS`, `NGA_MY_SKILLS`, and `NGU_DOC_SKILLS` in `src/game/skills.js` from temporary placeholder skills to 6 fully defined skills per sect (slots 0-5, unlock levels 1/1/3/5/7/10). Implement sector-specific skill effects (`slow`, `stun`, `heal`, `buff`).
 - **Core loop connection:** Provides skill progression choices on level up, encouraging players to try different sects and skill slot bindings.
 - **MVP scope:**
   - Author complete 6-skill catalog data in `src/game/skills.js` for all 3 remaining sects as planned in `docs/plan/sect-skills.md`.
