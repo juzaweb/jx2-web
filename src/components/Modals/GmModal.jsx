@@ -7,6 +7,7 @@ import "../../styles/gm-modal.css";
 const TABS = [
   { key: "level", labelKey: "gm.tabs.level" },
   { key: "potions", labelKey: "gm.tabs.potions" },
+  { key: "equipment", labelKey: "gm.tabs.equipment" },
   { key: "teleport", labelKey: "gm.tabs.teleport" },
   { key: "utility", labelKey: "gm.tabs.utility" }
 ];
@@ -43,8 +44,20 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
     emitGmAction("heal_full");
   };
 
-  const handleAddItems = (items) => {
-    emitGmAction("add_items", { items });
+  const handleAddItems = (items, text, log) => {
+    emitGmAction("add_items", { items, text, log });
+  };
+
+  const handleEquipCostumeSet = () => {
+    emitGmAction("equip_set", {
+      equipment: {
+        helmet: "non-lang-khach",
+        armor: "ao-lang-khach",
+        pants: "quan-lang-khach"
+      },
+      text: "Đã khoác y phục mới!",
+      log: "Đã trang bị trọn bộ Y Phục Lãng Khách."
+    });
   };
 
   const handleAddCoins = (amount) => {
@@ -219,6 +232,59 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
                     })}
                   >
                     🎁 {t("gm.potions.receiveAll")}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "equipment" && (
+            <>
+              <div className="gm-section">
+                <span className="gm-section-title">{t("gm.equipment.costumeSet")}</span>
+                <p className="gm-desc" style={{ fontSize: "12px", color: "#d8c29d", margin: "0 0 10px 0", lineHeight: 1.4 }}>
+                  {t("gm.equipment.costumeDesc")}
+                </p>
+                <div className="gm-btn-grid">
+                  <button
+                    className="gm-btn"
+                    onClick={() => handleAddItems({ "non-lang-khach": 1 })}
+                  >
+                    👒 {t("gm.equipment.getHat")}
+                  </button>
+                  <button
+                    className="gm-btn"
+                    onClick={() => handleAddItems({ "ao-lang-khach": 1 })}
+                  >
+                    🥋 {t("gm.equipment.getRobe")}
+                  </button>
+                  <button
+                    className="gm-btn"
+                    onClick={() => handleAddItems({ "quan-lang-khach": 1 })}
+                  >
+                    👖 {t("gm.equipment.getPants")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="gm-section">
+                <span className="gm-section-title">{t("gm.equipment.quickActions")}</span>
+                <div className="gm-btn-grid">
+                  <button
+                    className="gm-btn gold"
+                    onClick={() => handleAddItems({
+                      "non-lang-khach": 1,
+                      "ao-lang-khach": 1,
+                      "quan-lang-khach": 1
+                    })}
+                  >
+                    🎁 {t("gm.equipment.receiveFullSet")}
+                  </button>
+                  <button
+                    className="gm-btn primary"
+                    onClick={handleEquipCostumeSet}
+                  >
+                    ✨ {t("gm.equipment.equipFullSet")}
                   </button>
                 </div>
               </div>

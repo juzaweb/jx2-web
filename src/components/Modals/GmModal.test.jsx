@@ -18,6 +18,7 @@ describe("GmModal Component", () => {
     expect(markup).toContain("Lệnh Bài GM");
     expect(markup).toContain("Đẳng Cấp");
     expect(markup).toContain("Dược Phẩm");
+    expect(markup).toContain("Trang Phục");
     expect(markup).toContain("Truyền Tống");
     expect(markup).toContain("Tiện Ích");
   });

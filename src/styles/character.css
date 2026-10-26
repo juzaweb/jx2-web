@@ -273,7 +273,8 @@
   height: clamp(140px, 30vh, 300px);
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.8));
 }
-.char-model-body {
+.char-model-body,
+.char-model-layer {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -282,6 +283,7 @@
   /* Smooth scaling: the art is upscaled by a non-integer factor, so
      nearest-neighbour would produce uneven, "broken" pixels. */
   image-rendering: auto;
+  pointer-events: none;
 }
 .char-model-name {
   position: absolute;

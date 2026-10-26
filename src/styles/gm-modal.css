@@ -115,13 +115,13 @@
 
 .gm-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: #140808;
   border-bottom: 2px solid #5a1e1e;
 }
 
 .gm-tab {
-  padding: 8px 4px;
+  padding: 8px 2px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -131,6 +131,9 @@
   cursor: pointer;
   text-align: center;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gm-tab:hover {
@@ -293,5 +296,12 @@
   background: rgba(43, 138, 62, 0.25);
   color: #69db7c;
   border: 1px solid #2b8a3e;
+}
+
+@media (max-width: 480px) {
+  .gm-tab {
+    font-size: 11px;
+    padding: 6px 1px;
+  }
 }
 

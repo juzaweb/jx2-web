@@ -57,6 +57,42 @@ export const lenhBaiGm = {
   desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
 };
 
+/**
+ * Starter wuxia robe equipment.
+ */
+export const aoLangKhach = {
+  id: "ao-lang-khach",
+  name: "Lam Y Lãng Khách",
+  icon: "icon-armor-lang-khach",
+  slot: "armor",
+  bonuses: { defense: 8, maxHp: 30 },
+  desc: "Y phục vạt chéo giang hồ sơ nhập. Dệt từ vải thô nhẹ nhàng, tiện lợi cho việc bôn tẩu hành hiệp."
+};
+
+/**
+ * Starter wuxia bamboo hat equipment (plain hat for male, veiled hat for female).
+ */
+export const nonLangKhach = {
+  id: "non-lang-khach",
+  name: "Nón Trúc Lãng Khách",
+  icon: "icon-hat-non-truc",
+  slot: "helmet",
+  bonuses: { defense: 5, maxMp: 20 },
+  desc: "Nón đan từ nan tre trúc vùng biên ải. Che nắng che mưa, giúp hiệp khách giữ vững tâm trí khi phong ba bão táp."
+};
+
+/**
+ * Starter wuxia trousers & boots equipment (shared between male and female).
+ */
+export const quanLangKhach = {
+  id: "quan-lang-khach",
+  name: "Quần Lãng Khách",
+  icon: "icon-pants-lang-khach",
+  slot: "pants",
+  bonuses: { defense: 4, movementSpeed: 10 },
+  desc: "Quần thô gọn gàng kết hợp xà cạp bọc chân, tiện lợi cho việc khinh công và phiêu bạt giang hồ."
+};
+
 /** Number of slots the inventory grid renders (5 columns x 6 rows). */
 export const INVENTORY_GRID_SIZE = 30;
 
@@ -83,15 +119,26 @@ export function splitSilver(silver) {
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 
 /**
+ * Standalone equipment items (not included in the starting inventory grid).
+ */
+export const EQUIPMENT_ITEMS = [aoLangKhach, nonLangKhach, quanLangKhach];
+
+/**
  * The bag grid contents. Every entry is an item the player can actually obtain and
  * use: the hotbar consumables and tools. The rendered grid itself is a fixed 5x6 block of slots
  * (see {@link INVENTORY_GRID_SIZE}); an entry of `null` renders an empty slot.
  * @type {Array<null | {id:string, name:string, icon:string, slot?:string, bonuses?:Record<string,number>, desc:string, useSlot?:number}>}
  */
-export const INVENTORY_ITEMS = [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu, lenhBaiGm];
+export const INVENTORY_ITEMS = [
+  kimSangDuoc,
+  daiHoanDan,
+  nuNhiHong,
+  hoiThanhPhu,
+  lenhBaiGm
+];
 
 /**
- * Look up a catalog item by id across both the quick-slot and grid catalogs.
+ * Look up a catalog item by id across quick-slots, grid inventory, and equipment.
  * @param {string} id
  * @returns {object|null}
  */
@@ -100,6 +147,7 @@ export function getItemById(id) {
   return (
     QUICK_ITEMS.find((item) => item.id === id) ||
     INVENTORY_ITEMS.find((item) => item && item.id === id) ||
+    EQUIPMENT_ITEMS.find((item) => item && item.id === id) ||
     null
   );
 }
@@ -379,7 +427,7 @@ export function applyQuantities(quantities = defaultQuantities()) {
   const owned = sanitizeQuantities(quantities) || {};
 
   const inventoryItems = [];
-  INVENTORY_ITEMS.filter(Boolean).forEach((item) => {
+  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS].filter(Boolean).forEach((item) => {
     const qty = quantityOf(owned, item.id);
     if (qty > 0) inventoryItems.push({ ...item, qty });
   });

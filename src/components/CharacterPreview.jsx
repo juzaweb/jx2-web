@@ -2,10 +2,10 @@ import React from "react";
 import { buildCharacterPreview } from "../game/characterPreview.js";
 
 /**
- * Paper-doll preview (static full-body art) for the character sheet.
+ * Paper-doll preview (static full-body art + dynamic equipment layers) for the character sheet.
  */
-export function CharacterPreview({ gender = "male" }) {
-  const preview = buildCharacterPreview({ gender });
+export function CharacterPreview({ gender = "male", equipment = {} }) {
+  const preview = buildCharacterPreview({ gender, equipment });
 
   return (
     <div
@@ -21,6 +21,18 @@ export function CharacterPreview({ gender = "male" }) {
           backgroundPosition: preview.backgroundPosition
         }}
       />
+      {preview.layers?.map((layer) => (
+        <div
+          key={layer.key}
+          className={`char-model-layer char-model-${layer.key}`}
+          style={{
+            backgroundImage: `url(${layer.url})`,
+            backgroundSize: preview.backgroundSize,
+            backgroundPosition: preview.backgroundPosition,
+            zIndex: layer.zIndex
+          }}
+        />
+      ))}
     </div>
   );
 }

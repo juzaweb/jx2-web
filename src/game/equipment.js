@@ -17,6 +17,7 @@ import { getItemById } from "./items.js";
  * @type {Array<{ key: string, label: string, layer: number }>}
  */
 export const EQUIPMENT_SLOTS = [
+  { key: "pants", label: "Quần", layer: 1 },
   { key: "armor", label: "Giáp", layer: 2 },
   { key: "helmet", label: "Mũ", layer: 3 },
   { key: "accessory", label: "Trang sức", layer: 4 },

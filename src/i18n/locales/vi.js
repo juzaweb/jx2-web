@@ -400,6 +400,18 @@ export default {
     "lenh-bai-gm": {
       name: "Lệnh Bài GM",
       desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
+    },
+    "ao-lang-khach": {
+      name: "Lam Y Lãng Khách",
+      desc: "Y phục vạt chéo giang hồ sơ nhập. Dệt từ vải thô nhẹ nhàng, tiện lợi cho việc bôn tẩu hành hiệp."
+    },
+    "non-lang-khach": {
+      name: "Nón Trúc Lãng Khách",
+      desc: "Nón đan từ nan tre trúc vùng biên ải. Che nắng che mưa, giúp hiệp khách giữ vững tâm trí khi phong ba bão táp."
+    },
+    "quan-lang-khach": {
+      name: "Quần Lãng Khách",
+      desc: "Quần thô gọn gàng kết hợp xà cạp bọc chân, tiện lợi cho việc khinh công và phiêu bạt giang hồ."
     }
   },
   gm: {
@@ -408,6 +420,7 @@ export default {
     tabs: {
       level: "Đẳng Cấp",
       potions: "Dược Phẩm",
+      equipment: "Trang Phục",
       teleport: "Truyền Tống",
       utility: "Tiện Ích"
     },
@@ -429,6 +442,17 @@ export default {
       receiveAll: "Nhận Tất Cả Dược Phẩm (x99)",
       fullHealed: "Đã hồi phục toàn bộ Sinh lực và Nội lực!",
       potionsReceived: "Đã nhận dược phẩm vào túi đồ."
+    },
+    equipment: {
+      title: "Trang Phục Lãng Khách",
+      costumeSet: "Bộ Y Phục Lãng Khách (Áo, Nón, Quần)",
+      costumeDesc: "Trang phục Lãng Khách giang hồ (Nón Trúc / Mạng che mặt nữ, Lam Y, Quần & Hài).",
+      getHat: "Nón Lãng Khách",
+      getRobe: "Áo Lãng Khách",
+      getPants: "Quần Lãng Khách",
+      quickActions: "Thao Tác Nhanh",
+      receiveFullSet: "Nhận Trọn Bộ Y Phục",
+      equipFullSet: "Mặc Trọn Bộ Ngay"
     },
     teleport: {
       title: "Hồi Phù & Truyền Tống",

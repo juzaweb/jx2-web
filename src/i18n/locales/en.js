@@ -400,6 +400,18 @@ export default {
     "lenh-bai-gm": {
       name: "GM Imperial Token",
       desc: "Supreme authority token of the GM. Opens admin control panel to grant levels, vitals, potions and map travel."
+    },
+    "ao-lang-khach": {
+      name: "Wanderer's Blue Robe",
+      desc: "A cross-collar wuxia robe woven from lightweight fabric, ideal for traveling the martial world."
+    },
+    "non-lang-khach": {
+      name: "Wanderer's Bamboo Hat",
+      desc: "A conical bamboo hat crafted by borderland artisans. Protects against sun and rain on the perilous journey."
+    },
+    "quan-lang-khach": {
+      name: "Wanderer's Trousers",
+      desc: "Sturdy travel trousers wrapped with leg gaiters, designed for light footwork and wandering the rivers and lakes."
     }
   },
   gm: {
@@ -408,6 +420,7 @@ export default {
     tabs: {
       level: "Level",
       potions: "Potions",
+      equipment: "Costumes",
       teleport: "Teleport",
       utility: "Utility"
     },
@@ -429,6 +442,17 @@ export default {
       receiveAll: "Receive All Potions (x99)",
       fullHealed: "Fully restored Health and Inner force!",
       potionsReceived: "Received potions to bag."
+    },
+    equipment: {
+      title: "Wanderer Costumes",
+      costumeSet: "Wanderer Costume Set (Hat, Robe, Trousers)",
+      costumeDesc: "Wanderer martial outfit (Bamboo Hat / Female Veiled Hat, Blue Robe, Trousers & Boots).",
+      getHat: "Wanderer Hat",
+      getRobe: "Wanderer Robe",
+      getPants: "Wanderer Trousers",
+      quickActions: "Quick Actions",
+      receiveFullSet: "Receive Full Set",
+      equipFullSet: "Equip Full Set Now"
     },
     teleport: {
       title: "Talismans & Teleport",

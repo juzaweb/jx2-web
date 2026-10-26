@@ -43,7 +43,8 @@ function makeScene() {
   };
 }
 
-function makeSpriteScene() {
+function makeSpriteScene(availableTextures = ["hero-body-male", "hero-body-female"]) {
+  const textureSet = new Set(availableTextures);
   const container = {
     x: 0,
     y: 0,
@@ -51,8 +52,12 @@ function makeSpriteScene() {
     add(o) {
       container.children.push(o);
     },
-    removeAll() {},
-    destroy() {}
+    removeAll() {
+      container.children = [];
+    },
+    destroy() {
+      container.children = [];
+    }
   };
   const shape = () => ({
     x: 0,
@@ -104,7 +109,7 @@ function makeSpriteScene() {
       })
     },
     textures: {
-      exists: (key) => key === "hero-body-male" || key === "hero-body-female"
+      exists: (key) => textureSet.has(key)
     },
     _container: container
   };
@@ -214,5 +219,93 @@ describe("HeroRigView baked body", () => {
 
     expect(scene._container.children.length).toBeGreaterThan(1);
     expect(view.key).toContain("cam-y-bao");
+  });
+
+  it("instantiates modular equipment sprites when matching textures exist", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-body-female",
+      "hero-armor-lang-khach-male",
+      "hero-hat-non-truc"
+    ]);
+    const view = new HeroRigView(scene);
+
+    view.set(0, { armor: "ao-lang-khach", helmet: "non-truc" }, "male");
+
+    expect(view.equipSprites.armor).toBeDefined();
+    expect(view.equipSprites.armor.texture).toBe("hero-armor-lang-khach-male");
+    expect(view.equipSprites.helmet).toBeDefined();
+    expect(view.equipSprites.helmet.texture).toBe("hero-hat-non-truc");
+    expect(view.equipSprites.armor.frame).toBe(0);
+    expect(view.equipSprites.helmet.frame).toBe(0);
+  });
+
+  it("synchronizes animation frames across body and all modular equipment sprites", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-armor-lang-khach-male",
+      "hero-hat-non-truc"
+    ]);
+    const view = new HeroRigView(scene);
+    view.set(2, { armor: "ao-lang-khach", helmet: "non-truc" }, "male");
+
+    expect(view.bodySprite.frame).toBe(8);
+    expect(view.equipSprites.armor.frame).toBe(8);
+    expect(view.equipSprites.helmet.frame).toBe(8);
+
+    view.animate(Math.PI / 2);
+
+    expect(view.bodySprite.frame).toBe(9);
+    expect(view.equipSprites.armor.frame).toBe(9);
+    expect(view.equipSprites.helmet.frame).toBe(9);
+    expect(view.equipSprites.armor.frameSets).toBe(1);
+    expect(view.equipSprites.helmet.frameSets).toBe(1);
+  });
+
+  it("falls back to vector shapes for slots lacking sprite textures while rendering sprites for supported slots", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-hat-non-truc"
+      // armor sprite texture intentionally omitted
+    ]);
+    const view = new HeroRigView(scene);
+
+    view.set(0, { armor: "ao-lang-khach", helmet: "non-truc" }, "male");
+
+    expect(view.equipSprites.helmet).toBeDefined();
+    expect(view.equipSprites.armor).toBeUndefined();
+    // Container includes: bodySprite + vector primitives for armor + helmet sprite
+    expect(scene._container.children.length).toBeGreaterThan(2);
+  });
+
+  it("cleans up equipment sprites on destroy and unequip", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-armor-lang-khach-male"
+    ]);
+    const view = new HeroRigView(scene);
+    view.set(0, { armor: "ao-lang-khach" }, "male");
+    expect(view.equipSprites.armor).toBeDefined();
+
+    view.set(0, {}, "male");
+    expect(view.equipSprites.armor).toBeUndefined();
+
+    view.set(0, { armor: "ao-lang-khach" }, "male");
+    view.destroy();
+    expect(view.equipSprites).toEqual({});
+    expect(view.bodySprite).toBeNull();
+  });
+
+  it("rebuilds equipment when independent pants slot changes", () => {
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-pants-lang-khach-male"
+    ]);
+    const view = new HeroRigView(scene);
+    view.set(0, { pants: "quan-lang-khach" }, "male");
+    expect(view.equipSprites.pants).toBeDefined();
+
+    view.set(0, { pants: null }, "male");
+    expect(view.equipSprites.pants).toBeUndefined();
   });
 });

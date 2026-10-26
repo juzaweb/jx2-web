@@ -134,16 +134,18 @@ const SLOT_DRAW = { armor, accessory, weapon, helmet };
 
 /**
  * Build the equipment overlays for a baked body pose.
- * @param {{direction?:number, equipment?:Record<string,string|null>}} [opts]
+ * @param {{direction?:number, equipment?:Record<string,string|null>, excludeSlots?:string[]}} [opts]
  * @returns {Array<Object>} primitives tagged with their equipment slot
  */
-export function buildBodyEquipment({ direction = 0, equipment = {} } = {}) {
+export function buildBodyEquipment({ direction = 0, equipment = {}, excludeSlots = [] } = {}) {
   if (!equipment || typeof equipment !== "object") return [];
   const pose = poseFor(direction);
   const parts = [];
+  const excluded = new Set(Array.isArray(excludeSlots) ? excludeSlots : []);
 
   for (const slot of EQUIP_SLOT_ORDER) {
-    if (equipment[slot]) SLOT_DRAW[slot](parts, pose, equipment[slot]);
+    if (excluded.has(slot)) continue;
+    if (equipment[slot]) SLOT_DRAW[slot]?.(parts, pose, equipment[slot]);
   }
 
   return parts;

@@ -1015,13 +1015,45 @@ export class JiangHuScene extends Phaser.Scene {
 
       case "add_items":
         if (payload.items) {
+          const itemNames = [];
           for (const [id, qty] of Object.entries(payload.items)) {
             addQuantity(id, qty);
+            const item = getItemById(id);
+            if (item?.name) itemNames.push(item.name);
           }
           this.onInventoryChanged();
-          this.combat.showFloatText(this.player.x, this.player.y - 68, "Đã nhận dược phẩm!", "#69db7c");
+          const floatText = payload.text || (itemNames.length === 1 ? `Đã nhận ${itemNames[0]}!` : "Đã nhận vật phẩm!");
+          this.combat?.showFloatText(this.player.x, this.player.y - 68, floatText, "#69db7c");
           playTone(520, 0.15, "triangle", 0.03);
-          this.uiBridge.addLog("Đã nhận vật phẩm vào túi đồ.", "system");
+          const logText = payload.log || (itemNames.length > 0 ? `Đã nhận ${itemNames.join(", ")} vào túi đồ.` : "Đã nhận vật phẩm vào túi đồ.");
+          this.uiBridge.addLog(logText, "system");
+        }
+        break;
+
+      case "equip_set":
+        if (this.player && payload.equipment) {
+          for (const [slot, itemId] of Object.entries(payload.equipment)) {
+            if (itemId) {
+              const previous = equippedIn(this.player.equipment, slot);
+              if (previous === itemId) {
+                continue;
+              }
+              if (previous) {
+                addQuantity(previous, 1);
+              }
+              if (getQuantity(itemId) > 0) {
+                consumeQuantity(itemId, 1);
+              }
+            }
+          }
+          this.player.applyEquipment({ ...this.player.equipment, ...payload.equipment });
+          const floatText = payload.text || "Đã khoác y phục mới!";
+          this.combat?.showFloatText(this.player.x, this.player.y - 68, floatText, "#ffd43b");
+          playTone(600, 0.2, "triangle", 0.04);
+          const logText = payload.log || "Đã trang bị trọn bộ y phục.";
+          this.uiBridge.addLog(logText, "system");
+          this.emitEquipment();
+          this.onInventoryChanged();
         }
         break;
 

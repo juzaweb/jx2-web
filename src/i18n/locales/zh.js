@@ -401,6 +401,18 @@ export default {
     "lenh-bai-gm": {
       name: "GM令牌",
       desc: "GM总管至高令牌。可打开管理面板获取等级、恢复气血内力、获取药水与地图传送。"
+    },
+    "ao-lang-khach": {
+      name: "浪客青衣",
+      desc: "初入江湖所着交领布衣。轻便透气，利于仗剑天涯。"
+    },
+    "non-lang-khach": {
+      name: "浪客斗笠",
+      desc: "采边境竹篾编制而成的斗笠。遮风避雨，助侠士泰然面对江湖风雨。"
+    },
+    "quan-lang-khach": {
+      name: "浪客劲装裤",
+      desc: "利落布裤搭配绑腿护膝，便利用于施展轻功与闯荡江湖。"
     }
   },
   gm: {
@@ -409,6 +421,7 @@ export default {
     tabs: {
       level: "等级",
       potions: "药品",
+      equipment: "服饰",
       teleport: "传送",
       utility: "功能"
     },
@@ -430,6 +443,17 @@ export default {
       receiveAll: "获取全部药品 (x99)",
       fullHealed: "气血与内力已全部回满！",
       potionsReceived: "药品已放入包裹。"
+    },
+    equipment: {
+      title: "浪客套装",
+      costumeSet: "浪客套装（斗笠、青衣、劲装裤）",
+      costumeDesc: "江湖浪客服饰（斗笠/女子面纱斗笠、交领青衣、绑腿裤靴）。",
+      getHat: "浪客斗笠",
+      getRobe: "浪客青衣",
+      getPants: "浪客劲装裤",
+      quickActions: "快捷操作",
+      receiveFullSet: "获取完整套装",
+      equipFullSet: "一键穿戴全套"
     },
     teleport: {
       title: "回城与传送",

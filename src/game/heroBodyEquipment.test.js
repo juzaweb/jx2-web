@@ -41,4 +41,21 @@ describe("buildBodyEquipment", () => {
 
     expect(Math.sign(weaponX(right))).toBe(-Math.sign(weaponX(left)));
   });
+
+  it("skips excluded slots when excludeSlots is provided", () => {
+    const parts = buildBodyEquipment({
+      direction: 0,
+      equipment: {
+        armor: "cam-y-bao",
+        helmet: "tu-kim-quan",
+        weapon: "hac-ung-kiem"
+      },
+      excludeSlots: ["armor", "helmet"]
+    });
+
+    const slots = parts.map((part) => part.slot);
+    expect(slots.includes("armor")).toBe(false);
+    expect(slots.includes("helmet")).toBe(false);
+    expect(slots.includes("weapon")).toBe(true);
+  });
 });

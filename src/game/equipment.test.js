@@ -13,9 +13,10 @@ import {
 import { getItemById } from "./items.js";
 
 describe("equipment model", () => {
-  it("exposes four unique slots", () => {
-    expect(EQUIPMENT_SLOT_KEYS).toHaveLength(4);
-    expect(new Set(EQUIPMENT_SLOT_KEYS).size).toBe(4);
+  it("exposes five unique slots", () => {
+    expect(EQUIPMENT_SLOT_KEYS).toHaveLength(5);
+    expect(new Set(EQUIPMENT_SLOT_KEYS).size).toBe(5);
+    expect(EQUIPMENT_SLOT_KEYS).toContain("pants");
     EQUIPMENT_SLOTS.forEach((slot) => {
       expect(typeof slot.label).toBe("string");
       expect(slot.label.length).toBeGreaterThan(0);
