@@ -1283,7 +1283,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
       const other = alive.find(
         (enemy) =>
           enemy.id !== candidate.id &&
-          Math.hypot(enemy.x - candidate.x, enemy.y - candidate.y) > 700
+          Math.hypot(enemy.x - candidate.x, enemy.y - candidate.y) > 1400
       );
       if (other) {
         target = candidate;
@@ -1306,7 +1306,7 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     });
     await new Promise((resolve) => setTimeout(resolve, 60));
 
-    // A hit inside the palm's r300 area is accepted; one 700+ units away from the
+    // A hit inside the palm's r900 area is accepted; one 1400+ units away from the
     // impact centre is dropped even though it is still inside the cast range.
     client.send({ type: "enemy_hit", payload: { id: target.id, skill: "nhu_lai_than_chuong", damage: 9999 } });
     client.send({ type: "enemy_hit", payload: { id: outside.id, skill: "nhu_lai_than_chuong", damage: 9999 } });

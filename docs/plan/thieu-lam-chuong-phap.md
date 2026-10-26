@@ -50,7 +50,7 @@ from the entry move so new characters have a 1 MP-cheap opener.
 | 2 | Đại Tu Di Chưởng | `dai_tu_di_chuong` | 3* | 12 | 6000 | enemy r6000 (ranged, reaches camera edge) | stun 800ms (mult 1.3) | sprite row 1 flies to target / burst | VLTK2 |
 | 3 | La Hán Trận | `la_han_tran` | 5* | 18 | 9000 | self | **buff** `attackPct` 0.10 + `speedPct` 0.20 + `critRate` 0.05, 180s | sprite row 2 (formation) / — | VLTK2 |
 | 4 | Kim Cang Bất Hoại | `kim_cang_bat_hoai` | 7 | 15 | 15000 | self | **buff** `defensePct` 0.25, 8s | aura / — | VLTK2 |
-| 5 | Như Lai Thần Chưởng | `nhu_lai_than_chuong` | 10 | 35 | 30000 | enemy r6000 (capped to camera), AoE r300 at impact | stun 1200ms (mult 2.4) | cast at hero / palm drops and blooms on impact | VLTK2 |
+| 5 | Như Lai Thần Chưởng | `nhu_lai_than_chuong` | 10 | 35 | 30000 | enemy r6000 (capped to camera), AoE r900 at impact | stun 1200ms (mult 2.4) | cast at hero / palm drops and blooms on impact | VLTK2 |
 
 Design rules:
 
@@ -145,13 +145,15 @@ Two VFX tracks are needed:
 - `lazyAssets.js` registers `vfx-nhu-lai-than-chuong` (256×256, same sheet
   contract as Đại Tu Di Chưởng), so `ensureSectVfx` downloads it with the rest of
   the Thiếu Lâm sheets.
-- Frames 0–1 play once at the hero as the cast gesture. Frames 2–3 then drop
-  from above onto the strike area (`type: "slam"`): frame 2 falls with the arm
-  and frame 3 lands as the ground impact, followed by a short fade. The drop is
-  delayed until the cast gesture finishes so the two beats read separately.
-- The catalog sets `size: 260`, `impactScale: 1.4` and `type: "slam"`. The
-  landing frame starts at 85% of the impact scale and blooms to 140% over
-  140ms, so the ground palm visibly grows to cover the r300 AoE.
+- Frames 0–1 play once at the hero as the cast gesture at `castScale` (40% of
+  the impact size). Frames 2–3 then drop from above onto the strike area at full
+  size (`type: "slam"`): frame 2 falls with the arm and frame 3 lands as the
+  ground impact, blooming to 150% before a short fade. The drop is delayed until
+  the cast gesture finishes so the two beats read separately.
+- The catalog sets `size: 800`, `castScale: 0.4`, `impactScale: 1.5` and
+  `type: "slam"`. The cast gesture stays small, the falling/landing palm uses the
+  full size, and the landing frame starts at 85% of the impact scale and blooms
+  to 150% over 140ms, so the ground palm visibly grows to cover the r900 AoE.
   `dropHeight`/`dropDuration` are optional overrides (default
   `max(140, size*0.8)` and 280ms).
 - `impact: null` on purpose: damage resolves at cast time, so an extra burst

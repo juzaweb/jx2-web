@@ -272,6 +272,7 @@ describe("playSkillCastVfx sprite playback", () => {
     expect(animConfigs[0]).toMatchObject({ key: "palm-slam-cast", repeat: 0, frameRate: 12 });
     expect(animConfigs[0].frames).toHaveLength(2);
     expect(castSprite.play).toHaveBeenCalledWith("palm-slam-cast");
+    expect(castSprite.setScale).toHaveBeenCalledWith(((260 * 1.8) / 256) * 0.4);
     expect(scene.add.sprite).toHaveBeenCalledTimes(1);
 
     // The impact starts after the cast gesture.
@@ -281,6 +282,7 @@ describe("playSkillCastVfx sprite playback", () => {
 
     expect(scene.add.sprite).toHaveBeenCalledTimes(2);
     expect(impactSprite.setFrame).toHaveBeenCalledWith(2);
+    expect(impactSprite.setOrigin).toHaveBeenCalledWith(0.5, 0.9);
 
     const end = toIso(140, 100);
     const [x, y, key] = scene.add.sprite.mock.calls[1];

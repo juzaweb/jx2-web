@@ -129,7 +129,7 @@ const THIEU_LAM_SKILLS = [
     cooldown: 30000,
     target: "enemy",
     range: 6000,
-    radius: 300,
+    radius: 900,
     mult: 2.4,
     effects: [{ kind: "stun", duration: 1200 }],
     vfx: {
@@ -138,8 +138,9 @@ const THIEU_LAM_SKILLS = [
       cast: "shockwave",
       impact: null,
       color: 0xffb347,
-      size: 260,
-      impactScale: 1.4,
+      size: 800,
+      castScale: 0.4,
+      impactScale: 1.5,
       fps: 12
     }
   }

@@ -80,15 +80,16 @@ describe("skill catalog", () => {
       cooldown: 30000,
       target: "enemy",
       range: 6000,
-      radius: 300,
+      radius: 900,
       mult: 2.4,
       effects: [{ kind: "stun", duration: 1200 }],
       vfx: {
         sprite: "vfx-nhu-lai-than-chuong",
         type: "slam",
         impact: null,
-        size: 260,
-        impactScale: 1.4
+        size: 800,
+        castScale: 0.4,
+        impactScale: 1.5
       }
     });
   });

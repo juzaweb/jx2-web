@@ -112,11 +112,14 @@ function playSlamSpriteVfx(scene, skill, player, target, aimPoint, art) {
     scene.anims.create({ key: castKey, frames, frameRate: fps, repeat: 0 });
   }
 
+  // The cast gesture is intentionally small; only the descending/landing frames
+  // grow into the full-size palm.
+  const castScale = scale * (Number(skill.vfx?.castScale) || 0.4);
   const castSprite = scene.add
     .sprite(start.x, start.y - 26, key)
     .setOrigin(0.5, 0.62)
     .setDepth(start.depth + DEPTH_BONUS)
-    .setScale(scale);
+    .setScale(castScale);
   castSprite.play(castKey);
   castSprite.once("animationcomplete", () => castSprite.destroy());
 
@@ -132,12 +135,14 @@ function playSlamSpriteVfx(scene, skill, player, target, aimPoint, art) {
   const dropDuration = Number(skill.vfx?.dropDuration) || 280;
   // The landing frame blooms wider than the falling one so the ground impact
   // visually covers the AoE it resolves.
-  const impactScale = Number(skill.vfx?.impactScale) || 1.4;
+  const impactScale = Number(skill.vfx?.impactScale) || 1.5;
 
   const spawnImpact = () => {
     const impact = scene.add
       .sprite(end.x, end.y - 26 - dropHeight, key)
-      .setOrigin(0.5, 0.62)
+      // Anchor near the bottom so the landing art's dust/fingertips sit on the
+      // strike point instead of sinking half the enlarged palm below it.
+      .setOrigin(0.5, 0.9)
       .setDepth(end.depth + DEPTH_BONUS + 1)
       .setScale(scale)
       .setFrame(impactStart);
