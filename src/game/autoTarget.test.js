@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  AUTO_TARGET_PVP_RANGE,
-  AUTO_TARGET_RANGE,
-  pickAutoTarget
-} from "./autoTarget.js";
+import { AUTO_TARGET_RANGE, pickAutoTarget } from "./autoTarget.js";
 
 const player = (overrides = {}) => ({ x: 0, y: 0, ...overrides });
 
@@ -60,14 +56,38 @@ describe("pickAutoTarget", () => {
     expect(picked).toBeNull();
   });
 
-  it("prefers a PK-flagged peer over a closer monster while duelling", () => {
-    const wolf = monster({ x: 30 });
-    const rival = peer({ pkFlag: true, x: 400 });
+  it("picks the nearest body, monster or duellist alike", () => {
+    const nearWolf = monster({ id: "wolf-near", x: 30 });
+    const farRival = peer({ pkFlag: true, x: 400 });
+    const peerPicked = pickAutoTarget({
+      player: player(),
+      enemies: [nearWolf],
+      peers: [farRival],
+      allowPeers: true
+    });
+    expect(peerPicked).toEqual({ target: nearWolf, kind: "monster" });
+
+    const nearRival = peer({ id: "rival-near", pkFlag: true, x: 40 });
+    const farWolf = monster({ id: "wolf-far", x: 410 });
+    const rivalPicked = pickAutoTarget({
+      player: player(),
+      enemies: [farWolf],
+      peers: [nearRival],
+      allowPeers: true
+    });
+    expect(rivalPicked).toEqual({ target: nearRival, kind: "player" });
+  });
+
+  it("targets a flagged peer standing as far as the monster reach allows", () => {
+    // Live case: the two heroes stood ~1000px apart (both framed on screen) but
+    // the peer check used to stop at 600, so a monster further away won instead.
+    const wolf = monster({ x: 1061 });
+    const rival = peer({ pkFlag: true, x: 1011 });
     const picked = pickAutoTarget({
       player: player(),
       enemies: [wolf],
       peers: [rival],
-      preferPlayers: true
+      allowPeers: true
     });
 
     expect(picked).toEqual({ target: rival, kind: "player" });
@@ -79,7 +99,7 @@ describe("pickAutoTarget", () => {
     const picked = pickAutoTarget({
       player: player(),
       peers: [peaceful, own],
-      preferPlayers: true,
+      allowPeers: true,
       selfId: "me"
     });
 
@@ -92,18 +112,18 @@ describe("pickAutoTarget", () => {
       player: player(),
       enemies: [wolf],
       peers: [peer({ pkFlag: false })],
-      preferPlayers: true
+      allowPeers: true
     });
 
     expect(picked).toEqual({ target: wolf, kind: "monster" });
   });
 
-  it("respects the peer range while duelling", () => {
-    const outOfRange = peer({ pkFlag: true, x: AUTO_TARGET_PVP_RANGE + 1 });
+  it("shares one radius between monsters and peers", () => {
+    const outOfRange = peer({ pkFlag: true, x: AUTO_TARGET_RANGE + 1 });
     const picked = pickAutoTarget({
       player: player(),
       peers: [outOfRange],
-      preferPlayers: true
+      allowPeers: true
     });
 
     expect(picked).toBeNull();

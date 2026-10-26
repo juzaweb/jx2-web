@@ -19,6 +19,8 @@ import { NetworkClient } from "./networkClient.js";
 import { JiangHuScene } from "./game.js";
 import { setQuantities, getQuantity } from "./items.js";
 import { bridge, EVENTS } from "./bridge.js";
+import { HERO_FOOT_Y } from "./heroRigView.js";
+import { WORLD_SCALE } from "./worldConfig.js";
 
 /** Registers the scene lifecycle hooks the way Phaser's event emitter does. */
 const bindTeardown = () => {
@@ -412,7 +414,7 @@ describe("JiangHuScene touch auto-targeting", () => {
       enemyTarget: null,
       autoTargetRing: { show: vi.fn(), hide: vi.fn() },
       player: { x: 0, y: 0, pkFlag: false },
-      enemyManager: { getAlive: () => [] },
+      enemyManager: { getAll: () => [] },
       remotePlayerManager: { getAll: () => [] },
       combat: { localPlayerId: "me" },
       updateEnemyTarget: vi.fn(),
@@ -422,26 +424,39 @@ describe("JiangHuScene touch auto-targeting", () => {
 
   it("rings the closest monster and remembers it", () => {
     const target = wolf();
-    const scene = touchScene({ enemyManager: { getAlive: () => [wolf({ x: 400 }), target] } });
+    const scene = touchScene({ enemyManager: { getAll: () => [wolf({ x: 400 }), target] } });
 
     scene.updateAutoTarget();
 
     expect(scene.autoTarget).toEqual({ target, kind: "monster" });
-    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(100, 0, "monster");
+    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(100, 0, "monster", 0);
   });
 
-  it("prefers a flagged rival while the hero flies the PK flag", () => {
-    const opponent = rival({ x: 500 });
+  it("targets a flagged rival when it is the nearest body", () => {
+    const opponent = rival({ x: 120 });
     const scene = touchScene({
       player: { x: 0, y: 0, pkFlag: true },
-      enemyManager: { getAlive: () => [wolf({ x: 30 })] },
+      enemyManager: { getAll: () => [wolf({ x: 700 })] },
       remotePlayerManager: { getAll: () => [opponent] }
     });
 
     scene.updateAutoTarget();
 
     expect(scene.autoTarget).toEqual({ target: opponent, kind: "player" });
-    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(500, 0, "player");
+    expect(scene.autoTargetRing.show).toHaveBeenCalledWith(120, 0, "player", HERO_FOOT_Y * WORLD_SCALE);
+  });
+
+  it("never rings a rival while the hero is peaceful", () => {
+    const opponent = rival({ x: 120 });
+    const wolfNear = wolf({ x: 400 });
+    const scene = touchScene({
+      enemyManager: { getAll: () => [wolfNear] },
+      remotePlayerManager: { getAll: () => [opponent] }
+    });
+
+    scene.updateAutoTarget();
+
+    expect(scene.autoTarget).toEqual({ target: wolfNear, kind: "monster" });
   });
 
   it("keeps the ring on the chase already under way", () => {
@@ -449,7 +464,7 @@ describe("JiangHuScene touch auto-targeting", () => {
     const closer = wolf({ id: "closer", x: 10 });
     const scene = touchScene({
       enemyTarget: locked,
-      enemyManager: { getAlive: () => [closer, locked] }
+      enemyManager: { getAll: () => [closer, locked] }
     });
 
     scene.updateAutoTarget();
@@ -467,7 +482,7 @@ describe("JiangHuScene touch auto-targeting", () => {
   });
 
   it("shows nothing when the layout has a cursor", () => {
-    const scene = touchScene({ autoTargetEnabled: false, enemyManager: { getAlive: () => [wolf()] } });
+    const scene = touchScene({ autoTargetEnabled: false, enemyManager: { getAll: () => [wolf()] } });
 
     scene.updateAutoTarget();
 
@@ -484,6 +499,30 @@ describe("JiangHuScene touch auto-targeting", () => {
 
   it("aims a cast nowhere when touch has no target", () => {
     expect(touchScene().castAimPoint()).toBeNull();
+  });
+
+  it("aims a long-range art at the nearest body inside its own reach", () => {
+    // Đại Tu Di Chưởng reaches 6000, so a wolf beyond the ring radius still gets
+    // aimed at instead of the skill flying into empty air.
+    const target = wolf({ x: 900 });
+    const scene = touchScene({ enemyManager: { getAll: () => [target] } });
+
+    expect(scene.castAimPoint("dai_tu_di_chuong")).toEqual({ x: 900, y: 0 });
+  });
+
+  it("keeps the aim empty when nothing is inside the skill's reach", () => {
+    const scene = touchScene({ enemyManager: { getAll: () => [wolf({ x: 5000 })] } });
+
+    // La Hán Quyền reaches 300, so the search widens only to the auto-target radius.
+    expect(scene.castAimPoint("la_han_quyen")).toBeNull();
+  });
+
+  it("aims a close-range art at the ringed target before it is in reach", () => {
+    // The hero then walks in: combat.approachAndCast closes to the skill's reach.
+    const target = wolf({ x: 900 });
+    const scene = touchScene({ autoTarget: { target, kind: "monster" } });
+
+    expect(scene.castAimPoint("la_han_quyen")).toEqual({ x: 900, y: 0 });
   });
 
   it("keeps the pointer aim on desktop", () => {

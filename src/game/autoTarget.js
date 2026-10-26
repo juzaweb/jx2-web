@@ -1,17 +1,19 @@
 /**
  * Auto-targeting for the touch layout.
  *
- * The on-screen controls have no cursor to aim with, so the scene picks the
- * most relevant victim itself and rings it under the feet. While the hero flies
- * the PK flag a flagged opponent wins the pick, otherwise the nearest living
- * monster does. Kept Phaser-free so it can be unit tested in isolation.
+ * The on-screen controls have no cursor to aim with, so the scene picks a
+ * victim itself and rings it under the feet. Monsters and duellists share one
+ * candidate list and one radius: the nearest body wins, whatever it is. A
+ * peaceful hero skips peers entirely — the server refuses hits on them.
+ * Kept Phaser-free so it can be unit tested in isolation.
  */
 
-/** Radius (world px) a monster may stand in and still be auto-targeted. */
-export const AUTO_TARGET_RANGE = 600;
-
-/** Radius (world px) a PK-flagged peer may stand in and still be auto-targeted. */
-export const AUTO_TARGET_PVP_RANGE = 600;
+/**
+ * Radius (world px) a candidate may stand in and still be auto-targeted. Roughly
+ * three ground tiles — far enough to ring a target you can already hit without
+ * reaching across the whole map.
+ */
+export const AUTO_TARGET_RANGE = 1200;
 
 /**
  * A target whose visuals have not been torn down yet. Mocks used in tests may
@@ -29,43 +31,20 @@ function isLive(entity) {
 }
 
 /**
- * Closest live entity inside `maxRange` that passes `accept`.
- * @param {{x:number,y:number}} origin
- * @param {Array<Object>} entities
- * @param {number} maxRange
- * @param {(entity:Object)=>boolean} accept
- * @returns {Object|null}
- */
-function nearestWithin(origin, entities, maxRange, accept) {
-  let best = null;
-  let bestDistance = Infinity;
-
-  for (const entity of entities || []) {
-    if (!isLive(entity) || !accept(entity)) continue;
-    const distance = Math.hypot(entity.x - origin.x, entity.y - origin.y);
-    if (distance > maxRange || distance >= bestDistance) continue;
-    best = entity;
-    bestDistance = distance;
-  }
-
-  return best;
-}
-
-/**
  * Pick the victim the touch controls aim at.
  *
- * Player priority is intentional: a duel is a decision the player already made
- * by raising the PK flag, so a flagged opponent is picked over a closer monster.
- * A peaceful hero never auto-targets peers — the server would refuse every hit.
+ * One list, one radius, nearest wins. Monsters and PK-flagged peers are pooled
+ * so a duellist standing between two wolves is picked when (and only when) it is
+ * the closest body. `allowPeers` carries the hero's PK flag: a peaceful hero
+ * never auto-targets peers, because the server would refuse every hit.
  *
  * @param {{
  *   player: {x:number,y:number}|null,
  *   enemies?: Array<Object>,
  *   peers?: Array<Object>,
- *   preferPlayers?: boolean,
+ *   allowPeers?: boolean,
  *   selfId?: string|null,
- *   monsterRange?: number,
- *   playerRange?: number
+ *   range?: number
  * }} options
  * @returns {{target:Object, kind:"player"|"monster"}|null}
  */
@@ -73,26 +52,29 @@ export function pickAutoTarget({
   player,
   enemies = [],
   peers = [],
-  preferPlayers = false,
+  allowPeers = false,
   selfId = null,
-  monsterRange = AUTO_TARGET_RANGE,
-  playerRange = AUTO_TARGET_PVP_RANGE
+  range = AUTO_TARGET_RANGE
 } = {}) {
   if (!player || typeof player.x !== "number" || typeof player.y !== "number") return null;
   if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) return null;
 
-  if (preferPlayers) {
-    const peer = nearestWithin(
-      player,
-      peers,
-      playerRange,
-      (entry) => entry.pkFlag === true && entry.id !== selfId
-    );
-    if (peer) return { target: peer, kind: "player" };
+  let best = null;
+  let bestDistance = Infinity;
+  const consider = (entity, kind) => {
+    if (!isLive(entity)) return;
+    const distance = Math.hypot(entity.x - player.x, entity.y - player.y);
+    if (distance > range || distance >= bestDistance) return;
+    best = { target: entity, kind };
+    bestDistance = distance;
+  };
+
+  for (const monster of enemies || []) consider(monster, "monster");
+  if (allowPeers) {
+    for (const peer of peers || []) {
+      if (peer?.pkFlag === true && peer.id !== selfId) consider(peer, "player");
+    }
   }
 
-  const monster = nearestWithin(player, enemies, monsterRange, () => true);
-  if (monster) return { target: monster, kind: "monster" };
-
-  return null;
+  return best;
 }

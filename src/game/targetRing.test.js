@@ -65,6 +65,17 @@ describe("TargetRing", () => {
     expect(container.setVisible).toHaveBeenCalledWith(true);
   });
 
+  it("drops to the drawn feet without moving the ground depth", () => {
+    const { scene, container } = makeScene();
+    const ring = new TargetRing(scene);
+
+    // Hero rigs draw their feet 205 world px below the anchor.
+    ring.show(120, 240, "player", 205);
+
+    expect(container.setPosition).toHaveBeenCalledWith(120, 445);
+    expect(container.setDepth).toHaveBeenCalledWith(239);
+  });
+
   it("follows the target without rebuilding the shapes", () => {
     const { scene, container } = makeScene();
     const ring = new TargetRing(scene);

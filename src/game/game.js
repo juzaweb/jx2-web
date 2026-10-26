@@ -1,7 +1,8 @@
 import * as Phaser from "phaser";
 import { MapStage } from "./mapStage.js";
-import { WORLD_POSITION_SCALE, WORLD_TILE } from "./worldConfig.js";
+import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_TILE } from "./worldConfig.js";
 import { Player } from "./player.js";
+import { HERO_FOOT_Y } from "./heroRigView.js";
 import { EnemyManager, findEnemyAt } from "./enemy.js";
 import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
@@ -20,7 +21,7 @@ import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
 import { usesTouchControls } from "./orientation.js";
-import { pickAutoTarget } from "./autoTarget.js";
+import { AUTO_TARGET_RANGE, pickAutoTarget } from "./autoTarget.js";
 import { TargetRing } from "./targetRing.js";
 import { DEFAULT_CURSOR, applyCursor, cursorForGroundPoint } from "./hoverCursor.js";
 import {
@@ -574,7 +575,7 @@ export class JiangHuScene extends Phaser.Scene {
         if (!this.started || this.isPaused || !skillId) return;
         // Same aim the number keys use: the projectile follows the pointer
         // (desktop) or the ringed auto-target (touch), never the last footstep.
-        this.combat.castSkillById(skillId, this.castAimPoint());
+        this.combat.castSkillById(skillId, this.castAimPoint(skillId));
       }),
       bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
         if (this.started && quickSlots) {
@@ -869,7 +870,7 @@ export class JiangHuScene extends Phaser.Scene {
     const boundSkillId = skillIdFromBinding(binding);
     if (boundSkillId) {
       // Same aim as the mobile arc: pointer on desktop, auto-target on touch.
-      this.combat.castSkillById(boundSkillId, this.castAimPoint());
+      this.combat.castSkillById(boundSkillId, this.castAimPoint(boundSkillId));
       return;
     }
 
@@ -1676,15 +1677,7 @@ export class JiangHuScene extends Phaser.Scene {
     // A chase already under way owns the ring: re-picking every frame would make
     // the halo hop to whichever monster happens to be closer mid-fight.
     const locked = this.lockedAutoTarget();
-    const next = locked ||
-      pickAutoTarget({
-        player: this.player,
-        selfId: this.combat?.localPlayerId || null,
-        enemies: this.enemyManager?.getAlive?.() || [],
-        peers: this.remotePlayerManager?.getAll?.() || [],
-        // Raising the PK flag is the player saying "a duel is what I want".
-        preferPlayers: this.player?.pkFlag === true
-      });
+    const next = locked || this.pickTouchTarget();
 
     this.autoTarget = next;
 
@@ -1693,7 +1686,29 @@ export class JiangHuScene extends Phaser.Scene {
       return;
     }
 
-    this.autoTargetRing?.show(next.target.x, next.target.y, next.kind);
+    // A hero rig draws its feet one rig-height below the anchor, so the halo has
+    // to be pushed down to sit on the ground; monster art is anchored at the feet.
+    const footOffset = next.kind === "player" ? HERO_FOOT_Y * WORLD_SCALE : 0;
+    this.autoTargetRing?.show(next.target.x, next.target.y, next.kind, footOffset);
+  }
+
+  /**
+   * The nearest body the touch controls would aim at, inside `range`. Monsters
+   * and (while the PK flag is up) flagged peers share one candidate list.
+   * @param {number} [range]
+   * @returns {{target:Object, kind:"player"|"monster"}|null}
+   */
+  pickTouchTarget(range = AUTO_TARGET_RANGE) {
+    return pickAutoTarget({
+      player: this.player,
+      selfId: this.combat?.localPlayerId || null,
+      // `getAll()` + the picker's own liveness check avoids allocating a filtered
+      // array on every frame, which `getAlive()` would.
+      enemies: this.enemyManager?.getAll?.() || [],
+      peers: this.remotePlayerManager?.getAll?.() || [],
+      allowPeers: this.player?.pkFlag === true,
+      range
+    });
   }
 
   /**
@@ -1750,16 +1765,30 @@ export class JiangHuScene extends Phaser.Scene {
    * Where a skill cast should fly. The touch layout has no cursor, so the
    * auto-target is the aim; with nothing to hit the skill follows the hero's
    * facing (a null aim) instead of a stale finger position on the HUD.
+   *
+   * A long-range art (Đại Tu Di Chưởng and Như Lai Thần Chưởng reach 6000) may
+   * hit a body the ringed auto-target radius never reaches, so `skillId` widens
+   * the search to that skill's own reach before giving up on aiming.
+   * @param {string|null} [skillId]
    * @returns {{x:number,y:number}|null}
    */
-  castAimPoint() {
-    if (this.autoTargetEnabled) {
-      const target = this.autoTarget?.target;
-      return target ? { x: target.x, y: target.y } : null;
+  castAimPoint(skillId = null) {
+    if (!this.autoTargetEnabled) {
+      const pointer = this.input.activePointer;
+      return pointer ? fromIso(pointer.worldX, pointer.worldY) : null;
     }
 
-    const pointer = this.input.activePointer;
-    return pointer ? fromIso(pointer.worldX, pointer.worldY) : null;
+    const ringed = this.autoTarget?.target;
+    if (ringed) return { x: ringed.x, y: ringed.y };
+
+    const skill = skillId ? skillById(skillId) : null;
+    const reach = Math.max(
+      AUTO_TARGET_RANGE,
+      Number(skill?.range) || 0,
+      Number(skill?.radius) || 0
+    );
+    const target = this.pickTouchTarget(reach)?.target;
+    return target ? { x: target.x, y: target.y } : null;
   }
 
   update(time, delta) {

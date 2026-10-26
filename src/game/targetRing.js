@@ -75,10 +75,11 @@ export class TargetRing {
   /**
    * Paint the ring under a target's feet.
    * @param {number} x world X
-   * @param {number} y world Y
+   * @param {number} y world Y (the target's logical anchor)
    * @param {"player"|"monster"} [kind]
+   * @param {number} [footOffset] world px from the anchor down to the drawn feet
    */
-  show(x, y, kind = "monster") {
+  show(x, y, kind = "monster", footOffset = 0) {
     const container = this.create();
     if (!container) return;
 
@@ -93,7 +94,8 @@ export class TargetRing {
     const scale = Number.isFinite(zoom) && zoom > 0 ? 1 / zoom : 1;
 
     container
-      .setPosition(x, y)
+      .setPosition(x, y + footOffset)
+      // Depth still sorts by the ground cell, not the drawn feet.
       .setDepth(isoDepth(x, y) - 1)
       .setScale(scale)
       .setVisible(true);

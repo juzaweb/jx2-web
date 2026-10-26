@@ -24,12 +24,14 @@ const SHADOW_LAYERS = [
  * }}
  */
 export function createHeroShadow(scene, footY) {
-  const layers = SHADOW_LAYERS.map(([width, height, offsetY, alpha]) => ({
-    // Fill alpha stays 1: `setFactor` drives the object alpha, and Phaser
-    // multiplies the two, so baking alpha into the fill would double-fade it.
-    obj: scene.add.ellipse(0, footY + offsetY, width, height, 0x000000),
-    baseAlpha: alpha
-  }));
+  const layers = SHADOW_LAYERS.map(([width, height, offsetY, alpha]) => {
+    const obj = scene.add.ellipse(0, footY + offsetY, width, height, 0x000000);
+    // Start at the layer's own alpha: the fill stays opaque so `setFactor` can
+    // drive the object alpha, but a consumer that never calls `setFactor` (the
+    // remote-player avatar) would otherwise paint a solid black disc.
+    obj.setAlpha(alpha);
+    return { obj, baseAlpha: alpha };
+  });
 
   return {
     layers,
