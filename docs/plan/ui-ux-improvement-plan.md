@@ -1,15 +1,15 @@
 # 2D Game UI/UX Improvement Plan
 
-- **Date:** 2026-10-25
+- **Date:** 2026-10-26
 - **Project / engine:** JX2 Wuxia RPG ("Giang Hồ") — React 18 + Phaser 3.80 (Vite build system)
-- **Audit scope:** React HUD Overlay (`src/components/HUD/*`), Modals (`src/components/Modals/*`), Touch Controls (`src/components/MobileControls.jsx`), Game Orchestrator (`src/App.jsx`), Styling & Design Tokens (`src/index.css`), Phaser-React Event Bridge (`src/game/bridge.js`, `src/game/uiBridgeAdapter.js`), and Vitest test suite (`src/**/*.test.js`, `src/**/*.test.jsx`).
+- **Audit scope:** React HUD Overlay (`src/components/HUD/*`), Modals (`src/components/Modals/*`), Touch Controls (`src/components/MobileControls.jsx`), Game Orchestrator (`src/App.jsx`), Styling & Design Tokens (`src/index.css`), Phaser-React Event Bridge (`src/game/bridge.js`, `src/game/uiBridgeAdapter.js`), combat feedback (`src/game/combat.js`, `src/game/pvpTargeting.js`), and Vitest test suite (`src/**/*.test.js`, `src/**/*.test.jsx`).
 - **Limitations:** Static code inspection, architectural review, and Vitest suite execution performed in headless Linux sandbox environment. Physical mobile device touch response and actual OLED screen rendering could not be directly playtested; verified via CSS media queries, responsive logic, and unit tests.
 
 ---
 
 ## Executive summary
 
-"Giang Hồ" is a browser-playable 2D Wuxia RPG combining a Phaser 3 canvas engine with a React 18 UI overlay. The game delivers a distinct Wuxia aesthetic with parchment modals, CJK icon glyphs, metallic brackets, and classic status bars.
+"Giang Hồ" is a browser-playable 2D Wuxia RPG combining a Phaser 3 canvas engine with a React 18 UI overlay. The game delivers an authentic Wuxia aesthetic with parchment modals, CJK icon glyphs, metallic brackets, and classic status bars.
 
 As the gameplay expands across multi-faction sect skills, inventory management, NPC shops, and mobile touch controls, several key UI/UX friction points diminish combat responsiveness and player clarity:
 
@@ -17,6 +17,7 @@ As the gameplay expands across multi-faction sect skills, inventory management, 
 2. **Skill Cooldown & Resource Readiness:** Cooldown timers render as plain text numbers without radial conic sweep overlays or distinct visual states when MP/Stamina is insufficient for skill execution.
 3. **Mobile & Touch Ergonomics:** Spatial collision between the virtual joystick, chat panel, and hotbar dock on low-resolution mobile viewports (<720px width).
 4. **Shortcut Discoverability:** Essential keyboard hotkeys (`F3`, `F4`, `F5`, `Tab`, `M`) rely on tooltips or help modals rather than persistent shortcut badge overlays on HUD controls.
+5. **Inventory Comparative Tooltips:** Lack of side-by-side equipment comparison tooltips when inspecting inventory items against equipped gear.
 
 Addressing these prioritized improvements will enhance combat clarity, streamline input discoverability, and improve touch device ergonomics without changing core game mechanics or art direction.
 
@@ -50,7 +51,7 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
   - [ ] Selecting an enemy displays a golden/red selection ring around the entity sprite in Phaser.
   - [ ] Target Vitals HUD frame appears top-center with live updating target health percentage.
   - [ ] Target frame auto-clears when the target dies or moves beyond interaction range.
-- **Validation:** Select mobs in Bien Kinh map; verify selection reticle position and real-time HP depletion.
+- **Validation:** Select mobs in Biện Kinh map; verify selection reticle position and real-time HP depletion.
 - **Effort:** M (Requires Phaser selection tracking + React HUD bridge integration)
 - **Dependencies / risks:** Minimal risk; depends on target payload emitted via `bridge.js`.
 
