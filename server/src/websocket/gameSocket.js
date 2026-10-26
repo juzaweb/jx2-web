@@ -6,8 +6,23 @@ import { userDb } from "../data/userDb.js";
 import { verifySessionToken } from "../auth/session.js";
 import { clampToRange } from "../../../src/game/aim.js";
 import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
-import { canPvpAttack, clampPvpDamage, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
+import { canPvpAttack, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
+import {
+  applyEnemyControlEffects,
+  clearEnemyControlEffects,
+  enemyMoveScale,
+  isEnemyStunned
+} from "../../../src/game/enemyEffects.js";
+import {
+  HIT_RADIUS_SLACK,
+  HIT_WINDOW_MS,
+  MAX_HITS_PER_CAST as SHARED_MAX_HITS_PER_CAST,
+  MELEE_REACH,
+  attackIntervalFor,
+  maxTravelDistance
+} from "../../../src/game/combatRules.js";
+import { advanceRegen, billableDeltaMs, passiveRegenRate } from "../../../src/game/passiveRegen.js";
 import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
 import { getMonster } from "../../../src/game/enemyCatalog.js";
 import {
@@ -20,12 +35,21 @@ import {
 import {
   applyReward,
   normalizeProgress,
-  progressPayload,
-  vitalsForLevel
+  progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, skillMpCost, skillCooldown } from "../../../src/game/skills.js";
+import { skillById, skillMpCost, skillCooldown, skillUnlocked } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
+import { deriveCombatStats } from "../../../src/game/derivedStats.js";
+import { getConsumableEffect } from "../../../src/game/items.js";
 import { shopPurchase } from "../../../src/game/shop.js";
+import {
+  consumeItem,
+  equipItem,
+  grantItem,
+  readBag,
+  readEquipment,
+  unequipSlot
+} from "../game/playerBag.js";
 
 /**
  * Clean sanitization for player strings
@@ -69,26 +93,6 @@ const clampCastAim = (skill, x, y, payload, bounds) => {
   };
   const reach = Number(skill.range) > 0 ? Number(skill.range) : Number(skill.radius) || 0;
   return clampToRange({ x, y }, aim, reach);
-};
-
-/** Equipment slots the client renders (see src/game/equipment.js). */
-const EQUIPMENT_SLOTS = ["armor", "helmet", "accessory", "weapon"];
-
-/**
- * Reduce a client-reported equipment map to the known slots with short string
- * ids (or null). Peers only render *which* slots are filled, so the id is opaque
- * and only its presence matters.
- * @param {Object} val
- * @returns {Record<string, string|null>}
- */
-const sanitizeEquipment = (val) => {
-  const out = {};
-  if (!val || typeof val !== "object") return out;
-  for (const slot of EQUIPMENT_SLOTS) {
-    const id = val[slot];
-    out[slot] = typeof id === "string" && id.length > 0 ? id.slice(0, 64) : null;
-  }
-  return out;
 };
 
 /** Protocol bounds. The client also clamps the camera/player to the smaller
@@ -221,10 +225,10 @@ export { PLAYER_IFRAME_MS };
 export const ACTION_COOLDOWN_MS = 300;
 
 /** How long after a cast its follow-up hit(s) stay authorized (an AoE may hit many). */
-export const CAST_HIT_WINDOW_MS = 2000;
+export const CAST_HIT_WINDOW_MS = HIT_WINDOW_MS;
 
 /** Maximum follow-up hit messages accepted from one cast (AoE headroom). */
-export const MAX_HITS_PER_CAST = 8;
+export const MAX_HITS_PER_CAST = SHARED_MAX_HITS_PER_CAST;
 
 /** Drop broadcasts to a socket once it has this much unflushed data (backpressure). */
 const MAX_BUFFERED_BYTES = 1_000_000;
@@ -283,6 +287,10 @@ export const createEnemyState = (
       coinsMax: monster.coinsMax,
       tuning: monster.ai || null,
       respawnMs: Number.isFinite(monster.respawnMs) ? monster.respawnMs : null,
+      // Server-owned control effects: a skill may stun or slow this monster.
+      stunUntil: 0,
+      slowUntil: 0,
+      slowPct: 0,
       isDead: false
     };
   });
@@ -333,6 +341,8 @@ export class GameSocketManager {
     this.verifyToken = options.verifyToken || verifySessionToken;
     this.ownsCharacter =
       options.ownsCharacter || ((userId, characterId) => characterDb.ownsCharacter(userId, characterId));
+    this.findCharacter =
+      options.findCharacter || ((userId, characterId) => characterDb.findById(userId, characterId));
     this.maxBufferedBytes = Number.isFinite(options.maxBufferedBytes)
       ? options.maxBufferedBytes
       : MAX_BUFFERED_BYTES;
@@ -342,6 +352,7 @@ export class GameSocketManager {
     this.setupServer();
     this.startHeartbeat();
     this.startEnemyTick();
+    this.startRegenTick();
   }
 
   /**
@@ -517,20 +528,16 @@ export class GameSocketManager {
         this.handlePlayerMove(ws, msg.payload);
         break;
 
-      case "player_equipment":
-        this.handlePlayerEquipment(ws, msg.payload);
+      case "use_item":
+        this.handleUseItem(ws, msg.payload);
         break;
 
-      case "player_stats":
-        this.handlePlayerStats(ws, msg.payload);
+      case "equip_item":
+        this.handleEquipItem(ws, msg.payload);
         break;
 
-      case "player_heal":
-        this.handlePlayerHeal(ws, msg.payload);
-        break;
-
-      case "player_restore_mp":
-        this.handlePlayerRestoreMp(ws, msg.payload);
+      case "unequip_slot":
+        this.handleUnequipSlot(ws, msg.payload);
         break;
 
       case "shop_buy":
@@ -584,54 +591,54 @@ export class GameSocketManager {
    * @param {Object} payload
    */
   handlePlayerJoin(ws, payload = {}) {
-    const playerId = sanitizeStr(payload.id || `guest_${Math.random().toString(36).slice(2, 9)}`, 64);
-    const username = sanitizeStr(payload.username || "Lãng Khách", 32);
-    const displayName = sanitizeStr(payload.displayName || username, 32);
-    // Identity: the session token names the account, and the requested character
-    // must belong to it. An unauthenticated (or foreign-character) join is still
-    // allowed to be *present* in the world, but owns no ledger and earns nothing.
+    // A verified session token names the account, and the requested character
+    // must belong to it. Guests have no ledger to own, and letting an arbitrary
+    // client id into the roster would let one socket impersonate a peer, so the
+    // join is refused instead.
     const userId = this.verifyToken(payload.token);
     const requestedCharacter = sanitizeStr(payload.characterId || "", 64);
-    const characterId =
-      userId && requestedCharacter && this.ownsCharacter(userId, requestedCharacter)
-        ? requestedCharacter
-        : null;
+    if (!userId || !requestedCharacter || !this.ownsCharacter(userId, requestedCharacter)) {
+      this.send(ws, { type: "join_rejected", payload: { reason: "auth" } });
+      return;
+    }
+
+    const character = this.findCharacter(userId, requestedCharacter);
+    if (!character) {
+      this.send(ws, { type: "join_rejected", payload: { reason: "character" } });
+      return;
+    }
+
+    const characterId = requestedCharacter;
+    // The character id is the canonical player id: it cannot be spoofed, and two
+    // tabs of the same character resolve to the same roster entry.
+    const playerId = characterId;
+    const displayName = userDb.resolveDisplayName(userId, character.name || "Lãng Khách");
+    const username = sanitizeStr(displayName, 32);
+    const equipment = readEquipment(characterId);
 
     // The server is the economy's source of truth: a fresh character starts at
     // level 1; an existing one resumes from its persisted ledger, never from a
-    // client-reported level.
-    // The requested sect is server-owned: it comes from the stored character, so
-    // a client cannot claim another sect's kit.
-    const character = characterId ? characterDb.findById(userId, characterId) : null;
-    const saved = characterId ? store.getProgress(characterId) : null;
-    const progress = characterId
-      ? saved
-        ? normalizeProgress(saved)
-        : { level: 1, exp: 0, coins: 0, kills: 0 }
-      : null;
-    const vitals = progress ? vitalsForLevel(progress.level) : null;
-    // Persist the ledger (creating it on a first visit) and stamp the account's
-    // authoritative display name so the derived leaderboard never shows a blank.
-    if (characterId) {
-      store.setProgress(characterId, progress, userDb.resolveDisplayName(userId, displayName));
-    }
+    // client-reported level. The sect and gender come from the stored character.
+    const saved = store.getProgress(characterId);
+    const progress = saved ? normalizeProgress(saved) : { level: 1, exp: 0, coins: 0, kills: 0 };
+    store.setProgress(characterId, progress, displayName);
 
-    const isAdmin = Boolean(
-      userDb.isAdmin(userId) ||
-      username.toLowerCase() === "admin" ||
-      username.toLowerCase().startsWith("gm")
-    );
+    const stats = deriveCombatStats({ level: progress.level, equipment });
+    const storedVitals = store.getVitals(characterId);
+    const hp =
+      storedVitals?.hp == null
+        ? stats.maxHp
+        : clampNum(storedVitals.hp, 0, stats.maxHp, stats.maxHp);
+    const mp =
+      storedVitals?.mp == null
+        ? stats.maxMp
+        : clampNum(storedVitals.mp, 0, stats.maxMp, stats.maxMp);
+    store.setVitals(characterId, { hp, mp });
 
-    if (isAdmin && characterId) {
-      const bag = store.getInventory(characterId);
-      if (!bag["lenh-bai-gm"]) {
-        bag["lenh-bai-gm"] = 1;
-        store.setInventory(characterId, bag);
-      }
-      this.send(ws, {
-        type: "inventory_sync",
-        payload: { inventory: bag }
-      });
+    const isAdmin = userDb.isAdmin(userId);
+    let bag = readBag(characterId);
+    if (isAdmin && !bag["lenh-bai-gm"]) {
+      bag = grantItem(characterId, "lenh-bai-gm", 1).bag;
     }
 
     // If this player ID was already connected from an old socket, remove old one
@@ -655,39 +662,43 @@ export class GameSocketManager {
     const requestedMapId = sanitizeStr(payload.mapId || "", 64);
     const mapId = isKnownMap(requestedMapId) ? requestedMapId : DEFAULT_MAP_ID;
     const entryMap = getMap(mapId);
+    const spawnX = clampNum(payload.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x);
+    const spawnY = clampNum(payload.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y);
 
     const playerData = {
       id: playerId,
       username,
       displayName,
       mapId,
-      x: clampNum(payload.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x),
-      y: clampNum(payload.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y),
+      x: spawnX,
+      y: spawnY,
       vx: clampNum(payload.vx, -500, 500, 0),
       vy: clampNum(payload.vy, -500, 500, 0),
       direction: payload.direction === "left" ? "left" : "right",
       stance: payload.stance === "side" ? "side" : "front",
-      equipment: sanitizeEquipment(payload.equipment),
+      // Worn gear is server-owned: it comes from storage, never from the join packet.
+      equipment,
       isAdmin,
       // Character gender drives the peer's rig silhouette ("male" | "female").
-      gender: payload.gender === "female" ? "female" : "male",
+      gender: character.gender === "female" ? "female" : "male",
       characterId,
       progress,
       questRewarded: saved?.questRewarded ?? false,
-      // Level and the HP ceiling are derived from the server-owned ledger, never
-      // from the client.
-      level: progress ? progress.level : 1,
-      maxHp: vitals ? vitals.maxHp : 100,
-      hp: 0,
-      // MP is server-owned like HP: the join seeds it, every later change is
-      // driven by the server (skill cost, potion, level-up refill).
-      maxMp: vitals ? vitals.maxMp : 60,
-      mp: 0,
-      // Reported purely so the server can roll wolf bites and skill damage against it.
-      defense: clampNum(payload.defense, 0, 9999, 6),
-      attack: clampNum(payload.attack, 0, 99999, 24),
-      critRate: clampNum(payload.critRate, 0, 1, 0.12),
-      sect: character?.sect || "thieu-lam",
+      // Level and both HP/MP ceilings are derived from the server-owned ledger.
+      level: progress.level,
+      maxHp: stats.maxHp,
+      hp,
+      maxMp: stats.maxMp,
+      mp,
+      // Combat stats are derived from level + worn gear, then updated by buffs.
+      attack: stats.attack,
+      defense: stats.defense,
+      critRate: stats.critRate,
+      critDamage: stats.critDamage,
+      attackSpeed: stats.attackSpeed,
+      /** Active timed buffs: { stat, amount, until, skillId }. */
+      buffs: [],
+      sect: character.sect,
       pkFlag: payload.pkFlag === true,
       invulnerableUntil: 0,
       nextBiteAt: 0,
@@ -696,11 +707,17 @@ export class GameSocketManager {
       /** skill id -> timestamp the next cast is allowed. */
       skillReadyAt: Object.create(null),
       /** { skillId, at, hits, aim } of the last accepted cast, used to authorize hits. */
-      lastCast: null
+      lastCast: null,
+      /** { at } of the last accepted normal swing, used to authorize plain hits. */
+      lastSwing: null,
+      /** Movement validation baseline. */
+      lastMoveAt: Date.now(),
+      lastX: spawnX,
+      lastY: spawnY,
+      /** Passive regen accumulator, billed by the server tick. */
+      regenAt: Date.now(),
+      regenCarry: 0
     };
-
-    playerData.hp = clampNum(payload.hp, 0, playerData.maxHp, playerData.maxHp);
-    playerData.mp = clampNum(payload.mp, 0, playerData.maxMp, playerData.maxMp);
 
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
@@ -732,6 +749,23 @@ export class GameSocketManager {
         payload: { ...progressPayload(progress), questRewarded: playerData.questRewarded }
       });
     }
+
+    // Publish the server-owned state a joining client must render instead of
+    // recomputing it: bag, worn gear, derived combat stats and vitals.
+    this.send(ws, { type: "inventory_sync", payload: { inventory: bag } });
+    this.send(ws, { type: "equipment_sync", payload: { equipment } });
+    this.send(ws, {
+      type: "player_stats",
+      payload: { id: playerId, ...stats }
+    });
+    this.send(ws, {
+      type: "player_hp",
+      payload: { id: playerId, hp, maxHp: stats.maxHp }
+    });
+    this.send(ws, {
+      type: "player_mp",
+      payload: { id: playerId, mp, maxMp: stats.maxMp }
+    });
 
     // 2. Announce the new player to everyone else standing on the same map
     this.broadcastToMap(
@@ -776,6 +810,10 @@ export class GameSocketManager {
     player.vy = 0;
     // A fresh map means fresh aggro; do not carry a bite cooldown across.
     player.nextBiteAt = 0;
+    // Server-driven travel is not a movement exploit: reset the validation baseline.
+    player.lastX = player.x;
+    player.lastY = player.y;
+    player.lastMoveAt = Date.now();
 
     const peers = [];
     this.players.forEach((other, clientWs) => {
@@ -843,8 +881,37 @@ export class GameSocketManager {
     // Movement is clamped to the map the player stands on, exactly like the join
     // clamp, so the two can never disagree about where the hero may be.
     const bounds = getMap(player.mapId).bounds;
-    player.x = clampNum(payload.x, bounds.x0, bounds.x1, player.x);
-    player.y = clampNum(payload.y, bounds.y0, bounds.y1, player.y);
+    const targetX = clampNum(payload.x, bounds.x0, bounds.x1, player.x);
+    const targetY = clampNum(payload.y, bounds.y0, bounds.y1, player.y);
+    const now = Date.now();
+
+    // A client may only cover as much ground as its walk speed allows since the
+    // previous accepted step. A larger jump (teleport, speed hack) is refused and
+    // the mover is snapped back to the server position. Server-driven moves
+    // (portal, respawn, Hồi Thành Phù, GM) reset the baseline themselves.
+    const speedPct = this.effectiveStats(player, now).speedPct || 0;
+    const allowed = maxTravelDistance(now - player.lastMoveAt, 1 + speedPct);
+    if (Math.hypot(targetX - player.lastX, targetY - player.lastY) > allowed) {
+      this.send(ws, {
+        type: "player_moved",
+        payload: {
+          id: player.id,
+          x: player.x,
+          y: player.y,
+          vx: 0,
+          vy: 0,
+          direction: player.direction,
+          stance: player.stance
+        }
+      });
+      return;
+    }
+
+    player.x = targetX;
+    player.y = targetY;
+    player.lastX = targetX;
+    player.lastY = targetY;
+    player.lastMoveAt = now;
     player.vx = clampNum(payload.vx, -2500, 2500, 0);
     player.vy = clampNum(payload.vy, -2500, 2500, 0);
     if (payload.direction) {
@@ -875,81 +942,191 @@ export class GameSocketManager {
   }
 
   /**
-   * Relay a change to the slots a player is wearing so peers can redraw their
-   * rig. The reported map is sanitized to known slots; the sender already knows
-   * its own gear, so it is only broadcast to everyone else.
-   * @param {WebSocket} ws
-   * @param {Object} payload
+   * Push the authoritative bag to its owner.
+   * @param {Object} player
+   * @param {Record<string, number>} bag
    */
-  handlePlayerEquipment(ws, payload = {}) {
-    const player = this.players.get(ws);
-    if (!player) return;
+  sendInventory(player, bag) {
+    const ws = this.playerById.get(player.id)?.ws || null;
+    this.send(ws, { type: "inventory_sync", payload: { inventory: bag } });
+  }
 
-    player.equipment = sanitizeEquipment(payload.equipment);
-
+  /**
+   * Broadcast the worn gear to peers so their rigs redraw. The owner already has
+   * its own copy from `equipment_sync`.
+   * @param {Object} player
+   * @param {WebSocket|null} [excludeWs]
+   */
+  broadcastEquipment(player, excludeWs = null) {
     this.broadcastPlayerState(
       player,
       {
         type: "player_equipment",
         payload: { id: player.id, equipment: player.equipment }
       },
-      ws
+      excludeWs
     );
   }
 
   /**
-   * Update the one part of a player's block the server trusts the client to own:
-   * defense (used to roll wolf bites). The level, HP ceiling and current HP are
-   * all server-owned now — a level-up grows maxHp and heals on the server, and a
-   * client stat report can never change them.
-   * @param {WebSocket} ws
-   * @param {Object} payload
+   * Move a player to their current map's spawn (Hồi Thành Phù) and tell everyone,
+   * including the mover, where they landed.
+   * @param {Object} player
    */
-  handlePlayerStats(ws, payload = {}) {
-    const player = this.players.get(ws);
-    if (!player) return;
-
-    player.defense = clampNum(payload.defense, 0, 9999, player.defense);
-    player.attack = clampNum(payload.attack, 0, 99999, player.attack);
-    player.critRate = clampNum(payload.critRate, 0, 1, player.critRate);
-  }
-
-  /**
-   * Apply a heal the client requested (potion, level-up, etc.). The server clamps
-   * it to the ceiling, so a client can never heal past its own maxHp.
-   * @param {WebSocket} ws
-   * @param {Object} payload
-   */
-  handlePlayerHeal(ws, payload = {}) {
-    const player = this.players.get(ws);
-    if (!player) return;
-
-    const amount = clampNum(payload.amount, 0, 9999, 0);
-    if (amount <= 0) return;
-
-    player.hp = Math.min(player.maxHp, player.hp + amount);
+  teleportToSpawn(player) {
+    const map = getMap(player.mapId);
+    player.x = map.spawn.x;
+    player.y = map.spawn.y;
+    player.vx = 0;
+    player.vy = 0;
+    player.lastX = player.x;
+    player.lastY = player.y;
+    player.lastMoveAt = Date.now();
 
     this.broadcastPlayerState(player, {
-      type: "player_hp",
-      payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      type: "player_moved",
+      payload: {
+        id: player.id,
+        x: player.x,
+        y: player.y,
+        vx: 0,
+        vy: 0,
+        direction: player.direction,
+        stance: player.stance
+      }
     });
   }
 
   /**
-   * Restore MP the client requested (potion, pickup). Clamped to the server's
-   * ceiling, so a client can never raise another player's MP or overflow its own.
+   * Consume one bag item. The bag decrement, the effect and the resulting pools
+   * are all decided here; the client only names the item.
    * @param {WebSocket} ws
-   * @param {Object} payload
+   * @param {{itemId?:string}} payload
    */
-  handlePlayerRestoreMp(ws, payload = {}) {
+  handleUseItem(ws, payload = {}) {
     const player = this.players.get(ws);
-    if (!player) return;
+    if (!player || !player.characterId) return;
 
-    const amount = clampNum(payload.amount, 0, 9999, 0);
-    if (amount <= 0) return;
+    const itemId = sanitizeStr(payload.itemId, 64);
+    const effect = getConsumableEffect(itemId);
+    const consumed = consumeItem(player.characterId, itemId, 1);
 
-    player.mp = Math.min(player.maxMp, player.mp + amount);
-    this.broadcastMp(player);
+    if (!effect || !consumed.ok) {
+      if (!consumed.ok) this.sendInventory(player, consumed.bag);
+      this.send(ws, {
+        type: "item_result",
+        payload: {
+          ok: false,
+          action: "use",
+          itemId,
+          reason: effect ? consumed.reason : "not_usable"
+        }
+      });
+      return;
+    }
+
+    let healed = 0;
+    let restored = 0;
+    if (effect.hp) {
+      const before = player.hp;
+      player.hp = Math.min(player.maxHp, player.hp + effect.hp);
+      healed = player.hp - before;
+    }
+    if (effect.mp) {
+      const before = player.mp;
+      player.mp = Math.min(player.maxMp, player.mp + effect.mp);
+      restored = player.mp - before;
+    }
+
+    this.sendInventory(player, consumed.bag);
+
+    if (healed > 0) {
+      this.broadcastPlayerState(player, {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      });
+    }
+    if (restored > 0) this.broadcastMp(player);
+    if (effect.teleport === "spawn") this.teleportToSpawn(player);
+
+    this.persistVitals(player);
+    this.send(ws, {
+      type: "item_result",
+      payload: {
+        ok: true,
+        action: "use",
+        itemId,
+        heal: healed,
+        restoreMp: restored,
+        hp: player.hp,
+        maxHp: player.maxHp,
+        mp: player.mp,
+        maxMp: player.maxMp
+      }
+    });
+  }
+
+  /**
+   * Equip one bag item. The bag and equipment writes are atomic from the
+   * server's point of view, and the client is only told the result.
+   * @param {WebSocket} ws
+   * @param {{itemId?:string}} payload
+   */
+  handleEquipItem(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player || !player.characterId) return;
+
+    const itemId = sanitizeStr(payload.itemId, 64);
+    const result = equipItem(player.characterId, itemId);
+    if (!result.ok) {
+      this.sendInventory(player, result.bag);
+      this.send(ws, {
+        type: "item_result",
+        payload: { ok: false, action: "equip", itemId, slot: result.slot, reason: result.reason }
+      });
+      return;
+    }
+
+    player.equipment = result.equipment;
+    this.sendInventory(player, result.bag);
+    this.send(ws, { type: "equipment_sync", payload: { equipment: result.equipment } });
+    this.sendPlayerStats(player);
+    this.broadcastEquipment(player, ws);
+    this.send(ws, {
+      type: "item_result",
+      payload: { ok: true, action: "equip", itemId, slot: result.slot }
+    });
+  }
+
+  /**
+   * Take off whatever is worn in one slot and return it to the bag.
+   * @param {WebSocket} ws
+   * @param {{slot?:string}} payload
+   */
+  handleUnequipSlot(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player || !player.characterId) return;
+
+    const slot = sanitizeStr(payload.slot, 32);
+    const itemId = player.equipment?.[slot] || null;
+    const result = unequipSlot(player.characterId, slot);
+    if (!result.ok) {
+      this.send(ws, {
+        type: "item_result",
+        payload: { ok: false, action: "unequip", slot, reason: result.reason }
+      });
+      return;
+    }
+
+    player.equipment = result.equipment;
+    this.sendInventory(player, result.bag);
+    this.send(ws, { type: "equipment_sync", payload: { equipment: result.equipment } });
+    this.sendPlayerStats(player);
+    this.broadcastEquipment(player, ws);
+    this.send(ws, {
+      type: "item_result",
+      payload: { ok: true, action: "unequip", slot, itemId }
+    });
   }
 
   /**
@@ -1020,10 +1197,8 @@ export class GameSocketManager {
 
     // Write the item first: if the bag cannot be persisted, no silver is spent.
     try {
-      const bag = store.getInventory(player.characterId);
-      const stored = Math.max(0, Math.floor(Number(bag[purchase.item.id]) || 0));
-      bag[purchase.item.id] = stored + purchase.qty;
-      store.setInventory(player.characterId, bag);
+      const granted = grantItem(player.characterId, purchase.item.id, purchase.qty);
+      if (!granted.ok) throw new Error("Invalid purchase item");
     } catch (err) {
       if (process.env.NODE_ENV !== "test") {
         console.error("[WebSocket] Failed to store purchase:", err.message);
@@ -1044,6 +1219,7 @@ export class GameSocketManager {
 
     player.progress = { ...player.progress, coins: player.progress.coins - purchase.total };
     this.persistProgress(player);
+    this.sendInventory(player, readBag(player.characterId));
 
     this.send(ws, {
       type: "player_progress",
@@ -1070,6 +1246,160 @@ export class GameSocketManager {
   }
 
   /**
+   * Derived combat stats for a player right now: base + worn gear + active
+   * buffs. Expired buffs are pruned here so the array cannot grow forever.
+   * @param {Object} player
+   * @param {number} [now]
+   * @returns {ReturnType<typeof deriveCombatStats>}
+   */
+  effectiveStats(player, now = Date.now()) {
+    if (Array.isArray(player.buffs)) {
+      player.buffs = player.buffs.filter((buff) => !(buff?.until <= now));
+    }
+    return deriveCombatStats({
+      level: player.level,
+      equipment: player.equipment,
+      buffs: player.buffs,
+      now
+    });
+  }
+
+  /**
+   * Recompute and store the player's combat stats after a level, gear or buff
+   * change. HP/MP ceilings follow the level, so both pools are clamped.
+   * @param {Object} player
+   * @param {number} [now]
+   * @returns {ReturnType<typeof deriveCombatStats>}
+   */
+  refreshStats(player, now = Date.now()) {
+    const stats = this.effectiveStats(player, now);
+    player.attack = stats.attack;
+    player.defense = stats.defense;
+    player.critRate = stats.critRate;
+    player.critDamage = stats.critDamage;
+    player.attackSpeed = stats.attackSpeed;
+    player.maxHp = stats.maxHp;
+    player.maxMp = stats.maxMp;
+    player.hp = Math.min(player.hp, stats.maxHp);
+    player.mp = Math.min(player.mp, stats.maxMp);
+    return stats;
+  }
+
+  /**
+   * Push the authoritative stat block to its owner (never to peers).
+   * @param {Object} player
+   * @returns {ReturnType<typeof deriveCombatStats>}
+   */
+  sendPlayerStats(player) {
+    const stats = this.refreshStats(player);
+    const ws = this.playerById.get(player.id)?.ws || null;
+    this.send(ws, { type: "player_stats", payload: { id: player.id, ...stats } });
+    return stats;
+  }
+
+  /**
+   * Persist HP/MP after a change. Best-effort: a failed write is logged but the
+   * live state stays correct, and the next change retries.
+   * @param {Object} player
+   */
+  persistVitals(player) {
+    if (!player.characterId) return;
+    try {
+      store.setVitals(player.characterId, { hp: player.hp, mp: player.mp });
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to persist vitals:", err.message);
+      }
+    }
+  }
+
+  /**
+   * Apply a cast's self effects (buffs, heals) on the server. Damage-over-time and
+   * monster effects are resolved by the hit handlers.
+   * @param {Object} player
+   * @param {Object} skill
+   * @param {number} now
+   */
+  applySkillSelfEffects(player, skill, now) {
+    let statsChanged = false;
+    let healed = 0;
+
+    for (const effect of skill.effects || []) {
+      if (effect?.kind === "buff") {
+        const amount = Number(effect.amount) || 0;
+        const duration = Number(effect.duration) || 0;
+        if (!effect.stat || duration <= 0) continue;
+        player.buffs.push({
+          skillId: skill.id,
+          stat: effect.stat,
+          amount,
+          until: now + duration
+        });
+        statsChanged = true;
+      } else if (effect?.kind === "heal") {
+        const flat = Number(effect.amount) || 0;
+        const pct = Number(effect.pctMaxHp) || 0;
+        const amount = Math.round(flat + player.maxHp * pct);
+        if (amount > 0) {
+          const before = player.hp;
+          player.hp = Math.min(player.maxHp, player.hp + amount);
+          healed += player.hp - before;
+        }
+      }
+    }
+
+    if (statsChanged) this.sendPlayerStats(player);
+    if (healed > 0) {
+      this.broadcastPlayerState(player, {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      });
+      this.persistVitals(player);
+    }
+  }
+
+  /**
+   * Server-side passive regen (tâm pháp): bill a short, bounded tick per player
+   * and broadcast whenever a whole HP point lands.
+   */
+  tickRegen() {
+    const now = Date.now();
+    this.players.forEach((player) => {
+      const rate = passiveRegenRate(player.sect, player.level);
+      const previous = player.regenAt;
+      player.regenAt = now;
+
+      if (rate <= 0 || player.hp <= 0) {
+        player.regenCarry = 0;
+        return;
+      }
+
+      const delta = billableDeltaMs(previous, now);
+      if (delta <= 0) return;
+
+      const { carry, amount } = advanceRegen(player.regenCarry, rate, delta);
+      player.regenCarry = carry;
+      if (amount <= 0) return;
+
+      player.hp = Math.min(player.maxHp, player.hp + amount);
+      this.broadcastPlayerState(player, {
+        type: "player_hp",
+        payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
+      });
+      this.persistVitals(player);
+    });
+  }
+
+  /**
+   * Start the regen tick. Short interval so `billableDeltaMs` never sees a gap
+   * larger than its one-second ceiling.
+   */
+  startRegenTick() {
+    this.regenTimer = setInterval(() => this.tickRegen(), 250);
+    if (this.regenTimer.unref) this.regenTimer.unref();
+  }
+
+  /**
    * Player triggers attack / skill animation. A skill's MP cost is spent from the
    * server-owned pool; an unaffordable cast is refused (and the caster resynced),
    * so the client can never cast past its mana.
@@ -1081,14 +1411,30 @@ export class GameSocketManager {
     if (!player) return;
 
     const now = Date.now();
-    if (now < player.nextAttackAt) return;
-    player.nextAttackAt = now + ACTION_COOLDOWN_MS;
-
-    // Only skills belonging to the player's server-owned sect can be cast; an
-    // unknown or foreign id degrades to a plain attack.
     const requested = skillById(payload.skill);
-    const skill = requested && requested.sect === player.sect ? requested : null;
+
+    // A skill id that exists but belongs to another sect, or is still locked, is
+    // refused instead of silently degrading into a free plain swing.
+    if (requested && requested.sect !== player.sect) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "sect" } });
+      return;
+    }
+    if (requested && !skillUnlocked(requested, player.level)) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "locked" } });
+      return;
+    }
+    if (requested?.passive) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "passive" } });
+      return;
+    }
+
+    const skill = requested || null;
     const skillId = skill ? skill.id : "normal";
+    const cadence = Math.max(
+      100,
+      Math.round(attackIntervalFor(this.effectiveStats(player, now).attackSpeed))
+    );
+    if (now < player.nextAttackAt) return;
 
     if (skill) {
       const readyAt = player.skillReadyAt[skillId] || 0;
@@ -1105,7 +1451,10 @@ export class GameSocketManager {
       }
       player.mp -= cost;
       this.broadcastMp(player);
+      this.persistVitals(player);
     }
+
+    player.nextAttackAt = now + cadence;
 
     const aimBounds = getMap(player.mapId).bounds;
     const x = clampNum(payload.x, aimBounds.x0, aimBounds.x1, player.x);
@@ -1115,9 +1464,15 @@ export class GameSocketManager {
     const aim = skill ? clampCastAim(skill, player.x, player.y, payload, aimBounds) : null;
     const facingRight = payload.facingRight !== false;
 
-    // A successful cast authorizes the skill's follow-up hit. `enemy_hit` refuses
-    // a skill the player did not just cast, so damage cannot be minted freely.
-    if (skill) player.lastCast = { skillId, at: now, hits: 0, aim };
+    // A successful cast authorizes the skill's follow-up hit; a plain swing
+    // authorizes exactly one normal hit. `enemy_hit` / `player_hit` refuse a hit
+    // that does not follow an accepted action, so damage cannot be minted freely.
+    if (skill) {
+      player.lastCast = { skillId, at: now, hits: 0, aim };
+      this.applySkillSelfEffects(player, skill, now);
+    } else {
+      player.lastSwing = { at: now, used: false };
+    }
 
     this.broadcastPlayerState(
       player,
@@ -1154,9 +1509,49 @@ export class GameSocketManager {
   }
 
   /**
-   * Apply an authoritative PvP hit. The client reports the damage number, but the
-   * server clamps it, checks flags/range/immunity, and applies it to the target's
-   * own HP. The resulting HP is broadcast, so no client can decide its own health.
+   * Recompute one PvP strike from server-owned stats.
+   *
+   * A skill hit must follow an accepted cast (same id, inside the hit window,
+   * under the per-cast cap) and is recomputed from the skill multiplier. A plain
+   * hit must follow an accepted swing and consumes that swing, so one click can
+   * never land twice.
+   *
+   * @param {Object} attacker
+   * @param {Object} target
+   * @param {*} requestedSkill raw `payload.skill`
+   * @param {number} now
+   * @returns {number|null} damage, or null when the action is not authorized
+   */
+  resolvePlayerHitDamage(attacker, target, requestedSkill, now) {
+    const attackerStats = this.effectiveStats(attacker, now);
+    const targetStats = this.effectiveStats(target, now);
+
+    const skill = requestedSkill ? skillById(requestedSkill) : null;
+    if (skill) {
+      if (skill.sect !== attacker.sect) return null;
+      const cast = attacker.lastCast;
+      if (!cast || cast.skillId !== skill.id || now - cast.at > CAST_HIT_WINDOW_MS) return null;
+      if (cast.hits >= MAX_HITS_PER_CAST) return null;
+      cast.hits += 1;
+      return computeSkillDamage(
+        skill,
+        { attack: attackerStats.attack, critRate: attackerStats.critRate, critDamage: attackerStats.critDamage },
+        { defense: targetStats.defense },
+        this.random
+      ).damage;
+    }
+
+    const swing = attacker.lastSwing;
+    if (!swing || swing.used || now - swing.at > HIT_WINDOW_MS) return null;
+    swing.used = true;
+    return computeDamage(attackerStats, targetStats, this.random).damage;
+  }
+
+  /**
+   * Apply an authoritative PvP hit. Damage is recomputed here from server-owned
+   * stats (gear, level, buffs) and the target's own defense; the server then
+   * checks flags/range/immunity and applies it to the target's HP. The reported
+   * `payload.damage` is ignored entirely.
    * @param {WebSocket} ws
    * @param {Object} payload
    */
@@ -1174,8 +1569,9 @@ export class GameSocketManager {
     const target = targetEntry?.data;
     if (!target) return this.rejectHit(ws, "target_missing");
 
-    const damage = clampPvpDamage(payload.damage);
-    if (damage === null) return this.rejectHit(ws, "damage_invalid");
+    const damage = this.resolvePlayerHitDamage(attacker, target, payload.skill, now);
+    if (damage === null) return this.rejectHit(ws, "no_action");
+    if (!(damage > 0)) return this.rejectHit(ws, "damage_invalid");
 
     const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
     if (!canPvpAttack(attacker, target, distance)) {
@@ -1262,6 +1658,8 @@ export class GameSocketManager {
     // attacker may not be on the broadcast's map at all.
     this.sendToAttackerOffMap(attacker, target.mapId, hpMessage);
 
+    this.persistVitals(target);
+
     if (target.hp <= 0) {
       this.respawnPlayer(target, attacker, source);
     }
@@ -1294,9 +1692,17 @@ export class GameSocketManager {
     const map = getMap(victim.mapId);
 
     victim.hp = victim.maxHp;
+    victim.mp = victim.maxMp;
     victim.x = map.spawn.x;
     victim.y = map.spawn.y;
+    victim.vx = 0;
+    victim.vy = 0;
+    victim.lastX = victim.x;
+    victim.lastY = victim.y;
+    victim.lastMoveAt = Date.now();
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
+    this.persistVitals(victim);
+    this.broadcastMp(victim);
 
     const defeatMessage = {
       type: "player_defeated",
@@ -1398,7 +1804,6 @@ export class GameSocketManager {
     switch (action) {
       case "set_level": {
         const level = clampNum(payload.level, 1, 150, player.progress?.level || 1);
-        const vitals = vitalsForLevel(level);
         if (player.progress) {
           player.progress.level = level;
           player.progress.exp = 0;
@@ -1407,10 +1812,10 @@ export class GameSocketManager {
           }
         }
         player.level = level;
-        player.maxHp = vitals.maxHp;
-        player.maxMp = vitals.maxMp;
-        player.hp = vitals.maxHp;
-        player.mp = vitals.maxMp;
+        this.refreshStats(player);
+        player.hp = player.maxHp;
+        player.mp = player.maxMp;
+        this.persistVitals(player);
 
         this.send(ws, {
           type: "player_progress",
@@ -1427,6 +1832,7 @@ export class GameSocketManager {
           type: "player_mp",
           payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
         });
+        this.sendPlayerStats(player);
         break;
       }
 
@@ -1445,10 +1851,8 @@ export class GameSocketManager {
           player.progress = { level: next.level, exp: next.exp, coins: next.coins, kills: next.kills };
           store.setProgress(player.characterId, player.progress);
 
-          const vitals = vitalsForLevel(next.level);
           player.level = next.level;
-          player.maxHp = vitals.maxHp;
-          player.maxMp = vitals.maxMp;
+          this.refreshStats(player);
 
           if (next.levelUps > 0) {
             player.hp = player.maxHp;
@@ -1461,12 +1865,14 @@ export class GameSocketManager {
               type: "player_mp",
               payload: { id: player.id, mp: player.mp, maxMp: player.maxMp }
             });
+            this.persistVitals(player);
           }
 
           this.send(ws, {
             type: "player_progress",
             payload: { ...progressPayload(player.progress), levelUps: next.levelUps }
           });
+          this.sendPlayerStats(player);
         }
         break;
       }
@@ -1474,6 +1880,7 @@ export class GameSocketManager {
       case "heal_full": {
         player.hp = player.maxHp;
         player.mp = player.maxMp;
+        this.persistVitals(player);
         this.broadcastToMap(player.mapId, {
           type: "player_hp",
           payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
@@ -1489,17 +1896,10 @@ export class GameSocketManager {
         if (!player.characterId) return;
         const items = payload.items;
         if (!items || typeof items !== "object") return;
-        const bag = store.getInventory(player.characterId);
         for (const [id, qty] of Object.entries(items)) {
-          if (typeof qty === "number" && qty > 0) {
-            bag[id] = (bag[id] || 0) + Math.floor(qty);
-          }
+          if (typeof qty === "number" && qty > 0) grantItem(player.characterId, id, qty);
         }
-        store.setInventory(player.characterId, bag);
-        this.send(ws, {
-          type: "inventory_sync",
-          payload: { inventory: bag }
-        });
+        this.sendInventory(player, readBag(player.characterId));
         break;
       }
 
@@ -1522,47 +1922,58 @@ export class GameSocketManager {
         const targetMapId = sanitizeStr(payload.mapId || "", 64);
         if (!isKnownMap(targetMapId)) return;
         const targetMap = getMap(targetMapId);
-        const spawn = payload.spawn || targetMap.spawn;
+        const requested = payload.spawn || targetMap.spawn;
+        const x = clampNum(requested.x, targetMap.bounds.x0, targetMap.bounds.x1, targetMap.spawn.x);
+        const y = clampNum(requested.y, targetMap.bounds.y0, targetMap.bounds.y1, targetMap.spawn.y);
         const currentMapId = player.mapId;
 
+        player.x = x;
+        player.y = y;
+        player.vx = 0;
+        player.vy = 0;
+        player.nextBiteAt = 0;
+        // A server-side teleport is not a movement exploit: reset the baseline.
+        player.lastX = x;
+        player.lastY = y;
+        player.lastMoveAt = Date.now();
+
         if (currentMapId !== targetMapId) {
-          this.broadcastToMap(currentMapId, {
-            type: "player_left",
-            payload: { id: player.id }
-          }, ws);
-          this.playerGrid.get(currentMapId)?.remove(player);
-
+          this.broadcastToMap(currentMapId, { type: "player_left", payload: { id: player.id } }, ws);
           player.mapId = targetMapId;
-          player.x = spawn.x;
-          player.y = spawn.y;
-          this.playerGrid.get(targetMapId)?.add(player);
 
-          const newPeers = this.getPlayersOnMap(targetMapId, ws).map((p) => this.playerSnapshot(p));
-          const newEnemies = this.getEnemiesOnMap(targetMapId).map((e) => this.enemySnapshot(e));
+          const peers = Array.from(this.players.values())
+            .filter((peer) => peer !== player && peer.mapId === targetMapId)
+            .map((peer) => this.playerSnapshot(peer));
 
           this.send(ws, {
             type: "map_changed",
             payload: {
               mapId: targetMapId,
-              spawn,
-              players: newPeers,
-              enemies: newEnemies
+              spawn: { x, y },
+              players: peers,
+              enemies: this.getEnemyState(targetMapId)
             }
           });
-
-          this.broadcastToMap(targetMapId, {
-            type: "player_joined",
-            payload: this.playerSnapshot(player)
-          }, ws);
+          this.broadcastToMap(
+            targetMapId,
+            { type: "player_joined", payload: { player: this.playerSnapshot(player) } },
+            ws
+          );
         } else {
-          player.x = spawn.x;
-          player.y = spawn.y;
-          this.playerGrid.get(currentMapId)?.update(player);
-          this.broadcastToMap(currentMapId, {
+          this.broadcastPlayerState(player, {
             type: "player_moved",
-            payload: { id: player.id, x: spawn.x, y: spawn.y }
+            payload: {
+              id: player.id,
+              x,
+              y,
+              vx: 0,
+              vy: 0,
+              direction: player.direction,
+              stance: player.stance
+            }
           });
         }
+        this.persistVitals(player);
         break;
       }
 
@@ -1628,12 +2039,13 @@ export class GameSocketManager {
     const enemy = this.rosterFor(player.mapId).get(payload.id);
     if (!enemy) return;
 
-    let damage;
-    const skill = skillById(payload.skill);
+    const now = Date.now();
+    let damage = 0;
+    const skill = payload.skill ? skillById(payload.skill) : null;
+
     if (skill && skill.sect === player.sect) {
       // Only a hit that follows a validated cast is accepted; otherwise a client
       // could mint damage without paying MP or cooldown.
-      const now = Date.now();
       const cast = player.lastCast;
       if (!cast || cast.skillId !== skill.id || now - cast.at > CAST_HIT_WINDOW_MS) return;
       // Cap follow-up hits per cast (an AoE may legitimately hit a handful).
@@ -1641,26 +2053,32 @@ export class GameSocketManager {
       cast.hits += 1;
 
       // Skill hits are authoritative: the server recomputes the damage from the
-      // catalog and the player's own attack stat instead of trusting the client.
+      // catalog and the player's own derived stats, never from the client.
       // An AoE hit must land inside the cast's own impact area; older clients
       // without an aim point keep the caster-centred fallback.
       if (skill.radius > 0) {
         const center = cast.aim || { x: player.x, y: player.y };
         const distanceToCenter = Math.hypot(center.x - enemy.x, center.y - enemy.y);
-        if (distanceToCenter > skill.radius + 40) return;
+        if (distanceToCenter > skill.radius + HIT_RADIUS_SLACK) return;
       } else {
         const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-        if (distance > skill.range + skill.radius + 40) return;
+        if (distance > skill.range + skill.radius + HIT_RADIUS_SLACK) return;
       }
-      damage = computeSkillDamage(
-        skill,
-        { attack: player.attack, critRate: player.critRate, critDamage: 1.5 },
-        { defense: enemy.defense },
-        Math.random
-      ).damage;
+
+      const stats = this.effectiveStats(player, now);
+      damage = computeSkillDamage(skill, stats, { defense: enemy.defense }, this.random).damage;
     } else {
-      if (typeof payload.damage !== "number" || !Number.isFinite(payload.damage) || payload.damage <= 0) return;
-      damage = Math.round(Math.min(payload.damage, 200));
+      // A plain sword hit must follow an accepted swing, land inside melee reach,
+      // and consumes that swing: the client cannot choose its own damage, hit
+      // from across the map, or land the same swing on several monsters.
+      const swing = player.lastSwing;
+      if (!swing || swing.used || now - swing.at > HIT_WINDOW_MS) return;
+
+      const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+      if (distance > MELEE_REACH + HIT_RADIUS_SLACK) return;
+
+      swing.used = true;
+      damage = computeDamage(this.effectiveStats(player, now), enemy, this.random).damage;
     }
 
     if (damage <= 0) return;
@@ -1680,6 +2098,10 @@ export class GameSocketManager {
       enemy.isDead = true;
       this.gridFor(enemy.mapId).remove(enemy);
       this.scheduleEnemyRespawn(enemy);
+    } else if (skill) {
+      // A landed skill applies its control effects here, where movement and
+      // bites are decided. The client only renders the resulting positions.
+      applyEnemyControlEffects(enemy, skill, now);
     }
 
     this.broadcastToMap(enemy.mapId, {
@@ -1720,9 +2142,7 @@ export class GameSocketManager {
     const next = applyReward(player.progress, reward);
     player.progress = { level: next.level, exp: next.exp, coins: next.coins, kills: next.kills };
     player.level = next.level;
-    const vitals = vitalsForLevel(next.level);
-    player.maxHp = vitals.maxHp;
-    player.maxMp = vitals.maxMp;
+    this.refreshStats(player);
 
     if (next.levelUps > 0) {
       // A level-up heals HP and refills MP, matching the client's expectation.
@@ -1733,12 +2153,14 @@ export class GameSocketManager {
         payload: { id: player.id, hp: player.hp, maxHp: player.maxHp }
       });
       this.broadcastMp(player);
+      this.persistVitals(player);
     }
 
     this.send(ws, {
       type: "player_progress",
       payload: { ...progressPayload(player.progress), levelUps: next.levelUps }
     });
+    this.sendPlayerStats(player);
     return next;
   }
 
@@ -1811,10 +2233,16 @@ export class GameSocketManager {
         ? { x0: WORLD_MIN_X, y0: WORLD_MIN_Y, x1: WORLD_MAX_X, y1: WORLD_MAX_Y }
         : map.bounds;
 
+      const now = Date.now();
       roster.forEach((enemy) => {
         if (enemy.isDead) return;
 
-        const next = stepEnemy(enemy, mapPlayers, this.enemyTickMs);
+        // A stunned monster holds position; a slowed one advances its AI clock
+        // slower, so the same step logic produces a shorter move.
+        const scale = enemyMoveScale(enemy, now);
+        if (scale <= 0) return;
+
+        const next = stepEnemy(enemy, mapPlayers, this.enemyTickMs * scale);
         const x = clampNum(Math.round(next.x), bounds.x0, bounds.x1, enemy.x);
         const y = clampNum(Math.round(next.y), bounds.y0, bounds.y1, enemy.y);
         if (x === enemy.x && y === enemy.y) return;
@@ -1848,7 +2276,7 @@ export class GameSocketManager {
 
       const candidates = grid
         .getNear(player.x, player.y, BITE_TUNING.range)
-        .filter((enemy) => !enemy.isDead);
+        .filter((enemy) => !enemy.isDead && !isEnemyStunned(enemy, now));
       let nearest = null;
       let nearestDistance = Infinity;
       candidates.forEach((enemy) => {
@@ -1862,8 +2290,8 @@ export class GameSocketManager {
 
       player.nextBiteAt = now + BITE_TUNING.cooldownMs;
 
-      // Bites use the monster's own combat block, so a level-30 boss hits far
-      // harder than a level-3 stray dog.
+      // Bites use the monster's own combat block, and the target's defence comes
+      // from its server-derived stats (gear + buffs), so gear actually protects.
       const result = computeDamage(
         {
           attack: nearest.attack,
@@ -1871,8 +2299,8 @@ export class GameSocketManager {
           critRate: nearest.critRate,
           critDamage: nearest.critDamage
         },
-        { defense: player.defense },
-        Math.random
+        { defense: this.effectiveStats(player, now).defense },
+        this.random
       );
       this.applyPlayerDamage(player, result.damage, null, "wolf", nearest.name);
     });
@@ -1909,6 +2337,7 @@ export class GameSocketManager {
     enemy.x = enemy.homeX;
     enemy.y = enemy.homeY;
     enemy.isDead = false;
+    clearEnemyControlEffects(enemy);
     this.gridFor(mapId).add(enemy);
 
     this.broadcastToMap(mapId, { type: "enemy_respawned", payload: this.enemySnapshot(enemy) });
@@ -1935,6 +2364,19 @@ export class GameSocketManager {
       // A superseded socket has nothing to announce: the player is still here on
       // the socket that replaced it.
       if (ws.__superseded) return;
+
+      // Persist the server-owned vitals so a reconnect resumes them instead of
+      // starting at full HP. A superseded socket is skipped above because the
+      // replacement has already loaded (or is about to load) newer values.
+      if (player.characterId) {
+        try {
+          store.setVitals(player.characterId, { hp: player.hp, mp: player.mp });
+        } catch (err) {
+          if (process.env.NODE_ENV !== "test") {
+            console.error("[WebSocket] Failed to persist vitals:", err.message);
+          }
+        }
+      }
 
       const mapId = player.mapId || DEFAULT_MAP_ID;
       const mapStillOccupied = Array.from(this.players.values()).some(
@@ -1973,7 +2415,10 @@ export class GameSocketManager {
       clearInterval(this.heartbeatTimer);
     }
     if (this.enemyTickTimer) {
-      clearInterval(this.enemyTickTimer);
+
+    if (this.regenTimer) {
+      clearInterval(this.regenTimer);
+    } clearInterval(this.enemyTickTimer);
     }
     this.enemyRespawnTimers.forEach((timer) => clearTimeout(timer));
     this.enemyRespawnTimers.clear();

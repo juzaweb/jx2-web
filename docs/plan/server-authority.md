@@ -1,8 +1,37 @@
 # Server-authoritative game state — migration plan
 
-Status: **planned**. The client becomes a renderer/input layer. The server owns
-damage, stats, buffs, regen, HP/MP, inventory, equipment, position validation,
-and the login policy.
+Status: **implemented** (phases 0–6). Verified with `npm test` (655 client tests),
+`npm --prefix server test` (73 server tests) and `npm run build`.
+
+The client is now a renderer/input layer. The server owns damage, stats, buffs,
+regen, HP/MP, inventory, equipment, position validation, and the login policy.
+
+## 0. Implementation status
+
+| Phase | State | Notes |
+| --- | --- | --- |
+| 0 — Shared pure model | done | `derivedStats.js`, `combatRules.js`, `CONSUMABLE_EFFECTS`, `EQUIPMENT_SLOTS` |
+| 1 — Server persistence and identity | done | schema v4 (`equipment`/`hp`/`mp`/`state_imported`), `playerBag.js`, authenticated join, `POST /api/state/import` |
+| 2 — Server combat authority | done | custom swing/cast authorisation, derived stats, server ticks regen and buffs, `player_stats` outbound |
+| 3 — Server inventory/equipment/consumables | done | `use_item` / `equip_item` / `unequip_slot`, `inventory_sync`, `equipment_sync`, persisted vitals |
+| 4 — Movement validation | done | `maxTravelDistance` with snap-back; server teleports reset the baseline |
+| 5 — Client rewrite | done | join packet trimmed to token + character; damage numbers come from the server echo |
+| 6 — Tests, docs, cleanup | done | rewritten WS/Auth tests, `state.test.js`, dead offline/loot code removed |
+
+Deviations from the original sketch:
+
+- `PUT /api/inventory` and `POST /api/leaderboard/submit` are removed. The
+  leaderboard now reads the persisted `saves` ledger, and `GET /api/inventory/:id`
+  is an authenticated, owner-only read.
+- localStorage still stores the legacy bag/equipment keys, but only as the
+  one-time import source (`POST /api/state/import`). Runtime state, stats and
+  gear are never persisted client-side.
+- The client keeps an in-memory copy of the bag/gear for rendering; every change
+  originates from a server `inventory_sync` / `equipment_sync`.
+- Monster control effects (stun/slow) are server-owned too: `src/game/enemyEffects.js`
+  is applied on an accepted skill hit and honoured by the AI tick and the bite
+  tick, so a stunned monster cannot move or bite. The client only follows the
+  resulting positions (`Enemy` no longer keeps local stun/slow timers).
 
 ## 1. Why
 

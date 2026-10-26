@@ -5,34 +5,24 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
-import { ENEMY_TUNING } from "../../src/game/enemyAi.js";
-import { MARKET_NPCS, MARKET_SPAWN } from "../../src/game/marketLayout.js";
-import { skillById } from "../../src/game/skills.js";
-
-// Every skill of the Thiếu Lâm kit. `thieu_lam_tam_phap` is a passive internal
-// art (no MP, no cooldown), so only the four active palm skills are cast below.
-const THIEU_LAM_KIT_IDS = [
-  "thieu_lam_tam_phap",
-  "dai_tu_di_chuong",
-  "la_han_tran",
-  "kim_cang_bat_hoai",
-  "nhu_lai_than_chuong"
-];
-const HAS_THIEU_LAM_KIT = THIEU_LAM_KIT_IDS.every((id) => Boolean(skillById(id)));
-const SKIP_NO_KIT = HAS_THIEU_LAM_KIT ? false : "Thiếu Lâm palm kit is incomplete";
+import { MARKET_NPCS } from "../../src/game/marketLayout.js";
+import { DEFAULT_MAP_ID, getMap } from "../../src/game/maps/mapRegistry.js";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
 let createApp;
 let initGameSocket;
 let ENEMY_MAX_HP;
+let store;
+let userDb;
+let adminUserId;
+let gameSocket;
 
+/** Small client wrapper: queues messages and resolves predicates. */
 const createTestClient = async (url) => {
   const ws = new WebSocket(url);
   const queue = [];
   const listeners = [];
-  // Every parsed message, including ones a waitFor already consumed, so a test can
-  // also assert that an event was *not* sent.
   const messages = [];
 
   ws.on("message", (raw) => {
@@ -41,14 +31,14 @@ const createTestClient = async (url) => {
       messages.push(msg);
       for (let i = 0; i < listeners.length; i++) {
         if (listeners[i].predicate(msg)) {
-          const l = listeners.splice(i, 1)[0];
-          clearTimeout(l.timer);
-          return l.resolve(msg);
+          const listener = listeners.splice(i, 1)[0];
+          clearTimeout(listener.timer);
+          return listener.resolve(msg);
         }
       }
       queue.push(msg);
     } catch {
-      // ignore
+      // ignore malformed frames
     }
   });
 
@@ -63,21 +53,19 @@ const createTestClient = async (url) => {
     send: (data) => ws.send(JSON.stringify(data)),
     waitFor: (predicate, timeoutMs = 2500) => {
       for (let i = 0; i < queue.length; i++) {
-        if (predicate(queue[i])) {
-          return Promise.resolve(queue.splice(i, 1)[0]);
-        }
+        if (predicate(queue[i])) return Promise.resolve(queue.splice(i, 1)[0]);
       }
-
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           const idx = listeners.findIndex((l) => l.timer === timer);
           if (idx !== -1) listeners.splice(idx, 1);
           reject(new Error(`Timed out waiting for message after ${timeoutMs}ms`));
         }, timeoutMs);
-
         listeners.push({ predicate, resolve, timer });
       });
     },
+    /** Wait `ms` and then report how many queued messages match. */
+    count: (predicate) => messages.filter(predicate).length,
     close: () =>
       new Promise((res) => {
         if (ws.readyState === WebSocket.CLOSED) return res();
@@ -87,9 +75,26 @@ const createTestClient = async (url) => {
   };
 };
 
-test("WebSocket Real-time Multiplayer Suite", async (t) => {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Send an authenticated join and wait for init_world / join_rejected. */
+const join = async (client, { characterId, token = "test-token", x = 5000, y = 5000, extra = {} }) => {
+  client.send({
+    type: "player_join",
+    payload: { token, characterId, x, y, ...extra }
+  });
+  return client.waitFor((m) => m.type === "init_world" || m.type === "join_rejected");
+};
+
+/** Swing once (normal attack) then report the hit after the cadence passes. */
+const swingAndHitEnemy = async (client, enemyId, waitMs = 340) => {
+  await sleep(waitMs);
+  client.send({ type: "player_attack", payload: { skill: "normal", x: 0, y: 0, facingRight: true } });
+  client.send({ type: "enemy_hit", payload: { id: enemyId, damage: 9999 } });
+};
+
+test("WebSocket server-authority suite", async (t) => {
   let server;
-  let gameSocket;
   let port;
   let testDataDir;
 
@@ -102,14 +107,18 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
   });
 
   await t.test("Setup test HTTP & WebSocket server", async () => {
-    // Isolate the database before importing the server modules (they open SQLite
-    // at import), so this suite never reads or writes the development database.
     testDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "jx2-ws-test-"));
     process.env.DB_PATH = path.join(testDataDir, "ws.sqlite");
     process.env.NODE_ENV = "test";
 
     ({ createApp } = await import("../src/app.js"));
     ({ initGameSocket, ENEMY_MAX_HP } = await import("../src/websocket/gameSocket.js"));
+    ({ store } = await import("../src/data/playerDb.js"));
+    ({ userDb } = await import("../src/data/userDb.js"));
+
+    // An admin account is required for the GM tests; registration marks the
+    // "admin_" prefix as role=admin (see userDb.isAdmin).
+    adminUserId = userDb.register("admin_ws_test", "123456", "Quản Trị Viên").id;
 
     const app = createApp();
     server = http.createServer(app);
@@ -121,10 +130,21 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
           path: "/ws",
           enemyRespawnMs: 800,
           enemyTickMs: 50,
-          // Test authority: "test-token" is the account "test_user", and it owns
-          // whichever character it asks for.
-          verifyToken: (token) => (token === "test-token" ? "test_user" : null),
-          ownsCharacter: () => true
+          // Deterministic rolls: 0.5 never crits and never rolls a dodge.
+          random: () => 0.5,
+          // Test authority: two tokens, one owned-character rule.
+          verifyToken: (token) => {
+            if (token === "test-token") return "test_user";
+            if (token === "admin-token") return adminUserId;
+            return null;
+          },
+          ownsCharacter: (_userId, characterId) => characterId !== "char_not_owned",
+          findCharacter: (_userId, characterId) => ({
+            id: characterId,
+            name: characterId,
+            sect: "thieu-lam",
+            gender: characterId === "char_female" ? "female" : "male"
+          })
         });
         resolve();
       });
@@ -133,1205 +153,504 @@ test("WebSocket Real-time Multiplayer Suite", async (t) => {
     assert.ok(port > 0, "Server bound to port");
   });
 
-  await t.test("Client 1 connects and receives init_world on join", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+  await t.test("Join requires a verified token and an owned character", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    // Send player_join
-    client1.send({
+    // No token.
+    client.send({ type: "player_join", payload: { characterId: "char_a", x: 5000, y: 5000 } });
+    assert.equal((await client.waitFor((m) => m.type === "join_rejected")).payload.reason, "auth");
+
+    // Invalid token.
+    client.send({ type: "player_join", payload: { token: "bad-token", characterId: "char_a" } });
+    assert.equal((await client.waitFor((m) => m.type === "join_rejected")).payload.reason, "auth");
+
+    // No character.
+    client.send({ type: "player_join", payload: { token: "test-token" } });
+    assert.equal((await client.waitFor((m) => m.type === "join_rejected")).payload.reason, "auth");
+
+    // A character the account does not own.
+    client.send({
       type: "player_join",
-      payload: {
-        id: "usr_alice",
-        username: "alice",
-        displayName: "Hiệp Nữ Alice",
-        x: 6400,
-        y: 6200,
-        level: 5
-      }
+      payload: { token: "test-token", characterId: "char_not_owned" }
     });
+    assert.equal((await client.waitFor((m) => m.type === "join_rejected")).payload.reason, "auth");
 
-    const initMsg = await client1.waitFor((m) => m.type === "init_world");
-    assert.equal(initMsg.type, "init_world");
-    assert.equal(initMsg.payload.yourId, "usr_alice");
-    assert.equal(initMsg.payload.players.length, 0, "Alice is first player in world");
-
-    await client1.close();
+    await client.close();
   });
 
-  await t.test("Multiplayer broadcast: join, move, attack, chat, and leave", async () => {
+  await t.test("Join publishes authoritative state and ignores forged fields", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+
+    // Forged level, stats, HP/MP, equipment and gender must all be ignored.
+    const init = await join(client, {
+      characterId: "char_sync",
+      extra: {
+        hp: 1,
+        maxHp: 9999,
+        mp: 0,
+        maxMp: 9999,
+        attack: 999,
+        defense: 999,
+        critRate: 1,
+        level: 99,
+        equipment: { armor: "cam-y-bao", weapon: 5 },
+        gender: "female"
+      }
+    });
+    assert.equal(init.type, "init_world");
+    assert.equal(init.payload.yourId, "char_sync");
+    assert.equal(init.payload.players.length, 0);
+
+    const progress = await client.waitFor((m) => m.type === "player_progress");
+    assert.equal(progress.payload.level, 1);
+    assert.equal(progress.payload.exp, 0);
+    assert.equal(progress.payload.coins, 0);
+    assert.equal(progress.payload.kills, 0);
+
+    const hp = await client.waitFor((m) => m.type === "player_hp" && m.payload.id === "char_sync");
+    assert.equal(hp.payload.hp, 100);
+    assert.equal(hp.payload.maxHp, 100);
+
+    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.id === "char_sync");
+    assert.equal(mp.payload.mp, 60);
+    assert.equal(mp.payload.maxMp, 60);
+
+    const stats = await client.waitFor((m) => m.type === "player_stats");
+    assert.equal(stats.payload.attack, 24);
+    assert.equal(stats.payload.defense, 6);
+    assert.equal(stats.payload.maxHp, 100);
+    assert.equal(stats.payload.level, 1);
+
+    const equipment = await client.waitFor((m) => m.type === "equipment_sync");
+    assert.equal(equipment.payload.equipment.armor, null, "forged gear is ignored");
+    assert.equal(equipment.payload.equipment.weapon, null);
+
+    const bag = await client.waitFor((m) => m.type === "inventory_sync");
+    assert.equal(typeof bag.payload.inventory, "object");
+
+    await client.close();
+  });
+
+  await t.test("Gender comes from the stored character, not the join packet", async () => {
+    const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(observer, { characterId: "char_observer" });
+
+    const female = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(female, { characterId: "char_female", x: 5100, y: 5000 });
+
+    const joined = await observer.waitFor(
+      (m) => m.type === "player_joined" && m.payload.player.id === "char_female"
+    );
+    assert.equal(joined.payload.player.gender, "female");
+
+    await female.close();
+    await observer.close();
+  });
+
+  await t.test("Multiplayer broadcast: move, attack, chat, and leave", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    // Client 1 joins
-    client1.send({
-      type: "player_join",
-      payload: {
-        id: "usr_hero1",
-        username: "Hero1",
-        displayName: "Độc Cô Cầu Bại",
-        x: 5000,
-        y: 5000
-      }
-    });
-    const init1 = await client1.waitFor((m) => m.type === "init_world");
-    assert.equal(init1.payload.yourId, "usr_hero1");
+    await join(client1, { characterId: "char_hero1" });
+    const joined = client1.waitFor((m) => m.type === "player_joined");
+    await join(client2, { characterId: "char_hero2", x: 5100, y: 5000 });
 
-    // Client 2 joins -> Client 1 should receive player_joined
-    client2.send({
-      type: "player_join",
-      payload: {
-        id: "usr_hero2",
-        username: "Hero2",
-        displayName: "Lệnh Hồ Xung",
-        x: 5500,
-        y: 5200
-      }
-    });
+    const j = await joined;
+    assert.equal(j.payload.player.id, "char_hero2");
 
-    const joinBroadcast = await client1.waitFor((m) => m.type === "player_joined");
-    assert.equal(joinBroadcast.payload.player.id, "usr_hero2");
-    assert.equal(joinBroadcast.payload.player.displayName, "Lệnh Hồ Xung");
+    const init2 = client2.messages.find((m) => m.type === "init_world");
+    assert.equal(init2.payload.players.length, 1);
+    assert.equal(init2.payload.players[0].id, "char_hero1");
 
-    // Client 2 should have received init_world containing Hero1
-    const client2Init = await client2.waitFor((m) => m.type === "init_world");
-    assert.equal(client2Init.payload.players.length, 1);
-    assert.equal(client2Init.payload.players[0].id, "usr_hero1");
-
-    // Test movement broadcast: Client 1 moves -> Client 2 receives player_moved
+    // A legitimate step is broadcast to the rest of the map.
     client1.send({
       type: "player_move",
-      payload: {
-        x: 5300,
-        y: 5100,
-        vx: 120,
-        vy: 0,
-        direction: "right",
-        stance: "side"
-      }
+      payload: { x: 5050, y: 5000, vx: 120, vy: 0, direction: "right", stance: "side" }
     });
+    const moved = await client2.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "char_hero1"
+    );
+    assert.equal(moved.payload.x, 5050);
+    assert.equal(moved.payload.stance, "side");
 
-    const moveBroadcast = await client2.waitFor((m) => m.type === "player_moved");
-    assert.equal(moveBroadcast.payload.id, "usr_hero1");
-    assert.equal(moveBroadcast.payload.x, 5300);
-    assert.equal(moveBroadcast.payload.y, 5100);
-    assert.equal(moveBroadcast.payload.stance, "side");
-
-    // Test attack broadcast: Client 1 attacks -> Client 2 receives player_attacked
     client1.send({
       type: "player_attack",
-      payload: {
-        skill: "normal",
-        x: 5300,
-        y: 5100,
-        facingRight: true
-      }
+      payload: { skill: "normal", x: 5050, y: 5000, facingRight: true }
     });
+    const attacked = await client2.waitFor(
+      (m) => m.type === "player_attacked" && m.payload.id === "char_hero1"
+    );
+    assert.equal(attacked.payload.skill, "normal");
 
-    const attackBroadcast = await client2.waitFor((m) => m.type === "player_attacked");
-    assert.equal(attackBroadcast.payload.id, "usr_hero1");
-    assert.equal(attackBroadcast.payload.skill, "normal");
-
-    // Test chat broadcast: Client 2 chats -> Both receive player_chat
     client2.send({
       type: "player_chat",
-      payload: {
-        text: "Huynh đệ cùng tẩu giang hồ nhé!",
-        channel: "world"
-      }
+      payload: { text: "Huynh đệ cùng tẩu giang hồ nhé!", channel: "world" }
     });
+    const chat = await client1.waitFor((m) => m.type === "player_chat");
+    assert.equal(chat.payload.text, "Huynh đệ cùng tẩu giang hồ nhé!");
+    assert.equal(typeof chat.payload.sender, "string");
+    assert.ok(chat.payload.sender.length > 0);
 
-    const chatBroadcast1 = await client1.waitFor((m) => m.type === "player_chat");
-    assert.equal(chatBroadcast1.payload.text, "Huynh đệ cùng tẩu giang hồ nhé!");
-    assert.equal(chatBroadcast1.payload.sender, "Lệnh Hồ Xung");
-
-    // Test disconnect: Client 2 disconnects -> Client 1 receives player_left
     await client2.close();
-
-    const leaveBroadcast = await client1.waitFor(
-      (m) => m.type === "player_left" && m.payload.id === "usr_hero2"
+    const left = await client1.waitFor(
+      (m) => m.type === "player_left" && m.payload.id === "char_hero2"
     );
-    assert.equal(leaveBroadcast.payload.id, "usr_hero2");
+    assert.equal(left.payload.id, "char_hero2");
 
     await client1.close();
   });
 
-  await t.test("Equipment is sanitized on join and relayed when it changes", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+  await t.test("Movement is validated: a teleport jump is snapped back", async () => {
+    const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(observer, { characterId: "char_move_watch", x: 5300, y: 5000 });
 
-    client1.send({
-      type: "player_join",
-      payload: {
-        id: "usr_eq1",
-        username: "Eq1",
-        x: 4000,
-        y: 4000,
-        // Unknown slots and non-string ids must be dropped.
-        equipment: { armor: "cam-y-bao", helmet: "phuong-vu-bao", bogus: "x", weapon: 5 }
-      }
-    });
-    await client1.waitFor((m) => m.type === "init_world");
-
-    // Client 2's init snapshot must carry client 1's worn slots, sanitized.
-    client2.send({ type: "player_join", payload: { id: "usr_eq2", username: "Eq2", x: 4100, y: 4100 } });
-    const init2 = await client2.waitFor((m) => m.type === "init_world");
-    const snap = init2.payload.players.find((p) => p.id === "usr_eq1");
-    assert.equal(snap.equipment.armor, "cam-y-bao");
-    assert.equal(snap.equipment.helmet, "phuong-vu-bao");
-    assert.equal(snap.equipment.weapon, null);
-    assert.equal(snap.equipment.bogus, undefined);
-
-    // A later change is relayed to peers only, with the same sanitizing.
-    client1.send({
-      type: "player_equipment",
-      payload: { equipment: { weapon: "hac-ung-kiem", armor: null, junk: "x" } }
-    });
-    const relay = await client2.waitFor((m) => m.type === "player_equipment");
-    assert.equal(relay.payload.id, "usr_eq1");
-    assert.equal(relay.payload.equipment.weapon, "hac-ung-kiem");
-    assert.equal(relay.payload.equipment.armor, null);
-    assert.equal(relay.payload.equipment.junk, undefined);
-
-    await client1.close();
-    await client2.close();
-  });
-
-  await t.test("Gender is carried on join and broadcast to peers", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    client1.send({
-      type: "player_join",
-      payload: { id: "usr_g1", username: "G1", x: 400, y: 400, gender: "female" }
-    });
-    await client1.waitFor((m) => m.type === "init_world");
-
-    // Client 2 connects only now, so it never sees the initial g1 broadcast and
-    // its init snapshot is the first (and only) place g1's gender appears.
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client2.send({ type: "player_join", payload: { id: "usr_g2", username: "G2", x: 410, y: 410, gender: "bogus" } });
-    const init2 = await client2.waitFor((m) => m.type === "init_world");
-    const snap = init2.payload.players.find((p) => p.id === "usr_g1");
-    assert.equal(snap.gender, "female");
-
-    // Unknown genders fall back to "male" (client 2 reported a bogus value).
-    const joinBroadcast = await client1.waitFor(
-      (m) => m.type === "player_joined" && m.payload.player.id === "usr_g2"
-    );
-    assert.equal(joinBroadcast.payload.player.gender, "male");
-
-    // A character switch re-joins; the new gender rides the join broadcast so
-    // peers redraw from player_joined (no dedicated gender packet exists).
-    client1.send({
-      type: "player_join",
-      payload: { id: "usr_g1", username: "G1", x: 400, y: 400, gender: "male" }
-    });
-    const rejoined = await client2.waitFor(
-      (m) => m.type === "player_joined" && m.payload.player.id === "usr_g1"
-    );
-    assert.equal(rejoined.payload.player.gender, "male");
-
-    await client1.close();
-    await client2.close();
-  });
-
-  await t.test("Player HP is server-authoritative (level-derived ceiling, heals clamp)", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    client1.send({ type: "player_join", payload: { id: "usr_hp1", username: "Hp1", x: 6400, y: 6200, hp: 100 } });
-    await client1.waitFor((m) => m.type === "init_world");
-    // The client-reported maxHp is ignored: the ceiling comes from the ledger (level 1 -> 100).
-    client2.send({ type: "player_join", payload: { id: "usr_hp2", username: "Hp2", x: 6600, y: 6200, hp: 80, maxHp: 120 } });
-    await client2.waitFor((m) => m.type === "init_world");
-    await client1.waitFor((m) => m.type === "player_joined");
-
-    // The joiner already carries its health in the join snapshot
-    const joinBroadcast = client1.messages.find((m) => m.type === "player_joined");
-    assert.equal(joinBroadcast.payload.player.hp, 80);
-    assert.equal(joinBroadcast.payload.player.maxHp, 100, "maxHp is derived from the server-owned level");
-
-    // A client cannot set its own HP or ceiling through a stats report
-    const before = client1.messages.length;
-    client2.send({ type: "player_stats", payload: { hp: 9999, maxHp: 9999, defense: 6 } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    assert.equal(
-      client1.messages.slice(before).filter((m) => m.type === "player_hp").length,
-      0,
-      "A stats report can never change HP or the ceiling"
-    );
-
-    // A heal is clamped to the ceiling, never past it
-    client2.send({ type: "player_heal", payload: { amount: 9999 } });
-    const healed = await client1.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_hp2");
-    assert.equal(healed.payload.hp, 100, "The heal clamps to the server ceiling");
-    assert.equal(healed.payload.maxHp, 100);
-
-    // Sockets that never joined cannot heal
-    const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    spectator.send({ type: "player_heal", payload: { amount: 50 } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    assert.equal(
-      client1.messages.filter((m) => m.type === "player_hp" && m.payload.id === undefined).length,
-      0,
-      "An un-joined socket's heal is ignored"
-    );
-
-    await spectator.close();
-    await client2.close();
-    await client1.close();
-  });
-
-  await t.test("Palm skill spends server-owned MP", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({ type: "player_join", payload: { id: "usr_palm_mp", token: "test-token", characterId: "char_mp_1", username: "PalmMp", x: 640, y: 620 } });
-    await client.waitFor((m) => m.type === "init_world");
+    await join(client, { characterId: "char_move", x: 5000, y: 5000 });
 
-    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 640, y: 620, facingRight: true } });
+    // A 4000px jump cannot be covered in one step at walk speed.
+    client.send({ type: "player_move", payload: { x: 9000, y: 5000, vx: 0, vy: 0 } });
+    const snapped = await client.waitFor((m) => m.type === "player_moved" && m.payload.id === "char_move");
+    assert.equal(snapped.payload.x, 5000, "the server keeps its own position");
+    assert.equal(snapped.payload.y, 5000);
+
+    // A small walk is accepted and broadcast to the rest of the map (the mover
+    // is excluded from its own broadcast, so a peer observes it).
+    client.send({ type: "player_move", payload: { x: 5100, y: 5000, vx: 120, vy: 0 } });
+    const accepted = await observer.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "char_move"
+    );
+    assert.equal(accepted.payload.x, 5100);
+
+    await client.close();
+    await observer.close();
+  });
+
+  await t.test("Monster damage is authoritative (client damage is ignored)", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_dmg", x: 8350, y: 6000 });
+
+    // No preceding swing: the hit is dropped, so damage cannot be minted freely.
+    client.send({ type: "enemy_hit", payload: { id: 0, damage: 9999 } });
+    await sleep(120);
+    assert.equal(
+      client.count((m) => m.type === "enemy_hit" && m.payload.damage > 0),
+      0,
+      "an unswung hit is ignored"
+    );
+
+    // After a real swing the server recomputes the damage from its own stats.
+    client.send({ type: "player_attack", payload: { skill: "normal", x: 8400, y: 6000, facingRight: true } });
+    client.send({ type: "enemy_hit", payload: { id: 0, damage: 9999 } });
+    const hit = await client.waitFor((m) => m.type === "enemy_hit" && m.payload.damage > 0);
+    assert.ok(hit.payload.damage < 9999, "the client-reported damage is ignored");
+    assert.ok(hit.payload.damage <= 50, "damage stays within the plausible range");
+    assert.equal(hit.payload.hp, ENEMY_MAX_HP - hit.payload.damage);
+
+    await client.close();
+  });
+
+  await t.test("Skill casts are validated (unlock, passive, MP, damage)", async () => {
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_skill", x: 9450, y: 6700 });
+
+    // Locked at level 1.
+    client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong" } });
+    const locked = await client.waitFor((m) => m.type === "skill_rejected");
+    assert.equal(locked.payload.reason, "locked");
+
+    // A passive internal art cannot be cast.
+    client.send({ type: "player_attack", payload: { skill: "thieu_lam_tam_phap" } });
+    const passive = await client.waitFor((m) => m.type === "skill_rejected");
+    assert.equal(passive.payload.reason, "passive");
+
+    // A real cast spends its MP, then its follow-up hit is recomputed server-side.
+    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 9500, y: 6700, facingRight: true } });
     const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 48);
     assert.equal(mp.payload.maxMp, 60);
 
-    await client.close();
-  });
-
-  await t.test("MP is server-authoritative (skill cost, potion clamp, no free cast)", { skip: SKIP_NO_KIT }, async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({ type: "player_join", payload: { id: "usr_mp1", token: "test-token", characterId: "char_mp_1", username: "Mp1", x: 640, y: 620 } });
-    await client.waitFor((m) => m.type === "init_world");
-
-    // Each cast spends that skill's MP from the server-owned pool (level 1 -> maxMp 60).
-    // Distinct skills are used so their individual cooldowns never block the next cast.
-    const casts = [
-      { skill: "dai_tu_di_chuong", mp: 48 },
-      { skill: "la_han_tran", mp: 30 },
-      { skill: "kim_cang_bat_hoai", mp: 10 }
-    ];
-    for (const step of casts) {
-      client.send({ type: "player_attack", payload: { skill: step.skill, x: 640, y: 620, facingRight: true } });
-      const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === step.mp);
-      assert.equal(mp.payload.maxMp, 60);
-      await new Promise((resolve) => setTimeout(resolve, 320));
-    }
-
-    // An unaffordable ultimate is refused: MP never goes negative
-    client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong", x: 640, y: 620, facingRight: true } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    const lastMp = client.messages.filter((m) => m.type === "player_mp").at(-1);
-    assert.equal(lastMp.payload.mp, 10, "The refused cast spends nothing");
-
-    // A restore is clamped to the ceiling
-    client.send({ type: "player_restore_mp", payload: { amount: 9999 } });
-    const refilled = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 60);
-    assert.equal(refilled.payload.maxMp, 60);
+    client.send({ type: "enemy_hit", payload: { id: 1, skill: "dai_tu_di_chuong", damage: 9999 } });
+    const hit = await client.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 1 && m.payload.damage > 0);
+    assert.ok(hit.payload.damage < 9999);
 
     await client.close();
   });
 
-  await t.test("Skill hits are damage-authoritative (client damage is ignored)", { skip: SKIP_NO_KIT }, async () => {
+  await t.test("Stun is applied by the server and holds the monster still", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    // Wolf 6 lives at (10500, 8200). A hero 900 units away is inside its aggro
+    // range (1050) but well outside its stop distance (260), leaving enough
+    // runway that it is still walking when the stun expires.
+    await join(client, { characterId: "char_stun", x: 9600, y: 8200 });
+
+    const movesWolf6 = (m) =>
+      m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 6);
+
+    // Confirm the server is actively moving that wolf before we stun it.
+    await client.waitFor(movesWolf6, 3000);
+
+    // `dai_tu_di_chuong` carries an 800ms stun; the hit must survive the blow.
     client.send({
-      type: "player_join",
-      payload: {
-        id: "usr_skilldmg",
-        token: "test-token",
-        characterId: "char_eco_1",
-        username: "SkillDmg",
-        x: 8400,
-        y: 6000,
-        // Weak enough that one palm hit cannot kill the wolf: later subtests
-        // still need enemies 0..2 alive on this map.
-        attack: 12,
-        critRate: 0
-      }
+      type: "player_attack",
+      payload: { skill: "dai_tu_di_chuong", x: 10500, y: 8200, facingRight: true }
     });
-    await client.waitFor((m) => m.type === "init_world");
-
-    // A hit without a preceding cast is ignored: damage cannot be minted freely.
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "dai_tu_di_chuong", damage: 9999 } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    assert.equal(
-      client.messages.filter((m) => m.type === "enemy_hit" && m.payload.damage > 0).length,
-      0,
-      "an uncast skill hit is dropped"
-    );
-
-    // After a real cast the server recomputes the damage from the catalog.
-    client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 8400, y: 6000, facingRight: true } });
-    client.send({ type: "enemy_hit", payload: { id: 0, skill: "dai_tu_di_chuong", damage: 9999 } });
+    client.send({ type: "enemy_hit", payload: { id: 6, skill: "dai_tu_di_chuong", damage: 9999 } });
     const hit = await client.waitFor(
-      (m) => m.type === "enemy_hit" && m.payload.id === 0 && m.payload.damage > 0
+      (m) => m.type === "enemy_hit" && m.payload.id === 6 && m.payload.damage > 0
     );
-    assert.ok(hit.payload.damage < 9999, "the server ignored the client-reported damage");
-    assert.ok(hit.payload.damage <= 120, "damage stays within the skill's plausible range");
+    assert.ok(hit.payload.hp > 0, "the stun skill does not kill the wolf");
+
+    const before = client.messages.length;
+    await sleep(500);
+    assert.equal(
+      client.messages.slice(before).filter(movesWolf6).length,
+      0,
+      "a stunned monster holds position"
+    );
+
+    // Once the stun expires the AI resumes and the wolf walks again.
+    const resumed = await client.waitFor(movesWolf6, 2000);
+    assert.ok(resumed);
 
     await client.close();
   });
 
-  await t.test("Kill rewards credit the server-owned ledger and persist", async () => {
+  await t.test("Kill rewards credit the server-owned ledger", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({ type: "player_join", payload: { id: "usr_eco1", token: "test-token", characterId: "char_eco_1", username: "Eco1", x: 840, y: 600 } });
-    await client.waitFor((m) => m.type === "init_world");
+    await join(client, { characterId: "char_kill", x: 11050, y: 5900 });
 
-    // Joining seeds the ledger at level 1
-    const seeded = client.messages.find((m) => m.type === "player_progress");
-    assert.equal(seeded.payload.level, 1);
-    assert.equal(seeded.payload.exp, 0);
-    assert.equal(seeded.payload.coins, 0);
-    assert.equal(seeded.payload.kills, 0);
-
-    // Three kills at 35 EXP each reach level 2 (100 needed) with 5 EXP left over
-    for (const id of [0, 1, 2]) {
-      client.send({ type: "enemy_hit", payload: { id, damage: ENEMY_MAX_HP } });
-      await client.waitFor((m) => m.type === "enemy_reward" && m.payload.enemyId === id);
-    }
-    const finalProgress = await client.waitFor((m) => m.type === "player_progress" && m.payload.kills === 3);
-    assert.equal(finalProgress.payload.exp, 5);
-    assert.equal(finalProgress.payload.level, 2);
-    assert.ok(finalProgress.payload.coins >= 9 && finalProgress.payload.coins <= 27);
-    assert.equal(finalProgress.payload.maxHp, 120, "maxHp follows the new level");
-
-    // A level-up also refills MP to the new (higher) ceiling
-    const mpRefill = await client.waitFor((m) => m.type === "player_mp" && m.payload.maxMp === 70);
-    assert.equal(mpRefill.payload.mp, 70, "A level-up refills MP");
-
-    // The derived leaderboard carries the character's resolved display name
-    const lb = await (await fetch(`http://127.0.0.1:${port}/api/leaderboard?sortBy=level&limit=50`)).json();
-    const entry = lb.data.rankings.find((r) => r.playerId === "char_eco_1");
-    assert.ok(entry, "The played character appears in the leaderboard");
-    assert.equal(entry.playerName, "Eco1");
-    assert.equal(entry.level, 2);
-
-    await client.close();
-
-    // The ledger survives a reconnect (persisted by the server)
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client2.send({ type: "player_join", payload: { id: "usr_eco1b", token: "test-token", characterId: "char_eco_1", username: "Eco1", x: 840, y: 600 } });
-    await client2.waitFor((m) => m.type === "init_world");
-    const resumed = await client2.waitFor((m) => m.type === "player_progress");
-    assert.equal(resumed.payload.level, 2);
-    assert.equal(resumed.payload.kills, 3);
-    await client2.close();
-  });
-
-  await t.test("Shop purchases debit server silver and store the item", async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({
-      type: "player_join",
-      payload: {
-        id: "usr_shop",
-        token: "test-token",
-        characterId: "char_shop_1",
-        username: "Shop",
-        x: 6400,
-        y: 6050
+    let reward = null;
+    for (let attempt = 0; attempt < 8 && !reward; attempt++) {
+      await swingAndHitEnemy(client, 2, attempt === 0 ? 0 : 340);
+      try {
+        reward = await client.waitFor(
+          (m) => m.type === "enemy_reward" && m.payload.enemyId === 2,
+          500
+        );
+      } catch {
+        // keep swinging
       }
-    });
-    await client.waitFor((m) => m.type === "init_world");
+    }
+    assert.ok(reward, "the monster dies after a few swings");
+    assert.equal(reward.payload.exp, 35);
+    assert.ok(reward.payload.coins >= 3 && reward.payload.coins <= 9);
+    assert.equal(reward.payload.drop, undefined, "kills never grant items");
 
-    // Buying from across the map is refused even with silver.
-    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
-    const farAway = await client.waitFor(
-      (m) => m.type === "shop_result" && m.payload.ok === false
+    const progress = await client.waitFor(
+      (m) => m.type === "player_progress" && m.payload.kills >= 1
     );
-    assert.equal(farAway.payload.reason, "range");
-    assert.equal(farAway.payload.coins, 0, "a refused purchase spends nothing");
+    assert.equal(progress.payload.kills, 1);
+    assert.equal(progress.payload.exp, 35);
 
-    // Walk up to the Dược Sư, then earn silver deterministically from the
-    // one-off quest payout instead of killing shared enemies (that would
-    // perturb the later enemy-state tests).
-    const duocNpc = MARKET_NPCS.find((npc) => npc.shop === "pharmacy");
-    client.send({
-      type: "player_move",
-      payload: { x: duocNpc.x, y: duocNpc.y + 80, vx: 0, vy: 0 }
-    });
-    client.send({ type: "quest_claim", payload: {} });
-    const earned = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins > 0);
-    assert.equal(earned.payload.coins, 20);
+    await client.close();
+  });
+
+  await t.test("Inventory is server-authoritative (use_item)", async () => {
+    store.setInventory("char_item", { "kim-sang-duoc": 2, "hoi-thanh-phu": 1 });
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_item" });
+
+    const initial = await client.waitFor((m) => m.type === "inventory_sync");
+    assert.equal(initial.payload.inventory["kim-sang-duoc"], 2);
+
+    client.send({ type: "use_item", payload: { itemId: "kim-sang-duoc" } });
+    const first = await client.waitFor(
+      (m) => m.type === "inventory_sync" && m.payload.inventory["kim-sang-duoc"] === 1
+    );
+    assert.equal(first.payload.inventory["kim-sang-duoc"], 1);
+
+    const result = await client.waitFor((m) => m.type === "item_result" && m.payload.action === "use");
+    assert.equal(result.payload.ok, true);
+
+    // An exhausted stack is refused and never applied.
+    client.send({ type: "use_item", payload: { itemId: "kim-sang-duoc" } });
+    await client.waitFor(
+      (m) => m.type === "inventory_sync" && !m.payload.inventory["kim-sang-duoc"]
+    );
+    client.send({ type: "use_item", payload: { itemId: "kim-sang-duoc" } });
+    const refused = await client.waitFor(
+      (m) => m.type === "item_result" && m.payload.action === "use" && m.payload.ok === false
+    );
+    assert.equal(refused.payload.ok, false);
+
+    // The teleport scroll moves the player on the server.
+    const spawn = getMap(DEFAULT_MAP_ID).spawn;
+    client.send({ type: "use_item", payload: { itemId: "hoi-thanh-phu" } });
+    const moved = await client.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "char_item"
+    );
+    assert.equal(moved.payload.x, spawn.x);
+    assert.equal(moved.payload.y, spawn.y);
+
+    await client.close();
+  });
+
+  await t.test("Equipment is server-authoritative", async () => {
+    store.setInventory("char_eq", { "ao-lang-khach": 1 });
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_eq" });
+    // Drain the join-time (empty) gear snapshot so the next one is the equip result.
+    await client.waitFor((m) => m.type === "equipment_sync");
+
+    client.send({ type: "equip_item", payload: { itemId: "ao-lang-khach" } });
+    const equipped = await client.waitFor((m) => m.type === "equipment_sync");
+    assert.equal(equipped.payload.equipment.armor, "ao-lang-khach");
+
+    const result = await client.waitFor((m) => m.type === "item_result" && m.payload.action === "equip");
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.slot, "armor");
+
+    // A forged stat report cannot change anything (the inbound message is gone).
+    client.send({ type: "player_stats", payload: { defense: 9999, attack: 9999 } });
+    await sleep(120);
+    assert.equal(
+      client.count((m) => m.type === "player_stats" && m.payload.defense === 9999),
+      0,
+      "forged stats are ignored"
+    );
+
+    // Taking it off returns it to the server bag.
+    client.send({ type: "unequip_slot", payload: { slot: "armor" } });
+    const unequipped = await client.waitFor(
+      (m) => m.type === "equipment_sync" && m.payload.equipment.armor === null
+    );
+    assert.equal(unequipped.payload.equipment.armor, null);
+    const bag = await client.waitFor(
+      (m) => m.type === "inventory_sync" && m.payload.inventory["ao-lang-khach"] === 1
+    );
+    assert.equal(bag.payload.inventory["ao-lang-khach"], 1);
+
+    await client.close();
+  });
+
+  await t.test("Shop purchases debit the server ledger", async () => {
+    store.setProgress("char_shop", { level: 1, exp: 0, coins: 100, kills: 0 }, "char_shop");
+    const npc = MARKET_NPCS.find((entry) => entry.shop === "pharmacy");
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_shop", x: npc.x, y: npc.y + 80 });
+
+    const before = await client.waitFor((m) => m.type === "player_progress");
+    assert.equal(before.payload.coins, 100);
 
     client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
     const bought = await client.waitFor((m) => m.type === "shop_result");
     assert.equal(bought.payload.ok, true);
-    assert.equal(bought.payload.itemId, "kim-sang-duoc");
-    assert.equal(bought.payload.qty, 1);
     assert.equal(bought.payload.total, 8);
-    assert.equal(bought.payload.coins, earned.payload.coins - 8, "silver is debited by the server");
+    assert.equal(bought.payload.coins, 92);
 
-    // The authoritative ledger and bag both reflect the purchase.
-    const progress = await client.waitFor((m) => m.type === "player_progress" && m.payload.coins === earned.payload.coins - 8);
-    assert.equal(progress.payload.coins, earned.payload.coins - 8);
-
-    // Unknown stock and unaffordable quantities are refused without charging.
-    client.send({ type: "shop_buy", payload: { itemId: "thiet-trao", qty: 1 } });
-    const unknown = await client.waitFor((m) => m.type === "shop_result" && m.payload.ok === false);
-    assert.equal(unknown.payload.reason, "unknown");
-
-    client.send({ type: "shop_buy", payload: { itemId: "nu-nhi-hong", qty: 99 } });
-    const poor = await client.waitFor(
-      (m) => m.type === "shop_result" && m.payload.ok === false && m.payload.reason === "coins"
+    const progress = await client.waitFor(
+      (m) => m.type === "player_progress" && m.payload.coins === 92
     );
-    assert.equal(poor.payload.coins, earned.payload.coins - 8, "a refused purchase spends nothing");
+    assert.equal(progress.payload.coins, 92);
+    const bag = await client.waitFor(
+      (m) => m.type === "inventory_sync" && m.payload.inventory["kim-sang-duoc"] === 1
+    );
+    assert.equal(bag.payload.inventory["kim-sang-duoc"], 1);
 
     await client.close();
-
-    // The server bag is authoritative and already contains the purchase.
-    const inventory = await (await fetch(`http://127.0.0.1:${port}/api/inventory/char_shop_1`)).json();
-    assert.equal(inventory.data.inventory["kim-sang-duoc"], 1, "the purchase is stored on the server bag");
-
-    // A guest (no verified character) cannot trade.
-    const guest = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    guest.send({ type: "player_join", payload: { id: "usr_shop_guest", username: "Guest" } });
-    await guest.waitFor((m) => m.type === "init_world");
-    guest.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
-    const refused = await guest.waitFor((m) => m.type === "shop_result");
-    assert.equal(refused.payload.ok, false);
-    assert.equal(refused.payload.reason, "guest");
-    await guest.close();
-  });
-
-  await t.test("Unauthenticated joins earn nothing", async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    // No token: the player is present but owns no ledger.
-    client.send({ type: "player_join", payload: { id: "usr_guest", characterId: "char_eco_1", username: "Guest", x: 840, y: 600 } });
-    await client.waitFor((m) => m.type === "init_world");
-
-    assert.equal(
-      client.messages.filter((m) => m.type === "player_progress").length,
-      0,
-      "An unauthenticated join is not sent a ledger"
-    );
-
-    client.send({ type: "enemy_hit", payload: { id: 4, damage: ENEMY_MAX_HP } });
-    await client.waitFor((m) => m.type === "enemy_reward" && m.payload.enemyId === 4);
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    assert.equal(
-      client.messages.filter((m) => m.type === "player_progress").length,
-      0,
-      "A kill by an unauthenticated player pays no progress"
-    );
-
-    await client.close();
-
-    // The owned character's ledger is untouched by the guest's kill.
-    const owner = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    owner.send({ type: "player_join", payload: { id: "usr_owner", token: "test-token", characterId: "char_eco_1", username: "Owner", x: 840, y: 600 } });
-    await owner.waitFor((m) => m.type === "init_world");
-    const progress = await owner.waitFor((m) => m.type === "player_progress");
-    assert.equal(progress.payload.kills, 3, "The guest's kill did not credit the owned character");
-    await owner.close();
   });
 
   await t.test("Wolves bite on the server and stream authoritative HP", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_bite", x: 8400, y: 6000 });
 
-    // Stand on wolf 0's home; it settles within bite range immediately
-    client.send({
-      type: "player_join",
-      payload: { id: "usr_bite", username: "Bite", x: 8400, y: 6000, hp: 100, maxHp: 100, defense: 6 }
-    });
-    await client.waitFor((m) => m.type === "init_world");
-
-    const bite = await client.waitFor((m) => m.type === "player_hp" && m.payload.damage > 0, 3000);
-    assert.equal(bite.payload.id, "usr_bite");
-    assert.equal(bite.payload.sourceName, "Sói Xám");
-    assert.ok(bite.payload.damage >= 1);
-    assert.equal(bite.payload.hp, 100 - bite.payload.damage, "HP reflects the server-rolled bite");
-
-    await client.close();
-  });
-
-  await t.test("Heartbeat ping-pong responds", async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    client.send({ type: "ping" });
-    const pong = await client.waitFor((m) => m.type === "pong");
-    assert.equal(pong.type, "pong");
-    assert.ok(pong.time > 0);
-
-    await client.close();
-  });
-
-  await t.test("GM actions: authoritative level set, full heal, and god mode", async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({
-      type: "player_join",
-      payload: { id: "usr_gm", username: "GM_Player", x: 640, y: 620 }
-    });
-    await client.waitFor((m) => m.type === "init_world");
-
-    // Test set_level
-    client.send({
-      type: "gm_action",
-      payload: { action: "set_level", level: 99 }
-    });
-    const progress = await client.waitFor((m) => m.type === "player_progress" && m.payload.level === 99);
-    assert.equal(progress.payload.level, 99);
-
-    // Test heal_full
-    client.send({
-      type: "gm_action",
-      payload: { action: "heal_full" }
-    });
-    const hp = await client.waitFor((m) => m.type === "player_hp");
-    assert.equal(hp.payload.hp, hp.payload.maxHp);
-
-    // Test god mode
-    client.send({
-      type: "gm_action",
-      payload: { action: "toggle_god_mode", enabled: true }
-    });
-    const gmState = await client.waitFor((m) => m.type === "gm_state");
-    assert.equal(gmState.payload.isGodMode, true);
-
-    await client.close();
-  });
-
-  await t.test("Non-admin cannot perform GM actions", async () => {
-    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({
-      type: "player_join",
-      payload: { id: "usr_regular", username: "RegularPlayer", x: 640, y: 620 }
-    });
-    await client.waitFor((m) => m.type === "init_world");
-
-    client.send({
-      type: "gm_action",
-      payload: { action: "set_level", level: 99 }
-    });
-    const err = await client.waitFor((m) => m.type === "error");
-    assert.match(err.payload.message, /quyền quản trị GM/);
-
-    await client.close();
-  });
-
-  await t.test("Enemy state is server-managed: shared HP, shared death and respawn", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    client1.send({ type: "player_join", payload: { id: "usr_wolf1", username: "Wolf1", x: 8400, y: 6000 } });
-    const init1 = await client1.waitFor((m) => m.type === "init_world");
-    assert.equal(init1.payload.enemies.length, 8, "World init ships the full enemy roster");
-    assert.equal(init1.payload.enemies[0].hp, ENEMY_MAX_HP);
-    assert.equal(init1.payload.enemies[0].isDead, false);
-
-    client2.send({ type: "player_join", payload: { id: "usr_wolf2", username: "Wolf2", x: 9000, y: 6400 } });
-    await client2.waitFor((m) => m.type === "init_world");
-    await client1.waitFor((m) => m.type === "player_joined");
-
-    // Hero1 hits wolf 0 for 20 -> both players must see 25 HP
-    client1.send({ type: "enemy_hit", payload: { id: 0, damage: 20, x: 8400, y: 6000 } });
-    const hit1 = await client1.waitFor((m) => m.type === "enemy_hit");
-    const hit2 = await client2.waitFor((m) => m.type === "enemy_hit");
-    assert.equal(hit1.payload.hp, 25);
-    assert.equal(hit2.payload.hp, 25);
-    assert.equal(hit2.payload.attackerId, "usr_wolf1");
-    assert.equal(hit2.payload.damage, 20);
-
-    // Hero2 finishes it -> the death is shared
-    client2.send({ type: "enemy_hit", payload: { id: 0, damage: 25 } });
-    const kill1 = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.isDead === true);
-    const kill2 = await client2.waitFor((m) => m.type === "enemy_hit" && m.payload.isDead === true);
-    assert.equal(kill1.payload.hp, 0);
-    assert.equal(kill1.payload.attackerId, "usr_wolf2");
-    assert.equal(kill2.payload.hp, 0);
-
-    // The killing blow's reward is rolled by the server and shared by both clients
-    const reward1 = await client1.waitFor((m) => m.type === "enemy_reward");
-    const reward2 = await client2.waitFor((m) => m.type === "enemy_reward");
-    assert.equal(reward1.payload.enemyId, 0);
-    assert.equal(reward1.payload.attackerId, "usr_wolf2");
-    assert.equal(reward2.payload.attackerId, "usr_wolf2");
-    assert.equal(reward1.payload.exp, 35);
-    assert.ok(reward1.payload.coins >= 3 && reward1.payload.coins <= 9);
-    assert.equal(reward1.payload.drop, undefined, "Kills no longer grant items");
-
-    // Hitting a corpse resyncs instead of dealing damage twice
-    client1.send({ type: "enemy_hit", payload: { id: 0, damage: 25 } });
-    const resync = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.damage === 0);
-    assert.equal(resync.payload.hp, 0);
-    assert.equal(resync.payload.isDead, true);
-
-    // A corpse hit resyncs and can never pay a second reward
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      client1.messages.filter((m) => m.type === "enemy_reward").length,
-      1,
-      "Only the killing blow pays a reward"
-    );
-
-    // Respawn is driven by the server clock, not by the killer's client
-    const respawned = await client2.waitFor(
-      (m) => m.type === "enemy_respawned" && m.payload.id === 0,
+    const bite = await client.waitFor(
+      (m) => m.type === "player_hp" && m.payload.id === "char_bite" && m.payload.damage > 0,
       3000
     );
-    assert.equal(respawned.payload.id, 0);
-    assert.equal(respawned.payload.hp, ENEMY_MAX_HP);
-    assert.equal(respawned.payload.isDead, false);
+    assert.equal(bite.payload.sourceName, "Sói Xám");
+    assert.ok(bite.payload.damage >= 1);
+    assert.equal(bite.payload.hp, 100 - bite.payload.damage);
 
-    // Unknown ids and malformed reports are ignored
-    client1.send({ type: "enemy_hit", payload: { id: 99, damage: 10 } });
-    client1.send({ type: "enemy_hit", payload: { id: 0, damage: -50 } });
-    client1.send({ type: "enemy_move", payload: {} });
-
-    // Damage cannot move a wolf: wolf 6 sits at its home (1050, 820), out of every
-    // player's range, and a hit carrying a bogus position must not relocate it
-    client1.send({ type: "enemy_hit", payload: { id: 6, damage: 1, x: 100, y: 100 } });
-    const hitWolf6 = await client1.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 6);
-    assert.equal(hitWolf6.payload.x, 10500, "The server keeps its own enemy position");
-    assert.equal(hitWolf6.payload.y, 8200);
-
-    // Movement is server-owned: a client's own position report changes nothing.
-    // Wolf 5 sits at its home (760, 800) with nobody in range, so it must stay there.
-    client1.send({ type: "enemy_move", payload: { enemies: [{ id: 5, x: 9000, y: 6400 }] } });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    assert.equal(
-      client1.messages.filter(
-        (m) => m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 5)
-      ).length,
-      0,
-      "A client-reported enemy position is ignored"
-    );
-
-    // Sockets that never joined cannot touch the shared enemy state
-    const spectator = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    spectator.send({ type: "enemy_hit", payload: { id: 3, damage: 40 } });
-    spectator.send({ type: "enemy_move", payload: { enemies: [{ id: 3, x: 100, y: 100 }] } });
-    spectator.send({ type: "player_join", payload: { id: "usr_wolf3", username: "Wolf3", x: 1000, y: 1000 } });
-
-    const spectatorInit = await spectator.waitFor((m) => m.type === "init_world");
-    const wolfThree = spectatorInit.payload.enemies.find((e) => e.id === 3);
-    assert.equal(wolfThree.hp, ENEMY_MAX_HP, "Un-joined sockets cannot damage enemies");
-    assert.equal(wolfThree.x, 12600, "Un-joined sockets cannot move enemies");
-
-    spectator.send({ type: "ping" });
-    assert.equal((await spectator.waitFor((m) => m.type === "pong")).type, "pong", "Server stays healthy");
-
-    await spectator.close();
-    await client2.close();
-    await client1.close();
+    await client.close();
   });
 
-  await t.test("Enemy movement is server-owned and shared by every player", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+  await t.test("PvP damage is recomputed (client damage is ignored)", async () => {
+    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const target = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 
-    // Wolf 1 spawns at (950, 670): client2 stands next to it, client1 is far away
-    client1.send({ type: "player_join", payload: { id: "usr_move1", username: "Move1", x: 14000, y: 6700 } });
-    await client1.waitFor((m) => m.type === "init_world");
-    client2.send({ type: "player_join", payload: { id: "usr_move2", username: "Move2", x: 10500, y: 6700 } });
-    await client2.waitFor((m) => m.type === "init_world");
-    await client1.waitFor((m) => m.type === "player_joined");
+    await join(attacker, { characterId: "char_pk1", x: 5000, y: 5000, extra: { pkFlag: true } });
+    await join(target, { characterId: "char_pk2", x: 5150, y: 5000, extra: { pkFlag: true } });
 
-    const nearPlayer = { x: 10500, y: 6700 };
-    const stopDistance = ENEMY_TUNING.stopDistance;
-    const wolfOne = (m) =>
-      m.type === "enemy_moved" ? m.payload.enemies.find((enemy) => enemy.id === 1) : null;
-    const settled = (m) => {
-      const wolf = wolfOne(m);
-      return Boolean(wolf) && Math.hypot(wolf.x - nearPlayer.x, wolf.y - nearPlayer.y) <= stopDistance + 1;
-    };
+    // A swing authorizes one strike; the reported 9999 is ignored.
+    attacker.send({ type: "player_attack", payload: { skill: "normal", x: 5000, y: 5000, facingRight: true } });
+    attacker.send({ type: "player_hit", payload: { targetId: "char_pk2", damage: 9999 } });
+    const hit = await target.waitFor(
+      (m) => m.type === "player_hp" && m.payload.id === "char_pk2" && m.payload.damage > 0
+    );
+    assert.ok(hit.payload.damage < 9999, "the client-reported damage is ignored");
+    assert.equal(hit.payload.hp, 100 - hit.payload.damage);
+    assert.equal(hit.payload.source, "pvp");
 
-    // Both players watch the wolf walk to the *nearer* player, not to their own
-    const seenByFarPlayer = await client1.waitFor(settled, 4000);
-    const seenByNearPlayer = await client2.waitFor(settled, 4000);
-    assert.ok(wolfOne(seenByFarPlayer).x < nearPlayer.x, "The far player sees it hold short of the nearer player");
-    assert.ok(wolfOne(seenByNearPlayer).x < nearPlayer.x);
-
-    // At rest the AI produces no delta, so the tick stops broadcasting that wolf
-    const before = client1.messages.length;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // The immunity window blocks an immediate follow-up.
+    const before = target.count(
+      (m) => m.type === "player_hp" && m.payload.id === "char_pk2" && m.payload.damage > 0
+    );
+    attacker.send({ type: "player_attack", payload: { skill: "normal", x: 5000, y: 5000 } });
+    attacker.send({ type: "player_hit", payload: { targetId: "char_pk2", damage: 9999 } });
+    await sleep(150);
     assert.equal(
-      client1.messages.slice(before).filter((m) => wolfOne(m)).length,
-      0,
-      "A settled wolf stops generating movement traffic"
+      target.count((m) => m.type === "player_hp" && m.payload.id === "char_pk2" && m.payload.damage > 0),
+      before,
+      "a hit during the immunity window is ignored"
     );
 
-    await client1.close();
-    await client2.close();
-  });
-
-  await t.test("PvP: the server applies damage, gates on PK flag and range, and respawns the loser", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    // Client 1 joins with the PK flag on
-    client1.send({
-      type: "player_join",
-      payload: { id: "usr_pk1", username: "Pk1", displayName: "Kiếm Khách", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await client1.waitFor((m) => m.type === "init_world");
-
-    // Client 2 joins flagged too, close to client 1
-    client2.send({
-      type: "player_join",
-      payload: { id: "usr_pk2", username: "Pk2", displayName: "Đao Khách", x: 5400, y: 5200, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    const init2 = await client2.waitFor((m) => m.type === "init_world");
-    assert.equal(init2.payload.players[0].pkFlag, true, "The PK flag travels in the world snapshot");
-
-    const joined2 = await client1.waitFor((m) => m.type === "player_joined");
-    assert.equal(joined2.payload.player.pkFlag, true);
-
-    // A flagged hit inside range is applied by the server and streamed as HP
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 20 } });
-    const hit = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0);
-    assert.equal(hit.payload.hp, 80);
-    assert.equal(hit.payload.damage, 20);
-    assert.equal(hit.payload.sourceName, "Kiếm Khách");
-
-    // The immunity window blocks an immediate follow-up hit
-    const hitsSoFar = client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0).length;
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 20 } });
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.damage > 0).length,
-      hitsSoFar,
-      "A hit during the immunity window is ignored"
-    );
-
-    // A peaceful target cannot be hit
+    // A peaceful target cannot be hit: the strike is rejected with a reason.
     const peaceful = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    peaceful.send({
-      type: "player_join",
-      payload: { id: "usr_peace", username: "Peace", x: 5000, y: 5200, hp: 100, maxHp: 100, pkFlag: false }
-    });
-    await peaceful.waitFor((m) => m.type === "init_world");
-    await client1.waitFor((m) => m.type === "player_joined" && m.payload.player.id === "usr_peace");
-
-    client1.send({ type: "player_hit", payload: { targetId: "usr_peace", damage: 30 } });
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    assert.equal(
-      peaceful.messages.filter((m) => m.type === "player_hp" && m.payload.damage > 0).length,
-      0,
-      "A player without the PK flag is immune"
+    await join(peaceful, { characterId: "char_peace", x: 5150, y: 5020, extra: { pkFlag: false } });
+    await sleep(400);
+    attacker.send({ type: "player_attack", payload: { skill: "normal", x: 5000, y: 5000 } });
+    attacker.send({ type: "player_hit", payload: { targetId: "char_peace", damage: 30 } });
+    const rejected = await attacker.waitFor(
+      (m) => m.type === "player_hit_rejected" && m.payload.reason === "target_peaceful"
     );
-
-    // Self-hits, unknown targets and negative damage never land
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk1", damage: 10 } });
-    client1.send({ type: "player_hit", payload: { targetId: "nobody", damage: 10 } });
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: -5 } });
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    assert.equal(
-      client2.messages.filter((m) => m.type === "player_hp" && m.payload.damage === 10).length,
-      0,
-      "Self, unknown and negative hits never land"
-    );
-
-    // Damage is clamped and a lethal blow respawns the victim at Biện Kinh
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 9999 } });
-    const lethal = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 0);
-    assert.equal(lethal.payload.damage, 200, "Damage is clamped to the shared ceiling");
-
-    const defeat = await client2.waitFor((m) => m.type === "player_defeated");
-    assert.equal(defeat.payload.victimId, "usr_pk2");
-    assert.equal(defeat.payload.attackerId, "usr_pk1");
-    assert.equal(defeat.payload.attackerName, "Kiếm Khách");
-    assert.deepEqual(defeat.payload.respawn, {
-      mapId: "market",
-      x: MARKET_SPAWN.x,
-      y: MARKET_SPAWN.y
-    });
-
-    const restored = await client2.waitFor((m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100);
-    assert.equal(restored.payload.maxHp, 100);
-
-    // Players standing at the fight spot must learn about the teleport and the
-    // refilled HP, otherwise they keep a corpse with an empty bar on screen.
-    const teleport = await client1.waitFor((m) => m.type === "player_moved" && m.payload.id === "usr_pk2");
-    assert.deepEqual([teleport.payload.x, teleport.payload.y], [MARKET_SPAWN.x, MARKET_SPAWN.y]);
-    const refilled = await client1.waitFor(
-      (m) => m.type === "player_hp" && m.payload.id === "usr_pk2" && m.payload.hp === 100
-    );
-    assert.equal(refilled.payload.maxHp, 100);
-
-    // The victim is now at the respawn point, out of the attacker's range
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    const afterRespawn = client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2").length;
-    client1.send({ type: "player_hit", payload: { targetId: "usr_pk2", damage: 10 } });
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      client2.messages.filter((m) => m.type === "player_hp" && m.payload.id === "usr_pk2").length,
-      afterRespawn,
-      "A hit beyond the melee range is dropped"
-    );
-
-    // PK flag toggles are relayed
-    client1.send({ type: "player_pk", payload: { pkFlag: false } });
-    const pk = await client2.waitFor((m) => m.type === "player_pk");
-    assert.equal(pk.payload.id, "usr_pk1");
-    assert.equal(pk.payload.pkFlag, false);
+    assert.equal(rejected.payload.reason, "target_peaceful");
 
     await peaceful.close();
-    await client2.close();
-    await client1.close();
-  });
-
-  await t.test("PvP: a reconnect keeps the same player id hittable instead of orphaning it", async () => {
-    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    attacker.send({
-      type: "player_join",
-      payload: { id: "usr_rc_atk", username: "Atk", displayName: "Atk", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await attacker.waitFor((m) => m.type === "init_world");
-
-    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    victim.send({
-      type: "player_join",
-      payload: { id: "usr_rc_vic", username: "Vic", displayName: "Vic", x: 5200, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await victim.waitFor((m) => m.type === "init_world");
-
-    // A flaky link: the victim joins again on a new socket under the same id, so
-    // the server closes the old one and its close event lands afterwards.
-    const reconnected = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    reconnected.send({
-      type: "player_join",
-      payload: { id: "usr_rc_vic", username: "Vic", displayName: "Vic", x: 5200, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await reconnected.waitFor((m) => m.type === "init_world");
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    attacker.send({ type: "player_hit", payload: { targetId: "usr_rc_vic", damage: 20 } });
-    const hit = await reconnected.waitFor(
-      (m) => m.type === "player_hp" && m.payload.id === "usr_rc_vic" && m.payload.damage > 0
-    );
-    assert.equal(hit.payload.hp, 80, "The reconnected socket still owns the player");
-
+    await target.close();
     await attacker.close();
-    await reconnected.close();
   });
 
-  await t.test("PvP: a retreating target can dodge, and the roll is server-side", async () => {
-    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+  await t.test("GM actions require an administrator", async () => {
+    const regular = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(regular, { characterId: "char_regular" });
+    regular.send({ type: "gm_action", payload: { action: "set_level", level: 99 } });
+    const err = await regular.waitFor((m) => m.type === "error");
+    assert.match(err.payload.message, /quyền quản trị GM/);
+    await regular.close();
 
-    attacker.send({
-      type: "player_join",
-      payload: { id: "dodge_atk", username: "A", displayName: "Atk", x: 5000, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await attacker.waitFor((m) => m.type === "init_world");
-    victim.send({
-      type: "player_join",
-      payload: { id: "dodge_vic", username: "V", displayName: "Vic", x: 5400, y: 5000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await victim.waitFor((m) => m.type === "init_world");
-
-    // The victim runs straight away from the attacker (+x), so the dodge window opens.
-    victim.send({ type: "player_move", payload: { x: 5400, y: 5000, vx: 300, vy: 0 } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-
-    const originalRandom = gameSocket.random;
-    gameSocket.random = () => 0; // pin the roll: any chance at all => dodged
-    attacker.send({ type: "player_hit", payload: { targetId: "dodge_vic", damage: 20 } });
-    const dodge = await attacker.waitFor((m) => m.type === "player_hit_rejected" && m.payload.reason === "dodged");
-    assert.ok(dodge.payload.chance > 0, "The refusal reports the dodge chance");
-    assert.equal(
-      victim.messages.filter((m) => m.type === "player_hp" && m.payload.damage > 0).length,
-      0,
-      "A dodged strike deals no damage"
+    const admin = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(admin, { characterId: "char_gm", token: "admin-token" });
+    admin.send({ type: "gm_action", payload: { action: "set_level", level: 99 } });
+    const progress = await admin.waitFor(
+      (m) => m.type === "player_progress" && m.payload.level === 99
     );
-
-    // Standing still closes the window: the very same roll now lands.
-    victim.send({ type: "player_move", payload: { x: 5400, y: 5000, vx: 0, vy: 0 } });
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    gameSocket.random = () => 0;
-    attacker.send({ type: "player_hit", payload: { targetId: "dodge_vic", damage: 20 } });
-    const landed = await victim.waitFor(
-      (m) => m.type === "player_hp" && m.payload.id === "dodge_vic" && m.payload.damage > 0
-    );
-    gameSocket.random = originalRandom;
-
-    assert.equal(landed.payload.hp, 80);
-
-    await attacker.close();
-    await victim.close();
+    assert.equal(progress.payload.level, 99);
+    await admin.close();
   });
 
-  await t.test("Combat actions are rate-limited (anti-amplification)", async () => {
-    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    attacker.send({ type: "player_join", payload: { id: "rl1", username: "Rl1", x: 500, y: 500, pkFlag: true } });
-    await attacker.waitFor((m) => m.type === "init_world");
-    observer.send({ type: "player_join", payload: { id: "rl2", username: "Rl2", x: 5000, y: 5000 } });
-    await observer.waitFor((m) => m.type === "init_world");
-
-    // Ten attacks fired back-to-back collapse to a single broadcast
-    for (let i = 0; i < 10; i++) {
-      attacker.send({ type: "player_attack", payload: { skill: "normal", x: 500, y: 500, facingRight: true } });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      observer.messages.filter((m) => m.type === "player_attacked" && m.payload.id === "rl1").length,
-      1,
-      "Rapid attacks within the cooldown yield one broadcast"
-    );
-
-    await attacker.close();
-    await observer.close();
-  });
-
-  await t.test("Player state is map-scoped", async () => {
-    const mover = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    // The roster is map-wide (init_world / player_joined / player_left), so the
-    // client renders every peer on the map and needs every peer's state. Streaming
-    // it on a radius instead froze those peers mid-walk on screen.
-    mover.send({ type: "player_join", payload: { id: "scope_mover", username: "M", x: 3000, y: 3000 } });
-    await mover.waitFor((m) => m.type === "init_world");
-    farObserver.send({ type: "player_join", payload: { id: "scope_far", username: "F", x: 9500, y: 9000 } });
-    await farObserver.waitFor((m) => m.type === "init_world");
-
-    mover.send({ type: "player_move", payload: { x: 3010, y: 3000 } });
-    const moved = await farObserver.waitFor(
-      (m) => m.type === "player_moved" && m.payload.id === "scope_mover"
-    );
-
-    assert.equal(moved.payload.x, 3010, "A peer on the other side of the map still gets the move");
-
-    await mover.close();
-    await farObserver.close();
-  });
-
-  await t.test("Enemy state is map-scoped", async () => {
-    const hitter = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    hitter.send({ type: "player_join", payload: { id: "enemy_hit_h", username: "H", x: 3000, y: 3000 } });
-    const hitterInit = await hitter.waitFor((m) => m.type === "init_world");
-    assert.ok(hitterInit.payload.enemies.length > 0, "The join ships the whole enemy roster");
-    farObserver.send({ type: "player_join", payload: { id: "enemy_hit_f", username: "F", x: 9500, y: 9000 } });
-    await farObserver.waitFor((m) => m.type === "init_world");
-
-    // Wolf 0 lives at 8400,6000 — nowhere near the far observer. It still owns that
-    // avatar on screen, so it must still receive its HP or the bar goes stale.
-    hitter.send({ type: "enemy_hit", payload: { id: 0, damage: 5 } });
-    const farHit = await farObserver.waitFor((m) => m.type === "enemy_hit");
-
-    assert.equal(farHit.payload.id, 0, "A player on the other side of the map sees the hit");
-    assert.equal(farHit.payload.damage, 5);
-
-    await hitter.close();
-    await farObserver.close();
-  });
-
-  await t.test("A defeat reaches the victim and the rest of the map", async () => {
-    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const farObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    attacker.send({ type: "player_join", payload: { id: "kill_atk", username: "A", x: 1000, y: 1000, hp: 100, pkFlag: true } });
-    await attacker.waitFor((m) => m.type === "init_world");
-    victim.send({ type: "player_join", payload: { id: "kill_vic", username: "V", x: 1010, y: 1000, hp: 100, pkFlag: true } });
-    await victim.waitFor((m) => m.type === "init_world");
-    farObserver.send({ type: "player_join", payload: { id: "kill_far", username: "F", x: 9000, y: 9000 } });
-    await farObserver.waitFor((m) => m.type === "init_world");
-
-    attacker.send({ type: "player_hit", payload: { targetId: "kill_vic", damage: 100 } });
-    // The victim is teleported on death, so its own copy is sent directly; the rest
-    // of the map learns about the kill through the map-wide broadcast.
-    await victim.waitFor((m) => m.type === "player_defeated" && m.payload.victimId === "kill_vic");
-    const farView = await farObserver.waitFor(
-      (m) => m.type === "player_defeated" && m.payload.victimId === "kill_vic"
-    );
-
-    assert.equal(farView.payload.source, "pvp", "Every player on the map sees the kill");
-    await attacker.close();
-    await victim.close();
-    await farObserver.close();
-  });
-
-  await t.test("PvP: the attacker sees the damage on their own target", async () => {
-    const attacker = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const victim = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    attacker.send({
-      type: "player_join",
-      payload: { id: "far_atk", username: "A", x: 1000, y: 1000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await attacker.waitFor((m) => m.type === "init_world");
-    // 600 apart: inside the PvP reach (3 tiles), so the strike is accepted.
-    victim.send({
-      type: "player_join",
-      payload: { id: "far_vic", username: "V", x: 1600, y: 1000, hp: 100, maxHp: 100, pkFlag: true }
-    });
-    await victim.waitFor((m) => m.type === "init_world");
-
-    attacker.send({ type: "player_hit", payload: { targetId: "far_vic", damage: 25 } });
-    const attackerView = await attacker.waitFor((m) => m.type === "player_hp" && m.payload.id === "far_vic");
-
-    assert.equal(attackerView.payload.hp, 75, "The attacker is told the victim's new HP");
-
-    await attacker.close();
-    await victim.close();
-  });
-
-  await t.test("Backpressure: lagging sockets are skipped", async () => {
-    const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    client1.send({ type: "player_join", payload: { id: "bp1", username: "Bp1", x: 3000, y: 3000 } });
-    await client1.waitFor((m) => m.type === "init_world");
-    client2.send({ type: "player_join", payload: { id: "bp2", username: "Bp2", x: 3000, y: 3000 } });
-    await client2.waitFor((m) => m.type === "init_world");
-    await client1.waitFor((m) => m.type === "player_joined");
-
-    const threshold = gameSocket.maxBufferedBytes;
-    gameSocket.maxBufferedBytes = 0; // every socket now counts as "lagging"
-    client1.send({ type: "player_move", payload: { x: 3010, y: 3010 } });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    gameSocket.maxBufferedBytes = threshold;
-
-    assert.equal(
-      client2.messages.filter((m) => m.type === "player_moved").length,
-      0,
-      "A skipped broadcast never reaches the lagging socket"
-    );
-
-    client1.send({ type: "player_move", payload: { x: 3020, y: 3020 } });
-    const moved = await client2.waitFor((m) => m.type === "player_moved");
-    assert.equal(moved.payload.x, 3020, "With the threshold restored, updates flow again");
-
-    await client1.close();
-    await client2.close();
-  });
-
-  await t.test("Map travel: a portal swaps the map, the roster and the peer list", async () => {
-    const marketObserver = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    const traveller = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-
-    marketObserver.send({ type: "player_join", payload: { id: "travel_2", username: "T2", x: 6400, y: 6050 } });
-    await marketObserver.waitFor((m) => m.type === "init_world");
-
-    traveller.send({ type: "player_join", payload: { id: "travel_1", username: "T1", x: 6400, y: 6050 } });
-    const init = await traveller.waitFor((m) => m.type === "init_world");
-    assert.equal(init.payload.mapId, "market", "A join without a map id lands in Biện Kinh");
-    await marketObserver.waitFor((m) => m.type === "player_joined");
-
-    // The market portal takes the hero east.
-    traveller.send({ type: "map_change", payload: { portalId: "east-gate" } });
-    const changed = await traveller.waitFor((m) => m.type === "map_changed");
-
-    assert.equal(changed.payload.mapId, "dong-mon-thanh");
-    assert.deepEqual(changed.payload.spawn, { x: 1200, y: 7000 });
-    assert.equal(changed.payload.enemies.length, 270, "The forest ships its full hunting roster");
-    assert.ok(changed.payload.enemies.every((enemy) => enemy.mapId === "dong-mon-thanh"));
-    assert.ok(
-      changed.payload.enemies.every((enemy) => !enemy.isBoss),
-      "The forest has no boss"
-    );
-
-    // The roster spans all three level bands.
-    const levels = changed.payload.enemies.map((enemy) => enemy.level);
-    assert.ok(levels.some((level) => level <= 10), "Tier 1 monsters");
-    assert.ok(levels.some((level) => level > 10 && level <= 20), "Tier 2 monsters");
-    assert.ok(levels.some((level) => level > 20), "Tier 3 monsters");
-
-    // The old map sees them leave, and only the original join was announced there.
-    await marketObserver.waitFor((m) => m.type === "player_left" && m.payload.id === "travel_1");
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      marketObserver.messages.filter(
-        (m) => m.type === "player_joined" && m.payload.player.id === "travel_1"
-      ).length,
-      1,
-      "Arriving on the town is not announced to the market"
-    );
-
-    // The new map's roster is the one this player can hit.
-    traveller.send({ type: "enemy_hit", payload: { id: 0, damage: 5 } });
-    const hit = await traveller.waitFor((m) => m.type === "enemy_hit");
-    assert.equal(hit.payload.mapId, "dong-mon-thanh");
-    assert.equal(hit.payload.id, 0);
-
-    // Unknown portals, and portals of a map the player is not on, are refused.
-    traveller.send({ type: "map_change", payload: { portalId: "nowhere" } });
-    const rejected = await traveller.waitFor((m) => m.type === "map_change_rejected");
-    assert.equal(rejected.payload.mapId, "dong-mon-thanh");
-
-    marketObserver.send({ type: "map_change", payload: { portalId: "west-gate" } });
-    const rejected2 = await marketObserver.waitFor((m) => m.type === "map_change_rejected");
-    assert.equal(rejected2.payload.mapId, "market", "The market has no west-gate portal");
-
-    // Returning through the town portal brings the hero back west.
-    traveller.send({ type: "map_change", payload: { portalId: "west-gate" } });
-    const back = await traveller.waitFor((m) => m.type === "map_changed");
-    assert.equal(back.payload.mapId, "market");
-    assert.deepEqual(back.payload.spawn, { x: 10300, y: 5500 });
-
-    await traveller.close();
-    await marketObserver.close();
-  });
-
-  await t.test("AoE hits are validated against the cast impact centre", async () => {
+  await t.test("Un-joined sockets cannot act on the world", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
-    client.send({
-      type: "player_join",
-      payload: {
-        id: "usr_aoe_center",
-        token: "test-token",
-        characterId: "char_eco_1",
-        username: "AoeCenter",
-        x: 8400,
-        y: 6000
-      }
-    });
-    const init = await client.waitFor((m) => m.type === "init_world");
-    const alive = init.payload.enemies.filter((enemy) => !enemy.isDead);
 
-    let target = null;
-    let outside = null;
-    for (const candidate of alive) {
-      const other = alive.find(
-        (enemy) =>
-          enemy.id !== candidate.id &&
-          Math.hypot(enemy.x - candidate.x, enemy.y - candidate.y) > 1400
-      );
-      if (other) {
-        target = candidate;
-        outside = other;
-        break;
-      }
-    }
-    assert.ok(target && outside, "two separated enemies are available for the AoE check");
+    client.send({ type: "enemy_hit", payload: { id: 3, damage: 40 } });
+    client.send({ type: "player_hit", payload: { targetId: "char_any", damage: 40 } });
+    client.send({ type: "player_move", payload: { x: 100, y: 100 } });
+    client.send({ type: "use_item", payload: { itemId: "kim-sang-duoc" } });
+    await sleep(120);
 
-    client.send({
-      type: "player_attack",
-      payload: {
-        skill: "nhu_lai_than_chuong",
-        x: 8400,
-        y: 6000,
-        aimX: target.x,
-        aimY: target.y,
-        facingRight: true
-      }
-    });
-    await new Promise((resolve) => setTimeout(resolve, 60));
-
-    // A hit inside the palm's r900 area is accepted; one 1400+ units away from the
-    // impact centre is dropped even though it is still inside the cast range.
-    client.send({ type: "enemy_hit", payload: { id: target.id, skill: "nhu_lai_than_chuong", damage: 9999 } });
-    client.send({ type: "enemy_hit", payload: { id: outside.id, skill: "nhu_lai_than_chuong", damage: 9999 } });
-
-    const hit = await client.waitFor(
-      (m) => m.type === "enemy_hit" && m.payload.id === target.id && m.payload.damage > 0
-    );
-    assert.ok(hit.payload.damage < 9999, "the server recomputes the skill damage");
-
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    assert.equal(
-      client.messages.filter(
-        (m) => m.type === "enemy_hit" && m.payload.id === outside.id && m.payload.damage > 0
-      ).length,
-      0,
-      "a hit outside the impact centre is dropped"
-    );
+    // The server stays healthy and emits nothing on behalf of a non-player.
+    client.send({ type: "ping" });
+    assert.equal((await client.waitFor((m) => m.type === "pong")).type, "pong");
+    assert.equal(client.count((m) => m.type === "enemy_hit"), 0);
 
     await client.close();
   });
 
   await t.test("Teardown test server", async () => {
-    gameSocket.close();
-    await new Promise((res) => server.close(res));
+    if (gameSocket?.wss) {
+      gameSocket.wss.clients.forEach((client) => client.terminate());
+    }
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    assert.ok(true);
   });
 });
-

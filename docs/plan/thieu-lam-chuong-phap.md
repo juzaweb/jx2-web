@@ -66,10 +66,12 @@ Design rules:
   excluded from the `F5` drag sources and the mobile picker so they cannot be
   bound, and `passiveRegen.js` sums the unlocked
   passive arts of the sect every frame.
-- The regen tick mirrors each healed point to the server with `player_heal`
-  (same path as a potion), so HP stays server-authoritative and is clamped to
-  the server's own ceiling. Fractional HP is carried between frames: 2 HP/s at
-  60 fps heals 1 HP every 500 ms instead of being rounded away.
+- The regen tick runs on the **server** (`tickRegen` in `gameSocket.js`) using
+  the same `passiveRegen.js` maths, and streams `player_hp` on each whole HP
+  point. The client no longer heals itself or reports heals, so HP stays
+  server-authoritative and clamped to the server's own ceiling. Fractional HP is
+  carried between ticks: 2 HP/s at a 250 ms tick heals 1 HP every 500 ms instead
+  of being rounded away.
 - Time spent paused is never billed. `billableDeltaMs()` drops any gap longer
   than `MAX_TICK_MS` (1 s), so opening a modal or backgrounding the tab cannot
   bank minutes of regen and refill the hero the moment play resumes.

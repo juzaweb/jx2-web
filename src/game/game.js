@@ -7,15 +7,15 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantities, getQuantity, consumeQuantity, addQuantity, replaceQuantities, getItemById, QUICK_ITEMS } from "./items.js";
+import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, QUICK_ITEMS } from "./items.js";
+import { skillById } from "./skills.js";
+import { translate } from "../i18n/translator.js";
 import { loadQuickSlots, skillIdFromBinding } from "./quickSlots.js";
 import { planEquip, equippedIn } from "./equipment.js";
 import { NetworkClient } from "./networkClient.js";
 import { RemotePlayerManager } from "./remotePlayerManager.js";
 import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
-import { InventorySyncer } from "./inventorySync.js";
-import { apiClient } from "./apiClient.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
 import { PVP_ATTACK_RANGE } from "./pvp.js";
@@ -71,8 +71,6 @@ export class JiangHuScene extends Phaser.Scene {
      */
     this.connectionBlocked = true;
     this.unsubscribers = [];
-    /** Server sync for the active character's bag; built in create(). */
-    this.inventorySync = null;
     /** Active map; the save file decides the initial value in create(). */
     this.currentMapId = DEFAULT_MAP_ID;
     this.requestedMapId = null;
@@ -184,31 +182,12 @@ export class JiangHuScene extends Phaser.Scene {
       ensureSectVfx(this, skillsForSect(session.activeCharacter.sect));
     }
     this.enemyManager = new EnemyManager(this);
-    // Offline, the client owns the roster from the map definition; online, the
-    // server streams its own roster (see handleInitWorld).
-    this.enemyManager.create(this.offlineSpawns(this.map));
 
     // The roster exists now, so the monster collisions can be wired too.
     this.stage.bindColliders();
 
     // UI Bridge Adapter to communicate with React components
     this.uiBridge = new UIBridgeAdapter();
-
-    // Per-character bag sync; the owner (character id) is resolved from the session
-    // on every call so switching characters retargets it.
-    this.inventorySync = new InventorySyncer({
-      api: apiClient,
-      getOwnerId: () => readSession()?.activeCharacter?.id || null,
-      getQuantities,
-      setQuantities: replaceQuantities,
-      onAdopt: () => {
-        this.uiBridge.updateInventory();
-        this.saveGame(false);
-      },
-      onError: (error) => {
-        console.warn("[Inventory] Đồng bộ hành trang lên máy chủ thất bại:", error?.message || error);
-      }
-    });
 
     // Combat system with state change hook for auto-saving
     this.combat = new CombatSystem(
@@ -219,17 +198,12 @@ export class JiangHuScene extends Phaser.Scene {
       () => this.saveGame(false)
     );
 
-    // Restore the saved stats/position on the map resolved above.
+    // Restore the local position and settings. Gameplay state (stats, bag, gear,
+    // quest progress) is server-owned and arrives over the socket instead.
     if (this.savedData) {
-      if (this.savedData.stats) {
-        this.player.loadStats(this.savedData.stats);
-      }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
         const { x, y } = this.savedData.position;
         if (isInsideMap(this.map, x, y)) this.player.setPosition(x, y);
-      }
-      if (this.savedData.questRewarded !== undefined) {
-        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
       }
       if (this.savedData.audioEnabled !== undefined) {
         setAudioEnabled(this.savedData.audioEnabled);
@@ -275,6 +249,14 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.on("player_moved", (payload) => {
+      // A `player_moved` naming us is the server correcting our position (snap-back
+      // after a rejected jump, respawn, Hồi Thành Phù or a GM teleport).
+      if (payload?.id && payload.id === this.combat?.localPlayerId) {
+        if (Number.isFinite(payload.x) && Number.isFinite(payload.y)) {
+          this.player.setPosition(payload.x, payload.y);
+        }
+        return;
+      }
       this.remotePlayerManager.handlePlayerMoved(payload);
     });
 
@@ -301,6 +283,30 @@ export class JiangHuScene extends Phaser.Scene {
       this.handlePlayerMp(payload);
     });
 
+    // Server-derived combat stats (gear + buffs) and the worn gear itself.
+    this.networkClient.on("player_stats", (payload) => {
+      this.handlePlayerStats(payload);
+    });
+
+    this.networkClient.on("equipment_sync", (payload) => {
+      this.handleEquipmentSync(payload);
+    });
+
+    // Result of a server-side use/equip/unequip action.
+    this.networkClient.on("item_result", (payload) => {
+      this.handleItemResult(payload);
+    });
+
+    this.networkClient.on("skill_rejected", (payload) => {
+      this.handleSkillRejected(payload);
+    });
+
+    // The server refused the join (missing/expired session or a character that
+    // does not belong to the account).
+    this.networkClient.on("join_rejected", (payload) => {
+      this.handleJoinRejected(payload);
+    });
+
     this.networkClient.on("player_defeated", (payload) => {
       this.handlePlayerDefeated(payload);
     });
@@ -324,6 +330,12 @@ export class JiangHuScene extends Phaser.Scene {
     // Server-authoritative enemy state: damage, movement and respawn are shared
     this.networkClient.on("enemy_hit", (payload) => {
       this.enemyManager.applyEnemyState(payload);
+      if (payload?.damage > 0) {
+        const enemy = this.enemyManager.getById?.(payload.id);
+        if (enemy) {
+          this.combat.showFloatText(enemy.x, enemy.y - 30, `-${payload.damage}`, "#ffb49a");
+        }
+      }
     });
 
     this.networkClient.on("enemy_moved", (payload) => {
@@ -617,17 +629,6 @@ export class JiangHuScene extends Phaser.Scene {
       })
     );
 
-    // Enemy respawn loop (offline only — online, the server owns the respawn clock)
-    this.spawnTimer = this.time.addEvent({
-      delay: 9000,
-      loop: true,
-      callback: () => {
-        if (this.started && !this.isPaused && !this.networkClient?.isConnected) {
-          this.enemyManager.respawnEnemies();
-        }
-      }
-    });
-
     // Periodic auto-save timer (every 15s while active)
     this.autoSaveTimer = this.time.addEvent({
       delay: 15000,
@@ -665,17 +666,6 @@ export class JiangHuScene extends Phaser.Scene {
     if (this.requestedMapId) return this.requestedMapId;
     if (isKnownMap(saved?.mapId)) return saved.mapId;
     return DEFAULT_MAP_ID;
-  }
-
-  /**
-   * Roster the client may own: none while the server is connected (it streams
-   * its own), and none on `safe` maps.
-   * @param {object} map
-   */
-  offlineSpawns(map) {
-    if (!map || map.safe) return [];
-    if (this.networkClient?.isConnected) return [];
-    return map.enemySpawns || [];
   }
 
   /** Redraw the radar and the full city map for the active map. */
@@ -748,7 +738,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.cameras.main.centerOn(arrival.x, arrival.y);
 
     if (!this.networkClient?.isConnected) {
-      this.enemyManager.create(this.offlineSpawns(target));
+      this.enemyManager.create([]);
     }
     // Wire the monsters to the new map's obstacles (the group may be new).
     this.stage.bindColliders();
@@ -802,6 +792,14 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     this.applyServerWorld(payload);
+
+    // The server names us by character id, so adopt it as the local identity.
+    // Kill attribution and PvP rejection messages carry this id, not the
+    // per-tab id invented before the join.
+    if (payload.yourId) {
+      this.remotePlayerManager.setLocalPlayerId(payload.yourId);
+      this.combat.setLocalPlayerId(payload.yourId);
+    }
 
     // The server rebuilt our player from the join packet — a snapshot taken when
     // the socket opened. Re-assert the flag the HUD shows, otherwise a reconnect
@@ -894,10 +892,9 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (!this.applyConsumableEffect(itemId)) return;
 
-    const { ok } = consumeQuantity(itemId, 1);
-    if (!ok) return;
-
-    this.onInventoryChanged();
+    // The server consumes the item and persists the bag; the resulting
+    // inventory_sync / player_hp / player_mp packets update this client.
+    this.uiBridge.updateHud(this.player.stats);
   }
 
   /**
@@ -917,83 +914,18 @@ export class JiangHuScene extends Phaser.Scene {
   applyConsumableEffect(itemId) {
     if (!itemId) return false;
 
-    if (itemId === "kim-sang-duoc") {
-      // Kim Sáng Dược (+35 HP)
-      if (this.player.stats.hp >= this.player.stats.maxHp) {
-        this.uiBridge.addLog("Sinh lực đã đầy, không cần dùng Kim Sáng Dược.", "guide");
-        return false;
-      }
-      const healed = this.player.heal(35);
-      // The server owns HP, so mirror the heal into the authoritative pool too.
-      this.networkClient?.sendHeal?.({ amount: 35 });
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `+${healed} HP`, "#69db7c");
-      playTone(520, 0.12, "triangle", 0.03);
-      this.uiBridge.addLog(`Đã dùng Kim Sáng Dược: hồi phục ${healed} HP.`, "combat");
-      this.uiBridge.updateHud(this.player.stats);
-      return true;
-    }
+    const effect = getConsumableEffect(itemId);
+    if (!effect) return false;
 
-    if (itemId === "dai-hoan-dan") {
-      // Đại Hoàn Đan (+25 MP)
-      if (this.player.stats.mp >= this.player.stats.maxMp) {
-        this.uiBridge.addLog("Nội lực đã tràn đầy, không cần dùng Đại Hoàn Đan.", "guide");
-        return false;
-      }
-      const restored = this.player.restoreMp(25);
-      // The server owns MP, so mirror the restore into the authoritative pool too.
-      this.networkClient?.sendRestoreMp?.({ amount: 25 });
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `+${restored} MP`, "#74c0fc");
-      playTone(580, 0.12, "sine", 0.03);
-      this.uiBridge.addLog(`Đã dùng Đại Hoàn Đan: hồi phục ${restored} MP.`, "combat");
-      this.uiBridge.updateHud(this.player.stats);
-      return true;
-    }
-
-    if (itemId === "nu-nhi-hong") {
-      // Nữ Nhi Hồng (+50 HP & +30 MP)
-      if (
-        this.player.stats.hp >= this.player.stats.maxHp &&
-        this.player.stats.mp >= this.player.stats.maxMp
-      ) {
-        this.uiBridge.addLog("Sinh lực và nội lực đều đã đầy, không cần dùng Nữ Nhi Hồng.", "guide");
-        return false;
-      }
-      const healed = this.player.heal(50);
-      const restored = this.player.restoreMp(30);
-      this.networkClient?.sendHeal?.({ amount: 50 });
-      this.networkClient?.sendRestoreMp?.({ amount: 30 });
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `Ấm lòng! +HP +MP`, "#ffd43b");
-      playTone(440, 0.15, "triangle", 0.035);
-      this.uiBridge.addLog(`Uống Nữ Nhi Hồng: Hồi phục ${healed} HP và ${restored} MP!`, "combat");
-      this.uiBridge.updateHud(this.player.stats);
-      return true;
-    }
-
-    if (itemId === "hoi-thanh-phu") {
-      // Hồi Thành Phù (Về điểm hồi sinh của bản đồ đang đứng)
-      const map = this.map || getMap(this.currentMapId || DEFAULT_MAP_ID);
-      const spawn = map.spawn;
-      this.player.setPosition(spawn.x, spawn.y);
-      this.combat.showFloatText(this.player.x, this.player.y - 68, `Về ${map.name}`, "#ffdd59");
-      playTone(330, 0.2, "sine", 0.04);
-      this.uiBridge.addLog(`Đã dùng Hồi Thành Phù quay về trung tâm ${map.name}.`, "system");
-      return true;
-    }
-
-    if (itemId === "lenh-bai-gm") {
-      bridge.emit(EVENTS.GM_MODAL_TOGGLE);
-      this.uiBridge.addLog("Đã mở Giao diện Lệnh Bài GM.", "system");
-      playTone(660, 0.15, "triangle", 0.04);
+    // Effects and bag decrements are server-owned. A client that is not connected
+    // cannot use an item because there is nothing authoritative to apply it to.
+    if (!this.networkClient?.isConnected) {
+      this.uiBridge.addLog("Cần kết nối máy chủ để sử dụng vật phẩm.", "guide");
       return false;
     }
 
-    const item = getItemById(itemId);
-    if (item) {
-      this.uiBridge.addLog(`Đã sử dụng ${item.name}.`, "system");
-      return true;
-    }
-
-    return false;
+    this.networkClient.useItem(itemId);
+    return true;
   }
 
   /**
@@ -1011,73 +943,31 @@ export class JiangHuScene extends Phaser.Scene {
     // Local immediate feedback / actions
     switch (payload.action) {
       case "heal_full":
-        if (this.player) {
-          this.player.stats.hp = this.player.stats.maxHp;
-          this.player.stats.mp = this.player.stats.maxMp;
-          this.combat.showFloatText(this.player.x, this.player.y - 68, "Full HP & MP!", "#ffd43b");
-          playTone(550, 0.15, "triangle", 0.04);
-          this.uiBridge.updateHud(this.player.stats);
-          this.uiBridge.addLog("Đã hồi phục toàn bộ Sinh lực và Nội lực!", "system");
-        }
+        // The server restores HP/MP and broadcasts the new pools.
+        this.uiBridge.addLog("Máy chủ đang hồi phục toàn bộ Sinh lực và Nội lực...", "system");
         break;
 
       case "add_items":
         if (payload.items) {
-          const itemNames = [];
-          for (const [id, qty] of Object.entries(payload.items)) {
-            addQuantity(id, qty);
-            const item = getItemById(id);
-            if (item?.name) itemNames.push(item.name);
-          }
-          this.onInventoryChanged();
-          const floatText = payload.text || (itemNames.length === 1 ? `Đã nhận ${itemNames[0]}!` : "Đã nhận vật phẩm!");
-          this.combat?.showFloatText(this.player.x, this.player.y - 68, floatText, "#69db7c");
-          playTone(520, 0.15, "triangle", 0.03);
-          const logText = payload.log || (itemNames.length > 0 ? `Đã nhận ${itemNames.join(", ")} vào túi đồ.` : "Đã nhận vật phẩm vào túi đồ.");
+          const itemNames = Object.keys(payload.items)
+            .map((id) => getItemById(id)?.name)
+            .filter(Boolean);
+          const logText =
+            payload.log ||
+            (itemNames.length > 0
+              ? `Đã nhận ${itemNames.join(", ")} vào túi đồ.`
+              : "Đã nhận vật phẩm vào túi đồ.");
           this.uiBridge.addLog(logText, "system");
         }
         break;
 
       case "equip_set":
-        if (this.player && payload.equipment) {
-          for (const [slot, itemId] of Object.entries(payload.equipment)) {
-            if (itemId) {
-              const previous = equippedIn(this.player.equipment, slot);
-              if (previous === itemId) {
-                continue;
-              }
-              if (previous) {
-                addQuantity(previous, 1);
-              }
-              if (getQuantity(itemId) > 0) {
-                consumeQuantity(itemId, 1);
-              }
-            }
-          }
-          this.player.applyEquipment({ ...this.player.equipment, ...payload.equipment });
-          const floatText = payload.text || "Đã khoác y phục mới!";
-          this.combat?.showFloatText(this.player.x, this.player.y - 68, floatText, "#ffd43b");
-          playTone(600, 0.2, "triangle", 0.04);
-          const logText = payload.log || "Đã trang bị trọn bộ y phục.";
-          this.uiBridge.addLog(logText, "system");
-          this.emitEquipment();
-          this.onInventoryChanged();
-        }
+        this.uiBridge.addLog(payload.log || "Máy chủ đang trang bị y phục...", "system");
         break;
 
       case "toggle_god_mode":
-        if (this.player) {
-          this.player.isGodMode = payload.enabled ?? !this.player.isGodMode;
-          const status = this.player.isGodMode ? "Bật" : "Tắt";
-          this.uiBridge.addLog(`Chế độ Bất Tử: ${status}`, "system");
-          this.combat.showFloatText(
-            this.player.x,
-            this.player.y - 68,
-            this.player.isGodMode ? "Vô Địch (Bất Tử)" : "Tắt Bất Tử",
-            this.player.isGodMode ? "#fcc419" : "#ff8787"
-          );
-          playTone(this.player.isGodMode ? 880 : 330, 0.2, "sine", 0.04);
-        }
+        // The server owns god mode and confirms it with gm_state.
+        this.uiBridge.addLog("Đã gửi yêu cầu đổi chế độ Bất Tử.", "system");
         break;
 
       case "toggle_speed":
@@ -1091,12 +981,8 @@ export class JiangHuScene extends Phaser.Scene {
         break;
 
       case "teleport":
-        if (payload.mapId) {
-          const map = getMap(payload.mapId);
-          if (map) {
-            this.loadMap(payload.mapId, payload.spawn || map.spawn, { notifyServer: true });
-          }
-        }
+        // The server relocates the hero and replies with map_changed.
+        this.uiBridge.addLog("Máy chủ đang dịch chuyển nhân vật...", "system");
         break;
 
       default:
@@ -1105,36 +991,33 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * React to any inventory change: refresh the HUD and persist locally, which
-   * also queues a server sync when the bag actually changed.
+   * React to a server bag change: refresh the HUD mirror. Persistence and the
+   * bag itself are server-owned, so nothing is written locally.
    */
   onInventoryChanged() {
     this.uiBridge.updateInventory();
-    this.saveGame(false);
   }
 
   /**
-   * Push the worn items to the React HUD.
+   * Push the worn items to the React HUD. The item ids mirror the server's
+   * `equipment_sync`; combat stats arrive separately as `player_stats`.
    */
   emitEquipment() {
     bridge.emit(EVENTS.EQUIPMENT_UPDATED, {
       equipment: { ...this.player.equipment }
     });
-    // Mirror to peers so their rigs show the same gear.
-    this.networkClient?.sendEquipment?.(this.player.equipment);
-    // Gear now feeds attack/defence/crit, so refresh the sheet snapshot too.
-    this.uiBridge.updateHud(this.player.stats);
   }
 
   /**
-   * Wear an inventory item in its slot. One unit is consumed from the bag and
-   * any item already in that slot is returned to it, so nothing is ever lost.
+   * Ask the server to wear an inventory item in its slot. The bag decrement,
+   * the previous item's return and the new stat block all come back from the
+   * server (`inventory_sync`, `equipment_sync`, `player_stats`).
    * @param {string} itemId
    */
   equipItem(itemId) {
     if (!this.player || !this.started) return;
 
-    const { ok, slot, error } = planEquip(this.player.equipment, itemId);
+    const { ok, error } = planEquip(this.player.equipment, itemId);
     if (!ok) {
       this.uiBridge.addLog(error || "Không thể trang bị vật phẩm này.", "guide");
       return;
@@ -1143,21 +1026,17 @@ export class JiangHuScene extends Phaser.Scene {
       this.uiBridge.addLog("Hành trang không còn vật phẩm này.", "guide");
       return;
     }
+    if (!this.networkClient?.isConnected) {
+      this.uiBridge.addLog("Cần kết nối máy chủ để trang bị vật phẩm.", "guide");
+      return;
+    }
 
-    const previous = equippedIn(this.player.equipment, slot);
-    const consumed = consumeQuantity(itemId, 1);
-    if (!consumed.ok) return;
-    if (previous) addQuantity(previous, 1);
-
-    this.player.applyEquipment({ ...this.player.equipment, [slot]: itemId });
-    const item = getItemById(itemId);
-    this.uiBridge.addLog(`Đã trang bị ${item?.name || itemId}.`, "system");
-    this.emitEquipment();
-    this.onInventoryChanged();
+    this.networkClient.equipItem(itemId);
+    this.uiBridge.addLog(`Đang trang bị ${getItemById(itemId)?.name || itemId}...`, "system");
   }
 
   /**
-   * Take off whatever is worn in `slot` and return it to the bag.
+   * Ask the server to take off whatever is worn in `slot` and return it to the bag.
    * @param {string} slot
    */
   unequipSlot(slot) {
@@ -1165,13 +1044,13 @@ export class JiangHuScene extends Phaser.Scene {
 
     const itemId = equippedIn(this.player.equipment, slot);
     if (!itemId) return;
+    if (!this.networkClient?.isConnected) {
+      this.uiBridge.addLog("Cần kết nối máy chủ để tháo trang bị.", "guide");
+      return;
+    }
 
-    addQuantity(itemId, 1);
-    this.player.applyEquipment({ ...this.player.equipment, [slot]: null });
-    const item = getItemById(itemId);
-    this.uiBridge.addLog(`Đã tháo ${item?.name || itemId}.`, "system");
-    this.emitEquipment();
-    this.onInventoryChanged();
+    this.networkClient.unequipSlot(slot);
+    this.uiBridge.addLog(`Đang tháo ${getItemById(itemId)?.name || itemId}...`, "system");
   }
 
   /**
@@ -1226,25 +1105,17 @@ export class JiangHuScene extends Phaser.Scene {
     if (!this.player) return;
 
     const success = StorageManager.save({
-      stats: this.player.stats,
       // The map id travels with the position, so a reload restores the hero on
-      // the map they were standing on instead of the default city.
+      // the map they were standing on instead of the default city. Every other
+      // gameplay value (stats, bag, gear, quests) is server-owned now.
       mapId: this.currentMapId,
       position: {
         x: Math.round(this.player.x),
         y: Math.round(this.player.y)
       },
-      questRewarded: this.uiBridge.questRewarded,
       audioEnabled: isAudioEnabled(),
       pkFlag: this.player.pkFlag === true
     });
-    // The bag is character-scoped, so it is persisted under the active character.
-    StorageManager.saveInventory(getQuantities());
-    StorageManager.saveEquipment(this.player.equipment);
-
-    // Mirror the bag to the character's server inventory. Deduped by signature, so
-    // a save that did not touch items (e.g. a kill) sends no request.
-    this.inventorySync?.sync();
 
     if (success && showFeedback) {
       this.uiBridge.addLog("Đã lưu tiến trình giang hồ thành công.", "system");
@@ -1382,6 +1253,109 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
+   * Apply the server-derived combat stats (base + gear + buffs). The client never
+   * computes these; it only mirrors them for the HUD and the sheet.
+   * @param {{id?:string, level?:number, attack?:number, defense?:number,
+   *   critRate?:number, critDamage?:number, attackSpeed?:number,
+   *   maxHp?:number, maxMp?:number, nextExp?:number}} payload
+   */
+  handlePlayerStats(payload = {}) {
+    const isLocal =
+      payload.id === this.combat?.localPlayerId ||
+      payload.id === this.remotePlayerManager?.localPlayerId;
+    if (!isLocal) return;
+
+    const stats = this.player.stats;
+    const numeric = ["level", "attack", "defense", "critRate", "critDamage", "attackSpeed", "maxHp", "maxMp", "nextExp"];
+    numeric.forEach((key) => {
+      if (Number.isFinite(payload[key])) stats[key] = payload[key];
+    });
+
+    stats.hp = Math.min(stats.hp, stats.maxHp);
+    stats.mp = Math.min(stats.mp, stats.maxMp);
+    this.uiBridge.updateHud(stats);
+  }
+
+  /**
+   * Mirror the worn gear the server persisted. Combat bonuses arrive separately
+   * in `player_stats`, so this only redraws the rig and updates the HUD.
+   * @param {{equipment?:Record<string,string|null>}} payload
+   */
+  handleEquipmentSync(payload = {}) {
+    if (!payload.equipment || !this.player) return;
+    this.player.applyEquipment(payload.equipment);
+    this.emitEquipment();
+    this.uiBridge.updateHud(this.player.stats);
+  }
+
+  /**
+   * Surface the result of a server-side use/equip/unequip action.
+   * @param {{ok?:boolean, action?:string, itemId?:string, slot?:string,
+   *   reason?:string, heal?:number, restoreMp?:number}} payload
+   */
+  handleItemResult(payload = {}) {
+    const reasons = {
+      not_usable: "Vật phẩm này không dùng được.",
+      missing_item: "Hành trang không còn vật phẩm này.",
+      not_equippable: "Vật phẩm không thể trang bị.",
+      unknown_slot: "Ô trang bị không hợp lệ.",
+      empty_slot: "Ô trang bị đang trống.",
+      unknown_item: "Vật phẩm không tồn tại."
+    };
+
+    if (payload.ok === false) {
+      this.uiBridge.addLog(reasons[payload.reason] || "Thao tác không thực hiện được.", "guide");
+      return;
+    }
+
+    if (payload.action === "use") {
+      if (payload.heal > 0) {
+        this.combat.showFloatText(this.player.x, this.player.y - 68, `+${payload.heal} HP`, "#69db7c");
+      }
+      if (payload.restoreMp > 0) {
+        this.combat.showFloatText(this.player.x, this.player.y - 68, `+${payload.restoreMp} MP`, "#74c0fc");
+      }
+      return;
+    }
+
+    const itemName = getItemById(payload.itemId)?.name || payload.itemId || payload.slot;
+    if (payload.action === "equip") {
+      this.uiBridge.addLog(`Đã trang bị ${itemName}.`, "system");
+    } else if (payload.action === "unequip") {
+      this.uiBridge.addLog(`Đã tháo ${itemName}.`, "system");
+    }
+  }
+
+  /**
+   * Explain a refused cast (foreign sect, locked technique, passive).
+   * @param {{skillId?:string, reason?:string}} payload
+   */
+  handleSkillRejected(payload = {}) {
+    const reasons = {
+      sect: "Môn phái không phù hợp với chiêu thức này.",
+      locked: "Cấp độ chưa đủ để dùng chiêu thức này.",
+      passive: "Tâm pháp bị động luôn vận hành, không cần thi triển."
+    };
+    const skill = payload.skillId ? skillById(payload.skillId) : null;
+    const name = skill ? translate(skill.nameKey, undefined, skill.id) : "Chiêu thức";
+    this.uiBridge.addLog(`${name}: ${reasons[payload.reason] || "Không thể thi triển."}`, "guide");
+  }
+
+  /**
+   * The server refused the join: there is no authoritative world to play in, so
+   * the gate stays closed and the reason is logged.
+   * @param {{reason?:string}} payload
+   */
+  handleJoinRejected(payload = {}) {
+    const reasons = {
+      auth: "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.",
+      character: "Nhân vật không thuộc tài khoản này."
+    };
+    this.uiBridge.addLog(reasons[payload.reason] || "Máy chủ từ chối kết nối.", "system");
+    this.setConnectionBlocked(true);
+  }
+
+  /**
    * The server declared a player defeated. The victim is teleported to the respawn
    * point; the killer gets credit and everyone else sees the outcome.
    * @param {{victimId?:string, victimName?:string, attackerId?:string, attackerName?:string, respawn?:{x:number,y:number}}} payload
@@ -1479,51 +1453,24 @@ export class JiangHuScene extends Phaser.Scene {
   sendNetworkJoin() {
     if (!this.player || !this.networkClient?.isConnected) return;
 
-    let tabId = "";
-    if (typeof window !== "undefined") {
-      if (!window.__jx2TabSessionId) {
-        window.__jx2TabSessionId = Math.random().toString(36).slice(2, 8);
-      }
-      tabId = window.__jx2TabSessionId;
-    }
-
-    let playerId = `guest_${tabId || Math.random().toString(36).slice(2, 8)}`;
-    let username = this.player.name || "Lãng Khách";
-    let displayName = username;
-
+    // The server identifies a player by their verified character id, so adopt
+    // that identity locally too: kill attribution and hit rejections carry it,
+    // and guest sessions are no longer a thing.
     const session = readSession();
-    if (session?.user?.id) {
-      playerId = `${session.user.id}_${tabId}`;
-      username = session.user.username || username;
-      displayName =
-        session.activeCharacter?.name ||
-        session.user.displayName ||
-        username;
-    }
+    const characterId = session?.activeCharacter?.id || null;
 
-    const effective = this.combat?.getEffectiveStats?.() || this.player.stats;
-    this.remotePlayerManager.setLocalPlayerId(playerId);
-    this.combat.setLocalPlayerId(playerId);
+    this.remotePlayerManager.setLocalPlayerId(characterId);
+    this.combat.setLocalPlayerId(characterId);
     this.networkClient.join({
-      id: playerId,
       token: session?.token || null,
-      characterId: session?.activeCharacter?.id || null,
+      characterId,
       // The server restores the hero on the map the client is standing on.
       mapId: this.currentMapId,
-      username,
-      displayName,
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
       vx: 0,
       vy: 0,
       direction: this.player.facing,
-      equipment: { ...this.player.equipment },
-      gender: normalizeGender(this.player.gender),
-      hp: this.player.stats?.hp || 100,
-      mp: this.player.stats?.mp || 0,
-      defense: effective.defense ?? 6,
-      attack: effective.attack ?? 24,
-      critRate: effective.critRate ?? 0.12,
       pkFlag: this.player.pkFlag === true
     });
   }
@@ -1572,12 +1519,7 @@ export class JiangHuScene extends Phaser.Scene {
 
   startGame() {
     this.started = true;
-    // Scope the bag to the active character before any load/save touches it.
-    StorageManager.setCharacterId(readSession()?.activeCharacter?.id || null);
     this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
-    // Re-entering (or switching characters) must re-read before any upload, so the
-    // initial save below cannot clobber the new character's server bag.
-    this.inventorySync?.reset();
     this.setPaused(false);
     if (this.player?.sprite?.body) {
       this.player.sprite.body.enable = true;
@@ -1585,33 +1527,21 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.sendNetworkJoin();
 
-    // Reload save for the active user session
+    // Only the position/map are restored locally; stats, bag, gear and quests
+    // arrive from the server in the join snapshot.
     this.savedData = StorageManager.load();
     if (this.savedData) {
-      if (this.savedData.stats) {
-        this.player.loadStats(this.savedData.stats);
-      }
       if (this.savedData.position && typeof this.savedData.position.x === "number") {
         const { x, y } = this.savedData.position;
         if (isInsideMap(this.map, x, y)) this.player.setPosition(x, y);
-      }
-      if (this.savedData.questRewarded !== undefined) {
-        this.uiBridge.setQuestRewarded(this.savedData.questRewarded);
       }
       this.uiBridge.updateHud(this.player.stats);
     }
 
     bridge.emit(EVENTS.GAME_STARTED);
 
-    // Wear the character's saved gear. Persisted per character like the bag.
-    this.player.applyEquipment(StorageManager.loadEquipment());
-    this.emitEquipment();
-
     if (this.savedData) {
-      this.uiBridge.addLog(
-        `Chào mừng trở lại! Tải lại nhân vật Cấp ${this.player.stats.level} — Bạc: ${this.player.stats.coins}.`,
-        "system"
-      );
+      this.uiBridge.addLog("Chào mừng trở lại giang hồ!", "system");
     } else {
       this.uiBridge.addLog(
         `Bạn đã đặt chân đến ${this.map.name}. Chúc hiệp khách hành tẩu bình an.`,
@@ -1621,10 +1551,6 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     this.saveGame(false);
-
-    // Pull the character's server bag once the active character is known (source
-    // of truth); falls back to / pushes the local bag when the server has none.
-    this.inventorySync?.load();
   }
 
   /**
@@ -1800,21 +1726,6 @@ export class JiangHuScene extends Phaser.Scene {
             vy,
             direction: this.player.facing
           });
-        }
-
-        // Report the stats the client owns: defense (rolls wolf bites), attack and
-        // crit (the server uses them to validate skill damage). Level/HP/MP stay
-        // server-owned.
-        const { defense, attack, critRate } = this.combat?.getEffectiveStats?.() || this.player.stats;
-        if (
-          defense !== this.lastReportedDefense ||
-          attack !== this.lastReportedAttack ||
-          critRate !== this.lastReportedCrit
-        ) {
-          this.lastReportedDefense = defense;
-          this.lastReportedAttack = attack;
-          this.lastReportedCrit = critRate;
-          this.networkClient.sendStats({ defense, attack, critRate });
         }
       }
     }

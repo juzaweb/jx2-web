@@ -2,9 +2,9 @@
  * Monster catalog shared by the Phaser client and the Node server.
  *
  * Every entry is pure data: no Phaser, no transport. The client uses `visual` to
- * paint the monster procedurally and `ai` to step it offline; the server uses the
- * combat block to roll bites and the reward block to pay the killer, so both
- * runtimes can never drift apart.
+ * paint the monster procedurally; the server uses `ai` to step it, the combat
+ * block to roll bites and the reward block to pay the killer, so both runtimes
+ * can never drift apart.
  *
  * Levels are tuned for the Đông Môn Thành hunting grounds, which span levels 3-29.
  * `soi-xam` (Sói Xám) is the legacy market wolf: its reward stays at 35 EXP and
@@ -32,7 +32,7 @@
  * @property {number} coinsMin
  * @property {number} coinsMax
  * @property {boolean} [isBoss]
- * @property {number} [respawnMs] Respawn delay override (server + offline client)
+ * @property {number} [respawnMs] Respawn delay override (server-owned)
  * @property {MonsterVisual} visual
  * @property {object} [ai] Per-monster AI tuning overrides (falls back to ENEMY_TUNING)
  */

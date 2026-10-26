@@ -1,5 +1,4 @@
 import * as Phaser from "phaser";
-import { stepEnemy, BITE_TUNING } from "./enemyAi.js";
 import { getMonster } from "./enemyCatalog.js";
 import { drawMonster } from "./enemyVisuals.js";
 import { interpolateEnemyPosition, reconcileEnemyState } from "./enemySync.js";
@@ -16,12 +15,6 @@ const NAME_OFFSET = 29;
  * screen while the monster does and is skipped once it is far outside the view.
  */
 const NAME_VISIBLE_RANGE = 600 * WORLD_SCALE;
-
-/** Pre-calculated squared bite range for fast collision distance check. */
-const BITE_RANGE_SQ = BITE_TUNING.range * BITE_TUNING.range;
-
-/** Client-driven respawn delay for regular monsters; a boss overrides it. */
-export const OFFLINE_RESPAWN_MS = 9000;
 
 /**
  * One monster instance. Its numbers come from the catalogue
@@ -60,22 +53,10 @@ export class Enemy {
       critRate: this.critRate,
       critDamage: this.critDamage
     };
-    /** Per-species AI tuning; `stepEnemy` falls back to the shared defaults. */
-    this.tuning = this.monster.ai || null;
-    /** Bosses must not pop back up on the regular ten-second timer. */
-    this.respawnMs = Number.isFinite(this.monster.respawnMs)
-      ? this.monster.respawnMs
-      : OFFLINE_RESPAWN_MS;
-    this.respawnAt = 0;
 
     this.visualScale = S * (this.monster.visual?.scale || 1);
 
     this.isDead = false;
-    this.nextBite = 0;
-    // Skill control state: a stunned monster holds still, a slowed one moves slower.
-    this.stunUntil = 0;
-    this.slowUntil = 0;
-    this.slowPct = 0;
     // Where the server last reported this monster (see applyServerState). Left
     // null until then, so it never slides toward a position nobody has claimed.
     this.targetX = null;
@@ -125,31 +106,24 @@ export class Enemy {
     this.nameText.setScale(S);
   }
 
-  update(time, delta, player, onBite) {
+  /**
+   * Render one frame: follow the server's position lead and redraw the labels.
+   * Monster life, damage, control effects and respawns are server-owned; the
+   * server already holds a stunned monster still, so this only interpolates.
+   * @param {number} time scene clock (ms), unused but part of the update contract
+   * @param {number} delta ms since the previous frame
+   * @param {{x:number, y:number}} player local hero, used for label culling
+   */
+  update(time, delta, player) {
     if (!this.sprite.active) return;
 
-    // Client-owned rosters bring monsters back on their own timer; the server
-    // owns respawns whenever it is connected (see scheduleEnemyRespawn).
-    if (this.isDead) {
-      if (!this.usesServerMovement() && this.respawnAt && time >= this.respawnAt) {
-        this.revive();
-      }
-      return;
-    }
+    // The server owns monster life: it sends `enemy_respawned` when a monster is
+    // back, so a dead one simply stops rendering until that snapshot arrives.
+    if (this.isDead) return;
 
-    // A stunned monster holds position; a slowed one advances its clock slower.
-    const stunned = time < this.stunUntil;
-    const slowFactor = time < this.slowUntil ? Math.max(0.15, 1 - (this.slowPct || 0)) : 1;
-
-    // Online the server steps the AI and this render follows its lead; offline the
-    // client steps the same shared AI with the local player as the only target
-    if (stunned) {
-      this.sprite.setVelocity(0, 0);
-    } else if (this.usesServerMovement()) {
-      this.followServerPosition(delta * slowFactor);
-    } else {
-      this.stepLocally(delta * slowFactor, player);
-    }
+    // The server steps the AI and this render follows its lead. With no snapshot
+    // yet the monster holds still rather than guessing a position.
+    this.followServerPosition(delta);
 
     const x = this.sprite.x;
     const y = this.sprite.y;
@@ -179,29 +153,10 @@ export class Enemy {
 
     const isNameVisible = absDx <= NAME_VISIBLE_RANGE && absDy <= NAME_VISIBLE_RANGE && (dx * dx + dy * dy) <= NAME_VISIBLE_RANGE * NAME_VISIBLE_RANGE;
     this.nameText.setVisible(isNameVisible);
-
-    if (absDx < BITE_TUNING.range && absDy < BITE_TUNING.range) {
-      const distSq = dx * dx + dy * dy;
-      if (distSq < BITE_RANGE_SQ && time > this.nextBite) {
-        this.nextBite = time + BITE_TUNING.cooldownMs;
-        if (typeof onBite === "function") {
-          onBite(this);
-        }
-      }
-    }
   }
 
   /**
-   * True while a server owns the roster; movement then arrives as snapshots
-   * instead of being simulated here.
-   * @returns {boolean}
-   */
-  usesServerMovement() {
-    return this.scene?.networkClient?.isConnected === true;
-  }
-
-  /**
-   * Online: render the position the server is leading towards.
+   * Render the position the server is leading towards.
    * @param {number} deltaMs
    */
   followServerPosition(deltaMs) {
@@ -214,27 +169,6 @@ export class Enemy {
         deltaMs
       )
     );
-  }
-
-  /**
-   * Offline: step the shared AI (src/game/enemyAi.js) against the local player.
-   * @param {number} deltaMs
-   * @param {{x:number, y:number}} player
-   */
-  stepLocally(deltaMs, player) {
-    const next = stepEnemy(
-      {
-        x: this.x,
-        y: this.y,
-        homeX: this.homeX,
-        homeY: this.homeY,
-        tuning: this.tuning
-      },
-      [{ x: player.x, y: player.y }],
-      deltaMs
-    );
-
-    this.applyStep(next);
   }
 
   /**
@@ -266,17 +200,6 @@ export class Enemy {
     }
   }
 
-  takeHit(damage) {
-    if (this.isDead) return;
-    this.hp -= damage;
-    this.wolfVisual.setAlpha(0.45);
-    this.scene.time.delayedCall(100, () => {
-      if (this.sprite.active && !this.isDead) {
-        this.wolfVisual.setAlpha(1);
-      }
-    });
-  }
-
   /**
    * Apply an authoritative server snapshot: health always, position by the
    * server's lead (a warp is applied at once, anything smaller is smoothed).
@@ -285,6 +208,7 @@ export class Enemy {
   applyServerState(state = {}) {
     if (!this.sprite.active) return;
 
+    const previousHp = this.hp;
     const next = reconcileEnemyState(
       { x: this.x, y: this.y, hp: this.hp, maxHp: this.maxHp, isDead: this.isDead },
       state
@@ -299,11 +223,27 @@ export class Enemy {
 
     if (this.isDead) this.revive();
 
+    // A snapshot that lowers HP is a landed hit: flash the sprite briefly so the
+    // authoritative number also reads as impact.
+    if (next.hp < previousHp) this.flashHit();
+
     if (Number.isFinite(state.x) && Number.isFinite(state.y)) {
       this.targetX = state.x;
       this.targetY = state.y;
       if (next.snap) this.placeAt(state.x, state.y);
     }
+  }
+
+  /**
+   * Brief white-out on the monster after a landed hit.
+   */
+  flashHit() {
+    this.wolfVisual.setAlpha(0.45);
+    this.scene.time.delayedCall(100, () => {
+      if (this.sprite.active && !this.isDead) {
+        this.wolfVisual.setAlpha(1);
+      }
+    });
   }
 
   die() {
@@ -313,18 +253,11 @@ export class Enemy {
     this.hpBack.setVisible(false);
     this.hpFill.setVisible(false);
     this.nameText.setVisible(false);
-
-    // Only the client-owned roster schedules its own return; the server sends
-    // `enemy_respawned` when it decides the monster is back.
-    if (!this.usesServerMovement()) {
-      this.respawnAt = (this.scene?.time?.now || 0) + this.respawnMs;
-    }
   }
 
   revive() {
     if (!this.sprite.active) return;
     this.isDead = false;
-    this.respawnAt = 0;
     this.hp = this.maxHp;
     this.sprite.setPosition(this.homeX, this.homeY);
     this.sprite.body.enable = true;
@@ -421,20 +354,9 @@ export class EnemyManager {
     this.group?.clear(false, false);
   }
 
-  update(time, delta, player, onBite) {
+  update(time, delta, player) {
     this.enemies.forEach((enemy) => {
-      enemy.update(time, delta, player, onBite);
-    });
-  }
-
-  /**
-   * Client-owned respawn sweep. Each monster carries its own timer, so this just
-   * revives whoever is due (kept for callers that still poke it directly).
-   */
-  respawnEnemies() {
-    const now = this.scene?.time?.now || 0;
-    this.enemies.forEach((enemy) => {
-      if (enemy.isDead && enemy.respawnAt && now >= enemy.respawnAt) enemy.revive();
+      enemy.update(time, delta, player);
     });
   }
 

@@ -115,7 +115,8 @@ describe("Character API Test Suite", () => {
     }).then((r) => r.json());
 
     const bag = await fetch(
-      `${baseUrl}/inventory/${created.data.character.id}`
+      `${baseUrl}/inventory/${created.data.character.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     ).then((r) => r.json());
 
     assert.deepEqual(bag.data.inventory, {
@@ -140,7 +141,8 @@ describe("Character API Test Suite", () => {
     }).then((r) => r.json());
 
     const bag = await fetch(
-      `${baseUrl}/inventory/${created.data.character.id}`
+      `${baseUrl}/inventory/${created.data.character.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     ).then((r) => r.json());
 
     assert.equal(bag.data.inventory["lenh-bai-gm"], 1);
@@ -162,15 +164,13 @@ describe("Character API Test Suite", () => {
     const characterId = created.data.character.id;
 
     // Simulate a character that has spent most of the kit.
-    await fetch(`${baseUrl}/inventory/${characterId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inventory: { "kim-sang-duoc": 2 } })
-    });
+    await store.setInventory(characterId, { "kim-sang-duoc": 2 });
 
     store.grantStarterItems(characterId);
 
-    const bag = await fetch(`${baseUrl}/inventory/${characterId}`).then((r) => r.json());
+    const bag = await fetch(`${baseUrl}/inventory/${characterId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((r) => r.json());
     assert.deepEqual(bag.data.inventory, { "kim-sang-duoc": 2 });
   });
 

@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { defaultEquipment, deriveEquipmentBonuses } from "./equipment.js";
+import { defaultEquipment } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
@@ -20,9 +20,6 @@ import {
 
 const S = WORLD_SCALE;
 const POS = WORLD_POSITION_SCALE;
-
-/** Stats that are always derived from base values + worn gear, never persisted. */
-const DERIVED_STATS = new Set(["attack", "defense", "attackSpeed", "critRate", "critDamage"]);
 
 export class Player {
   /**
@@ -63,8 +60,6 @@ export class Player {
     this.invulnerable = false;
     /** Worn items, slot -> item id. Drawn as overlays on the body sheet. */
     this.equipment = defaultEquipment();
-    /** Bonus totals already folded into `stats`, so a swap only applies a delta. */
-    this.equipmentBonuses = {};
     // PK opt-in flag: only a flagged player may fight or be fought (see pvp.js).
     this.pkFlag = false;
     this.targetX = null;
@@ -178,30 +173,13 @@ export class Player {
   }
 
   /**
-   * Wear the given items, redraw the rig and fold their bonuses into `stats`.
+   * Wear the given items and redraw the rig. Combat bonuses are derived on the
+   * server and arrive as `player_stats`, so nothing is folded into `stats` here.
    * @param {Record<string, string|null>} [equipment]
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
     this.rig?.set(this.facingDirection, this.equipment, this.gender);
-    this.refreshEquipmentBonuses();
-  }
-
-  /**
-   * Re-apply the worn items' combat bonuses. Only the stats the server also
-   * accepts from the client (attack, defence, crit) are touched: HP/MP ceilings
-   * are server-owned (see progression.js), so gear never inflates them locally.
-   */
-  refreshEquipmentBonuses() {
-    const next = deriveEquipmentBonuses(this.equipment);
-    const previous = this.equipmentBonuses;
-    const delta = (key) => (next[key] || 0) - (previous[key] || 0);
-
-    this.stats.attack = Math.max(0, this.stats.attack + delta("attack"));
-    this.stats.defense = Math.max(0, this.stats.defense + delta("defense"));
-    const critRate = this.stats.critRate + delta("critRate");
-    this.stats.critRate = Math.min(1, Math.max(0, Number(critRate.toFixed(4))));
-    this.equipmentBonuses = next;
   }
 
   /**
@@ -554,36 +532,8 @@ export class Player {
     this.touchDirection = direction;
   }
 
-  /**
-   * Restore anything persisted about the character. Combat stats are derived
-   * (base + worn gear), so they are never restored from disk — otherwise the
-   * saved gear bonus would be applied a second time by `applyEquipment`.
-   * @param {object} [savedStats]
-   */
-  loadStats(savedStats) {
-    if (!savedStats || typeof savedStats !== "object") return;
-    const persisted = Object.fromEntries(
-      Object.entries(savedStats).filter(([key]) => !DERIVED_STATS.has(key))
-    );
-    this.stats = {
-      ...this.stats,
-      ...persisted
-    };
-  }
 
-  heal(amount) {
-    const prev = this.stats.hp;
-    this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + amount);
-    return this.stats.hp - prev;
-  }
-
-  restoreMp(amount) {
-    const prev = this.stats.mp;
-    this.stats.mp = Math.min(this.stats.maxMp, this.stats.mp + amount);
-    return this.stats.mp - prev;
-  }
-
-  get x() {
+   get x() {
     return this.sprite ? this.sprite.x : this.spawnX;
   }
 
