@@ -1,9 +1,6 @@
 import * as Phaser from "phaser";
-import { addQuantity, rollDrop, DROP_TABLE_MAP, rollKillReward } from "./items.js";
 import { parseEnemyReward } from "./rewardSync.js";
 import { skillById, skillsForSect, skillMpCost, skillLockReason, skillUnlocked } from "./skills.js";
-import { computeSkillDamage, applyBuffsToStats } from "./skillDamage.js";
-import { advanceRegen, billableDeltaMs, passiveRegenRate } from "./passiveRegen.js";
 import {
   playSkillCastVfx,
   playSkillImpactVfx,
@@ -15,18 +12,13 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
-import { computeDamage } from "./damage.js";
+import { MELEE_REACH } from "./combatRules.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { bridge, EVENTS } from "./bridge.js";
 import { translate } from "../i18n/translator.js";
 
 let audioEnabled = true;
 let audioContext = null;
-
-const MAX_DROPS = 40;
-const UNOWNED_DROP_TTL_MS = 15000;
-/** World-space reach (px) of a plain sword swing against a monster. */
-const MELEE_REACH = 280;
 
 /**
  * A monster takes local damage through `takeHit`; a peer (RemotePlayer) does not,
@@ -111,15 +103,12 @@ export class CombatSystem {
   }
 
   /**
-   * The player's stats with active timed buffs applied. The server is told these
-   * numbers so its authoritative skill damage matches the client's prediction.
+   * The player's stats, exactly as the server publishes them. Buffs are applied
+   * server-side; the local buff list only drives VFX.
    * @returns {Object}
    */
   getEffectiveStats() {
-    const now = this.scene?.time?.now ?? 0;
-    // Do not prune here: `updateBuffs` owns the buff lifecycle so an expired
-    // buff's formation ring or overhead seal is still visible to hide.
-    return applyBuffsToStats(this.player.stats, this.buffs, now);
+    return this.player?.stats || {};
   }
 
   /**
@@ -242,16 +231,9 @@ export class CombatSystem {
     const targetEnemy = this.nearestEnemyInReach();
     if (targetEnemy) {
       this.beginAttack();
+      this.damageEnemy(targetEnemy);
 
-      const result = computeDamage(this.player, targetEnemy, Math.random);
-      this.damageEnemy(targetEnemy, result.damage, result.crit);
-
-      const targetName = targetEnemy.name || "mục tiêu";
-      if (result.crit) {
-        this.ui.addLog(`Chí mạng! Kiếm chiêu đánh trúng ${targetName} gây ${result.damage} sát thương!`);
-      } else {
-        this.ui.addLog(`Kiếm chiêu đánh trúng ${targetName} gây ${result.damage} sát thương.`);
-      }
+      this.ui.addLog(`Kiếm chiêu chém tới ${targetEnemy.name || "mục tiêu"}!`);
       return;
     }
 
@@ -585,7 +567,6 @@ export class CombatSystem {
   update(time) {
     const now = typeof time === "number" ? time : (this.scene?.time?.now ?? 0);
     this.updateBuffs(now);
-    this.updatePassiveRegen(now);
 
     const pending = this.pendingCast;
     if (!pending) return;
@@ -609,51 +590,6 @@ export class CombatSystem {
     if (!this.lastChaseAt || time - this.lastChaseAt > 400) {
       this.lastChaseAt = time;
       this.player.moveTo(target.x, target.y);
-    }
-  }
-
-  /**
-   * Apply the sect's passive internal-art regeneration. HP is server-owned, so
-   * the healed amount is mirrored to the server with a `player_heal`, exactly
-   * like a potion; the server clamps it to its own ceiling.
-   *
-   * The rate is cached per (sect, level) because this runs every frame, and the
-   * fractional remainder is carried so a 2 HP/s art heals 2 HP a second rather
-   * than 1 HP every other frame. Time spent paused is never billed: a stall
-   * longer than one frame is dropped instead of healing the hero to full.
-   * @param {number} now
-   */
-  updatePassiveRegen(now) {
-    const stats = this.player?.stats;
-    if (!stats) return;
-
-    const sect = this.player.sect;
-    const level = stats.level;
-    if (sect !== this.regenSect || level !== this.regenLevel) {
-      this.regenSect = sect;
-      this.regenLevel = level;
-      this.regenRate = passiveRegenRate(sect, level);
-      this.regenCarry = 0;
-    }
-
-    const deltaMs = billableDeltaMs(this.lastRegenAt, now);
-    this.lastRegenAt = now;
-
-    // A fallen hero (0 HP) waits for the server's respawn instead of healing up;
-    // a paused frame (deltaMs 0) and a full bar bank nothing either.
-    if (deltaMs <= 0 || this.regenRate <= 0 || stats.hp <= 0 || stats.hp >= stats.maxHp) {
-      this.regenCarry = 0;
-      return;
-    }
-
-    const { carry, amount } = advanceRegen(this.regenCarry, this.regenRate, deltaMs);
-    this.regenCarry = carry;
-    if (amount <= 0) return;
-
-    const healed = this.player.heal(amount);
-    if (healed <= 0) return;
-    if (this.scene?.networkClient?.isConnected) {
-      this.scene.networkClient.sendHeal({ amount: healed });
     }
   }
 
@@ -726,24 +662,17 @@ export class CombatSystem {
       return;
     }
 
-    const attacker = applyBuffsToStats(this.player.stats, this.buffs, now);
     let hits = 0;
-    let anyCrit = false;
 
     for (const wolf of targets) {
       playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
-      const result = computeSkillDamage(skill, attacker, wolf, Math.random);
-      if (result.damage > 0) {
-        if (result.crit) anyCrit = true;
-        this.damageEnemy(wolf, result.damage, result.crit, { skill: skill.id });
-        hits++;
-      }
+      this.damageEnemy(wolf, { skill: skill.id });
+      hits++;
       this.applySkillEffectsToEnemy(wolf, skill, now);
     }
 
-    const critText = anyCrit ? " (Chí mạng!)" : "";
     this.ui.addLog(
-      `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!${critText}`
+      `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!`
     );
   }
 
@@ -765,16 +694,11 @@ export class CombatSystem {
 
     playTargetMarker(this.scene, target.x, target.y, skill.vfx?.color);
 
-    const result = computeSkillDamage(skill, this.getEffectiveStats(), target, Math.random);
-    if (result.damage > 0) {
-      this.syncPosition();
-      this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, damage: result.damage });
-      // No damage number here: the server answers with player_hp (or a dodge
-      // refusal) and that is what draws the floating text.
-    }
+    this.syncPosition();
+    this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, skill: skill.id });
 
     this.ui.addLog(
-      `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!${result.crit ? " (Chí mạng!)" : ""}`
+      `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!`
     );
   }
 
@@ -873,14 +797,8 @@ export class CombatSystem {
           until: now + effect.duration
         });
       } else if (effect.kind === "heal") {
-        const amount = Math.round((effect.amount || 0) + (this.player.stats.maxHp * (effect.pctMaxHp || 0)));
-        if (amount > 0) {
-          if (this.scene.networkClient?.isConnected) {
-            this.scene.networkClient.sendHeal({ amount });
-          } else {
-            this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
-          }
-        }
+        // The server applies the heal when it accepts the cast and broadcasts the
+        // resulting player_hp; the client only plays the VFX.
       }
     }
     if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
@@ -1000,61 +918,32 @@ export class CombatSystem {
     this.aimAt(target);
     this.beginAttack(facingRight, this.pvpAttackIntervalMs());
 
-    const result = computeDamage(this.player, target, Math.random);
     this.syncPosition();
-    this.scene.networkClient?.sendPlayerHit?.({
-      targetId: target.id,
-      damage: result.damage
-    });
+    this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id });
 
-    // Optimistic feedback is intentionally omitted: the server confirms the hit via
-    // player_hp (or refuses it), and the client draws the number from that.
-    this.ui.addLog(
-      `${result.crit ? "Chí mạng! " : ""}Kiếm chiêu chém tới ${target.displayName || "đối thủ"}!`
-    );
+    // No optimistic damage: the server confirms the hit via player_hp (or refuses
+    // it) and that is what draws the floating number.
+    this.ui.addLog(`Kiếm chiêu chém tới ${target.displayName || "đối thủ"}!`);
   }
 
-  damageEnemy(wolf, damage, isCrit = false, meta = {}) {
-    if (wolf.isDead) return;
-
-    wolf.takeHit(damage);
-    const floatText = isCrit ? `-${damage} BẠO KÍCH!` : `-${damage}`;
-    const floatColor = isCrit ? "#ffcc00" : "#ffb49a";
-    this.showFloatText(wolf.x, wolf.y - 30, floatText, floatColor);
-    playTone(isCrit ? 180 : 120, 0.06, "square", isCrit ? 0.025 : 0.012);
+  /**
+   * Ask the server to resolve one hit against a monster. The client only names the
+   * target (and the skill when the hit came from a cast); damage, death, rewards
+   * and the floating number all come back in the server's `enemy_hit` broadcast.
+   * @param {Object} wolf
+   * @param {{skill?:string}} [meta]
+   */
+  damageEnemy(wolf, meta = {}) {
+    if (!wolf || wolf.isDead) return;
 
     const skill = meta.skill ? skillById(meta.skill) : null;
     if (skill) playSkillImpactVfx(this.scene, wolf.x, wolf.y, skill);
+    playTone(skill ? 180 : 120, 0.06, "square", skill ? 0.02 : 0.012);
 
-    // The server owns the wolf's health: a skill hit names the skill so the server
-    // can recompute the damage itself; a plain attack still reports its estimate.
     this.scene.networkClient?.sendEnemyHit?.({
       id: wolf.id,
-      damage,
-      ...(meta.skill ? { skill: meta.skill } : {})
+      ...(skill ? { skill: skill.id } : {})
     });
-
-    if (wolf.hp <= 0) {
-      this.handleWolfKill(wolf);
-    }
-  }
-
-  handleWolfKill(enemy) {
-    enemy.die();
-    const name = enemy.name || "quái vật";
-
-    // Online, enemy health and the reward are server-owned: the server rolls the
-    // payout and broadcasts `enemy_reward` + an authoritative `player_progress`.
-    if (this.usesServerRewards()) {
-      this.ui.addLog(`Đánh bại ${name}!`);
-      return;
-    }
-
-    // Offline (no server connection) progression is frozen: the kill plays out,
-    // but the client never mints coins/EXP of its own and nothing is dropped.
-    // The monster schedules its own return from its catalog `respawnMs`
-    // (see src/game/enemy.js), so nothing else is needed here.
-    this.ui.addLog(`Đánh bại ${name}! (ngoại tuyến — không nhận tiến trình)`);
   }
 
   /**
@@ -1161,95 +1050,6 @@ export class CombatSystem {
       this.scene.networkClient?.sendQuestClaim?.();
     }
     this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
-  }
-
-  /**
-   * Spawn a collectable drop. Without an explicit entry the loot is rolled
-   * locally (offline play); while connected the server supplies the entry so
-   * every client renders the same item.
-   * @param {number} x
-   * @param {number} y
-   * @param {?{id:string, qty:number}} [loot]
-   * @param {{collectable?:boolean}} [options] - `collectable: false` renders loot
-   *   owned by another player, which only shows up in the world
-   */
-  spawnDrop(x, y, loot = null, { collectable = true } = {}) {
-    this.drops = this.drops || [];
-    const rolled = loot || rollDrop();
-    const dropEntry = DROP_TABLE_MAP.get(rolled.id);
-
-    const drop = {
-      x,
-      y,
-      phase: Math.random() * 6,
-      active: true,
-      collectable,
-      itemId: rolled.id,
-      qty: rolled.qty ?? dropEntry?.qty ?? 1,
-      name: dropEntry ? dropEntry.name : rolled.id,
-      // Someone else's loot can never be picked up, so it fades instead of littering.
-      expiresAt: collectable ? null : (this.scene.time?.now ?? 0) + UNOWNED_DROP_TTL_MS
-    };
-
-    const dropIso = toIso(x, y);
-    drop.visual = this.scene.add.container(dropIso.x, dropIso.y).setDepth(isoDepth(x, y) + 5);
-    if (!collectable) {
-      drop.visual.setAlpha(0.55);
-    }
-    drop.visual.add(this.scene.add.circle(0, 0, 13, 0xe9bd59, 0.12));
-    drop.visual.add(
-      this.scene.add
-        .polygon(0, 0, [0, -8, 7, 0, 0, 8, -7, 0], 0x8fd7b2)
-        .setStrokeStyle(2, 0xe0f4c5)
-    );
-    drop.visual.add(this.scene.add.circle(0, 0, 2, 0xffffff));
-
-    this.drops.push(drop);
-  }
-
-  updateDrops(time) {
-    this.drops = this.drops || [];
-    if (this.drops.length > MAX_DROPS) {
-      this.drops = this.drops.filter((drop) => drop.active).slice(-MAX_DROPS);
-    }
-
-    this.drops.forEach((drop) => {
-      if (!drop.active) return;
-
-      if (!drop.collectable && time >= drop.expiresAt) {
-        drop.active = false;
-        drop.visual.destroy();
-        return;
-      }
-
-      const dropIso = toIso(drop.x, drop.y + Math.sin(time / 180 + drop.phase) * 4);
-      drop.visual.setPosition(dropIso.x, dropIso.y);
-
-      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, drop.x, drop.y) < 38) {
-        this.collectDrop(drop);
-      }
-    });
-  }
-
-  collectDrop(drop) {
-    if (!drop.active || !drop.collectable) return;
-    drop.active = false;
-    drop.visual.destroy();
-
-    // Coins are server-owned, so a pickup grants no bạc on the client. MP is
-    // server-owned too: predict locally and mirror the restore into the pool.
-    this.player.stats.mp = Math.min(this.player.stats.maxMp, this.player.stats.mp + 5);
-    this.scene.networkClient?.sendRestoreMp?.({ amount: 5 });
-
-    addQuantity(drop.itemId, drop.qty);
-
-    const dropName = drop.name || drop.itemId;
-    this.ui.addLog(`Nhặt được ${dropName} x${drop.qty}: +5 nội lực.`);
-    this.ui.updateHud(this.player.stats);
-    this.ui.updateInventory();
-    if (typeof this.onStateChange === "function") {
-      this.onStateChange();
-    }
   }
 
   showFloatText(x, y, text, color) {

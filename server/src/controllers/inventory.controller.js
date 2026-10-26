@@ -5,14 +5,21 @@ import { userDb } from "../data/userDb.js";
 export const getInventory = async (req, res, next) => {
   try {
     const { playerId } = req.params;
+
+    // Only the owning account may read a character's bag.
+    const ownerId = characterDb.getOwner(playerId);
+    if (!ownerId || ownerId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        error: "Bạn không có quyền truy cập túi đồ của nhân vật này."
+      });
+    }
+
     let inventory = await store.getInventory(playerId);
 
-    const ownerId = characterDb.getOwner(playerId);
-    if (ownerId && userDb.isAdmin(ownerId)) {
-      if (!inventory["lenh-bai-gm"]) {
-        inventory = { ...inventory, "lenh-bai-gm": 1 };
-        await store.setInventory(playerId, inventory);
-      }
+    if (userDb.isAdmin(ownerId) && !inventory["lenh-bai-gm"]) {
+      inventory = { ...inventory, "lenh-bai-gm": 1 };
+      await store.setInventory(playerId, inventory);
     }
 
     res.json({
@@ -20,26 +27,6 @@ export const getInventory = async (req, res, next) => {
       data: {
         playerId,
         inventory
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const updateInventory = async (req, res, next) => {
-  try {
-    const { playerId } = req.params;
-    const inventory = req.validatedInventory || req.body.inventory || req.body;
-
-    const updated = await store.setInventory(playerId, inventory);
-
-    res.json({
-      success: true,
-      message: "Cập nhật túi đồ thành công",
-      data: {
-        playerId,
-        inventory: updated
       }
     });
   } catch (err) {

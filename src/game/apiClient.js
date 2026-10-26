@@ -54,20 +54,29 @@ export class ApiClient {
   }
 
   /**
-   * Submit score directly to leaderboard
-   * @param {Object} entry
-   * @returns {Promise<Object>}
+   * One-time import of a legacy local save (bag + worn gear) for a character.
+   * The server refuses to run it twice, so calling it on every login is safe.
+   * @param {string} characterId
+   * @param {Record<string, number>} inventory
+   * @param {Record<string, string|null>} equipment
+   * @param {string} [token]
+   * @returns {Promise<{ characterId: string, inventory: Object, equipment: Object }>}
    */
-  async submitScore(entry) {
-    const res = await fetch(`${this.baseUrl}/leaderboard/submit`, {
+  async importState(characterId, inventory, equipment, token) {
+    const res = await fetch(`${this.baseUrl}/state/import`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entry),
+      headers: {
+        "Content-Type": "application/json",
+        ...this._getAuthHeaders(token)
+      },
+      body: JSON.stringify({ characterId, inventory, equipment })
     });
+    const json = await this._parseJson(res);
     if (!res.ok) {
-      throw new Error(`Failed to submit score: HTTP ${res.status}`);
+      const error = new Error(json?.error || `Không nhập được dữ liệu cũ (HTTP ${res.status})`);
+      error.status = res.status;
+      throw error;
     }
-    const json = await res.json();
     return json.data;
   }
 
@@ -87,21 +96,13 @@ export class ApiClient {
 
   /**
    * Update player inventory
+   * @deprecated The server owns the bag now; buy/use/equip over the WebSocket.
    * @param {string} playerId
    * @param {Record<string, number>} inventory
    * @returns {Promise<Record<string, number>>}
    */
   async updateInventory(playerId, inventory) {
-    const res = await fetch(`${this.baseUrl}/inventory/${encodeURIComponent(playerId)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inventory }),
-    });
-    if (!res.ok) {
-      throw new Error(`Failed to update inventory: HTTP ${res.status}`);
-    }
-    const json = await res.json();
-    return json.data.inventory;
+    throw new Error("Inventory is server-owned; use the WebSocket actions instead.");
   }
 
   /**

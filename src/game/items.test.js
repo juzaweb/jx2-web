@@ -14,7 +14,9 @@ import {
   addQuantity,
   consumeQuantity,
   rollKillReward,
-  KILL_REWARD
+  KILL_REWARD,
+  CONSUMABLE_EFFECTS,
+  getConsumableEffect
 } from "./items.js";
 
 describe("item catalog", () => {
@@ -253,6 +255,22 @@ describe("consumeQuantity", () => {
     // Nothing is owned until it is earned, so the first consume is refused.
     expect(fresh.consumeQuantity("dai-hoan-dan", 1)).toEqual({ ok: false, quantity: 0 });
     expect(fresh.getQuantity("dai-hoan-dan")).toBe(0);
+  });
+});
+
+describe("consumable effects", () => {
+  it("describes the server-owned effect of every usable item", () => {
+    expect(CONSUMABLE_EFFECTS["kim-sang-duoc"]).toEqual({ hp: 35 });
+    expect(CONSUMABLE_EFFECTS["dai-hoan-dan"]).toEqual({ mp: 25 });
+    expect(CONSUMABLE_EFFECTS["nu-nhi-hong"]).toEqual({ hp: 50, mp: 30 });
+    expect(CONSUMABLE_EFFECTS["hoi-thanh-phu"]).toEqual({ teleport: "spawn" });
+  });
+
+  it("looks effects up only for known ids", () => {
+    expect(getConsumableEffect("kim-sang-duoc")).toEqual({ hp: 35 });
+    expect(getConsumableEffect("ao-lang-khach")).toBeNull();
+    expect(getConsumableEffect("")).toBeNull();
+    expect(getConsumableEffect(null)).toBeNull();
   });
 });
 

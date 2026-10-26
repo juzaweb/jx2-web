@@ -164,6 +164,28 @@ export function getItemById(id) {
 }
 
 /**
+ * Server-owned effects of the usable consumables. The client renders the number
+ * the server broadcasts; it never applies these amounts itself.
+ * @type {Readonly<Record<string, { hp?: number, mp?: number, teleport?: "spawn" }>>}
+ */
+export const CONSUMABLE_EFFECTS = Object.freeze({
+  "kim-sang-duoc": Object.freeze({ hp: 35 }),
+  "dai-hoan-dan": Object.freeze({ mp: 25 }),
+  "nu-nhi-hong": Object.freeze({ hp: 50, mp: 30 }),
+  "hoi-thanh-phu": Object.freeze({ teleport: "spawn" })
+});
+
+/**
+ * Effect of one consumable, or null when the item is not usable.
+ * @param {string} id
+ * @returns {{ hp?: number, mp?: number, teleport?: "spawn" }|null}
+ */
+export function getConsumableEffect(id) {
+  if (typeof id !== "string" || id.length === 0) return null;
+  return CONSUMABLE_EFFECTS[id] || null;
+}
+
+/**
  * The kit every newly created regular character receives: health potions, mana potions
  * and return-city talismans. Only the server grants it (see
  * PlayerDatabase.grantStarterItems), so the client never seeds a bag on its own.

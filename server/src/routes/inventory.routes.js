@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { getInventory, updateInventory } from "../controllers/inventory.controller.js";
-import { validatePlayerId, validateInventoryPayload } from "../middlewares/validate.js";
+import { getInventory } from "../controllers/inventory.controller.js";
+import { requireAuth } from "../middlewares/auth.js";
+import { validatePlayerId } from "../middlewares/validate.js";
 
 const router = Router();
 
-router.get("/inventory/:playerId", validatePlayerId, getInventory);
-router.put("/inventory/:playerId", validatePlayerId, validateInventoryPayload, updateInventory);
+// Read-only debug surface. The bag itself is written exclusively over the
+// WebSocket (`use_item` / `equip_item` / `unequip_slot` / `shop_buy`).
+router.get("/inventory/:playerId", requireAuth, validatePlayerId, getInventory);
 
 export default router;
