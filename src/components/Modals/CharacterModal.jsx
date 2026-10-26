@@ -6,32 +6,25 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
 import { setDragPayload } from "./dragItem.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
-import { CharacterPreview } from "../CharacterPreview.jsx";
 
 /**
  * Paper-doll slots. A slot with a `source` shows the item worn in that equipment
  * slot and can be clicked to take it off; the rest are decorative placeholders.
  */
-const DOLL_SLOTS = {
-  columnLeft: [
-    { key: "helm", source: "helmet", labelKey: "slots.helmet" },
-    { key: "armor", source: "armor", labelKey: "slots.armor" },
-    { key: "belt", labelKey: "character.slots.belt" },
-    { key: "accessory", source: "accessory", labelKey: "slots.accessory", icon: "accessory" },
-    { key: "bracers", labelKey: "character.slots.bracers" },
-    { key: "weapon", source: "weapon", labelKey: "slots.weapon" },
-    // Sits directly above the corner "Phó mật tịch" slot.
-    { key: "secretManual", labelKey: "character.slots.secretManual", icon: "manual" }
-  ],
-  // Sits at the elbow where the vertical column meets the horizontal row.
-  corner: { key: "subManual", labelKey: "character.slots.subManual", icon: "subManual" },
-  row: [
-    { key: "cosHat", labelKey: "character.slots.cosHat", icon: "cosHat" },
-    { key: "cosTop", labelKey: "character.slots.cosTop", icon: "cosTop" },
-    { key: "cosPants", source: "pants", labelKey: "character.slots.cosPants", icon: "cosPants" },
-    { key: "mount", labelKey: "character.slots.mount", icon: "mount" }
-  ]
-};
+const COMPACT_SLOTS = [
+  { key: "helm", source: "helmet", labelKey: "slots.helmet", icon: "helm" },
+  { key: "secretManual", labelKey: "character.slots.secretManual", icon: "manual" },
+  { key: "armor", source: "armor", labelKey: "slots.armor", icon: "armor" },
+  { key: "subManual", labelKey: "character.slots.subManual", icon: "subManual" },
+  { key: "pants", source: "pants", labelKey: "slots.pants", icon: "cosPants" },
+  { key: "belt", labelKey: "character.slots.belt", icon: "belt" },
+  { key: "accessory", source: "accessory", labelKey: "slots.accessory", icon: "accessory" },
+  { key: "cosHat", labelKey: "character.slots.cosHat", icon: "cosHat" },
+  { key: "bracers", labelKey: "character.slots.bracers", icon: "bracers" },
+  { key: "cosTop", labelKey: "character.slots.cosTop", icon: "cosTop" },
+  { key: "weapon", source: "weapon", labelKey: "slots.weapon", icon: "weapon" },
+  { key: "mount", labelKey: "character.slots.mount", icon: "mount" }
+];
 
 const TABS = [
   { key: "equip", labelKey: "character.tabEquip", enabled: true },
@@ -213,6 +206,11 @@ export function CharacterModal({
 
         <div className="char-body">
           <div className="char-side">
+            {playerName && (
+              <div className="char-identity">
+                {playerName} · Lv {sheet.level}
+              </div>
+            )}
             <div className="char-stats">
               {sheet.vitals.map((row) => (
                 <div className="stat-row vital" key={row.key} data-stat={row.key}>
@@ -230,34 +228,23 @@ export function CharacterModal({
                 </div>
               ))}
             </div>
+
+            <div className="char-stats">
+              <div className="stat-row" data-stat="points">
+                <span className="stat-label">{t("character.points")}</span>
+                <span className="stat-value">{sheet.footer.points}</span>
+              </div>
+            </div>
           </div>
 
           <div className="char-main">
-            <div className="char-equip">
-              <div className="equip-col left">
-                {DOLL_SLOTS.columnLeft.map(renderSlot)}
-              </div>
-
-              <div className="char-model">
-                <CharacterPreview gender={gender} equipment={equipment} />
-                {playerName && <div className="char-model-name">{playerName}</div>}
-              </div>
-
-              <div className="equip-corner">{renderSlot(DOLL_SLOTS.corner)}</div>
-
-              <div className="equip-row">{DOLL_SLOTS.row.map(renderSlot)}</div>
+            <div className="char-equip-grid">
+              {COMPACT_SLOTS.map(renderSlot)}
             </div>
           </div>
         </div>
 
-        <div className="char-footer">
-          <span>
-            {t("character.points")} <b>{sheet.footer.points}</b>
-          </span>
-          <span>
-            {t("character.nextLevel")} <b>{sheet.footer.nextLevelExp}</b>
-          </span>
-        </div>
+
       </div>
     </div>
   );
