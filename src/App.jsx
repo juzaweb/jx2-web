@@ -1,10 +1,12 @@
-import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from "react";
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
 import { MobileControls } from "./components/MobileControls.jsx";
 import { MobileSkillPicker } from "./components/MobileSkillPicker.jsx";
+import { MobileItemPicker } from "./components/MobileItemPicker.jsx";
+import { useMobileSlotPicker } from "./components/hooks/useMobileSlotPicker.js";
 import { ConnectionLostOverlay } from "./components/ConnectionLostOverlay.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
@@ -22,6 +24,10 @@ import {
   assignMobileSkill
 } from "./game/mobileSkills.js";
 import {
+  loadMobileItems,
+  assignMobileItem
+} from "./game/mobileItems.js";
+import {
   loadQuickSlots,
   assignQuickSlot,
   clearQuickSlot,
@@ -31,6 +37,8 @@ import {
 import { skillsForSect } from "./game/skills.js";
 import {
   applyQuantities,
+  bagQuantity,
+  CONSUMABLE_ITEMS,
   setQuantities as rememberQuantities
 } from "./game/items.js";
 import { defaultEquipment } from "./game/equipment.js";
@@ -102,6 +110,20 @@ const loadCharacterInventory = (characterId) => {
   );
 };
 
+/**
+ * Stable module references for the two mobile binding stores. Passing an inline
+ * object would change identity every render and re-trigger the picker hook's
+ * character effect (which reloads from storage).
+ */
+const MOBILE_SKILL_BINDINGS = {
+  load: loadMobileSkills,
+  assign: assignMobileSkill
+};
+const MOBILE_ITEM_BINDINGS = {
+  load: loadMobileItems,
+  assign: assignMobileItem
+};
+
 export function App() {
   const { t } = useI18n();
   const [currentUser, setCurrentUser] = useState(() => {
@@ -146,11 +168,6 @@ export function App() {
   const [quickSlots, setQuickSlots] = useState(() =>
     loadQuickSlots(readSession()?.activeCharacter?.id)
   );
-  const [mobileSkills, setMobileSkills] = useState(() =>
-    loadMobileSkills(readSession()?.activeCharacter?.id)
-  );
-  // Index of the mobile arc button being rebound, or null when the picker is closed.
-  const [mobileSkillPicker, setMobileSkillPicker] = useState(null);
   const [shopNpc, setShopNpc] = useState(null);
   const [shopResult, setShopResult] = useState(null);
   const [stats, setStats] = useState({
@@ -180,6 +197,17 @@ export function App() {
     loadCharacterInventory(readSession()?.activeCharacter?.id)
   );
 
+  // Consumables the mobile HP/MP buttons can be bound to, with the stack the bag
+  // currently holds so the picker can grey out what has run out.
+  const mobileItemOptions = useMemo(
+    () =>
+      CONSUMABLE_ITEMS.map((item) => ({
+        ...item,
+        qty: bagQuantity(item.id, inventory.inventoryItems)
+      })),
+    [inventory]
+  );
+
   // Worn equipment (slot -> item id), scoped per character like the bag.
   const [equipment, setEquipment] = useState(() => StorageManager.loadEquipment());
 
@@ -195,9 +223,6 @@ export function App() {
     const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
     setQuickSlots(loadedQuickSlots);
     bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
-
-    setMobileSkills(loadMobileSkills(activeCharacter?.id));
-    setMobileSkillPicker(null);
 
     if (activeCharacter?.sect) {
       bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
@@ -238,36 +263,6 @@ export function App() {
       handleAssignQuickSlot(slot, skillBinding(skillId));
     },
     [handleAssignQuickSlot]
-  );
-
-  // Mobile arc: tap an empty "+" (or long-press a bound button) to open the picker.
-  const handleOpenMobileSkillPicker = useCallback((index) => {
-    // Close the help overlay without depending on `dismissHelp`, which is
-    // declared later in this component.
-    setIsHelpOpen(false);
-    setMobileSkillPicker(index);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
-  }, []);
-
-  const handleCloseMobileSkillPicker = useCallback(() => {
-    setMobileSkillPicker(null);
-    bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-  }, []);
-
-  const handleSelectMobileSkill = useCallback(
-    (skillId) => {
-      if (mobileSkillPicker === null) return;
-      const next = assignMobileSkill(
-        activeCharacter?.id,
-        mobileSkills,
-        mobileSkillPicker,
-        skillId
-      );
-      setMobileSkills(next);
-      setMobileSkillPicker(null);
-      bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
-    },
-    [activeCharacter?.id, mobileSkills, mobileSkillPicker]
   );
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
@@ -424,6 +419,20 @@ export function App() {
     bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
   }, []);
 
+  // Mobile bindings + the picker that edits them. The skill fan and the
+  // consumable column are the same interaction on the same storage shape, so one
+  // hook drives both (see `useMobileSlotPicker`).
+  const mobileSkillsPicker = useMobileSlotPicker({
+    characterId: activeCharacter?.id,
+    store: MOBILE_SKILL_BINDINGS,
+    onBeforeOpen: dismissHelp
+  });
+  const mobileItemsPicker = useMobileSlotPicker({
+    characterId: activeCharacter?.id,
+    store: MOBILE_ITEM_BINDINGS,
+    onBeforeOpen: dismissHelp
+  });
+
   const handleOpenCharacter = useCallback(() => {
     dismissHelp();
     setIsCharacterOpen(true);
@@ -488,7 +497,8 @@ export function App() {
         isCharacterOpen ||
         isSkillsOpen ||
         isCityMapOpen ||
-        mobileSkillPicker !== null ||
+        mobileSkillsPicker.isPickerOpen ||
+        mobileItemsPicker.isPickerOpen ||
         !!shopNpc ||
         isLoginOpen ||
         (!activeCharacter && !!currentUser);
@@ -551,8 +561,13 @@ export function App() {
 
       if (e.key !== "Escape") return;
 
-      if (mobileSkillPicker !== null) {
-        handleCloseMobileSkillPicker();
+      if (mobileSkillsPicker.isPickerOpen) {
+        mobileSkillsPicker.close();
+        return;
+      }
+
+      if (mobileItemsPicker.isPickerOpen) {
+        mobileItemsPicker.close();
         return;
       }
 
@@ -595,12 +610,14 @@ export function App() {
     activeCharacter,
     currentUser,
     shopNpc,
-    mobileSkillPicker,
+    mobileSkillsPicker.isPickerOpen,
+    mobileSkillsPicker.close,
+    mobileItemsPicker.isPickerOpen,
+    mobileItemsPicker.close,
     handleOpenCharacter,
     handleCloseCharacter,
     handleOpenInventory,
     handleCloseInventory,
-    handleCloseMobileSkillPicker,
     handleCloseShop
   ]);
 
@@ -809,10 +826,13 @@ export function App() {
           onMove={handleMove}
           onAttack={handleAttack}
           onCastSkill={handleCastSkill}
-          onAssignSkill={handleOpenMobileSkillPicker}
+          onAssignSkill={mobileSkillsPicker.open}
           onUseItem={handleUseItem}
+          onAssignItem={mobileItemsPicker.open}
           skills={skillsForSect(activeCharacter?.sect)}
-          skillSlots={mobileSkills}
+          skillSlots={mobileSkillsPicker.bindings}
+          items={mobileItemOptions}
+          itemSlots={mobileItemsPicker.bindings}
         />
       </div>
 
@@ -895,16 +915,25 @@ export function App() {
 
       {/* Mobile arc skill picker (tap "+" on a mobile skill button) */}
       <MobileSkillPicker
-        isOpen={mobileSkillPicker !== null}
-        slotIndex={mobileSkillPicker ?? 0}
+        isOpen={mobileSkillsPicker.isPickerOpen}
+        slotIndex={mobileSkillsPicker.pickerIndex ?? 0}
         skills={skillsForSect(activeCharacter?.sect)}
         level={stats.level}
-        selectedSkillId={
-          mobileSkillPicker !== null ? mobileSkills[mobileSkillPicker] ?? null : null
-        }
-        onSelect={handleSelectMobileSkill}
-        onClear={() => handleSelectMobileSkill(null)}
-        onClose={handleCloseMobileSkillPicker}
+        selectedSkillId={mobileSkillsPicker.selectedId}
+        onSelect={mobileSkillsPicker.select}
+        onClear={() => mobileSkillsPicker.select(null)}
+        onClose={mobileSkillsPicker.close}
+      />
+
+      {/* Mobile consumable picker (tap "+" on a mobile HP/MP button) */}
+      <MobileItemPicker
+        isOpen={mobileItemsPicker.isPickerOpen}
+        slotIndex={mobileItemsPicker.pickerIndex ?? 0}
+        items={mobileItemOptions}
+        selectedItemId={mobileItemsPicker.selectedId}
+        onSelect={mobileItemsPicker.select}
+        onClear={() => mobileItemsPicker.select(null)}
+        onClose={mobileItemsPicker.close}
       />
 
       {/* GM Command Panel ("Lệnh Bài GM") */}

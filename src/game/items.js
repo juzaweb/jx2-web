@@ -138,6 +138,17 @@ export const INVENTORY_ITEMS = [
 ];
 
 /**
+ * Items the player can bind to a mobile action button.
+ *
+ * Equipment carries a `slot` (it is worn, not used) and the GM token opens a
+ * panel instead of being drunk, so neither belongs on a consumable button.
+ * @type {Array<{id:string, name:string, icon:string, desc:string, useSlot?:number}>}
+ */
+export const CONSUMABLE_ITEMS = INVENTORY_ITEMS.filter(
+  (item) => item && item.useSlot && !item.slot && item.id !== "lenh-bai-gm"
+);
+
+/**
  * Look up a catalog item by id across quick-slots, grid inventory, and equipment.
  * @param {string} id
  * @returns {object|null}
@@ -292,6 +303,24 @@ export function getQuantity(id) {
   return typeof stored === "number" && Number.isFinite(stored)
     ? Math.max(0, Math.floor(stored))
     : 0;
+}
+
+/**
+ * How many of an item the bag holds. Falls back to the shared quantity store
+ * when the bag snapshot has no entry for it, so a freshly granted item still
+ * reports its stack.
+ * @param {string} itemId
+ * @param {Array<{id:string, qty?:number}>} [bag]
+ * @returns {number}
+ */
+export function bagQuantity(itemId, bag = []) {
+  if (typeof itemId !== "string" || itemId.length === 0) return 0;
+  const entries = (bag || []).filter((entry) => entry && entry.id === itemId);
+  if (entries.length === 0) return getQuantity(itemId);
+  return entries.reduce(
+    (sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1),
+    0
+  );
 }
 
 /**

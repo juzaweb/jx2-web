@@ -30,8 +30,8 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 1. **Launch & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Managed smoothly in `src/App.jsx` with guest session handling, i18n support (VI/EN), and mobile orientation prompts.
 2. **HUD Overlay:** `PlayerVitals` top-left displays Level, EXP, HP, MP, Stamina, and Martial Aura. `MinimapPanel` top-right shows radar canvas, quest tracker, subzone, and zoom/collapse controls.
 3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 mixed quick-slots (each holds a consumable item or a sect skill), plus system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode). Techniques are dragged from the `F5` skill tree onto a slot and cast with its number key; consumables are dragged from the bag.
-4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button, four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them) and two fixed potion buttons.
-5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `MobileSkillPicker`. Pointer drag support is provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js` (skills and items share the same drag pipeline).
+4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button and four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them). Two consumable buttons (`MobileItemPicker`) sit in their own column outside the fan and are empty until the player binds an item from the bag.
+5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `MobileSkillPicker`, `MobileItemPicker`. Pointer drag support is provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js` (skills and items share the same drag pipeline).
 
 ---
 
@@ -76,19 +76,20 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 ---
 
 ### [P1] Mobile Joystick and Chat Panel Collision Prevention & Touch Hitbox Scaling
-- **Status:** Proposed
+- **Status:** Implemented
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/components/MobileControls.jsx`, `src/components/HUD/ChatPanel.jsx`, `src/index.css` (`@media (max-width: 720px)`)
+- **Evidence:** `src/components/MobileControls.jsx`, `src/components/HUD/ChatPanel.jsx`, `src/index.css` (`:root` touch tokens, `@media (pointer: coarse), (max-height: 500px)`)
 - **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlaps with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
 - **Recommendation:**
   1. Automatically minimize `ChatPanel` into a compact icon tab when touch mobile controls are active.
   2. Increase touch target hitboxes for `MobileControls` arc buttons to a minimum of 48x48px with 8px padding gaps.
   3. Ensure virtual joystick touch capture zone is isolated from hotbar dock boundaries.
+- **What shipped:** all control sizes are now layout tokens (`--mctrl-*` on `:root`, scaled by `--mctrl-scale` on short viewports), the chat panel is lifted above the joystick (`bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2)`), the numbered `1`–`9` bar is hidden on touch so the joystick has no dock to overlap, and the menu tray re-centres as icon-only 48×44 buttons between the two thumbs.
 - **Acceptance criteria:**
-  - [ ] On mobile touch viewports, `ChatPanel` defaults to collapsed state to keep the joystick area clear.
-  - [ ] Skill arc buttons maintain minimum 48x48px touch boundaries without touch event overlap.
-- **Validation:** Test on mobile viewport configurations (375x667, 414x896) in browser dev tools and verify gesture isolation.
+  - [x] On mobile touch viewports, `ChatPanel` no longer overlaps the joystick.
+  - [x] Skill arc buttons maintain minimum 48x48px touch boundaries without touch event overlap (56px skills, 48px potions, 74px attack).
+- **Validation:** Measured with the dev server in an 844×390, 667×375 and 568×320 viewport: no rect intersection between joystick, skill fan, potion ring, menu tray, minimap and chat.
 - **Effort:** S (CSS breakpoint adjustments and default state in `App.jsx`)
 - **Dependencies / risks:** None.
 

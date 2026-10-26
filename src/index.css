@@ -644,7 +644,34 @@ body {
 
 /* ====================================================
    Mobile Touch On-Screen Controls (Virtual Joystick & Arc Skills)
+   ----------------------------------------------------
+   Sizes and offsets are layout tokens instead of fixed pixels, so the whole
+   cluster scales with the viewport (see --mctrl-scale below) and clears the
+   HUD. The tokens live on :root because other mobile-only rules — such as the
+   chat panel that has to move out from under the joystick — read them too.
 ==================================================== */
+:root {
+  --mctrl-scale: 1;
+  /* Gap between a control and the screen edge (safe-area aware). */
+  --mctrl-edge: calc(14px * var(--mctrl-scale));
+  --mctrl-safe-b: env(safe-area-inset-bottom, 0px);
+  --mctrl-safe-l: env(safe-area-inset-left, 0px);
+  --mctrl-safe-r: env(safe-area-inset-right, 0px);
+  --mctrl-joy: calc(124px * var(--mctrl-scale));
+  --mctrl-stick: calc(52px * var(--mctrl-scale));
+  --mctrl-attack: calc(84px * var(--mctrl-scale));
+  --mctrl-skill: calc(52px * var(--mctrl-scale));
+  --mctrl-potion: calc(48px * var(--mctrl-scale));
+  /* Fan around the attack button: orbital radius and angular step.
+     A 30deg step over the left/up quadrant is the widest span the screen edge
+     allows, so the radius is what keeps four 52px buttons from overlapping —
+     114px is the tightest value that still leaves a gap between them. */
+  --mctrl-arc-radius: calc(114px * var(--mctrl-scale));
+  --mctrl-arc-start: 180deg;
+  --mctrl-arc-step: 30deg;
+  --mctrl-rebind-ms: 780ms;
+}
+
 .mobile-controls {
   display: none;
   position: absolute;
@@ -656,10 +683,10 @@ body {
 /* --- Virtual Joystick (Bottom Left) --- */
 .virtual-joystick-base {
   position: absolute;
-  bottom: 25px;
-  left: 25px;
-  width: 120px;
-  height: 120px;
+  bottom: calc(var(--mctrl-edge) + var(--mctrl-safe-b));
+  left: calc(var(--mctrl-edge) + var(--mctrl-safe-l));
+  width: var(--mctrl-joy);
+  height: var(--mctrl-joy);
   background: radial-gradient(circle, rgba(29, 38, 44, 0.75) 0%, rgba(12, 18, 22, 0.88) 100%);
   border: 2px solid #a88741;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(212, 175, 55, 0.2);
@@ -678,10 +705,10 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 48px;
-  height: 48px;
-  margin-top: -24px;
-  margin-left: -24px;
+  width: var(--mctrl-stick);
+  height: var(--mctrl-stick);
+  margin-top: calc(var(--mctrl-stick) / -2);
+  margin-left: calc(var(--mctrl-stick) / -2);
   background: radial-gradient(circle, #5a4224 0%, #1e1309 100%);
   border: 2px solid #ffd43b;
   border-radius: 50%;
@@ -702,13 +729,15 @@ body {
 .joystick-dir-indicator.dir-right { right: 6px; top: 50%; transform: translateY(-50%); }
 
 /* --- Radial Arc Skill Cluster (Bottom Right) --- */
+/* Zero-size anchor parked in the bottom-right corner. Every button is placed
+   relative to it, so the cluster never depends on a hard-coded box width. */
 .mobile-skill-arc {
   position: absolute;
-  bottom: 15px;
-  right: 15px;
-  width: 210px;
-  height: 210px;
-  pointer-events: auto;
+  right: calc(var(--mctrl-edge) + var(--mctrl-safe-r));
+  bottom: calc(var(--mctrl-edge) + var(--mctrl-safe-b));
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 .arc-btn {
@@ -728,74 +757,89 @@ body {
   padding: 0;
 }
 
+.mobile-skill-arc > .arc-btn {
+  pointer-events: auto;
+}
+
+/* `scale` is a separate transform property, so pressing still works on buttons
+   whose `transform` is already used to orbit them around the attack button. */
 .arc-btn:active {
-  transform: scale(0.92);
+  scale: 0.93;
   filter: brightness(1.2);
 }
 
-/* Central Attack Button */
+/* Central Attack Button: the origin of the fan. */
 .arc-btn-attack {
-  bottom: 10px;
-  right: 10px;
-  width: 66px;
-  height: 66px;
+  right: 0;
+  bottom: 0;
+  width: var(--mctrl-attack);
+  height: var(--mctrl-attack);
   background: radial-gradient(circle, #5e1c1c 0%, #290808 100%);
   border: 2px solid #ff6b6b;
   box-shadow: 0 0 12px rgba(255, 107, 107, 0.4), inset 0 0 8px rgba(0, 0, 0, 0.8);
 }
 .arc-btn-attack .arc-icon {
-  font-size: 26px;
+  font-size: calc(26px * var(--mctrl-scale));
   line-height: 1;
 }
 .arc-btn-attack .arc-label {
-  font-size: 9px;
+  font-size: calc(9px * var(--mctrl-scale));
   font-weight: 800;
   color: #ffc9c9;
   margin-top: -2px;
 }
 
-/* Skill Buttons arranged in arc around Attack */
+/* Orbit placement: the button's centre starts on the attack button's centre,
+   then `rotate + translateX` walks it along a ring. The trailing counter-rotate
+   keeps the icon upright. Concrete slots only supply size, radius and angle. */
+.arc-orbit {
+  right: calc((var(--mctrl-attack) - var(--size)) / 2);
+  bottom: calc((var(--mctrl-attack) - var(--size)) / 2);
+  width: var(--size);
+  height: var(--size);
+  transform: rotate(var(--angle)) translateX(var(--radius)) rotate(calc(-1 * var(--angle)));
+}
+
+/* Skill Buttons arranged in arc around Attack.
+   --i is set inline per slot; slot 0 sits at --mctrl-arc-start and every next
+   slot advances clockwise by --mctrl-arc-step (180deg = left, 270deg = up). */
 .arc-btn-skill {
-  width: 48px;
-  height: 48px;
+  --size: var(--mctrl-skill);
+  --radius: var(--mctrl-arc-radius);
+  --angle: calc(var(--mctrl-arc-start) + var(--i, 0) * var(--mctrl-arc-step));
   background: radial-gradient(circle, #382c1a 0%, #17110a 100%);
   border: 1.5px solid #ffd166;
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
 }
 
-/* Radial Positioning for Skills */
-/* Skill 0 (U) - Left of attack */
-.arc-skill-0 {
-  bottom: 18px;
-  right: 88px;
-}
-/* Skill 1 (I) - Top-Left of attack */
-.arc-skill-1 {
-  bottom: 72px;
-  right: 76px;
-}
-/* Skill 2 (O) - Top of attack */
-.arc-skill-2 {
-  bottom: 88px;
-  right: 18px;
-}
-/* Skill 3 (P) - Top-Right / Outer arc */
-.arc-skill-3 {
-  bottom: 140px;
-  right: 18px;
-}
-
 .arc-skill-img {
-  width: 32px;
-  height: 32px;
+  width: 70%;
+  height: 70%;
   object-fit: contain;
   pointer-events: none;
-}
-.arc-glyph {
-  font-family: 'Noto Serif SC', 'Cinzel', serif;
-  font-size: 20px;
-  font-weight: 900;
+  /* Also the fallback glyph path: SkillIcon renders a span with this class when
+     the catalog has no icon asset. */
+  display: grid;
+  place-items: center;
+  font-size: calc(22px * var(--mctrl-scale));
+  line-height: 1;
   color: #ffe9a8;
+  text-shadow: 0 2px 4px #000;
+}
+
+/* Cooldown scrim: same information the desktop quick bar shows, so a mobile
+   player can tell at a glance whether an art is ready. */
+.arc-cd {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: calc(14px * var(--mctrl-scale));
+  font-weight: 900;
+  pointer-events: none;
 }
 
 .arc-badge {
@@ -811,51 +855,106 @@ body {
   border-radius: 3px;
 }
 
-/* Quick Potions in outer arc */
+/* Quick consumables (HP/MP): a separate column OUTSIDE the fan, so they never
+   sit between two techniques. Right edge clears the leftmost skill, the bottom
+   one lines up with the attack button, and each further slot stacks upward. */
 .arc-btn-potion {
-  width: 38px;
-  height: 38px;
+  right: calc(
+    var(--mctrl-attack) / 2 + var(--mctrl-arc-radius) + var(--mctrl-skill) / 2 + 10px
+  );
+  bottom: calc((var(--mctrl-potion) + 8px) * var(--item-slot, 0));
+  width: var(--mctrl-potion);
+  height: var(--mctrl-potion);
   background: radial-gradient(circle, #203328 0%, #0d1712 100%);
   border: 1.5px solid #4da5c7;
 }
-.arc-potion-1 {
-  bottom: 125px;
-  right: 76px;
-}
-.arc-potion-2 {
-  bottom: 135px;
-  right: 128px;
-}
-.arc-btn-potion .arc-icon {
-  font-size: 16px;
+
+/* Item art fills most of the button; the class hook also overrides the 28px
+   default from styles/item-icons.css without relying on stylesheet order. */
+.arc-btn-potion .item-icon {
+  width: 66%;
+  height: 66%;
+  pointer-events: none;
 }
 
-/* Unassigned skill button: dashed frame with a "+" prompt. */
+/* Bound, but the bag is empty: dashed and dimmed so it reads "restock" instead
+   of "ready" — the picker greys the same item out for the same reason. */
+.arc-btn-potion.is-out-of-stock {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+/* Unassigned skill button: dashed frame with a "+" prompt. Muted on purpose so
+   it never competes with the arts the player actually bound. */
 .arc-btn-empty {
   border-style: dashed;
-  border-color: #7a6535;
-  background: radial-gradient(circle, #201a10 0%, #100c07 100%);
+  border-color: #6b5730;
+  background: radial-gradient(circle, #1b160e 0%, #0d0a06 100%);
+  opacity: 0.85;
 }
 
 .arc-plus {
-  font-size: 26px;
+  font-size: calc(24px * var(--mctrl-scale));
   font-weight: 300;
   line-height: 1;
   color: #ffd166;
   text-shadow: 0 1px 3px #000;
 }
 
+/* Long-press feedback: a ring fills over --mctrl-rebind-ms, so the player can
+   see the rebind gesture building before the picker opens. */
+@property --mctrl-hold-p {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.arc-btn.is-holding::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(#ffd43b var(--mctrl-hold-p), rgba(255, 212, 59, 0) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  animation: arc-hold-fill var(--mctrl-rebind-ms) linear forwards;
+  pointer-events: none;
+}
+
+@keyframes arc-hold-fill {
+  from {
+    --mctrl-hold-p: 0%;
+  }
+  to {
+    --mctrl-hold-p: 100%;
+  }
+}
+
+/* Short landscape phones: shrink the cluster so its top button cannot reach the
+   minimap while the buttons stay above a finger's width. */
+@media (max-height: 400px) {
+  :root {
+    --mctrl-scale: 0.92;
+  }
+}
+
+@media (max-height: 340px) {
+  :root {
+    --mctrl-scale: 0.84;
+  }
+}
+
 /* ====================================================
-   Mobile Arc Skill Picker
+   Mobile action pickers (skill fan + consumable buttons)
 ==================================================== */
-.mobile-skill-picker-box {
+.mobile-picker-box {
   display: flex;
   flex-direction: column;
   text-align: left;
   max-height: 86vh;
 }
 
-.mobile-skill-picker-box h2 {
+.mobile-picker-box h2 {
   margin: 0 0 8px;
   font-family: 'Cinzel', 'Noto Serif SC', serif;
   font-size: 18px;
@@ -863,7 +962,7 @@ body {
   color: #ffe9a8;
 }
 
-.mobile-skill-list {
+.mobile-picker-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -872,10 +971,12 @@ body {
   overflow-y: auto;
 }
 
-.mobile-skill-row {
+.mobile-picker-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Comfortable touch row: 44px is the floor, 56px reads as a list item. */
+  min-height: 56px;
   padding: 8px 10px;
   cursor: pointer;
   text-align: left;
@@ -883,23 +984,24 @@ body {
   border: 1.5px solid rgba(156, 124, 61, 0.5);
   border-radius: 3px;
   color: #f0e2c0;
+  touch-action: manipulation;
 }
 
-.mobile-skill-row:hover:not(:disabled) {
+.mobile-picker-row:hover:not(:disabled) {
   border-color: #ffd166;
 }
 
-.mobile-skill-row.selected {
+.mobile-picker-row.selected {
   border-color: #ffd166;
   box-shadow: 0 0 8px rgba(255, 209, 102, 0.5);
 }
 
-.mobile-skill-row.locked {
+.mobile-picker-row.locked {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.mobile-skill-glyph {
+.mobile-picker-glyph {
   width: 26px;
   height: 26px;
   object-fit: contain;
@@ -910,18 +1012,18 @@ body {
   text-align: center;
 }
 
-.mobile-skill-name {
+.mobile-picker-name {
   flex: 1;
   font-size: 13px;
 }
 
-.mobile-skill-meta {
+.mobile-picker-meta {
   font-size: 11px;
   color: #9fb8b2;
   white-space: nowrap;
 }
 
-.mobile-skill-empty {
+.mobile-picker-empty {
   margin: 0;
   padding: 16px 8px;
   font-size: 12px;
@@ -929,7 +1031,7 @@ body {
   color: #cbb78d;
 }
 
-.mobile-skill-clear {
+.mobile-picker-clear {
   margin-bottom: 10px;
   padding: 8px 10px;
   width: 100%;
@@ -942,9 +1044,33 @@ body {
   border-radius: 3px;
 }
 
-.mobile-skill-clear:hover {
+.mobile-picker-clear:hover {
   border-color: #ff6b6b;
   color: #ffd1d1;
+}
+
+/* Landscape phones can barely fit a centred modal: lay the list out in two
+   columns so the whole roster is reachable without scrolling past the fold. */
+@media (max-height: 500px) {
+  .mobile-picker-box {
+    width: min(620px, calc(100% - 24px));
+    max-height: 96vh;
+    padding: 14px 16px;
+  }
+  .mobile-picker-box h2 {
+    margin: 0 0 4px;
+    font-size: 15px;
+  }
+  .mobile-picker-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    max-height: 56vh;
+  }
+  .mobile-picker-row {
+    min-height: 48px;
+    padding: 6px 8px;
+  }
 }
 
 /* ====================================================
@@ -1187,6 +1313,23 @@ body {
   .mobile-controls {
     display: block;
   }
+
+  /* Number keys do not exist on touch, so the numbered bar would only take
+     space under the thumbs: the touch arc replaces it. Menu buttons stay. */
+  .hotbar-slots {
+    display: none;
+  }
+}
+
+/* Portrait phones only: the landscape layout is the playable one, and these
+   trims would hide menu buttons on a narrow landscape window. */
+@media (max-width: 720px) and (orientation: portrait) {
+  .hotbar-slots .slot-item:nth-child(n+5) {
+    display: none;
+  }
+  .system-icons-tray .sys-btn:nth-child(n+4) {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1200,12 +1343,6 @@ body {
   .top-left-panel {
     transform: scale(0.85);
     transform-origin: top left;
-  }
-  .hotbar-slots .slot-item:nth-child(n+5) {
-    display: none;
-  }
-  .system-icons-tray .sys-btn:nth-child(n+4) {
-    display: none;
   }
 }
 
@@ -1540,5 +1677,65 @@ body.is-item-dragging .inv-tooltip {
   }
   .sys-lbl {
     font-size: 7px;
+  }
+}
+
+/* ====================================================
+   Touch layout for the dock
+   ----------------------------------------------------
+   Declared last on purpose: it must win over the desktop dock rules above.
+   With the numbered bar gone the plate has nothing left to frame, so it is
+   dropped and the menu tray moves into the strip between the joystick and the
+   skill arc — the only bottom band that no thumb control occupies.
+==================================================== */
+@media (max-width: 960px), (max-height: 500px), (pointer: coarse) {
+  .dock-container {
+    /* Centre the tray inside the free band: the padding below already excludes
+       both thumb controls, so it can never slide under one of them. */
+    justify-content: center;
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    gap: 6px;
+    /* Keep clear of the joystick on the left and the whole arc + potion column
+       footprint on the right. */
+    padding-left: calc(var(--mctrl-joy) + var(--mctrl-edge));
+    padding-right: calc(
+      var(--mctrl-attack) / 2 + var(--mctrl-arc-radius) + var(--mctrl-skill) / 2 +
+        var(--mctrl-potion) + var(--mctrl-edge) + 8px
+    );
+  }
+
+  .system-icons-tray {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Icon-only menu buttons: they have to fit between the two thumbs, and each
+     one still meets the 44px minimum touch target. With the label hidden the
+     glyph carries the whole meaning, so it gets the space back. */
+  .system-icons-tray .sys-btn {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .system-icons-tray .sys-ico {
+    font-size: 24px;
+    line-height: 1;
+  }
+  .system-icons-tray .sys-lbl {
+    display: none;
+  }
+
+  /* Opened chat would land on the joystick: lift it above the thumb zone. */
+  .bottom-left-panel {
+    bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2);
   }
 }

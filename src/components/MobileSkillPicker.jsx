@@ -28,16 +28,16 @@ export function MobileSkillPicker({
 
   return (
     <div id="mobile-skill-picker" className="overlay">
-      <div className="wuxia-modal metal-card mobile-skill-picker-box">
+      <div className="wuxia-modal metal-card mobile-picker-box">
         <button type="button" className="modal-close-x" onClick={onClose}>
           ×
         </button>
         <div className="modal-eyebrow">{t("skills.mobilePicker.eyebrow")}</div>
         <h2>{t("skills.mobilePicker.title", { index: slotIndex + 1 })}</h2>
 
-        <div className="mobile-skill-list">
+        <div className="mobile-picker-list">
           {options.length === 0 ? (
-            <p className="mobile-skill-empty">{t("skills.tree.empty")}</p>
+            <p className="mobile-picker-empty">{t("skills.tree.empty")}</p>
           ) : (
             options.map((skill) => {
               const unlocked = skillUnlocked(skill, level);
@@ -45,15 +45,15 @@ export function MobileSkillPicker({
                 <button
                   key={skill.id}
                   type="button"
-                  className={`mobile-skill-row${skill.id === selectedSkillId ? " selected" : ""}${
+                  className={`mobile-picker-row${skill.id === selectedSkillId ? " selected" : ""}${
                     unlocked ? "" : " locked"
                   }`}
                   disabled={!unlocked}
                   onClick={() => onSelect?.(skill.id)}
                 >
-                  <SkillIcon skill={skill} className="mobile-skill-glyph" />
-                  <span className="mobile-skill-name">{t(skill.nameKey, undefined, skill.id)}</span>
-                  <span className="mobile-skill-meta">
+                  <SkillIcon skill={skill} className="mobile-picker-glyph" />
+                  <span className="mobile-picker-name">{t(skill.nameKey, undefined, skill.id)}</span>
+                  <span className="mobile-picker-meta">
                     {unlocked ? `${skill.mp} MP` : skillLockLabel(skill, level, t)}
                   </span>
                 </button>
@@ -63,7 +63,7 @@ export function MobileSkillPicker({
         </div>
 
         {selectedSkillId && (
-          <button type="button" className="mobile-skill-clear" onClick={onClear}>
+          <button type="button" className="mobile-picker-clear" onClick={onClear}>
             {t("skills.mobilePicker.clear")}
           </button>
         )}

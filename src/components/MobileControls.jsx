@@ -2,14 +2,31 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { SkillIcon } from "./SkillIcon.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { MOBILE_SKILL_SLOTS } from "../game/mobileSkills.js";
+import { MOBILE_ITEM_SLOTS } from "../game/mobileItems.js";
+import { useSkillCooldowns } from "./hooks/useSkillCooldowns.js";
 
-/** Stable default so a missing prop never re-creates the array each render. */
+/** Stable defaults so a missing prop never re-creates the arrays each render. */
 const EMPTY_SKILL_SLOTS = Object.freeze(
   Array.from({ length: MOBILE_SKILL_SLOTS }, () => null)
 );
+const EMPTY_ITEM_SLOTS = Object.freeze(
+  Array.from({ length: MOBILE_ITEM_SLOTS }, () => null)
+);
+
+/**
+ * How long a bound button must be held to become a re-bind gesture. Long enough
+ * that combat taps never trip it, short enough to feel deliberate. Kept in sync
+ * with `--mctrl-rebind-ms` in index.css, which drives the progress ring.
+ */
+const REBIND_HOLD_MS = 780;
 
 /**
  * Mobile Controls with Virtual Joystick on bottom-left and Arc Skill Buttons on bottom-right.
+ *
+ * The arc is laid out by CSS: each button only reports its ring index through
+ * the `--i` custom property, so adding a slot costs one array entry. Both the
+ * skill fan and the consumable column start empty — a tap on "+" opens the
+ * matching picker, a long hold re-binds an occupied button.
  */
 export function MobileControls({
   onMove,
@@ -17,8 +34,11 @@ export function MobileControls({
   onCastSkill,
   onAssignSkill,
   onUseItem,
+  onAssignItem,
   skills = [],
-  skillSlots = EMPTY_SKILL_SLOTS
+  skillSlots = EMPTY_SKILL_SLOTS,
+  items = [],
+  itemSlots = EMPTY_ITEM_SLOTS
 }) {
   const { t } = useI18n();
   const [joystickActive, setJoystickActive] = useState(false);
@@ -29,9 +49,13 @@ export function MobileControls({
   /** Pending long-press that turns a bound button into a re-bind gesture. */
   const longPressTimer = useRef(null);
   const longPressFired = useRef(false);
+  /** Slot whose rebind ring is currently filling, keyed "skill:0" / "item:1". */
+  const [holdingKey, setHoldingKey] = useState(null);
+  const cooldownLeft = useSkillCooldowns();
 
   useEffect(
     () => () => {
+      // Unmounting mid-hold must not leave a pending rebind behind.
       clearTimeout(longPressTimer.current);
     },
     []
@@ -116,51 +140,67 @@ export function MobileControls({
     return { idx, skill };
   });
 
-  const handlePickPress = (idx) => (e) => {
+  // Consumable buttons, same contract as the skills: empty until the player
+  // binds an item from the bag.
+  const itemButtons = Array.from({ length: MOBILE_ITEM_SLOTS }, (_, idx) => {
+    const itemId = itemSlots?.[idx] || null;
+    const item = itemId
+      ? items.find((entry) => entry && entry.id === itemId) || null
+      : null;
+    return { idx, item };
+  });
+
+  const handlePickPress = (open) => (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onAssignSkill?.(idx);
+    open();
   };
 
-  const startSkillPress = (idx, skill) => (e) => {
+  /**
+   * Press-and-hold a bound button to re-bind it. The ring fills for exactly as
+   * long as the timer runs, so the gesture is discoverable; releasing earlier
+   * is a plain tap and activates the button.
+   */
+  const startPress = (key, onLongPress) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     // Capture the pointer so the release still lands on this button even if the
-    // finger drifts — otherwise the cast would be lost.
+    // finger drifts — otherwise the cast/use would be lost.
     e.currentTarget.setPointerCapture?.(e.pointerId);
     longPressFired.current = false;
     clearTimeout(longPressTimer.current);
-    // Hold a bound button to choose a different skill for it.
+    setHoldingKey(key);
     longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
       longPressFired.current = true;
-      onAssignSkill?.(idx);
-    }, 500);
+      setHoldingKey(null);
+      navigator.vibrate?.(10);
+      onLongPress();
+    }, REBIND_HOLD_MS);
   };
 
-  const endSkillPress = (skill) => (e) => {
+  const endPress = (activate) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     clearTimeout(longPressTimer.current);
     longPressTimer.current = null;
+    setHoldingKey(null);
     if (longPressFired.current) return;
-    onCastSkill?.(skill.id);
+    activate();
   };
 
-  const cancelSkillPress = () => {
+  const cancelPress = () => {
     clearTimeout(longPressTimer.current);
     longPressTimer.current = null;
+    setHoldingKey(null);
   };
 
   const handleAttackPress = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // Same reason as the action buttons: a drifting finger must still attack.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     onAttack?.();
-  };
-
-  const handlePotionPress = (slot) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onUseItem?.(slot);
   };
 
   return (
@@ -188,12 +228,13 @@ export function MobileControls({
 
       {/* Radial Arc Skill Cluster (Bottom Right) */}
       <div className="mobile-skill-arc">
-        {/* Main Central Attack Button */}
+        {/* Main Central Attack Button: also the centre of the orbit. */}
         <button
           id="mobile-attack"
           className="arc-btn arc-btn-attack"
           onPointerDown={handleAttackPress}
           title={t("skills.basicAttack", undefined, "Thường")}
+          aria-label={t("skills.basicAttack", undefined, "Thường")}
         >
           <span className="arc-icon">⚔</span>
           <span className="arc-label">Công</span>
@@ -204,16 +245,23 @@ export function MobileControls({
           const label = skill
             ? `${t(skill.nameKey, undefined, skill.id)} — ${t("skills.mobilePicker.rebind")}`
             : t("skills.mobilePicker.empty");
+          // Seconds of cooldown left, so the arc matches the desktop quick bar.
+          const cdLeft = skill ? cooldownLeft(skill.id) : 0;
           return (
             <button
               key={`mobile-skill-${idx}`}
               id={`mobile-skill-${idx}`}
-              className={`arc-btn arc-btn-skill arc-skill-${idx}${
+              className={`arc-btn arc-btn-skill arc-orbit${
                 skill ? "" : " arc-btn-empty"
-              }`}
-              onPointerDown={skill ? startSkillPress(idx, skill) : handlePickPress(idx)}
-              onPointerUp={skill ? endSkillPress(skill) : undefined}
-              onPointerCancel={skill ? cancelSkillPress : undefined}
+              }${holdingKey === `skill:${idx}` ? " is-holding" : ""}`}
+              style={{ "--i": idx }}
+              onPointerDown={
+                skill
+                  ? startPress(`skill:${idx}`, () => onAssignSkill?.(idx))
+                  : handlePickPress(() => onAssignSkill?.(idx))
+              }
+              onPointerUp={skill ? endPress(() => onCastSkill?.(skill.id)) : undefined}
+              onPointerCancel={skill ? cancelPress : undefined}
               onContextMenu={(event) => {
                 event.preventDefault();
                 onAssignSkill?.(idx);
@@ -228,27 +276,57 @@ export function MobileControls({
                   +
                 </span>
               )}
+              {cdLeft > 0 && <span className="arc-cd">{Math.ceil(cdLeft / 1000)}</span>}
             </button>
           );
         })}
 
-        {/* Quick Potions Arc (fixed consumables, independent of hotbar slots) */}
-        <button
-          className="arc-btn arc-btn-potion arc-potion-1"
-          onPointerDown={handlePotionPress("kim-sang-duoc")}
-          title="Kim Sáng Dược (+35 HP)"
-        >
-          <span className="arc-icon">🧪</span>
-          <span className="arc-badge">1</span>
-        </button>
-        <button
-          className="arc-btn arc-btn-potion arc-potion-2"
-          onPointerDown={handlePotionPress("dai-hoan-dan")}
-          title="Đại Hoàn Đan (+25 MP)"
-        >
-          <span className="arc-icon">🍷</span>
-          <span className="arc-badge">2</span>
-        </button>
+        {/* Consumable buttons: a column outside the fan, empty until bound */}
+        {itemButtons.map(({ idx, item }) => {
+          // A bound consumable the bag has run out of must not read as "ready".
+          const outOfStock = Boolean(item) && !(item.qty > 0);
+          const label = item
+            ? `${item.name} ×${item.qty ?? 0} — ${
+                outOfStock
+                  ? t("mobileItems.picker.outOfStock")
+                  : t("mobileItems.picker.rebind")
+              }`
+            : t("mobileItems.picker.empty");
+          return (
+            <button
+              key={`mobile-item-${idx}`}
+              id={`mobile-item-${idx}`}
+              className={`arc-btn arc-btn-potion${item ? "" : " arc-btn-empty"}${
+                outOfStock ? " is-out-of-stock" : ""
+              }${holdingKey === `item:${idx}` ? " is-holding" : ""}`}
+              style={{ "--item-slot": idx }}
+              onPointerDown={
+                item
+                  ? startPress(`item:${idx}`, () => onAssignItem?.(idx))
+                  : handlePickPress(() => onAssignItem?.(idx))
+              }
+              onPointerUp={item ? endPress(() => onUseItem?.(item.id)) : undefined}
+              onPointerCancel={item ? cancelPress : undefined}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                onAssignItem?.(idx);
+              }}
+              title={label}
+              aria-label={label}
+            >
+              {item ? (
+                <>
+                  <div className={`item-icon ${item.icon}`} />
+                  {item.qty > 0 && <span className="arc-badge">{item.qty}</span>}
+                </>
+              ) : (
+                <span className="arc-plus" aria-hidden="true">
+                  +
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

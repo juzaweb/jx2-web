@@ -387,6 +387,17 @@ export default {
     critDamage: "Critical hit",
     attackSpeed: "Attack speed"
   },
+  mobileItems: {
+    picker: {
+      eyebrow: "Assign item",
+      title: "Choose an item for button {index}",
+      empty: "No item assigned — tap to choose",
+      rebind: "Hold to change item",
+      clear: "Clear this button",
+      outOfStock: "Out",
+      none: "No usable items available."
+    }
+  },
   item: {
     "kim-sang-duoc": {
       name: "Golden Radiance Elixir",

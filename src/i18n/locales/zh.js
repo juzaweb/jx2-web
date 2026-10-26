@@ -388,6 +388,17 @@ export default {
     critDamage: "暴击命中",
     attackSpeed: "攻速"
   },
+  mobileItems: {
+    picker: {
+      eyebrow: "绑定物品",
+      title: "为按钮 {index} 选择物品",
+      empty: "未绑定物品——点击选择",
+      rebind: "长按更换物品",
+      clear: "解除该按钮的物品",
+      outOfStock: "已用完",
+      none: "没有可用的物品。"
+    }
+  },
   item: {
     "kim-sang-duoc": {
       name: "金创药",

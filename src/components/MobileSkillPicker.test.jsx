@@ -50,11 +50,11 @@ describe("MobileSkillPicker", () => {
     expect(markup).toContain("12 MP");
     // The level-5 art stays visible but disabled with its lock hint.
     expect(markup).toContain("Cần cấp 5");
-    expect(markup).toContain("mobile-skill-row locked");
+    expect(markup).toContain("mobile-picker-row locked");
   });
 
   it("shows the clear action only for a bound button", () => {
-    expect(renderPicker()).not.toContain("mobile-skill-clear");
-    expect(renderPicker({ selectedSkillId: "test_skill_1" })).toContain("mobile-skill-clear");
+    expect(renderPicker()).not.toContain("mobile-picker-clear");
+    expect(renderPicker({ selectedSkillId: "test_skill_1" })).toContain("mobile-picker-clear");
   });
 });

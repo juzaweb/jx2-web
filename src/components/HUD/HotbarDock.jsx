@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { localizeItem } from "../../i18n/localize.js";
-import { getItemById, getQuantity } from "../../game/items.js";
-import { bridge, EVENTS } from "../../game/bridge.js";
+import { getItemById, bagQuantity } from "../../game/items.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { beginItemDrag, didItemDragJustEnd } from "../Modals/pointerItemDrag.js";
+import { useSkillCooldowns } from "../hooks/useSkillCooldowns.js";
 import {
   DEFAULT_QUICK_SLOTS,
   skillIdFromBinding
@@ -29,40 +29,8 @@ export function HotbarDock({
   onMoveQuickSlot
 }) {
   const { t } = useI18n();
-  const [cooldownEnds, setCooldownEnds] = useState({});
-  const [clock, setClock] = useState(0);
-
-  useEffect(() => {
-    const off = bridge.on(EVENTS.SKILL_CAST, ({ skillId, cooldown }) => {
-      if (!skillId) return;
-      const now = Date.now();
-      setClock(now);
-      setCooldownEnds((prev) => ({ ...prev, [skillId]: now + (cooldown || 0) }));
-    });
-    return off;
-  }, []);
-
-  useEffect(() => {
-    const active = Object.values(cooldownEnds).some((end) => end > Date.now());
-    if (!active) return undefined;
-    const id = setInterval(() => {
-      const now = Date.now();
-      setClock(now);
-      setCooldownEnds((prev) => {
-        const next = {};
-        let changed = false;
-        for (const [slot, end] of Object.entries(prev)) {
-          if (end > now) next[slot] = end;
-          else changed = true;
-        }
-        return changed ? next : prev;
-      });
-    }, 200);
-    return () => clearInterval(id);
-  }, [cooldownEnds]);
-
-  const cooldownLeft = (skillId) =>
-    skillId ? Math.max(0, (cooldownEnds[skillId] || 0) - clock) : 0;
+  // Shared with the mobile touch arc so both surfaces show the same numbers.
+  const cooldownLeft = useSkillCooldowns();
 
   /**
    * Items are dragged with pointer events rather than HTML5 drag-and-drop, so
@@ -118,16 +86,7 @@ export function HotbarDock({
 
       const itemId = binding;
       const raw = itemId ? getItemById(itemId) : null;
-
-      let qty = 0;
-      if (itemId) {
-        const matched = (availableItems || []).filter((entry) => entry && entry.id === itemId);
-        if (matched.length > 0) {
-          qty = matched.reduce((sum, entry) => sum + (typeof entry.qty === "number" ? entry.qty : 1), 0);
-        } else {
-          qty = getQuantity(itemId);
-        }
-      }
+      const qty = itemId ? bagQuantity(itemId, availableItems) : 0;
 
       const item = raw ? localizeItem({ ...raw, qty }, t) : null;
       return { useSlot, item, skill: null };

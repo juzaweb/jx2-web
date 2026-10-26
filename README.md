@@ -8,8 +8,8 @@ A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs
 - **Phaser 3 Game Engine:** 60FPS Arcade physics, world map, collision detection, and entity management.
 - **Event-Driven Bridge:** Reactive bi-directional communication between Phaser game loop and React components.
 - **Sound & Combat:** Web Audio API synth effects for attacks, skills, potion drinking, and sound toggle.
-- **Persistent Progress:** Progress, hotbar bindings, mobile skill layout, inventory and equipment are saved per character with `localStorage`.
-- **Responsive & Touch Friendly:** Virtual joystick, attack button, and four configurable skill buttons (tap `+` to assign a technique, hold to rebind).
+- **Persistent Progress:** Progress, hotbar bindings, the mobile skill/consumable layout, inventory and equipment are saved per character with `localStorage`.
+- **Responsive & Touch Friendly:** Virtual joystick plus a radial skill fan around the Attack button, and a bindable HP/MP column outside it. Empty slots show `+`, a hold (780 ms, with a filling ring) rebinds one, and every arc button mirrors the desktop cooldown.
 
 ## Getting Started
 
@@ -57,7 +57,7 @@ npm run test:watch
 - **Talk to NPC:** `F`
 - **Character:** `F3` · **Inventory:** `F4` · **Skills:** `F5`
 - **Minimap zoom:** `Tab` · **City map:** `M` · **Pause/Guide:** `Esc`
-- **Mobile:** virtual joystick, central Attack button, four skill buttons (tap an empty `+` to choose a technique, hold a bound button to change it), and two fixed potion buttons (Kim Sáng Dược / Đại Hoàn Đan).
+- **Mobile:** virtual joystick (bottom-left), then a fan around the central Attack button with four configurable skills (tap an empty `+` to choose a technique, hold a bound button 780 ms to change it — a ring shows the hold building), plus a separate column of two consumable buttons outside the fan. Both kinds start empty: tap `+` to pick a skill, or an item from the bag (HP/MP potions, Nữ Nhi Hồng, Hồi Thành Phù; anything out of stock shows as "Hết"). Skill buttons draw their cooldown, item buttons their stack count. The numbered `1`–`9` bar is hidden on touch — the arc replaces it — and the menu tray shrinks to icon-only buttons between the two thumbs.
 
 ## Architecture
 ```
@@ -78,8 +78,11 @@ src/
 │   │   ├── SkillsModal.jsx    # F5 tree; skill drag sources for slots 1-9
 │   │   ├── ShopModal.jsx / CityMapModal.jsx / HelpModal.jsx / GmModal.jsx
 │   │   └── pointerItemDrag.js # Pointer drag shared by inventory & hotbar
-│   ├── MobileControls.jsx     # Joystick, attack, configurable skill arc
-│   └── MobileSkillPicker.jsx  # Assign a skill to a mobile arc button
+│   ├── MobileControls.jsx     # Joystick + CSS-driven skill/consumable cluster
+│   ├── MobileSkillPicker.jsx  # Assign a skill to a mobile arc button
+│   ├── MobileItemPicker.jsx   # Assign a consumable to a mobile HP/MP button
+│   └── hooks/
+│       └── useSkillCooldowns.js  # Shared cast-cooldown timers (bar + arc)
 └── game/
     ├── bridge.js         # Pub/Sub bridge between React & Phaser
     ├── game.js           # Phaser Scene & game factory
@@ -87,6 +90,8 @@ src/
     ├── skills.js         # Sect skill catalog (id, slot, cost, effects)
     ├── quickSlots.js     # Hotbar slots 1-9: item id or `skill:<skillId>`
     ├── mobileSkills.js   # Four per-character mobile skill bindings
+    ├── mobileItems.js    # Two per-character mobile consumable bindings
+    ├── slotBindings.js   # Shared per-character slot storage (used by both)
     ├── skillVfx.js       # Skill cast/impact visual effects
     ├── inventorySync.js  # Mirrors the bag with the server
     └── storage.js        # Progress persistence

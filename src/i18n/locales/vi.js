@@ -387,6 +387,17 @@ export default {
     critDamage: "Đòn chí mạng",
     attackSpeed: "Tốc độ đánh"
   },
+  mobileItems: {
+    picker: {
+      eyebrow: "Gán vật phẩm",
+      title: "Chọn vật phẩm cho nút {index}",
+      empty: "Chưa gán vật phẩm — chạm để chọn",
+      rebind: "Giữ để đổi vật phẩm",
+      clear: "Gỡ vật phẩm khỏi nút này",
+      outOfStock: "Hết",
+      none: "Không có vật phẩm nào dùng được."
+    }
+  },
   item: {
     "kim-sang-duoc": {
       name: "Kim Sáng Dược",

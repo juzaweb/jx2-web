@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,11 +9,84 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
+// CLI arguments parsing and forward support for Vite
+const rawArgs = process.argv.slice(2);
+const viteForwardArgs = [];
+
+let cliFrontendPort = null;
+let isHostEnabled = Boolean(process.env.HOST);
+let hostValue = process.env.HOST || null;
+
+for (let i = 0; i < rawArgs.length; i += 1) {
+  const arg = rawArgs[i];
+
+  if (arg === "--host") {
+    isHostEnabled = true;
+    const nextArg = rawArgs[i + 1];
+    if (nextArg && !nextArg.startsWith("-")) {
+      hostValue = nextArg;
+      viteForwardArgs.push(arg, nextArg);
+      i += 1;
+    } else {
+      viteForwardArgs.push(arg);
+    }
+  } else if (arg.startsWith("--host=")) {
+    isHostEnabled = true;
+    hostValue = arg.slice("--host=".length);
+    viteForwardArgs.push(arg);
+  } else if (arg === "--port") {
+    const nextArg = rawArgs[i + 1];
+    if (nextArg && !nextArg.startsWith("-")) {
+      const parsed = parseInt(nextArg, 10);
+      if (!Number.isNaN(parsed)) cliFrontendPort = parsed;
+      i += 1;
+    }
+  } else if (arg.startsWith("--port=")) {
+    const parsed = parseInt(arg.slice("--port=".length), 10);
+    if (!Number.isNaN(parsed)) cliFrontendPort = parsed;
+  } else {
+    viteForwardArgs.push(arg);
+  }
+}
+
+// If HOST env var was set but --host flag was not passed in args, inject it
+const hasHostInForwardArgs = viteForwardArgs.some(
+  (arg) => arg === "--host" || arg.startsWith("--host=")
+);
+if (isHostEnabled && !hasHostInForwardArgs) {
+  if (hostValue && hostValue !== "true") {
+    viteForwardArgs.push(`--host=${hostValue}`);
+  } else {
+    viteForwardArgs.push("--host");
+  }
+}
+
 // Ports configuration (supports environment variables or defaults)
 const baseBackendPort = parseInt(process.env.PORT, 10) || 5000;
 const baseFrontendPort =
-  parseInt(process.env.VITE_PORT || process.env.CLIENT_PORT, 10) || 3000;
+  cliFrontendPort ||
+  parseInt(process.env.VITE_PORT || process.env.CLIENT_PORT, 10) ||
+  3000;
 const MAX_PORT_SCAN = 20;
+
+/**
+ * Detect the primary non-internal IPv4 address for LAN access.
+ */
+const getLanIp = () => {
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name] || []) {
+        if (iface.family === "IPv4" && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+  } catch {
+    // Ignore interface discovery errors
+  }
+  return null;
+};
 
 /**
  * Check whether a port is free on the given loopback address.
@@ -53,10 +127,12 @@ const findAvailablePort = async (startPort) => {
   );
 };
 
+const lanIp = getLanIp();
 const backendPort = await findAvailablePort(baseBackendPort);
 const frontendPort = await findAvailablePort(baseFrontendPort);
 const apiBase =
-  process.env.VITE_API_BASE || `http://localhost:${backendPort}/api`;
+  process.env.VITE_API_BASE ||
+  (isHostEnabled ? "/api" : `http://localhost:${backendPort}/api`);
 
 console.log("\x1b[1m\x1b[32m%s\x1b[0m", "====================================================");
 console.log("\x1b[1m\x1b[32m%s\x1b[0m", "   Giang Hồ (jx2-web) — Dev Environment Launcher   ");
@@ -76,6 +152,13 @@ if (frontendPort !== baseFrontendPort) {
   console.log(`[Config] Frontend Web Port : \x1b[33m${frontendPort}\x1b[0m`);
 }
 console.log(`[Config] Client API Base   : \x1b[35m${apiBase}\x1b[0m`);
+if (isHostEnabled) {
+  const displayHost = hostValue && hostValue !== "true" ? hostValue : "0.0.0.0";
+  console.log(`[Config] Network Host      : \x1b[32m${displayHost}\x1b[0m`);
+  if (lanIp) {
+    console.log(`[Config] Network URL       : \x1b[1m\x1b[32mhttp://${lanIp}:${frontendPort}\x1b[0m`);
+  }
+}
 console.log("----------------------------------------------------\n");
 
 /**
@@ -114,9 +197,10 @@ pipeOutput(backend, `[API ${backendPort}]`, "\x1b[36m");
 
 // 2. Launch Frontend (Vite)
 const viteBin = path.join(rootDir, "node_modules", "vite", "bin", "vite.js");
+const viteArgs = [viteBin, "--port", String(frontendPort), ...viteForwardArgs];
 const frontend = spawn(
   process.execPath,
-  [viteBin, "--port", String(frontendPort)],
+  viteArgs,
   {
     cwd: rootDir,
     env: {

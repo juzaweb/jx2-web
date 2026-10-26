@@ -48,8 +48,41 @@ describe("MobileControls logic & props", () => {
     for (let idx = 0; idx < 4; idx++) {
       expect(markup).toContain(`id="mobile-skill-${idx}"`);
     }
-    expect((markup.match(/arc-plus/g) || []).length).toBe(4);
-    expect((markup.match(/arc-btn-empty/g) || []).length).toBe(4);
+    // Four skill slots plus the two consumable slots all start as "+".
+    expect((markup.match(/arc-plus/g) || []).length).toBe(6);
+    expect((markup.match(/arc-btn-empty/g) || []).length).toBe(6);
+  });
+
+  it("renders the two consumable buttons unassigned by default", () => {
+    const markup = renderControls();
+    expect(markup).toContain('id="mobile-item-0"');
+    expect(markup).toContain('id="mobile-item-1"');
+    // The column position comes from the slot index, not a hard-coded class.
+    expect(markup).toContain("--item-slot:0");
+    expect(markup).toContain("--item-slot:1");
+    expect(markup).toContain("Chưa gán vật phẩm");
+  });
+
+  it("marks a bound consumable the bag has run out of", () => {
+    const markup = renderControls({
+      items: [{ id: "dai-hoan-dan", name: "Đại Hoàn Đan", icon: "icon-mp-pot", qty: 0 }],
+      itemSlots: ["dai-hoan-dan", null]
+    });
+    expect(markup).toContain("is-out-of-stock");
+    // The label states the stock problem rather than the rebind hint...
+    expect(markup).toContain("Hết");
+    // ...and no quantity badge is rendered for an empty stack.
+    expect(markup).not.toContain('class="arc-badge">0<');
+  });
+
+  it("renders a bound consumable with its bag count", () => {
+    const markup = renderControls({
+      items: [{ id: "kim-sang-duoc", name: "Kim Sáng Dược", icon: "icon-hp-pot", qty: 7 }],
+      itemSlots: [null, "kim-sang-duoc"]
+    });
+    expect(markup).toContain("icon-hp-pot");
+    expect(markup).toContain(">7<");
+    expect(markup).toContain("Giữ để đổi vật phẩm");
   });
 
   it("renders a bound skill icon instead of the + prompt", () => {
@@ -57,9 +90,23 @@ describe("MobileControls logic & props", () => {
       skills: [{ id: "la_han_tran", glyph: "陣", nameKey: "skills.thieuLam.laHanTran.name" }],
       skillSlots: ["la_han_tran", null, null, null]
     });
-    expect((markup.match(/arc-plus/g) || []).length).toBe(3);
+    // Three empty skills plus the two unbound consumable buttons still show "+".
+    expect((markup.match(/arc-plus/g) || []).length).toBe(5);
     expect(markup).toContain("陣");
     // The tooltip explains the long-press rebind gesture.
     expect(markup).toContain("Giữ để đổi chiêu");
+  });
+
+  it("lets CSS place every arc slot by its ring index", () => {
+    const markup = renderControls();
+    // Slots carry --i so index.css can compute the angle; no per-slot offsets
+    // live in JS or in index-specific classes any more.
+    for (let idx = 0; idx < 4; idx++) {
+      expect(markup).toContain(`--i:${idx}`);
+      expect(markup).not.toContain(`arc-skill-${idx}`);
+    }
+    expect((markup.match(/arc-orbit/g) || []).length).toBe(4); // skills only
+    // Potions live outside the fan, in their own column.
+    expect((markup.match(/arc-btn-potion/g) || []).length).toBe(2);
   });
 });
