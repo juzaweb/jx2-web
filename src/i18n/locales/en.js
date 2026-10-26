@@ -412,6 +412,7 @@ export default {
     tabs: {
       level: "Level",
       potions: "Potions",
+      equipment: "Costumes",
       teleport: "Teleport",
       utility: "Utility"
     },
@@ -433,6 +434,17 @@ export default {
       receiveAll: "Receive All Potions (x99)",
       fullHealed: "Fully restored Health and Inner force!",
       potionsReceived: "Received potions to bag."
+    },
+    equipment: {
+      title: "Wanderer Costumes",
+      costumeSet: "Wanderer Costume Set (Hat, Robe, Trousers)",
+      costumeDesc: "Wanderer martial outfit (Bamboo Hat / Female Veiled Hat, Blue Robe, Trousers & Boots).",
+      getHat: "Wanderer Hat",
+      getRobe: "Wanderer Robe",
+      getPants: "Wanderer Trousers",
+      quickActions: "Quick Actions",
+      receiveFullSet: "Receive Full Set",
+      equipFullSet: "Equip Full Set Now"
     },
     teleport: {
       title: "Talismans & Teleport",

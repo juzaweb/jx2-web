@@ -413,6 +413,7 @@ export default {
     tabs: {
       level: "等级",
       potions: "药品",
+      equipment: "服饰",
       teleport: "传送",
       utility: "功能"
     },
@@ -434,6 +435,17 @@ export default {
       receiveAll: "获取全部药品 (x99)",
       fullHealed: "气血与内力已全部回满！",
       potionsReceived: "药品已放入包裹。"
+    },
+    equipment: {
+      title: "浪客套装",
+      costumeSet: "浪客套装（斗笠、青衣、劲装裤）",
+      costumeDesc: "江湖浪客服饰（斗笠/女子面纱斗笠、交领青衣、绑腿裤靴）。",
+      getHat: "浪客斗笠",
+      getRobe: "浪客青衣",
+      getPants: "浪客劲装裤",
+      quickActions: "快捷操作",
+      receiveFullSet: "获取完整套装",
+      equipFullSet: "一键穿戴全套"
     },
     teleport: {
       title: "回城与传送",
