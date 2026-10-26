@@ -845,8 +845,8 @@ export class GameSocketManager {
     const bounds = getMap(player.mapId).bounds;
     player.x = clampNum(payload.x, bounds.x0, bounds.x1, player.x);
     player.y = clampNum(payload.y, bounds.y0, bounds.y1, player.y);
-    player.vx = clampNum(payload.vx, -500, 500, 0);
-    player.vy = clampNum(payload.vy, -500, 500, 0);
+    player.vx = clampNum(payload.vx, -2500, 2500, 0);
+    player.vy = clampNum(payload.vy, -2500, 2500, 0);
     if (payload.direction) {
       player.direction = payload.direction === "left" ? "left" : "right";
     }

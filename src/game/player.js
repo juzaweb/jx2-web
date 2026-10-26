@@ -237,7 +237,7 @@ export class Player {
       this.faceDirection(directionFromVelocity(vx, vy));
 
       // Light procedural bob over the rig (the rig has no baked walk cycle).
-      this.stepPhase += delta * 0.016 * Math.min(speed / 120, 1.8);
+      this.stepPhase += delta * 0.016 * Math.min(speed / (120 * POS * WORLD_SPEED_SCALE), 1.8);
       this.rig?.animate(this.stepPhase);
       this.body.y = -Math.abs(Math.sin(this.stepPhase)) * 3.5;
       this.body.rotation = Phaser.Math.Linear(this.body.rotation, 0, 0.2);
