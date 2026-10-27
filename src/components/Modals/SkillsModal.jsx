@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
-import { skillLockReason, skillUnlocked } from "../../game/skills.js";
+import { skillLockReason } from "../../game/skills.js";
+import { normalizeWeaponType, WEAPON_LABEL_KEYS } from "../../game/weapons.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
 import { regenPerSecond } from "../../game/passiveRegen.js";
@@ -10,27 +11,22 @@ import { beginItemDrag, didItemDragJustEnd } from "./pointerItemDrag.js";
 import { skillBinding } from "../../game/quickSlots.js";
 import "../../styles/skills-modal.css";
 
-const SECT_NAME_KEYS = {
-  "thieu-lam": "characterSelect.sectThieuLam",
-  "vo-dang": "characterSelect.sectVoDang",
-  "nga-my": "characterSelect.sectNgaMy",
-  "ngu-doc": "characterSelect.sectNguDoc"
-};
-
 const ARROW_MARKER_ID = "skill-tree-arrow";
 
 /**
  * Skills Panel modal inspired by JX2 / VLTK2 skill trees ("Bảng Võ Học").
  *
- * The left side renders the sect's skills as a tree of gold tiles joined by
- * arrows (layout derived from each skill's `requires`); the right side shows the
- * selected skill's details and its quick-bind buttons.
+ * The left side renders the equipped weapon's skills as a tree of gold tiles
+ * joined by arrows (layout derived from each skill's `requires`); the right side
+ * shows the selected skill's details and its quick-bind buttons. Skills not yet
+ * studied from a book stay locked.
  */
 export function SkillsModal({
   isOpen,
   onClose,
   skills = [],
-  sect = "thieu-lam",
+  weapon = "kiem",
+  learnedSkills = [],
   level = 1,
   quickSlotsMapping = {},
   onAssignSkill
@@ -47,7 +43,7 @@ export function SkillsModal({
 
   if (!isOpen) return null;
 
-  const sectNameKey = SECT_NAME_KEYS[sect] || SECT_NAME_KEYS["thieu-lam"];
+  const weaponLabelKey = WEAPON_LABEL_KEYS[normalizeWeaponType(weapon)];
 
   const getBoundSlots = (skillId) => {
     const bound = [];
@@ -57,8 +53,10 @@ export function SkillsModal({
     return bound;
   };
 
-  const selectedUnlocked = selectedSkill ? skillUnlocked(selectedSkill, level) : false;
-  const selectedLockReason = selectedUnlocked ? null : skillLockReason(selectedSkill, level);
+  const selectedLockReason = selectedSkill
+    ? skillLockReason(selectedSkill, level, learnedSkills)
+    : null;
+  const selectedUnlocked = selectedSkill ? selectedLockReason === null : false;
   const selectedLockLabel = formatSkillLock(selectedLockReason, t);
   /** HP/s an always-on art restores; 0 for every cast skill. */
   const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill) : 0;
@@ -96,9 +94,9 @@ export function SkillsModal({
           </div>
         </div>
 
-        {/* Sect Info Header */}
+        {/* Weapon Info Header */}
         <div className="skills-header-info">
-          <span className="skills-sect-badge">{t(sectNameKey)}</span>
+          <span className="skills-weapon-badge">{t(weaponLabelKey)}</span>
           <span className="skills-level-badge">{t("common.level")} {level}</span>
         </div>
 
@@ -150,8 +148,8 @@ export function SkillsModal({
                 )}
 
                 {tree.nodes.map(({ skill, x, y }) => {
-                  const unlocked = skillUnlocked(skill, level);
-                  const lockReason = unlocked ? null : skillLockReason(skill, level);
+                  const lockReason = skillLockReason(skill, level, learnedSkills);
+                  const unlocked = lockReason === null;
                   const isSelected = skill.id === selectedId;
                   const boundSlots = getBoundSlots(skill.id);
                   const name = t(skill.nameKey, undefined, skill.id);

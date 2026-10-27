@@ -11,7 +11,9 @@ const TARGET_HP = 5000;
 function makeManager(skillId, { others = [] } = {}) {
   const attacker = {
     id: "attacker-1",
-    sect: "thieu-lam",
+    weaponType: "bao-tay",
+    level: 10,
+    learnedSkills: ["la_han_quyen", "dai_tu_di_chuong", "nhu_lai_than_chuong"],
     mapId: "city",
     x: 0,
     y: 0,

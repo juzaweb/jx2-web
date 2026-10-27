@@ -24,7 +24,7 @@ test("Kill reward suite", async (t) => {
     assert.equal(high.coins, KILL_REWARD.coinsMax);
   });
 
-  await t.test("pays EXP and bạc only, inside the documented ranges", () => {
+  await t.test("pays EXP and bạc, plus an optional skill book, inside the documented ranges", () => {
     for (let i = 0; i < 25; i++) {
       const reward = rollEnemyReward("usr_hero", enemy);
 
@@ -34,11 +34,14 @@ test("Kill reward suite", async (t) => {
         "enemyId",
         "exp",
         "level",
+        "loot",
         "monsterId",
         "name",
         "x",
         "y"
       ]);
+      assert.ok(Array.isArray(reward.loot));
+      assert.ok(reward.loot.length <= 1);
       // An enemy without a monster id falls back to the legacy market wolf, so the
       // historical reward numbers stay exactly what the rest of the suite expects.
       assert.equal(reward.monsterId, "soi-xam");

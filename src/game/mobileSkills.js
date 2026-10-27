@@ -2,7 +2,7 @@
  * Per-character skill bindings for the mobile arc buttons.
  *
  * The mobile cluster has {@link MOBILE_SKILL_SLOTS} buttons and starts empty: a
- * player taps a "+" button, picks a sect skill, and that button casts it. The
+ * player taps a "+" button, picks a weapon skill, and that button casts it. The
  * bindings are stored as an array of skill ids (null = empty button).
  *
  * Storage and sanitising rules live in `createSlotBindings`, shared with the

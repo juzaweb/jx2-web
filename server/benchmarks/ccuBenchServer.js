@@ -59,7 +59,6 @@ const gameSocket = initGameSocket(server, {
   findCharacter: (_userId, characterId) => ({
     id: characterId,
     name: characterId,
-    sect: "thieu-lam",
     gender: "male"
   })
 });

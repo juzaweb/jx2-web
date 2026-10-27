@@ -187,14 +187,13 @@ describe("ApiClient", () => {
       json: async () => ({
         success: true,
         data: {
-          character: { id: "c1", name: "Độc Cô Cầu Bại", sect: "nga-my", gender: "female" }
+          character: { id: "c1", name: "Độc Cô Cầu Bại", gender: "female" }
         }
       })
     });
 
-    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "nga-my", "token-create-123");
+    const res = await client.createCharacter("u1", "Độc Cô Cầu Bại", "female", "token-create-123");
     expect(res.character.id).toBe("c1");
-    expect(res.character.sect).toBe("nga-my");
     expect(res.character.gender).toBe("female");
     expect(global.fetch).toHaveBeenCalledWith(
       "http://mock-api:5000/api/users/u1/characters",
@@ -204,7 +203,7 @@ describe("ApiClient", () => {
           "Content-Type": "application/json",
           Authorization: "Bearer token-create-123"
         },
-        body: JSON.stringify({ name: "Độc Cô Cầu Bại", sect: "nga-my" })
+        body: JSON.stringify({ name: "Độc Cô Cầu Bại", gender: "female" })
       })
     );
   });

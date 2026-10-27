@@ -454,7 +454,7 @@ function headFemale(parts, pose) {
 }
 
 /**
- * The rig shape family for a weapon item, derived from its catalog icon. The
+ * The rig shape family for a weapon item, derived from its `weaponType`. The
  * held weapon is rebuilt whenever the `weapon` slot changes, so the same item
  * id shows the matching blade/claw in every direction. An unknown weapon id
  * falls back to the sword shape rather than leaving the hand empty.
@@ -463,9 +463,9 @@ function headFemale(parts, pose) {
  */
 export function weaponKindFor(weaponId) {
   if (typeof weaponId !== "string" || !weaponId) return null;
-  const icon = getItemById(weaponId)?.icon;
-  if (icon === "icon-claw") return "claw";
-  if (icon === "icon-blade") return "blade";
+  const weaponType = getItemById(weaponId)?.weaponType;
+  if (weaponType === "bao-tay") return "claw";
+  if (weaponType === "dao") return "blade";
   return "jian";
 }
 

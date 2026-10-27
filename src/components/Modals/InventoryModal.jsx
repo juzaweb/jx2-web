@@ -90,7 +90,7 @@ export function InventoryModal({
       onEquipItem?.(item.id);
       return;
     }
-    if (item.useSlot != null) {
+    if (item.useSlot != null || item.skillId) {
       // Use this exact item; the hotbar mapping may point somewhere else.
       onUseItem?.(item.id);
     }
@@ -192,7 +192,7 @@ export function InventoryModal({
             }
 
             const equippable = Boolean(item.slot);
-            const usable = equippable || item.useSlot != null;
+            const usable = equippable || item.useSlot != null || Boolean(item.skillId);
             return (
               <button
                 type="button"
@@ -282,7 +282,7 @@ export function InventoryModal({
               })}
             </div>
           )}
-          {hovered.useSlot != null && (
+          {(hovered.useSlot != null || hovered.skillId) && (
             <div className="inv-tooltip-use">{t("inventory.useHint")}</div>
           )}
         </div>

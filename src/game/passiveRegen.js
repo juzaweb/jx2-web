@@ -1,12 +1,12 @@
 /**
- * Health regeneration granted by a sect's passive internal arts (tâm pháp).
+ * Health regeneration granted by a weapon's passive internal arts (tâm pháp).
  *
- * Passive skills (`passive: true`) are never cast: they are always running for
- * their sect and restore health on their own. This module keeps that maths pure
- * and framework-free so the game loop only has to feed it elapsed time.
+ * Passive skills (`passive: true`) are never cast: once learned they are always
+ * running and restore health on their own. This module keeps that maths pure and
+ * framework-free so the game loop only has to feed it elapsed time.
  */
 
-import { skillsForSect, skillUnlocked } from "./skills.js";
+import { skillsForWeapon, skillUsable } from "./skills.js";
 
 /**
  * HP per second restored by one skill's `regen` effects.
@@ -25,17 +25,18 @@ export function regenPerSecond(skill) {
 }
 
 /**
- * Summed HP/s of every passive skill a sect's kit grants at `level`.
- * Unknown sects and locked passives contribute nothing.
- * @param {string} sect
+ * Summed HP/s of every passive skill a weapon's kit grants at `level`.
+ * Unknown weapons and unlearned passives contribute nothing.
+ * @param {string} weapon
  * @param {number} [level=1]
+ * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids
  * @returns {number}
  */
-export function passiveRegenRate(sect, level = 1) {
+export function passiveRegenRate(weapon, level = 1, learned = null) {
   let rate = 0;
-  for (const skill of skillsForSect(sect)) {
+  for (const skill of skillsForWeapon(weapon)) {
     if (skill?.passive !== true) continue;
-    if (!skillUnlocked(skill, level)) continue;
+    if (!skillUsable(skill, level, learned)) continue;
     rate += regenPerSecond(skill);
   }
   return rate;

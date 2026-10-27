@@ -550,7 +550,7 @@ body {
   cursor: default;
 }
 
-/* A numbered slot bound to a sect skill: same frame as an item slot, with the
+/* A numbered slot bound to a weapon skill: same frame as an item slot, with the
    technique art filling it and a cooldown scrim while it recovers. */
 .slot-item.skill-binding {
   border-style: solid;

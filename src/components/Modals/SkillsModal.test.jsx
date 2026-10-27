@@ -8,7 +8,7 @@ import { SkillsModal } from "./SkillsModal.jsx";
 const mockSkills = [
   {
     id: "test_skill_1",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 0,
     glyph: "掌",
     nameKey: "skills.thieuLam.daiTuDiChuong.name",
@@ -22,7 +22,7 @@ const mockSkills = [
   },
   {
     id: "test_skill_2",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 1,
     glyph: "陣",
     nameKey: "skills.thieuLam.laHanTran.name",
@@ -71,13 +71,13 @@ describe("SkillsModal Component", () => {
   it("distinguishes unlocked and locked tiles", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={mockSkills} level={1} />
+        <SkillsModal isOpen={true} skills={mockSkills} level={5} learnedSkills={["test_skill_1"]} />
       </I18nProvider>
     );
 
     expect(markup).toContain("skill-node unlocked");
     expect(markup).toContain("skill-node locked");
-    expect(markup).toContain("Cần cấp 5");
+    expect(markup).toContain("Cần học test_skill_1 trước");
   });
 
   it("shows the default selected skill details and the drag hint", () => {
@@ -87,6 +87,7 @@ describe("SkillsModal Component", () => {
           isOpen={true}
           skills={mockSkills}
           level={5}
+          learnedSkills={["test_skill_1", "test_skill_2"]}
           quickSlotsMapping={{ 1: "skill:test_skill_1", 4: "skill:test_skill_1" }}
         />
       </I18nProvider>
@@ -115,26 +116,25 @@ describe("SkillsModal Component", () => {
       </I18nProvider>
     );
 
-    expect(markup).toContain("Cần Thiếu Lâm Tâm Pháp cấp 5");
-    // The tile badge must show the blocking level (5), not the skill's own unlockLevel (1).
+    expect(markup).toContain("Cần học Thiếu Lâm Tâm Pháp trước");
+    // The tile badge shows the blocking level of the prerequisite.
     expect(markup).toContain(
-      '<span class="skill-node-level" aria-hidden="true">5</span>'
+      '<span class="skill-node-level" aria-hidden="true">1</span>'
     );
   });
 
-  it("displays correct sect badge for different sects", () => {
-    for (const [sect, expectedLabel] of [
-      ["thieu-lam", "Thiếu Lâm"],
-      ["vo-dang", "Võ Đang"],
-      ["nga-my", "Nga My"],
-      ["ngu-doc", "Ngũ Độc"]
+  it("displays the correct weapon badge for different kits", () => {
+    for (const [weapon, expectedLabel] of [
+      ["kiem", "Kiếm"],
+      ["bao-tay", "Bao Tay"],
+      ["dao", "Đao"]
     ]) {
       const markup = renderToStaticMarkup(
         <I18nProvider>
-          <SkillsModal isOpen={true} skills={[]} sect={sect} />
+          <SkillsModal isOpen={true} skills={[]} weapon={weapon} />
         </I18nProvider>
       );
-      expect(markup).toContain(`<span class="skills-sect-badge">${expectedLabel}</span>`);
+      expect(markup).toContain(`<span class="skills-weapon-badge">${expectedLabel}</span>`);
     }
   });
 });

@@ -1,20 +1,21 @@
 import React from "react";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-import { skillUnlocked } from "../game/skills.js";
+import { skillLockReason } from "../game/skills.js";
 import { skillLockLabel } from "../game/skillLockLabel.js";
 import { SkillIcon } from "./SkillIcon.jsx";
 
 /**
- * Mobile-only picker: choose which sect skill a touch-arc button casts.
+ * Mobile-only picker: choose which weapon skill a touch-arc button casts.
  *
  * The arc starts empty ("+"), so tapping an empty button opens this list. A
- * locked art stays visible but disabled, with the level/prerequisite hint.
+ * skill that is not learned yet (or is level-locked) stays visible but disabled.
  */
 export function MobileSkillPicker({
   isOpen,
   slotIndex = 0,
   skills = [],
   level = 1,
+  learnedSkills = [],
   selectedSkillId = null,
   onSelect,
   onClear,
@@ -40,7 +41,8 @@ export function MobileSkillPicker({
             <p className="mobile-picker-empty">{t("skills.tree.empty")}</p>
           ) : (
             options.map((skill) => {
-              const unlocked = skillUnlocked(skill, level);
+              const lockReason = skillLockReason(skill, level, learnedSkills);
+              const unlocked = lockReason === null;
               return (
                 <button
                   key={skill.id}
@@ -54,7 +56,7 @@ export function MobileSkillPicker({
                   <SkillIcon skill={skill} className="mobile-picker-glyph" />
                   <span className="mobile-picker-name">{t(skill.nameKey, undefined, skill.id)}</span>
                   <span className="mobile-picker-meta">
-                    {unlocked ? `${skill.mp} MP` : skillLockLabel(skill, level, t)}
+                    {unlocked ? `${skill.mp} MP` : skillLockLabel(skill, level, learnedSkills, t)}
                   </span>
                 </button>
               );

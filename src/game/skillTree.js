@@ -20,7 +20,7 @@ const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(v
 const pickSize = (value, fallback) => (isFiniteNumber(value) && value > 0 ? value : fallback);
 
 /**
- * Build the tile/connector layout for one sect's skill list.
+ * Build the tile/connector layout for one kit's skill list.
  *
  * Rows follow prerequisite depth, lanes spread branches horizontally. The first
  * child of a skill keeps its parent's lane so a straight kit renders as a

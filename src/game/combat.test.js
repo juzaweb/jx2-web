@@ -436,7 +436,8 @@ describe("CombatSystem kill rewards", () => {
 
   it("casts a hotbar-bound skill by catalog id", () => {
     const { combat, player } = makeCombat();
-    player.sect = "thieu-lam";
+    player.weaponType = "bao-tay";
+    combat.learnedSkills = new Set(["la_han_tran"]);
     combat.executeSkill = vi.fn();
     const ok = combat.castSkillById("la_han_tran");
     expect(ok).toBe(true);
@@ -445,10 +446,10 @@ describe("CombatSystem kill rewards", () => {
 
   it("handles an unknown skill id without crashing", () => {
     const { combat, player, ui } = makeCombat();
-    player.sect = "thieu-lam";
+    player.weaponType = "bao-tay";
     const ok = combat.castSkillById("no_such_skill");
     expect(ok).toBe(false);
-    expect(ui.addLog).toHaveBeenCalledWith("Môn phái này chưa có chiêu thức ở ô đó.");
+    expect(ui.addLog).toHaveBeenCalledWith("Vũ khí đang trang bị không có chiêu thức này.");
   });
 });
 
@@ -607,7 +608,7 @@ describe("skill targeting", () => {
 
   const makeCombat = ({ pkFlag = true, pvpTarget = null, wolves = [], peers = [] } = {}) => {
     const player = {
-      sect: "thieu-lam",
+      weaponType: "bao-tay",
       x: 0,
       y: 0,
       pkFlag,
@@ -627,6 +628,7 @@ describe("skill targeting", () => {
     };
     const ui = { addLog: vi.fn(), updateHud: vi.fn() };
     const combat = new CombatSystem(scene, player, { getAlive: () => wolves }, ui, () => {});
+    combat.learnedSkills = new Set(["dai_tu_di_chuong", "nhu_lai_than_chuong"]);
     return { combat, scene, ui };
   };
 

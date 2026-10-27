@@ -18,6 +18,10 @@ import { skillLockReason } from "./skills.js";
 export function formatSkillLock(reason, t = translate) {
   if (!reason) return "";
 
+  if (reason.kind === "book") {
+    return t("skills.picker.needsBook");
+  }
+
   if (reason.kind === "prereq") {
     return t("skills.tree.requires", {
       name: t(reason.nameKey, undefined, reason.id),
@@ -31,10 +35,11 @@ export function formatSkillLock(reason, t = translate) {
 /**
  * @param {Object} skill Catalog entry.
  * @param {number} level Character level.
+ * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids.
  * @param {(key: string, params?: Object, fallback?: string) => string} [t]
  *   Translator; defaults to the active runtime language.
  * @returns {string} Empty string when the skill is available.
  */
-export function skillLockLabel(skill, level, t = translate) {
-  return formatSkillLock(skillLockReason(skill, level), t);
+export function skillLockLabel(skill, level, learned = null, t = translate) {
+  return formatSkillLock(skillLockReason(skill, level, learned), t);
 }

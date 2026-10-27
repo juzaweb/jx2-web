@@ -6,12 +6,14 @@ import { GameSocketManager } from "../src/websocket/gameSocket.js";
  * Build a bare manager with only the collaborators `handleEnemyHit` touches, so
  * the authoritative splash path can be exercised without a live socket.
  */
-function makeManager({ enemies, castSkillId, playerSect = "thieu-lam" }) {
+function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
   const now = Date.now();
   const roster = new Map(enemies.map((enemy) => [enemy.id, enemy]));
   const player = {
     id: "player-1",
-    sect: playerSect,
+    weaponType: playerWeapon,
+    level: 10,
+    learnedSkills: ["la_han_quyen", "dai_tu_di_chuong"],
     mapId: "city",
     x: 0,
     y: 0,

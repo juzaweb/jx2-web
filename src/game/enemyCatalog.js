@@ -237,6 +237,46 @@ export const MONSTERS = {
 export const MONSTER_IDS = Object.keys(MONSTERS);
 
 /**
+ * Skill books each monster can drop, grouped by the hunting tier it belongs to.
+ * The starter skill (Kiếm Khí) is never in a pool: every hero already knows it.
+ * `chance` is the probability that a kill drops one book from the pool.
+ * @type {Readonly<Record<string, { chance: number, skills: string[] }>>}
+ */
+export const MONSTER_BOOK_DROPS = Object.freeze({
+  "son-ca": Object.freeze({ chance: 0.03, skills: ["thieu_duong_kiem_phap", "nga_my_kiem_phap"] }),
+  "soi-xam": Object.freeze({ chance: 0.03, skills: ["thieu_lam_tam_phap", "dai_tu_di_chuong"] }),
+  "da-lang": Object.freeze({
+    chance: 0.04,
+    skills: ["la_han_quyen", "thai_cuc_quyen", "mong_diep_thoi_tam", "ngu_doc_tam_phap", "truy_tam_doc"]
+  }),
+  "lam-tac": Object.freeze({
+    chance: 0.05,
+    skills: ["la_han_tran", "tam_thanh_kiem_phap", "tu_hang_pho_do", "van_doc_chieu_hong"]
+  }),
+  "hac-y-sat-thu": Object.freeze({
+    chance: 0.06,
+    skills: ["kim_cang_bat_hoai", "toat_hong_quan_khuyet", "luu_thuy_khanh_van", "u_hong_phiet_anh"]
+  }),
+  "thiet-giap-binh": Object.freeze({
+    chance: 0.08,
+    skills: ["nhu_lai_than_chuong", "tam_thanh_kiem_phap", "van_doc_chieu_hong"]
+  }),
+  "ma-giao-de-tu": Object.freeze({
+    chance: 0.1,
+    skills: ["nhu_lai_than_chuong", "kim_cang_bat_hoai", "u_hong_phiet_anh"]
+  })
+});
+
+/**
+ * Book-drop group for a monster, or null when it drops none.
+ * @param {string} [monsterId]
+ * @returns {{ chance: number, skills: string[] }|null}
+ */
+export function bookDropsFor(monsterId) {
+  return MONSTER_BOOK_DROPS[monsterId] || null;
+}
+
+/**
  * Resolve a monster definition, falling back to the legacy wolf so a stale
  * client or an old save can never crash the roster.
  * @param {string} [id]

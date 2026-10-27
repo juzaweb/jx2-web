@@ -95,28 +95,16 @@
   box-shadow: 0 0 26px rgba(110, 231, 183, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
-.jx2-cs-portrait.sect-thieu-lam {
-  border-color: #e0a34a;
-  background: radial-gradient(circle at 50% 40%, rgba(224, 163, 74, 0.28), rgba(0, 0, 0, 0.7) 70%);
-  box-shadow: 0 0 26px rgba(224, 163, 74, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
-}
-
-.jx2-cs-portrait.sect-nga-my {
-  border-color: #f0a6c8;
-  background: radial-gradient(circle at 50% 40%, rgba(240, 166, 200, 0.28), rgba(0, 0, 0, 0.7) 70%);
-  box-shadow: 0 0 26px rgba(240, 166, 200, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
-}
-
-.jx2-cs-portrait.sect-vo-dang {
+.jx2-cs-portrait.gender-male {
   border-color: #7fb8ff;
   background: radial-gradient(circle at 50% 40%, rgba(127, 184, 255, 0.28), rgba(0, 0, 0, 0.7) 70%);
   box-shadow: 0 0 26px rgba(127, 184, 255, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
-.jx2-cs-portrait.sect-ngu-doc {
-  border-color: #8be08b;
-  background: radial-gradient(circle at 50% 40%, rgba(139, 224, 139, 0.28), rgba(0, 0, 0, 0.7) 70%);
-  box-shadow: 0 0 26px rgba(139, 224, 139, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
+.jx2-cs-portrait.gender-female {
+  border-color: #f0a6c8;
+  background: radial-gradient(circle at 50% 40%, rgba(240, 166, 200, 0.28), rgba(0, 0, 0, 0.7) 70%);
+  box-shadow: 0 0 26px rgba(240, 166, 200, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.7);
 }
 
 .jx2-cs-portrait-glyph {
@@ -330,44 +318,24 @@
   border-color: #6ee7b7;
 }
 
-.jx2-cs-portrait-tile.sect-thieu-lam {
-  border-color: #7a5a2a;
-}
-
-.jx2-cs-portrait-tile.sect-thieu-lam.selected {
-  border-color: #e0a34a;
-  background: linear-gradient(180deg, rgba(80, 58, 20, 0.95), rgba(36, 24, 8, 0.95));
-  box-shadow: 0 0 12px rgba(224, 163, 74, 0.6);
-}
-
-.jx2-cs-portrait-tile.sect-nga-my {
-  border-color: #7a3b5a;
-}
-
-.jx2-cs-portrait-tile.sect-nga-my.selected {
-  border-color: #f0a6c8;
-  background: linear-gradient(180deg, rgba(80, 30, 52, 0.95), rgba(36, 10, 22, 0.95));
-  box-shadow: 0 0 12px rgba(240, 166, 200, 0.6);
-}
-
-.jx2-cs-portrait-tile.sect-vo-dang {
+.jx2-cs-portrait-tile.gender-male {
   border-color: #3b5a7a;
 }
 
-.jx2-cs-portrait-tile.sect-vo-dang.selected {
+.jx2-cs-portrait-tile.gender-male.selected {
   border-color: #7fb8ff;
   background: linear-gradient(180deg, rgba(30, 52, 80, 0.95), rgba(10, 22, 36, 0.95));
   box-shadow: 0 0 12px rgba(127, 184, 255, 0.6);
 }
 
-.jx2-cs-portrait-tile.sect-ngu-doc {
-  border-color: #3b7a4a;
+.jx2-cs-portrait-tile.gender-female {
+  border-color: #7a3b5a;
 }
 
-.jx2-cs-portrait-tile.sect-ngu-doc.selected {
-  border-color: #8be08b;
-  background: linear-gradient(180deg, rgba(24, 72, 36, 0.95), rgba(8, 30, 14, 0.95));
-  box-shadow: 0 0 12px rgba(139, 224, 139, 0.6);
+.jx2-cs-portrait-tile.gender-female.selected {
+  border-color: #f0a6c8;
+  background: linear-gradient(180deg, rgba(80, 30, 52, 0.95), rgba(36, 10, 22, 0.95));
+  box-shadow: 0 0 12px rgba(240, 166, 200, 0.6);
 }
 
 .jx2-cs-portrait-tile-glyph {

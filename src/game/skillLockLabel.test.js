@@ -12,19 +12,20 @@ const t = (key, params, fallback) => {
 
 describe("skillLockLabel", () => {
   it("returns an empty string when the skill is available", () => {
-    expect(skillLockLabel(skillById("thieu_lam_tam_phap"), 1, t)).toBe("");
+    expect(skillLockLabel(skillById("thieu_lam_tam_phap"), 1, null, t)).toBe("");
   });
 
   it("formats a pre-computed reason", () => {
     expect(formatSkillLock(null, t)).toBe("");
     expect(formatSkillLock({ kind: "level", level: 4 }, t)).toBe("level:4");
+    expect(formatSkillLock({ kind: "book" }, t)).toBe("skills.picker.needsBook");
     expect(
       formatSkillLock({ kind: "prereq", nameKey: "skills.thieuLam.thieuLamTamPhap.name", level: 5 }, t)
     ).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
   });
 
   it("labels a level gate", () => {
-    expect(skillLockLabel(skillById("tam_thanh_kiem_phap"), 1, t)).toBe("level:2");
+    expect(skillLockLabel(skillById("tam_thanh_kiem_phap"), 1, null, t)).toBe("level:2");
   });
 
   it("labels a prerequisite gate with the prerequisite name", () => {
@@ -33,6 +34,10 @@ describe("skillLockLabel", () => {
       unlockLevel: 1,
       requires: [{ id: "thieu_lam_tam_phap", level: 5 }]
     };
-    expect(skillLockLabel(gated, 1, t)).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
+    expect(skillLockLabel(gated, 1, null, t)).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
+  });
+
+  it("labels an unlearned skill as needing a book", () => {
+    expect(skillLockLabel(skillById("la_han_quyen"), 1, [], t)).toBe("skills.picker.needsBook");
   });
 });
