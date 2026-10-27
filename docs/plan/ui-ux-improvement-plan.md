@@ -80,16 +80,16 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 - **Confidence:** High
 - **Type:** Observed issue
 - **Evidence:** `src/components/MobileControls.jsx`, `src/components/HUD/ChatPanel.jsx`, `src/index.css` (`:root` touch tokens, `@media (pointer: coarse), (max-height: 500px)`)
-- **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlaps with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
+- **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlapped with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
 - **Recommendation:**
   1. Automatically minimize `ChatPanel` into a compact icon tab when touch mobile controls are active.
   2. Increase touch target hitboxes for `MobileControls` arc buttons to a minimum of 48x48px with 8px padding gaps.
   3. Ensure virtual joystick touch capture zone is isolated from hotbar dock boundaries.
-- **What shipped:** all control sizes are now layout tokens (`--mctrl-*` on `:root`, scaled by `--mctrl-scale` on short viewports), the chat panel is lifted above the joystick (`bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2)`), the numbered `1`–`9` bar is hidden on touch so the joystick has no dock to overlap, and the menu tray re-centres as icon-only 48×44 buttons between the two thumbs.
+- **What shipped:** All control sizes are layout tokens (`--mctrl-*` on `:root`, scaled by `--mctrl-scale` on short viewports), the chat panel is lifted above the joystick (`bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2)`), the numbered `1`–`9` bar is hidden on touch so the joystick has no dock to overlap, and the menu tray re-centres as icon-only 48x44 buttons between the two thumbs.
 - **Acceptance criteria:**
   - [x] On mobile touch viewports, `ChatPanel` no longer overlaps the joystick.
   - [x] Skill arc buttons maintain minimum 48x48px touch boundaries without touch event overlap (56px skills, 48px potions, 74px attack).
-- **Validation:** Measured with the dev server in an 844×390, 667×375 and 568×320 viewport: no rect intersection between joystick, skill fan, potion ring, menu tray, minimap and chat.
+- **Validation:** Measured with the dev server in an 844x390, 667x375 and 568x320 viewport: no rect intersection between joystick, skill fan, potion ring, menu tray, minimap and chat.
 - **Effort:** S (CSS breakpoint adjustments and default state in `App.jsx`)
 - **Dependencies / risks:** None.
 
