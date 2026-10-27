@@ -142,6 +142,37 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.success, false);
   });
 
+  test("Users: Profile access requires authentication and ownership", async () => {
+    // 1. Unauthenticated request must return 401
+    const unauthRes = await fetch(`${baseUrl}/users/me`);
+    assert.equal(unauthRes.status, 401);
+
+    // Login to get a valid token
+    const loginRes = await fetch(`${baseUrl}/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "hiepkhat99", password: "secretpassword123" })
+    });
+    const { token, user } = (await loginRes.json()).data;
+
+    // 2. Requesting own profile with valid token must succeed
+    const ownProfileRes = await fetch(`${baseUrl}/users/me?userId=${user.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    assert.equal(ownProfileRes.status, 200);
+    const ownJson = await ownProfileRes.json();
+    assert.equal(ownJson.success, true);
+    assert.equal(ownJson.data.user.id, user.id);
+
+    // 3. Requesting another user's profile with valid token must return 403
+    const foreignRes = await fetch(`${baseUrl}/users/me?userId=user_other_id_123`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    assert.equal(foreignRes.status, 403);
+    const foreignJson = await foreignRes.json();
+    assert.equal(foreignJson.success, false);
+  });
+
   test("Leaderboard reads from persisted saves", async () => {
     const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=5`);
     assert.equal(lbRes.status, 200);
