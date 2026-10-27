@@ -62,6 +62,21 @@ export default {
     remote: "Hiệp khách",
     pavilion: "Vạn Sự Thông"
   },
+  maps: {
+    market: "Biện Kinh",
+    "dong-mon-thanh": "Đông Môn Thành",
+    "bac-linh": "Bắc Lĩnh",
+    "tay-son": "Tây Sơn",
+    "trung-nguyen": "Trung Nguyên Chiến Trường",
+    "thuc-thanh": "Thục Thành",
+    "nguy-thanh": "Ngụy Thành",
+    "ba-thuc": "Ba Thục",
+    "kiem-cac": "Kiếm Các",
+    "nga-mi": "Nga Mi",
+    "hua-dien": "Hứa Điền",
+    "nghiep-quan": "Nghiệp Quan",
+    "quan-trung": "Quan Trung"
+  },
   chat: {
     tabs: {
       all: "Tổng hợp",
@@ -514,11 +529,7 @@ export default {
       equipFullSet: "Mặc Trọn Bộ Ngay"
     },
     teleport: {
-      title: "Hồi Phù & Truyền Tống",
-      receiveScroll: "Nhận 99x Hồi Thành Phù",
-      toMarket: "Truyền Tống: Biện Kinh",
-      toDongMonThanh: "Truyền Tống: Đông Môn Thành",
-      toSpawn: "Hồi Thành (Điểm hồi sinh)"
+      receiveScroll: "Nhận 99x Hồi Thành Phù"
     },
     utility: {
       title: "Ngân Lượng & Tiện Ích",

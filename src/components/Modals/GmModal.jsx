@@ -3,6 +3,7 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { MAX_LEVEL, MIN_LEVEL } from "../../game/progression.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
+import { MAP_IDS } from "../../game/maps/mapRegistry.js";
 import "../../styles/gm-modal.css";
 
 const TABS = [
@@ -306,18 +307,15 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
               <div className="gm-section">
                 <span className="gm-section-title">Dịch Chuyển Bản Đồ Tức Thời</span>
                 <div className="gm-btn-grid">
-                  <button
-                    className="gm-btn primary"
-                    onClick={() => handleTeleport("market")}
-                  >
-                    🏯 {t("gm.teleport.toMarket")}
-                  </button>
-                  <button
-                    className="gm-btn primary"
-                    onClick={() => handleTeleport("dong-mon-thanh")}
-                  >
-                    🌲 {t("gm.teleport.toDongMonThanh")}
-                  </button>
+                  {MAP_IDS.map((mapId) => (
+                    <button
+                      key={mapId}
+                      className="gm-btn primary"
+                      onClick={() => handleTeleport(mapId)}
+                    >
+                      🗺 {t(`maps.${mapId}`, undefined, mapId)}
+                    </button>
+                  ))}
                 </div>
               </div>
 

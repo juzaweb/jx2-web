@@ -7,11 +7,15 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
-  // The scene announces the active map on boot and on every portal trip.
+  // The scene announces the active map on boot and on every portal trip. Keep the
+  // id so a language switch re-renders the localized name instead of freezing the
+  // Vietnamese fallback the payload carried.
+  const [mapId, setMapId] = useState("");
   const [mapName, setMapName] = useState("");
 
   useEffect(() => {
     return bridge.on(EVENTS.MAP_CHANGED, (payload) => {
+      setMapId(payload?.mapId || "");
       setMapName(payload?.name || "");
     });
   }, []);
@@ -84,7 +88,9 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
         </div>
 
         <div className="minimap-subinfo">
-          <span className="subzone-name">{mapName || t("minimap.subzone")}</span>
+          <span className="subzone-name">
+            {mapId ? t(`maps.${mapId}`, undefined, mapName) : t("minimap.subzone")}
+          </span>
           <span className="coords" id="coords-text" ref={coordsRef}>
             6400 / 6200
           </span>
@@ -100,16 +106,19 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
           <div className="minimap-radar-sweep"></div>
         </div>
 
-        {/* Pinned Quest Objective */}
-        <div className="quest-tracker" id="quest-tracker">
-          <div className="quest-head">{t("minimap.questHead")}</div>
-          <div className="quest-body" id="quest-text">
-            {quest?.completed ? t("minimap.questDone") : t("minimap.questTodo")}
+        {/* Pinned Quest Objective. It describes Biện Kinh only, so a hunting
+            ground must not claim to be a safe city with no monsters. */}
+        {mapId === "market" && (
+          <div className="quest-tracker" id="quest-tracker">
+            <div className="quest-head">{t("minimap.questHead")}</div>
+            <div className="quest-body" id="quest-text">
+              {quest?.completed ? t("minimap.questDone") : t("minimap.questTodo")}
+            </div>
+            <div className="quest-progress" id="quest-progress">
+              {t("minimap.questSafe")}
+            </div>
           </div>
-          <div className="quest-progress" id="quest-progress">
-            {t("minimap.questSafe")}
-          </div>
-        </div>
+        )}
       </div>
     </section>
   );

@@ -305,7 +305,9 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                       <span className="jx2-cs-faction-label">
                         {t(`characterSelect.factions.${faction.id}`)}
                       </span>
-                      <span className="jx2-cs-faction-city">{faction.cityName}</span>
+                      <span className="jx2-cs-faction-city">
+                        {t(`maps.${faction.homeMapId}`, undefined, faction.cityName)}
+                      </span>
                     </button>
                   ))}
                 </div>

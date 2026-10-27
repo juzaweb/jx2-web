@@ -1,6 +1,7 @@
 # Faction cities, four gates and the central battlefield
 
-Status: **phase 2 implemented** (six hunting grounds + all city gates open).
+Status: **phase 2 implemented** (six hunting grounds + all city gates open),
+plus the phase-3 hardening pass (lazy rosters, localized map names, walkthrough).
 Remaining work is listed under _Not done_.
 
 ## Task checklist
@@ -31,8 +32,20 @@ Remaining work is listed under _Not done_.
 - [x] All four gates of Thục Thành and Ngụy Thành are wired.
 - [x] A gate arch with no portal behind it explains itself once per entry
       (generic safety net; no gate is currently shut).
-- [x] Tests: client 82 files / 842 tests, server 116 tests; `npm run build`
+- [x] Hunting rosters are built lazily on first use (`rosterFor`) instead of
+      preloading all 13 maps at boot; the enemy tick starts regardless.
+- [x] Map names are localized in VI/EN/ZH (`maps.<id>`); the minimap, city-map
+      modal, arrival log and GM teleport list re-render on language switch.
+- [x] Biện Kinh's quest tracker is hidden outside the capital, so a hunting
+      ground no longer claims "safe zone • no monsters".
+- [x] Legacy `saves.hp`/`saves.mp NOT NULL` databases are rebuilt on boot; new
+      characters could not be created on those databases before.
+- [x] Tests: client 82 files / 847 tests, server 121 tests; `npm run build`
       clean.
+- [x] Walkthrough: three fresh faction characters boot in their own capital;
+      all 24 portal links walk in both directions with the expected roster
+      (270 Đông Môn Thành, 90 per new ground, 0 in cities/battlefield); Bắc Lĩnh
+      rendered with Tuyết Lang and its localized name.
 
 ### Not done (phase 3+)
 
@@ -42,12 +55,6 @@ Remaining work is listed under _Not done_.
       GM-only would need an action).
 - [ ] Book/weapon drops for the level 30–60 species (they pay EXP and coins
       only, so the weapon kits stay unchanged).
-- [ ] Manual in-game walkthrough: one hero per camp, every gate, a cross-camp
-      fight on the battlefield, and a defeat returning home.
-- [ ] Optional performance work: load per-map enemy rosters lazily at boot
-      instead of preloading every hunting ground (13 maps now).
-- [ ] Localised map names (map names are still Vietnamese data strings in every
-      locale, matching the pre-existing maps).
 
 ## Goal & scope
 
@@ -103,6 +110,14 @@ battlefield through its south gate.
 - `src/game/maps/camps.js` — the camp expander extracted from Đông Môn Thành so
   every hunting ground shares one scatter rule; `maps/huntingGround.js` builds
   the six phase-2 grounds from a small spec (entrance side, groups, palette).
+- Enemy rosters are built on demand (`rosterFor`) instead of preloading every
+  map; the enemy tick always runs while enemies are enabled.
+- Map names live in the `maps.<id>` locale keys. Components keep the map id and
+  translate on render, so switching language repaints the minimap, city-map
+  modal and GM teleport list without a reload.
+- `PlayerDatabase` rebuilds a legacy `saves` table whose `hp`/`mp` are still
+  `NOT NULL`, under `BEGIN IMMEDIATE`, dropping retired columns and recreating
+  the leaderboard indexes.
 - Character creation now stores `faction` (`characters.faction`, migrated with a
   `han` default). The join snapshot carries `faction`, so nameplates can show
   enemies red on the battlefield.
@@ -112,9 +127,11 @@ battlefield through its south gate.
 
 ## Verification
 
-1. `npm test` — 82 files / 842 tests.
-2. `npm --prefix server test` — 116 tests.
+1. `npm test` — 82 files / 847 tests.
+2. `npm --prefix server test` — 121 tests.
 3. `npm run build` — clean.
-4. Manual: create one hero per camp; each boots into their own capital; Hán has
-   four working gates; two different camps can fight on the battlefield without
-   the PK flag; allies cannot; a defeat returns the hero to their own capital.
+4. Walkthrough (real WebSocket against the dev server): Thục/ Ngụy characters
+   boot in `thuc-thanh`/`nguy-thanh`; every city gate, both battlefield exits
+   and every `city-gate` return was walked; rosters loaded lazily on arrival.
+5. Visual check: Hán boots Biện Kinh, Bắc Lĩnh renders Tuyết Lang with the
+   localized minimap label, and the GM teleport tab lists all 13 maps.

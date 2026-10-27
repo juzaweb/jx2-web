@@ -92,6 +92,7 @@ export function findPlayerAt(players, x, y) {
  * @returns {boolean}
  */
 export function isDuelCandidate(attacker, player, pvpMode = PVP_MODE.FLAG) {
+  if (pvpMode === PVP_MODE.NONE) return false;
   if (pvpMode === PVP_MODE.FACTION) return isHostileFaction(attacker?.faction, player?.faction);
   return player?.pkFlag === true;
 }

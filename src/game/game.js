@@ -158,7 +158,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.map = getMap(this.currentMapId);
     this.mapConfig = mapWorldConfig(this.map);
     // Announce the boot map so the HUD can label the region before any travel.
-    bridge.emit(EVENTS.MAP_CHANGED, { mapId: this.map.id, name: this.map.name });
+    bridge.emit(EVENTS.MAP_CHANGED, { mapId: this.map.id, name: this.mapDisplayName() });
 
     // Draw the map and clamp the camera/physics to it. The NPCs come with it.
     this.stage = new MapStage(this);
@@ -715,6 +715,16 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
+   * Localized display name of a map, falling back to its authored Vietnamese name.
+   * @param {string} [mapId]
+   * @param {string} [fallback]
+   * @returns {string}
+   */
+  mapDisplayName(mapId = this.currentMapId, fallback = this.map?.name) {
+    return translate(`maps.${mapId}`, undefined, fallback);
+  }
+
+  /**
    * PvP policy of the map under the hero's feet.
    * @returns {"none"|"flag"|"faction"}
    */
@@ -839,8 +849,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.portalState = createPortalState();
     this.lockedGateId = null;
     this.drawMapPanels();
-    bridge.emit(EVENTS.MAP_CHANGED, { mapId: targetId, name: target.name });
-    this.uiBridge.addLog(`Đã đến ${target.name}.`, "system");
+    bridge.emit(EVENTS.MAP_CHANGED, { mapId: targetId, name: this.mapDisplayName(targetId, target.name) });
+    this.uiBridge.addLog(`Đã đến ${this.mapDisplayName(targetId, target.name)}.`, "system");
 
     if (notifyServer && this.networkClient?.isConnected) {
       this.networkClient.sendMapChange({ portalId });
@@ -1530,7 +1540,10 @@ export class JiangHuScene extends Phaser.Scene {
       }
       this.combat?.clearBuffs?.();
       this.uiBridge.updateHud(this.player.stats);
-      this.uiBridge.addLog(`Bạn đã bị đánh bại và hồi sinh tại ${this.map.name}.`, "combat");
+      this.uiBridge.addLog(
+        `Bạn đã bị đánh bại và hồi sinh tại ${this.mapDisplayName()}.`,
+        "combat"
+      );
       // Persist the full-HP respawn state.
       this.saveGame(false);
     }
@@ -1683,7 +1696,7 @@ export class JiangHuScene extends Phaser.Scene {
       this.uiBridge.addLog("Chào mừng trở lại giang hồ!", "system");
     } else {
       this.uiBridge.addLog(
-        `Bạn đã đặt chân đến ${this.map.name}. Chúc hiệp khách hành tẩu bình an.`,
+        `Bạn đã đặt chân đến ${this.mapDisplayName()}. Chúc hiệp khách hành tẩu bình an.`,
         "system"
       );
       this.player.setPosition(this.map.spawn.x, this.map.spawn.y);

@@ -89,7 +89,7 @@ export function pickAutoTarget({
         // On a faction battlefield the camp decides, so the PK flag is irrelevant.
         if (isHostileFaction(selfFaction, peer?.faction)) consider(peer, "player");
       }
-    } else {
+    } else if (pvpMode !== "none") {
       for (const peer of peers || []) {
         if (peer?.pkFlag === true && peer.id !== selfId) consider(peer, "player");
       }

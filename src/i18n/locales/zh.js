@@ -64,6 +64,21 @@ export default {
     remote: "侠客",
     pavilion: "万事通"
   },
+  maps: {
+    market: "汴京",
+    "dong-mon-thanh": "东门城",
+    "bac-linh": "北岭",
+    "tay-son": "西山",
+    "trung-nguyen": "中原战场",
+    "thuc-thanh": "蜀城",
+    "nguy-thanh": "魏城",
+    "ba-thuc": "巴蜀",
+    "kiem-cac": "剑阁",
+    "nga-mi": "峨眉",
+    "hua-dien": "许田",
+    "nghiep-quan": "邺关",
+    "quan-trung": "关中"
+  },
   chat: {
     tabs: {
       all: "综合",
@@ -517,11 +532,7 @@ export default {
       equipFullSet: "一键穿戴全套"
     },
     teleport: {
-      title: "回城与传送",
-      receiveScroll: "获取 99x 回城符",
-      toMarket: "传送：汴京主城",
-      toDongMonThanh: "传送：东门城野外",
-      toSpawn: "回城（复活点）"
+      receiveScroll: "获取 99x 回城符"
     },
     utility: {
       title: "银两与辅助功能",

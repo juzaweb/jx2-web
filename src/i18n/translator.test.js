@@ -5,6 +5,7 @@ import vi from "./locales/vi.js";
 import zh from "./locales/zh.js";
 import { detectLanguage, normalizeLanguage, setRuntimeLanguage, translateFor } from "./translator.js";
 import { EQUIPMENT_ITEMS, INVENTORY_ITEMS, QUICK_ITEMS } from "../game/items.js";
+import { MAP_IDS } from "../game/maps/mapRegistry.js";
 
 const flattenKeys = (dictionary, prefix = "") =>
   Object.entries(dictionary).flatMap(([key, value]) => {
@@ -71,6 +72,15 @@ describe("locale catalogs", () => {
   it("keeps every language key-for-key aligned with Vietnamese", () => {
     expect(flattenKeys(en).sort()).toEqual(viKeys);
     expect(flattenKeys(zh).sort()).toEqual(viKeys);
+  });
+
+  it("names every playable map in every locale", () => {
+    for (const id of MAP_IDS) {
+      for (const language of ["vi", "en", "zh"]) {
+        const name = translateFor(language, `maps.${id}`, undefined, "");
+        expect(name, `${language}/${id}`).not.toBe("");
+      }
+    }
   });
 
   it("defines a name and description for every item in the catalog", () => {

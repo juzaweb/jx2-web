@@ -203,3 +203,18 @@ test("a faction battlefield refuses to turn allies into targets", () => {
     "the refusal names the shared camp"
   );
 });
+
+test("a strike never crosses maps even at the same coordinates", () => {
+  const { target, messages, strike } = makeManager("la_han_quyen");
+  // A body on another map happens to sit inside PvP range in world units.
+  target.mapId = "market";
+
+  strike();
+
+  assert.equal(target.hp, TARGET_HP, "the off-map body is untouched");
+  assert.equal(
+    messages.filter((message) => message.payload?.reason === "target_missing").length,
+    1,
+    "the hit is refused as a missing target"
+  );
+});

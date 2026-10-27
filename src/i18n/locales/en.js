@@ -64,6 +64,21 @@ export default {
     remote: "Players",
     pavilion: "Pavilion"
   },
+  maps: {
+    market: "Bianjing",
+    "dong-mon-thanh": "Dongmen Town",
+    "bac-linh": "Beiling",
+    "tay-son": "Xishan",
+    "trung-nguyen": "Central Plains Battlefield",
+    "thuc-thanh": "Shu City",
+    "nguy-thanh": "Wei City",
+    "ba-thuc": "Bashu",
+    "kiem-cac": "Jiange",
+    "nga-mi": "Emei",
+    "hua-dien": "Xutian",
+    "nghiep-quan": "Yeguan",
+    "quan-trung": "Guanzhong"
+  },
   chat: {
     tabs: {
       all: "All",
@@ -516,11 +531,7 @@ export default {
       equipFullSet: "Equip Full Set Now"
     },
     teleport: {
-      title: "Talismans & Teleport",
-      receiveScroll: "Receive 99x Return City Talisman",
-      toMarket: "Teleport: Bianjing City",
-      toDongMonThanh: "Teleport: East Gate Suburb",
-      toSpawn: "Recall to Spawn Point"
+      receiveScroll: "Receive 99x Return City Talisman"
     },
     utility: {
       title: "Silver & Utility",

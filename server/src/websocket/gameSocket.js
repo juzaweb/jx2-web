@@ -30,7 +30,6 @@ import { WORLD_CONFIG } from "../../../src/game/worldConfig.js";
 import { getMonster } from "../../../src/game/enemyCatalog.js";
 import {
   DEFAULT_MAP_ID,
-  MAP_IDS,
   findPortal,
   getMap,
   isCombatAllowed,
@@ -347,22 +346,16 @@ export class GameSocketManager {
 
     if (this.enemiesEnabled) {
       // Biện Kinh is a safe city: its legacy roster only exists for harnesses that
-      // explicitly ask for it (`enemySpawns` / `enemyRespawnMs`). Every other map
-      // spawns its own hunting roster from its MapDefinition.
+      // explicitly ask for it (`enemySpawns` / `enemyRespawnMs`). Every other map's
+      // hunting roster is built on first use by `rosterFor()`, so a world with a
+      // dozen maps does not pay for a dozen rosters and spatial grids at boot.
       const marketSpawns =
         options.enemySpawns ??
         (options.enemyRespawnMs != null ? getMap(DEFAULT_MAP_ID).enemySpawns : []);
       this.loadRoster(DEFAULT_MAP_ID, marketSpawns);
-
-      MAP_IDS.forEach((mapId) => {
-        if (mapId === DEFAULT_MAP_ID) return;
-        const map = getMap(mapId);
-        if (map.safe || !map.enemySpawns?.length) return;
-        this.loadRoster(mapId, map.enemySpawns);
-      });
     }
     this.enemyRespawnMs = clampNum(options.enemyRespawnMs, 50, 600000, ENEMY_RESPAWN_MS);
-    this.enemyRespawnTimers = new Map(); // key: enemy id, value: timeout
+    this.enemyRespawnTimers = new Map(); // key: `${mapId}:${enemyId}`, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
 
     // Identity is proven by the session token, and the character must belong to
@@ -1755,6 +1748,9 @@ export class GameSocketManager {
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
     if (!target) return this.rejectHit(ws, "target_missing");
+    // Two maps can share world coordinates, so distance alone must never let a
+    // strike reach a body standing somewhere else.
+    if (target.mapId !== attacker.mapId) return this.rejectHit(ws, "target_missing");
     if (!this.canFightHere(target)) {
       return this.rejectHit(ws, "safe_zone", { targetId: target.id });
     }
@@ -1956,8 +1952,8 @@ export class GameSocketManager {
     // HP — including the victim, who reads its own pool from here.
     this.broadcastPlayerState(target, hpMessage);
 
-    // A strike can cross maps (the range check does not compare map ids), so the
-    // attacker may not be on the broadcast's map at all.
+    // Player hits are map-scoped, but a future cross-map effect must still reach an
+    // attacker who is no longer standing on the target's map.
     this.sendToAttackerOffMap(attacker, target.mapId, hpMessage);
 
     this.persistVitals(target);
@@ -2572,8 +2568,9 @@ export class GameSocketManager {
    * monsters in the same place, whoever happens to be nearby.
    */
   startEnemyTick() {
-    const hasEnemies = Array.from(this.enemyByMap.values()).some((roster) => roster.size > 0);
-    if (!hasEnemies) return;
+    // Rosters are lazy now, so "has enemies at boot" is no longer the right
+    // question: the tick must exist before the first map is ever opened.
+    if (!this.enemiesEnabled) return;
     this.enemyTickTimer = setInterval(() => this.tickEnemies(), this.enemyTickMs);
     if (this.enemyTickTimer.unref) this.enemyTickTimer.unref();
   }

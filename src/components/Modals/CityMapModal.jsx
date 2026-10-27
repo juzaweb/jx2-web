@@ -5,11 +5,14 @@ import { useI18n } from "../../i18n/I18nProvider.jsx";
 export function CityMapModal({ isOpen, onClose }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
-  // The scene announces the active map on boot and on every portal trip.
+  // The scene announces the active map on boot and on every portal trip. Keeping
+  // the id (not just the name) lets a language switch repaint the title.
+  const [mapId, setMapId] = useState("");
   const [mapName, setMapName] = useState("");
 
   useEffect(() => {
     return bridge.on(EVENTS.MAP_CHANGED, (payload) => {
+      setMapId(payload?.mapId || "");
       setMapName(payload?.name || "");
     });
   }, []);
@@ -43,7 +46,11 @@ export function CityMapModal({ isOpen, onClose }) {
           ×
         </button>
         <div className="modal-eyebrow">{t("cityMap.eyebrow")}</div>
-        <h2>{mapName ? t("cityMap.titleWithName", { name: mapName }) : t("cityMap.title")}</h2>
+        <h2>
+          {mapId
+            ? t("cityMap.titleWithName", { name: t(`maps.${mapId}`, undefined, mapName) })
+            : t("cityMap.title")}
+        </h2>
 
         <div className="city-map-view">
           <canvas ref={canvasRef} width={1000} height={1000} className="city-map-canvas" />
