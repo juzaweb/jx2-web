@@ -137,4 +137,61 @@ describe("SkillsModal Component", () => {
       expect(markup).toContain(`<span class="skills-weapon-badge">${expectedLabel}</span>`);
     }
   });
+
+  it("shows the skill level, its scaled damage and an affordable upgrade", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={5}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 5 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+
+    expect(markup).toContain("Cấp 5/10");
+    expect(markup).toContain("+40% hiệu quả");
+    // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68
+    expect(markup).toContain("ST: 168%");
+    expect(markup).toContain('class="skills-upgrade-btn"');
+    expect(markup).not.toContain('class="skills-upgrade-btn" disabled');
+    expect(markup).toContain("Nâng cấp — Cấp 6");
+    expect(markup).toContain("40 bạc");
+  });
+
+  it("disables an unaffordable upgrade and marks a maxed skill", () => {
+    const broke = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={5}
+          learnedSkills={["test_skill_1"]}
+          coins={0}
+          exp={0}
+        />
+      </I18nProvider>
+    );
+    expect(broke).toContain('class="skills-upgrade-btn" disabled');
+
+    const maxed = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={5}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 10 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+    expect(maxed).toContain("Đã đạt cấp tối đa (10)");
+    expect(maxed).not.toContain('class="skills-upgrade-btn"');
+  });
 });

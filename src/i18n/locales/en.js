@@ -259,6 +259,13 @@ export default {
     dmgTag: "Dmg: {pct}%",
     passiveTag: "Passive",
     regenTag: "Regen {hp} HP/s",
+    levelTag: "Lv {level}/{max}",
+    levelBonus: "+{pct}% power",
+    upgrade: "Upgrade — Lv {level}",
+    upgradeCost: "{coins} silver · {exp} EXP",
+    upgradeShort: "Requires {coins} silver and {exp} EXP",
+    upgradeHint: "Spend silver and EXP to raise this skill's level.",
+    maxLevel: "Max level reached ({max})",
     tree: {
       requires: "Learn {name} first",
       empty: "This weapon has no skills yet.",

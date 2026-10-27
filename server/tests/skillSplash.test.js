@@ -6,7 +6,7 @@ import { GameSocketManager } from "../src/websocket/gameSocket.js";
  * Build a bare manager with only the collaborators `handleEnemyHit` touches, so
  * the authoritative splash path can be exercised without a live socket.
  */
-function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
+function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay", skillLevels = {} }) {
   const now = Date.now();
   const roster = new Map(enemies.map((enemy) => [enemy.id, enemy]));
   const player = {
@@ -14,6 +14,7 @@ function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
     weaponType: playerWeapon,
     level: 10,
     learnedSkills: ["la_han_quyen", "dai_tu_di_chuong"],
+    skillLevels,
     mapId: "dong-mon-thanh",
     x: 0,
     y: 0,
@@ -113,4 +114,32 @@ test("Kiếm Khí's blast splashes reduced damage onto monsters caught in it", (
     "the burst only deals a fraction of the primary hit"
   );
   assert.equal(far.hp, 1000, "a monster outside the burst is untouched");
+});
+
+test("a levelled skill scales the primary and the splash by the same factor", () => {
+  // The splash is a fixed fraction of the strike's multiplier. Passing an
+  // already-leveled skill *and* a level would scale it twice, so the fraction
+  // must stay constant as the skill levels up.
+  const run = (level) => {
+    const primary = wolf("primary", 100);
+    const nearby = wolf("nearby", 250);
+    const { manager } = makeManager({
+      enemies: [primary, nearby],
+      castSkillId: "kiem_khi",
+      playerWeapon: "kiem",
+      skillLevels: { kiem_khi: level }
+    });
+
+    manager.handleEnemyHit("ws", { id: "primary", skill: "kiem_khi" });
+    return { primary: 1000 - primary.hp, splash: 1000 - nearby.hp };
+  };
+
+  const base = run(1);
+  const maxed = run(10);
+  assert.ok(maxed.primary > base.primary, "the primary hit grows with the level");
+  assert.ok(maxed.splash > base.splash, "the splash grows with the level too");
+  assert.ok(
+    Math.abs(maxed.splash / maxed.primary - base.splash / base.primary) < 0.02,
+    "the splash stays the same fraction of the primary hit"
+  );
 });

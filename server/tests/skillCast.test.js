@@ -7,9 +7,10 @@ import {
   isInsideCastArea,
   resolveSkillHit,
   splashDamage,
-  studyRejection
+  studyRejection,
+  upgradeRejection
 } from "../src/game/skillCast.js";
-import { skillById } from "../../src/game/skills.js";
+import { MAX_SKILL_LEVEL, skillById } from "../../src/game/skills.js";
 
 /** A server player object with just the fields the cast rules read. */
 const player = (overrides = {}) => ({
@@ -128,6 +129,32 @@ describe("server skill cast rules", () => {
     assert.ok(splash < primary.damage);
   });
 
+  it("keeps the splash fraction constant as the skill levels up", () => {
+    const skill = skillById("kiem_khi");
+    const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
+    // Defense is subtracted after the multiplier, so use an unarmoured target to
+    // isolate the multiplier scaling the level is responsible for.
+    const ratioAt = (level) => {
+      const primary = resolveSkillHit(
+        player({
+          learnedSkills: ["kiem_khi"],
+          skillLevels: { kiem_khi: level },
+          lastCast: { skillId: skill.id, at: 0, hits: 0, aim: { x: 0, y: 0 } }
+        }),
+        stats,
+        0,
+        skill.id,
+        100,
+        () => 0.99
+      );
+      return splashDamage(skill, stats, 0, () => 0.99, level) / primary.damage;
+    };
+
+    // Rounding to whole damage points moves the ratio slightly; a squared
+    // multiplier would roughly double it, far beyond this tolerance.
+    assert.ok(Math.abs(ratioAt(MAX_SKILL_LEVEL) - ratioAt(1)) < 0.02);
+  });
+
   it("only contains AoE hits inside the authorized area", () => {
     const skill = skillById("nhu_lai_than_chuong");
     const cast = { skillId: skill.id, aim: { x: 1000, y: 1000 } };
@@ -135,5 +162,64 @@ describe("server skill cast rules", () => {
     assert.equal(isInsideCastArea(cast, skill, { x: 1000 + skill.radius + 500, y: 1000 }, { x: 0, y: 0 }), false);
     // A non-AoE cast is not constrained here.
     assert.equal(isInsideCastArea(cast, skillById("kiem_khi"), { x: 0, y: 0 }, { x: 0, y: 0 }), true);
+  });
+
+  it("scales a hit with the caster's level in the skill", () => {
+    const skill = skillById("kiem_khi");
+    const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
+    const hitAt = (level) =>
+      resolveSkillHit(
+        player({
+          learnedSkills: ["kiem_khi"],
+          skillLevels: { kiem_khi: level },
+          lastCast: { skillId: skill.id, at: 0, hits: 0, aim: { x: 0, y: 0 } }
+        }),
+        stats,
+        10,
+        skill.id,
+        100,
+        () => 0.99
+      );
+
+    const low = hitAt(1);
+    const high = hitAt(MAX_SKILL_LEVEL);
+    assert.ok(high.damage > low.damage);
+    assert.ok(high.skill.mult > low.skill.mult);
+    assert.equal(high.skill.id, skill.id);
+  });
+
+  it("scales self buffs with the caster's level", () => {
+    const base = player({ learnedSkills: ["la_han_tran"] });
+    const strong = player({ learnedSkills: ["la_han_tran"], skillLevels: { la_han_tran: 10 } });
+    applyCastSelfEffects(base, skillById("la_han_tran"), 0);
+    applyCastSelfEffects(strong, skillById("la_han_tran"), 0);
+    assert.ok(strong.buffs[0].amount > base.buffs[0].amount);
+  });
+
+  it("refuses an upgrade the hero cannot pay for, and stops at the cap", () => {
+    const skill = skillById("kiem_khi");
+
+    assert.deepEqual(upgradeRejection(null, player()), { reason: "not_usable" });
+    assert.equal(upgradeRejection(skillById("thieu_duong_kiem_phap"), player())?.reason, "not_learned");
+
+    const maxed = player({
+      learnedSkills: ["kiem_khi"],
+      skillLevels: { kiem_khi: MAX_SKILL_LEVEL },
+      progress: { coins: 1e9, exp: 1e9 }
+    });
+    assert.equal(upgradeRejection(skill, maxed)?.reason, "max_level");
+
+    const broke = player({ learnedSkills: ["kiem_khi"], progress: { coins: 0, exp: 0 } });
+    assert.equal(upgradeRejection(skill, broke)?.reason, "coins");
+
+    const noExp = player({ learnedSkills: ["kiem_khi"], progress: { coins: 1e6, exp: 0 } });
+    assert.equal(upgradeRejection(skill, noExp)?.reason, "exp");
+
+    const rich = player({
+      learnedSkills: ["kiem_khi"],
+      skillLevels: { kiem_khi: 1 },
+      progress: { coins: 1e6, exp: 1e6 }
+    });
+    assert.equal(upgradeRejection(skill, rich), null);
   });
 });

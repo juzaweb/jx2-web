@@ -138,6 +138,14 @@ describe("SkillCastController", () => {
     expect(combat.player.hideFormation).toHaveBeenCalled();
   });
 
+  it("scales the predicted buff with the hero's level in the skill", () => {
+    const { combat, cast } = makeCombat({ skillLevels: { la_han_tran: 10 } });
+
+    cast.applySelfEffects(skillById("la_han_tran"), 0);
+    // +10% at level 1, +10% * 1.9 at level 10, matching the server's maths.
+    expect(combat.buffs[0].amount).toBeCloseTo(0.19);
+  });
+
   it("distinguishes a peer from a monster", () => {
     expect(isPeerTarget({ monsterId: "soi-xam" })).toBe(false);
     expect(isPeerTarget({ id: "p2" })).toBe(true);

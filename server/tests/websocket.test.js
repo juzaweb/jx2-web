@@ -697,6 +697,60 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
+  await t.test("Skill upgrades debit the ledger and persist the level", async () => {
+    store.setProgress("char_skill", { level: 10, exp: 500, coins: 500, kills: 0 }, "char_skill");
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_skill", x: 5000, y: 5000 });
+
+    const synced = await client.waitFor((m) => m.type === "skills_sync");
+    assert.equal(
+      synced.payload.levels.kiem_khi,
+      undefined,
+      "a freshly studied skill is implicitly level 1"
+    );
+
+    client.send({ type: "skill_upgrade", payload: { skillId: "kiem_khi" } });
+    const upgraded = await client.waitFor(
+      (m) => m.type === "item_result" && m.payload.action === "skill_upgrade"
+    );
+    assert.equal(upgraded.payload.ok, true);
+    assert.equal(upgraded.payload.level, 2);
+
+    // Level 2 costs 80 silver and 120 EXP (40/60 per target level).
+    const progress = await client.waitFor(
+      (m) => m.type === "player_progress" && m.payload.coins === 420
+    );
+    assert.equal(progress.payload.exp, 380);
+
+    const levels = await client.waitFor(
+      (m) => m.type === "skills_sync" && m.payload.levels?.kiem_khi === 2
+    );
+    assert.equal(levels.payload.levels.kiem_khi, 2);
+    assert.equal(store.getSkillLevels("char_skill").kiem_khi, 2);
+
+    await client.close();
+  });
+
+  await t.test("A skill upgrade the hero cannot pay for is refused", async () => {
+    store.setProgress("char_broke", { level: 10, exp: 0, coins: 0, kills: 0 }, "char_broke");
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_broke", x: 5000, y: 5000 });
+
+    client.send({ type: "skill_upgrade", payload: { skillId: "kiem_khi" } });
+    const refused = await client.waitFor(
+      (m) => m.type === "item_result" && m.payload.action === "skill_upgrade"
+    );
+    assert.equal(refused.payload.ok, false);
+    assert.equal(refused.payload.reason, "coins");
+    assert.equal(
+      store.getSkillLevels("char_broke").kiem_khi,
+      undefined,
+      "nothing is persisted when the price cannot be paid"
+    );
+
+    await client.close();
+  });
+
   await t.test("Wolves bite on the server and stream authoritative HP", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_bite", x: 8400, y: 6000 });

@@ -13,6 +13,7 @@
  * - `registry`  flat catalog, kits, id/slot lookups
  * - `gating`    learned / learnable / usable / lock-reason rules
  * - `cost`      MP and cooldown, including test-mode overrides
+ * - `levels`    skill levels (1..10): scaling, upgrade price and funds checks
  * - `effects`   shared interpretation of self-targeted effects
  * - `area`      cast reach and AoE containment maths
  * - `schema`    authoring helper and catalog validation
@@ -42,6 +43,22 @@ export {
   skillLockReason
 } from "./gating.js";
 
+
+export {
+  MAX_SKILL_LEVEL,
+  SKILL_LEVEL_BONUS_PER_LEVEL,
+  SKILL_UPGRADE_COINS_PER_LEVEL,
+  SKILL_UPGRADE_EXP_PER_LEVEL,
+  normalizeSkillLevel,
+  skillLevelOf,
+  skillLevelScale,
+  skillLevelBonus,
+  scaleSkillEffect,
+  skillAtLevel,
+  skillUpgradeCost,
+  skillLearnCost,
+  skillFundsShortfall
+} from "./levels.js";
 export { skillMpCost, skillCooldown, effectiveSkillMpCost, effectiveSkillCooldown } from "./cost.js";
 
 export {

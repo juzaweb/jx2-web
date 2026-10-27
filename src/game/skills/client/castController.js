@@ -20,7 +20,9 @@ import {
   effectiveSkillCooldown,
   effectiveSkillMpCost,
   selfBuffEntries,
+  skillAtLevel,
   skillCastReach,
+  skillLevelOf,
   skillLockReason,
   skillUsable,
   skillsForWeapon
@@ -687,12 +689,17 @@ export class SkillCastController {
 
   /**
    * Apply a skill's timed effects to the caster (buff, heal).
+   *
+   * The magnitudes follow the hero's level in the skill, exactly like the
+   * authoritative server, so the predicted buffs never disagree with the stats
+   * the server broadcasts a moment later.
    * @param {Object} skill
    * @param {number} now
    */
   applySelfEffects(skill, now) {
     const overheadSprite = skill.vfx?.type === "overhead" ? skill.vfx.overhead : null;
-    this.combat.buffs.push(...selfBuffEntries(skill, now));
+    const leveled = skillAtLevel(skill, skillLevelOf(this.combat.skillLevels, skill?.id));
+    this.combat.buffs.push(...selfBuffEntries(leveled, now));
 
     if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
       if (typeof skill.vfx.scale === "number") {
