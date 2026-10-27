@@ -5,7 +5,7 @@ import {
   ensureEquipmentTexture,
   ensureHeroBodyTexture,
   ensureOverheadTexture,
-  ensureSectVfx,
+  ensureWeaponVfx,
   ensureSpritesheet,
   ensureVfxTexture
 } from "./lazyAssets.js";
@@ -110,11 +110,11 @@ describe("ensureOverheadTexture", () => {
   });
 });
 
-describe("ensureSectVfx", () => {
+describe("ensureWeaponVfx", () => {
   it("queues only skills that carry a sprite, in a single loader batch", () => {
     const scene = makeScene();
 
-    ensureSectVfx(scene, [
+    ensureWeaponVfx(scene, [
       { id: "no-vfx" },
       { id: "palm", vfx: { sprite: "vfx-dai-tu-di-chuong" } },
       { id: "ring", vfx: { sprite: "vfx-la-han-tran" } },
@@ -129,10 +129,10 @@ describe("ensureSectVfx", () => {
     expect(scene.calls.filter(([name]) => name === "start")).toHaveLength(1);
   });
 
-  it("queues an overhead buff image together with the sect sheets", () => {
+  it("queues an overhead buff image together with the weapon sheets", () => {
     const scene = makeScene();
 
-    ensureSectVfx(scene, [{ id: "kim-cang", vfx: { type: "overhead", overhead: "buff-phat-an" } }]);
+    ensureWeaponVfx(scene, [{ id: "kim-cang", vfx: { type: "overhead", overhead: "buff-phat-an" } }]);
 
     expect(scene.calls).toEqual([
       ["image", "buff-phat-an", OVERHEAD_IMAGES["buff-phat-an"]],
@@ -140,11 +140,11 @@ describe("ensureSectVfx", () => {
     ]);
   });
 
-  it("returns true when every sect sheet is already loaded", () => {
+  it("returns true when every weapon sheet is already loaded", () => {
     const scene = makeScene({ loaded: ["vfx-la-han-tran"] });
 
     expect(
-      ensureSectVfx(scene, [{ vfx: { sprite: "vfx-la-han-tran" } }, { id: "no-vfx" }])
+      ensureWeaponVfx(scene, [{ vfx: { sprite: "vfx-la-han-tran" } }, { id: "no-vfx" }])
     ).toBe(true);
     expect(scene.calls).toEqual([]);
   });
@@ -152,7 +152,7 @@ describe("ensureSectVfx", () => {
   it("queues nothing for a kit without sprite VFX", () => {
     const scene = makeScene();
 
-    expect(ensureSectVfx(scene, [{ id: "plain" }, {}])).toBe(true);
+    expect(ensureWeaponVfx(scene, [{ id: "plain" }, {}])).toBe(true);
     expect(scene.calls).toEqual([]);
   });
 });

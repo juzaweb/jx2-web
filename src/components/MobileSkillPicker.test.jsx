@@ -42,8 +42,8 @@ describe("MobileSkillPicker", () => {
     expect(markup).toBe("");
   });
 
-  it("lists the sect skills for the tapped button", () => {
-    const markup = renderPicker({ slotIndex: 1 });
+  it("lists the weapon skills for the tapped button", () => {
+    const markup = renderPicker({ slotIndex: 1, learnedSkills: ["test_skill_1"] });
 
     expect(markup).toContain("Chọn chiêu cho nút 2");
     expect(markup).toContain("Đại Tu Di Chưởng");

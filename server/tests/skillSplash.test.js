@@ -6,12 +6,14 @@ import { GameSocketManager } from "../src/websocket/gameSocket.js";
  * Build a bare manager with only the collaborators `handleEnemyHit` touches, so
  * the authoritative splash path can be exercised without a live socket.
  */
-function makeManager({ enemies, castSkillId, playerSect = "thieu-lam" }) {
+function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
   const now = Date.now();
   const roster = new Map(enemies.map((enemy) => [enemy.id, enemy]));
   const player = {
     id: "player-1",
-    sect: playerSect,
+    weaponType: playerWeapon,
+    level: 10,
+    learnedSkills: ["la_han_quyen", "dai_tu_di_chuong"],
     mapId: "city",
     x: 0,
     y: 0,
@@ -88,4 +90,27 @@ test("a single-target skill does not splash", () => {
 
   assert.ok(primary.hp < 1000);
   assert.equal(nearby.hp, 1000);
+});
+
+test("Kiếm Khí's blast splashes reduced damage onto monsters caught in it", () => {
+  const primary = wolf("primary", 100);
+  const nearby = wolf("nearby", 250);
+  const far = wolf("far", 1000);
+  const { manager } = makeManager({
+    enemies: [primary, nearby, far],
+    castSkillId: "kiem_khi",
+    playerWeapon: "kiem"
+  });
+
+  manager.handleEnemyHit("ws", { id: "primary", skill: "kiem_khi" });
+
+  const primaryDamage = 1000 - primary.hp;
+  const splashDamage = 1000 - nearby.hp;
+  assert.ok(primaryDamage > 0, "the aimed monster takes the full hit");
+  assert.ok(splashDamage > 0, "a monster inside the burst is damaged too");
+  assert.ok(
+    splashDamage < primaryDamage,
+    "the burst only deals a fraction of the primary hit"
+  );
+  assert.equal(far.hp, 1000, "a monster outside the burst is untouched");
 });

@@ -3,7 +3,7 @@
 - **Date:** 2025-05-18
 - **Project / engine:** React 18, Vite, Phaser 3 (Arcade Physics), Node.js / WebSocket server authority
 - **Genre / target platform:** Browser-playable isometric 2.5D wuxia RPG (PC desktop & mobile web browser)
-- **Development stage:** Playable Alpha / Content Expansion (2 functional maps, 6-slot skill architecture, server-authoritative combat)
+- **Development stage:** Playable Alpha / Content Expansion (2 functional maps, weapon-kit skill architecture, server-authoritative combat)
 - **Audit scope:** `src/game/` (progression, equipment, items, skills, shop, combat, maps, worldManager), `src/components/` (HUD, Modals, MobileControls), `server/src/` (gameSocket, rewards, enemy loop), and `docs/`
 - **Limitations:** Live high-concurrency multiplayer latency (>200ms) was not benchmarked in real network conditions; art assets are constrained to programmatically generated vector graphics and existing sprite sheets.
 
@@ -12,9 +12,9 @@
 Giang Hồ is a React and Phaser 3 browser wuxia RPG inspired by classic Vietnamese martial arts MMORPGs (Võ Lâm Truyền Kỳ 2). The game features a solid technical foundation: 60FPS Arcade physics, server-authoritative movement/combat/rewards, bi-directional React-Phaser bridge, persistent storage, and two playable maps (Biện Kinh market town and Đông Môn Thành 270-monster hunting grounds).
 
 While core combat and navigation are functional, current playability faces four distinct design gaps:
-1. **Economic Sink & Upgrading Void:** Monsters drop silver coins and rare materials like Huyễn Kim Thạch (`DROP_TABLE` in `src/game/items.js`), but coins are only spent on basic potions at Dược Sư and Huyễn Kim Thạch has no usage.
+1. **Economic Sink & Upgrading Void:** Monsters pay silver and occasionally drop a skill book or a weapon, but silver is only spent on basic potions at Dược Sư; there is no gear-enhancement or material sink yet.
 2. **Combat Usability in Dense Camps:** Đông Môn Thành features 18 camps with 15 monsters each (270 total). Target selection lacks a visual lock indicator and range preview ring, leading to ambiguous target selection during dense fights.
-3. **Incomplete Skill Kits:** Thiếu Lâm has a rebuilt 6-slot palm kit (`thieu-lam-chuong-phap.md`), but Võ Đang, Nga My, and Ngũ Độc remain on 4-skill placeholder catalogs without full 6-slot progression.
+3. **Weapon Kit Depth:** The sect system was replaced by weapon kits (sword / gloves / saber) with book-based learning (`docs/weapon-skills.md`), but each weapon has a single item and a small kit — expanding those kits and weapon sources is the current content gap.
 4. **Short-Term Goal Absence:** Aside from grinding monster camps for EXP, players lack structured daily objectives. The HUD minimap has a Quest Tracker stub (`MinimapPanel.jsx`), but no repeatable quest engine exists.
 
 This document proposes 5 prioritized, evidence-backed features designed to deepen the core loop without introducing feature bloat or scope creep.
@@ -25,11 +25,11 @@ This document proposes 5 prioritized, evidence-backed features designed to deepe
 
 The implemented gameplay loop follows a classic ARPG structure:
 
-1. **Player Goal:** Advance character level (up to 150), acquire silver coins and rare materials, unlock sect martial arts, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
+1. **Player Goal:** Advance character level (up to 150), acquire silver coins and rare materials, learn weapon skills from books, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
 2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile joystick), casting the skill bound to a hotbar slot (`1`-`9`, assigned by dragging from the `F5` tree), consumable usage from hotbar slots, and talking to shopkeepers (`NPC_DUOC`).
 3. **Challenge / Opposition:** Aggressive and leashed enemy camps (`src/game/enemyCatalog.js`) in Đông Môn Thành (`dongMonThanhMap.js`). Enemies bite, pathfind toward players, and respawn on server ticks.
-4. **Feedback and Rewards:** Server-calculated damage numbers, floaty text, Web Audio synth sounds, EXP bar gains, silver payouts, and item drop rolls (`rollDrop()` in `src/game/items.js`).
-5. **Progression and Persistence:** Level vitals calculated in `src/game/progression.js`, equipment stat bonuses derived in `src/game/equipment.js` (`attack`, `defense`, `maxHp`, `maxMp`, `critRate`, `accuracy`), and `localStorage` / WebSocket sync via `src/game/storage.js` and `server/src/websocket/gameSocket.js`.
+4. **Feedback and Rewards:** Server-calculated damage numbers, floaty text, Web Audio synth sounds, EXP bar gains, silver payouts, and server-rolled skill-book/weapon drops (`rollEnemyReward` in `server/src/rewards.js`).
+5. **Progression and Persistence:** Level vitals calculated in `src/game/progression.js`, equipment stat bonuses derived in `src/game/equipment.js` (`attack`, `defense`, `maxHp`, `maxMp`, `critRate`, `accuracy`), all server-owned via `server/src/websocket/gameSocket.js`; only hotbar/mobile bindings live in `localStorage` (`src/game/storage.js`).
 
 ---
 
@@ -37,9 +37,9 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 | Priority | Feature | Target Player Value | Effort | Confidence |
 | --- | --- | --- | --- | --- |
-| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Converts silver & Huyễn Kim Thạch into stat growth (+1 to +10 gear), solving silver accumulation and item drop utility. | M | High |
+| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Converts silver (plus a new upgrade material) into stat growth (+1 to +10 gear), solving silver accumulation. | M | High |
 | **P1** | **Target Selection & Visual Lock Indicator (Khóa Mục Tiêu)** | Renders visual target ring & range feedback in 270-monster camps, fixing targeting ambiguity on PC & mobile. | S | High |
-| **P1** | **Remaining Sect Skill Kits (Võ Đang, Nga My, Ngũ Độc)** | Expands placeholder catalogs to full 6-slot kits matching Thiếu Lâm standard, unlocking true class identity. | M | High |
+| **P1** | **Weapon Kit Expansion & Weapon Sources** | Deepens the implemented sword/gloves/saber kits and adds more weapon items (drops or a smith) so players can specialize. | M | High |
 | **P2** | **Daily Bounty Quest System (Nhiệm Vụ Dã Tẩu)** | Reuses Minimap quest tracker UI to offer repeatable monster hunt contracts with silver and material rewards. | M | High |
 | **P2** | **Elite Monster Encounter (Trảm Tướng Đông Môn Thành)** | Adds an elite Boss spawn (Ma Giáo Trưởng Lao) in camp 18 to serve as a high-risk pinnacle test for level 25+ players. | S | Medium |
 
@@ -51,9 +51,9 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Gives silver coins and dropped materials (`huyen-kim-thach`) clear economic purpose. Allows players to continuously upgrade equipped gear (`weapon`, `armor`, `helmet`, `accessory`), giving tangible power progression when facing high-level camps in Đông Môn Thành.
-- **Design summary:** Players visit a Blacksmith NPC or open an Enhancement tab in the equipment sheet. Inserting an equipped item costs silver coins and 1x Huyễn Kim Thạch. Enhancing increases item bonus stats (e.g. `attack +2` per rank) up to +10. Success rate starts at 100% (+1 to +3) and scales down to 40% (+10), with failure retaining the item but consuming materials.
-- **Core loop connection:** Monster kill -> Silver & Huyễn Kim Thạch drop -> Blacksmith Enhancement -> Higher stats (`attack`, `defense`, `maxHp`) -> Able to farm higher-level camps.
+- **Player value:** Gives silver coins a progression purpose beyond potions. Allows players to continuously upgrade equipped gear (`weapon`, `armor`, `helmet`, `accessory`), giving tangible power progression when facing high-level camps in Đông Môn Thành.
+- **Design summary:** Players visit a Blacksmith NPC or open an Enhancement tab in the equipment sheet. Inserting an equipped item costs silver coins and 1x an upgrade material (e.g. a new Huyễn Kim Thạch item). Enhancing increases item bonus stats (e.g. `attack +2` per rank) up to +10. Success rate starts at 100% (+1 to +3) and scales down to 40% (+10), with failure retaining the item but consuming materials.
+- **Core loop connection:** Monster kill -> Silver & upgrade material -> Blacksmith Enhancement -> Higher stats (`attack`, `defense`, `maxHp`) -> Able to farm higher-level camps.
 - **MVP scope:**
   - Enhance equipped items up to +6 with deterministic silver + material cost.
   - Server-authoritative enhancement validation (`server/src/websocket/gameSocket.js`).
@@ -66,12 +66,12 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Risks and trade-offs:** Must be server-authoritative to prevent cheated upgrades. Requires clear UI feedback for success/failure.
 - **Effort:** M — Server validation logic, pure equipment modifier extension, and UI integration.
 - **Acceptance criteria:**
-  - [ ] Player can submit an equipped item, required silver, and Huyễn Kim Thạch to enhance gear.
+  - [ ] Player can submit an equipped item, required silver, and the upgrade material to enhance gear.
   - [ ] Enhancing item updates `deriveEquipmentBonuses()` with upgraded stat values.
   - [ ] Server validates silver and material balance before confirming enhancement.
   - [ ] Failed attempts deduct materials without destroying or corrupting equipped item.
 - **Validation plan:** Unit test enhancement logic in `equipment.test.js`; integration test server websocket handler with mock silver/material quantities.
-- **Evidence:** `src/game/items.js` defines `huyen-kim-thach` in `DROP_TABLE` (weight 5), but it currently has no usage in `shop.js` or `equipment.js`.
+- **Evidence:** There is no upgrade material in the item catalog today; the proposal would add one to `src/game/items.js` (and a drop or shop source) before it can be spent.
 - **Assumptions / open questions:** Enhancement values are flat additions to `bonuses` object.
 
 ---
@@ -105,31 +105,31 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 ---
 
-### [P1] Remaining Sect Skill Kits Completion (Võ Đang, Nga My, Ngũ Độc)
+### [P1] Weapon Kit Expansion & Weapon Sources
 
-- **Status:** Proposed
+- **Status:** Partially implemented — weapon kits, book learning and the first weapon drops shipped; this proposal covers the next step.
 - **Confidence:** High
-- **Player value:** Fulfills core wuxia class fantasy for all four playable sects. Players choosing Võ Đang (Taoist sword), Nga My (healing/support sword), or Ngũ Độc (poison/debuff) receive complete 6-slot skill trees matching Thiếu Lâm's standard.
-- **Design summary:** Expand `VO_DANG_SKILLS`, `NGA_MY_SKILLS`, and `NGU_DOC_SKILLS` in `src/game/skills.js` from 4 temporary skills to 6 fully defined skills per sect (slots 0-5, unlock levels 1/1/3/5/7/10). Implement sector-specific skill effects (`slow`, `stun`, `heal`, `buff`).
-- **Core loop connection:** Provides skill progression choices on level up, encouraging players to try different sects and skill slot bindings.
+- **Player value:** Lets a hero specialize by weapon (sword / gloves / saber) instead of a removed class, and gives every kit enough depth to keep progressing. Weapons already drop from `hac-y-sat-thu` (gloves) and `ma-giao-de-tu` (saber).
+- **Design summary:** Add more skills per kit and more weapon tiers per type. Keep the rules in `docs/weapon-skills.md`: `skill.weapon` must match the equipped weapon, non-starter skills are learned from books, and the server validates both.
+- **Core loop connection:** Farm monsters → books expand the current kit → better weapons from late camps → harder camps.
 - **MVP scope:**
-  - Author complete 6-skill catalog data in `src/game/skills.js` for all 3 remaining sects as planned in `docs/plan/sect-skills.md`.
-  - Add i18n translation strings (VI, EN, ZH) for all new skill names and descriptions in `src/i18n/locales/`.
-  - Provide vector/icon graphics for all 18 skill slots across `public/skills/`.
+  - Author additional skills per weapon kit in `src/game/skills.js`, with books in `MONSTER_BOOK_DROPS`.
+  - Add second-tier weapons (and a weapon source beyond drops, e.g. a smith NPC) so loot keeps pace with leveling.
+  - Add i18n strings (VI, EN, ZH) and icons for every new skill/weapon.
 - **Optional extensions:**
-  - Unique particle VFX sheets for ultimate skills (e.g., Thái Cực Thần Công, Phật Pháp Vô Biên).
-  - Damage-over-time (Poison/DoT) server tick extension for Ngũ Độc in v2 engine update.
-- **Dependencies:** `src/game/skills.js`, `src/game/skillDamage.js`, `src/i18n/locales/`, `server/src/websocket/gameSocket.js`.
-- **Risks and trade-offs:** Need to balance MP cost and cooldowns across sects so no single class trivializes monster hunting.
-- **Effort:** M — Catalog authoring, i18n copy, skill icons, and unit test expansion.
+  - Damage-over-time server tick extension for the dao (Ngũ Độc-flavoured) kit.
+  - Weapon-specific VFX sheets for new ultimates.
+- **Dependencies:** `src/game/skills.js`, `src/game/weapons.js`, `src/game/items.js`, `src/game/enemyCatalog.js`, `src/i18n/locales/`, `server/src/websocket/gameSocket.js`.
+- **Risks and trade-offs:** Balance MP/cooldowns across kits so no weapon trivializes hunting; more weapons mean more inventory/equipment UI states.
+- **Effort:** M — catalog authoring, i18n, icons, drop tables and tests.
 - **Acceptance criteria:**
-  - [ ] Every sect has exactly 6 unique skills occupying slots 0 through 5.
-  - [ ] All skills have valid unlock levels, MP costs, cooldowns, and range parameters.
-  - [ ] All skill names and descriptions resolve in VI, EN, and ZH locales without missing keys.
-  - [ ] Catalog invariants pass in `skills.test.js` for all 4 sects.
-- **Validation plan:** Run `npm test` covering catalog invariants; verify each new skill can be dragged from the `F5` tree onto a hotbar slot and cast with its number key, and assigned to a mobile arc button.
-- **Evidence:** `docs/plan/sect-skills.md` details exact planned skill specifications for Võ Đang, Nga My, and Ngũ Độc.
-- **Assumptions / open questions:** Initial Ngũ Độc implementation uses existing `slow`/`stun`/`heal`/`buff` mechanics before engine v2 DoT ticks.
+  - [ ] Every learnable skill has a book and appears in at least one monster drop pool (enforced by `skills.test.js`).
+  - [ ] Every weapon drop maps to a real item with `slot: "weapon"` and a `weaponType` (`rewards.test.js`).
+  - [ ] All skill names/descriptions resolve in VI, EN, ZH.
+  - [ ] `npm test` + `npm run server:test` stay green.
+- **Validation plan:** Bind a new skill from the `F5` tree, cast it with the matching weapon, and confirm the server rejects it with another weapon.
+- **Evidence:** `docs/weapon-skills.md` documents the current catalog, drop tables and extension steps.
+- **Assumptions / open questions:** Whether the next weapon source should be more monster drops or a dedicated smith NPC.
 
 ---
 
@@ -195,7 +195,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 ### Next
 High-value, well-understood features ready for immediate implementation:
 1. **Target Selection & Visual Lock Indicator [P1]:** Low risk, immediate combat clarity improvement.
-2. **Remaining Sect Skill Kits (Võ Đang, Nga My, Ngũ Độc) [P1]:** Fulfills core class identity, fully designed in `sect-skills.md`.
+2. **Weapon Kit Expansion & Weapon Sources [P1]:** Deepens the implemented weapon/book system, documented in `docs/weapon-skills.md`.
 3. **Equipment Enhancement System [P1]:** Connects existing `huyen-kim-thach` drops and silver to character power progression.
 
 ### Validate first
@@ -205,7 +205,7 @@ Features requiring gameplay balance check or technical spike:
 
 ### Later
 Longer-term expansions and future content iterations:
-1. **Server-authoritative Poison / DoT Engine (Ngũ Độc v2):** Add server-side status effect tick loop for poison damage over time.
+1. **Server-authoritative Poison / DoT Engine (Dao v2):** Add a server-side status effect tick loop for poison damage over time for the dao kit.
 2. **Multi-map World Expansion:** Additional high-level maps (e.g. Dương Châu, Biện Kinh Suburbs) with new monster species.
 
 ---
@@ -215,7 +215,7 @@ Longer-term expansions and future content iterations:
 ```
 [Milestone 1: Combat & Skill Polish]
   ├── Target Selection & Lock Indicator
-  └── Remaining Sect Skill Kits (Võ Đang, Nga My, Ngũ Độc)
+  └── Weapon Kit Expansion & Weapon Sources
 
 [Milestone 2: Economy & Progression Loop]
   ├── Equipment Enhancement System (+1..+6, Huyễn Kim Thạch sink)
@@ -234,9 +234,10 @@ Longer-term expansions and future content iterations:
    - [ ] Cast single-target skill -> Hits selected target.
    - [ ] Target dies -> Ring disappears smoothly without errors.
 
-2. **Sect Skill Integrity Test:**
-   - [ ] All 4 sects have 6 valid skills in `SKILLS_BY_SECT`.
-   - [ ] `npm test` runs catalog invariant tests across all sects.
+2. **Weapon Skill Integrity Test:**
+   - [ ] Every weapon kit has valid skills with unique slots.
+   - [ ] Every learnable skill has a book and at least one monster drop pool.
+   - [ ] `npm test` and `npm run server:test` pass catalog/reward invariants.
    - [ ] All skill names resolve in VI, EN, ZH locales.
 
 3. **Equipment Enhancement Test:**
@@ -262,4 +263,4 @@ Longer-term expansions and future content iterations:
 ## Open questions
 
 1. Should Equipment Enhancement have visual glowing weapon aura effects at +7 and above in the current Phaser rig renderer?
-2. Should Ngũ Độc poison mechanics be shipped as v1 (flat debuff/slow) first or wait for full server-authoritative DoT tick engine (v2)?
+2. Should the dao kit's poison mechanics be shipped as v1 (flat debuff/slow) first or wait for the full server-authoritative DoT tick engine (v2)?

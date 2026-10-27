@@ -82,23 +82,28 @@ portals, quest claim.
 
 ### Phase 1 — Server persistence and identity
 
-1. `server/src/data/playerDb.js` schema v4: add `equipment TEXT`, `hp INTEGER`,
-   `mp INTEGER`, `state_imported INTEGER`; add `getEquipment/setEquipment`,
-   `getVitals/setVitals`, `markStateImported`.
+1. `server/src/data/playerDb.js` schema v5: add `equipment TEXT`, `hp INTEGER`,
+   `mp INTEGER`, `state_imported INTEGER`, `learned_skills TEXT`; add
+   `getEquipment/setEquipment`, `getVitals/setVitals`,
+   `getLearnedSkills/addLearnedSkill`, `markStateImported`.
 2. New `server/src/game/playerBag.js`: read/modify/persist bag through `store`;
    `grantItem`, `consumeItem`, `equipFromBag`, `unequipToBag`, all validated by
    `getItemById` and `planEquip`.
 3. `handlePlayerJoin`: reject without a verified token and owned character
-   (`join_rejected`); derive sect, gender, equipment, level, HP/MP and stats from
-   the DB; ignore the client's `hp/mp/equipment/defense/attack/critRate/gender`.
-   Send `player_progress`, `inventory_sync`, `equipment_sync`, `player_stats`.
+   (`join_rejected`); derive gender, equipment, equipped weapon kit, learned
+   skills, level, HP/MP and stats from the DB; back-fill the starter sword and
+   `kiem_khi` for characters created before the weapon system; ignore the
+   client's `hp/mp/equipment/defense/attack/critRate/gender`. Send
+   `player_progress`, `inventory_sync`, `equipment_sync`, `skills_sync`,
+   `player_stats`.
 4. New authenticated `POST /api/state/import`, gated by `state_imported`: validate
    bag ids/quantities and equipment ownership, persist, return canonical state.
 5. Remove guest fallbacks from join, reward and shop paths.
 
 ### Phase 2 — Server combat authority
 
-1. `handlePlayerAttack`: accept only owned and unlocked skills (`skillUnlocked`),
+1. `handlePlayerAttack`: accept only skills of the worn weapon that the hero has
+   learned and levelled (`skillUsable` + `skill.weapon === player.weaponType`),
    derive attack cadence from attack speed, apply self heal/buff effects on the
    server, record `lastCast` / `lastSwing`.
 2. `handleEnemyHit`: normal attacks recompute with `computeDamage(derived, enemy)`,

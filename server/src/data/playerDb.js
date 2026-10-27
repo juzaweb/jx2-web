@@ -21,8 +21,9 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  *  3 — hands the starter kit to characters left with an empty bag.
  *  4 — adds server-owned equipment, persisted HP/MP and the one-time state-import flag.
  *  5 — adds the persisted map/position, so a relog resumes where the hero stood.
+ *  6 — adds the learned-skill ledger (skills are learned from dropped books).
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /**
  * Recursively drop prototype-polluting keys from untrusted input.
@@ -98,6 +99,7 @@ export class PlayerDatabase {
         quest_rewarded  INTEGER NOT NULL DEFAULT 0,
         inventory       TEXT NOT NULL DEFAULT '{}',
         equipment       TEXT NOT NULL DEFAULT '{}',
+        learned_skills  TEXT NOT NULL DEFAULT '[]',
         hp              INTEGER,
         map_id          TEXT,
         pos_x           REAL,
@@ -126,6 +128,7 @@ export class PlayerDatabase {
     addColumn("pos_y", "REAL");
     addColumn("starter_granted", "INTEGER NOT NULL DEFAULT 0");
     addColumn("equipment", "TEXT NOT NULL DEFAULT '{}'");
+    addColumn("learned_skills", "TEXT NOT NULL DEFAULT '[]'");
     addColumn("hp", "INTEGER");
     addColumn("mp", "INTEGER");
     addColumn("state_imported", "INTEGER NOT NULL DEFAULT 0");
@@ -165,6 +168,9 @@ export class PlayerDatabase {
     this.stmtUpdatePosition = this.db.prepare(
       "UPDATE saves SET map_id = ?, pos_x = ?, pos_y = ?, updated_at = ? WHERE player_id = ?"
     );
+    this.stmtUpdateLearned = this.db.prepare(
+      "UPDATE saves SET learned_skills = ?, updated_at = ? WHERE player_id = ?"
+    );
     this.stmtMarkStateImported = this.db.prepare(
       "UPDATE saves SET state_imported = 1, updated_at = ? WHERE player_id = ?"
     );
@@ -182,8 +188,8 @@ export class PlayerDatabase {
     this.stmtUpsert = this.db.prepare(`
       INSERT INTO saves (
         player_id, player_name, level, kills, coins, exp, quest_rewarded, inventory,
-        equipment, hp, mp, state_imported, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        equipment, learned_skills, hp, mp, state_imported, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(player_id) DO UPDATE SET
         player_name = excluded.player_name,
         level = excluded.level,
@@ -193,6 +199,7 @@ export class PlayerDatabase {
         quest_rewarded = excluded.quest_rewarded,
         inventory = excluded.inventory,
         equipment = excluded.equipment,
+        learned_skills = excluded.learned_skills,
         hp = excluded.hp,
         mp = excluded.mp,
         state_imported = excluded.state_imported,
@@ -254,6 +261,9 @@ export class PlayerDatabase {
    * Version 5 adds the persisted map/position columns, also created by the
    * ALTER TABLE guard above.
    *
+   * Version 6 adds the learned-skill ledger column, also created by the
+   * ALTER TABLE guard above.
+   *
    * Running once is enforced by the version check, so real items acquired later
    * are never touched again.
    */
@@ -299,6 +309,16 @@ export class PlayerDatabase {
     }
   }
 
+  _parseLearned(raw) {
+    try {
+      const parsed = JSON.parse(raw || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((id) => typeof id === "string" && id.length > 0);
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * Read the ledger row, creating it when the character has never played so a
    * later vitals/equipment write always has a row to target.
@@ -316,6 +336,7 @@ export class PlayerDatabase {
       questRewarded: 0,
       inventory: {},
       equipment: {},
+      learnedSkills: [],
       hp: null,
       mp: null,
       stateImported: 0,
@@ -341,6 +362,7 @@ export class PlayerDatabase {
       row.questRewarded,
       JSON.stringify(row.inventory || {}),
       JSON.stringify(row.equipment || {}),
+      JSON.stringify(row.learnedSkills || []),
       row.hp ?? null,
       row.mp ?? null,
       row.stateImported ?? 0,
@@ -505,6 +527,47 @@ export class PlayerDatabase {
     const clean = sanitizeData(equipment) || {};
     this.stmtUpdateEquipment.run(JSON.stringify(clean), Date.now(), playerId);
     return this.getEquipment(playerId);
+  }
+
+  // --- Learned skills ---
+
+  /**
+   * Skill ids the character has learned. Starter skills are not stored; readers
+   * treat them as always known.
+   * @param {string} playerId
+   * @returns {string[]}
+   */
+  getLearnedSkills(playerId) {
+    const row = this.stmtGet.get(playerId);
+    return row ? this._parseLearned(row.learned_skills) : [];
+  }
+
+  /**
+   * Replace the learned-skill list, dropping duplicates and non-strings.
+   * @param {string} playerId
+   * @param {string[]} skills
+   * @returns {string[]}
+   */
+  setLearnedSkills(playerId, skills = []) {
+    this._ensureRow(playerId);
+    const clean = Array.from(
+      new Set((Array.isArray(skills) ? skills : []).filter((id) => typeof id === "string" && id))
+    );
+    this.stmtUpdateLearned.run(JSON.stringify(clean), Date.now(), playerId);
+    return clean;
+  }
+
+  /**
+   * Record one newly learned skill. Returns the merged list.
+   * @param {string} playerId
+   * @param {string} skillId
+   * @returns {string[]}
+   */
+  addLearnedSkill(playerId, skillId) {
+    if (typeof skillId !== "string" || !skillId) return this.getLearnedSkills(playerId);
+    const learned = this.getLearnedSkills(playerId);
+    if (learned.includes(skillId)) return learned;
+    return this.setLearnedSkills(playerId, [...learned, skillId]);
   }
 
   /**

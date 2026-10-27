@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { translateFor } from "../i18n/translator.js";
+import { BOOK_ITEMS } from "./items.js";
+import { MONSTER_BOOK_DROPS } from "./enemyCatalog.js";
 import {
   SKILL_SLOTS,
   SKILLS,
-  SKILLS_BY_SECT,
-  skillsForSect,
+  SKILLS_BY_WEAPON,
+  skillsForWeapon,
   skillById,
   skillForSlot,
   skillMpCost,
@@ -14,13 +16,16 @@ import {
   skillRequires,
   skillLockReason,
   skillUnlocked,
+  skillLearned,
+  skillLearnable,
+  skillUsable,
   skillSlot,
-  normalizeSect
+  normalizeWeaponType
 } from "./skills.js";
 
 describe("skill catalog", () => {
-  it("exposes the Thiếu Lâm palm kit and its passive art", () => {
-    expect(Object.keys(SKILLS_BY_SECT)).toEqual(["thieu-lam", "vo-dang", "nga-my", "ngu-doc"]);
+  it("exposes the weapon kits and the starter sword skill", () => {
+    expect(Object.keys(SKILLS_BY_WEAPON)).toEqual(["bao-tay", "kiem", "dao"]);
     expect(SKILLS.map((skill) => skill.id)).toEqual([
       "thieu_lam_tam_phap",
       "dai_tu_di_chuong",
@@ -28,6 +33,7 @@ describe("skill catalog", () => {
       "la_han_tran",
       "kim_cang_bat_hoai",
       "nhu_lai_than_chuong",
+      "kiem_khi",
       "thieu_duong_kiem_phap",
       "thai_cuc_quyen",
       "tam_thanh_kiem_phap",
@@ -43,13 +49,21 @@ describe("skill catalog", () => {
     ]);
     expect(SKILL_SLOTS).toBe(6);
 
-    const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForSect("thieu-lam");
-    const laHanTran = skillsForSect("thieu-lam").find((skill) => skill.slot === 3);
-    const kimCangBatHoai = skillsForSect("thieu-lam").find((skill) => skill.slot === 4);
-    const nhuLaiThanChuong = skillsForSect("thieu-lam").find((skill) => skill.slot === 5);
+    expect(skillsForWeapon("kiem")[0]).toMatchObject({
+      id: "kiem_khi",
+      weapon: "kiem",
+      slot: 0,
+      starter: true,
+      unlockLevel: 1
+    });
+
+    const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForWeapon("bao-tay");
+    const laHanTran = skillsForWeapon("bao-tay").find((skill) => skill.slot === 3);
+    const kimCangBatHoai = skillsForWeapon("bao-tay").find((skill) => skill.slot === 4);
+    const nhuLaiThanChuong = skillsForWeapon("bao-tay").find((skill) => skill.slot === 5);
     expect(tamPhap).toMatchObject({
       id: "thieu_lam_tam_phap",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 0,
       icon: "/skills/thieu_lam_tam_phap.png",
       glyph: "心",
@@ -65,7 +79,7 @@ describe("skill catalog", () => {
     });
     expect(daiTuDiChuong).toMatchObject({
       id: "dai_tu_di_chuong",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 1,
       unlockLevel: 1,
       mp: 12,
@@ -75,7 +89,7 @@ describe("skill catalog", () => {
     });
     expect(laHanQuyen).toMatchObject({
       id: "la_han_quyen",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 2,
       icon: "/skills/la_han_quyen.png",
       glyph: "拳",
@@ -92,7 +106,7 @@ describe("skill catalog", () => {
     });
     expect(laHanTran).toMatchObject({
       id: "la_han_tran",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 3,
       unlockLevel: 1,
       mp: 18,
@@ -109,7 +123,7 @@ describe("skill catalog", () => {
     });
     expect(kimCangBatHoai).toMatchObject({
       id: "kim_cang_bat_hoai",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 4,
       icon: "/skills/kim_cang_bat_hoai.png",
       glyph: "卍",
@@ -130,7 +144,7 @@ describe("skill catalog", () => {
     });
     expect(nhuLaiThanChuong).toMatchObject({
       id: "nhu_lai_than_chuong",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 5,
       unlockLevel: 10,
       mp: 35,
@@ -166,35 +180,34 @@ describe("skill catalog", () => {
     }
   });
 
-  it("returns authored kit for all valid sects", () => {
-    expect(skillsForSect("thieu-lam").length).toBe(6);
-    expect(skillsForSect("vo-dang").length).toBe(4);
-    expect(skillsForSect("nga-my").length).toBe(4);
-    expect(skillsForSect("ngu-doc").length).toBe(4);
+  it("returns authored kit for all valid weapons", () => {
+    expect(skillsForWeapon("bao-tay").length).toBe(6);
+    expect(skillsForWeapon("kiem").length).toBe(9);
+    expect(skillsForWeapon("dao").length).toBe(4);
   });
 
-  it("normalises unknown sects to Thiếu Lâm", () => {
-    expect(normalizeSect("bogus")).toBe("thieu-lam");
-    expect(normalizeSect(undefined)).toBe("thieu-lam");
+  it("normalises unknown weapons to the sword kit", () => {
+    expect(normalizeWeaponType("bogus")).toBe("kiem");
+    expect(normalizeWeaponType(undefined)).toBe("kiem");
   });
 
   it("resolves skills by id and slot", () => {
     expect(skillById("dai_tu_di_chuong")?.slot).toBe(1);
-    expect(skillForSlot("thieu-lam", 1)?.id).toBe("dai_tu_di_chuong");
+    expect(skillForSlot("bao-tay", 1)?.id).toBe("dai_tu_di_chuong");
     expect(skillSlot("dai_tu_di_chuong")).toBe(1);
     expect(skillById("la_han_quyen")?.slot).toBe(2);
-    expect(skillForSlot("thieu-lam", 2)?.id).toBe("la_han_quyen");
+    expect(skillForSlot("bao-tay", 2)?.id).toBe("la_han_quyen");
     expect(skillSlot("la_han_quyen")).toBe(2);
     expect(skillById("la_han_tran")?.slot).toBe(3);
-    expect(skillForSlot("thieu-lam", 3)?.id).toBe("la_han_tran");
+    expect(skillForSlot("bao-tay", 3)?.id).toBe("la_han_tran");
     expect(skillSlot("la_han_tran")).toBe(3);
     expect(skillById("kim_cang_bat_hoai")?.slot).toBe(4);
-    expect(skillForSlot("thieu-lam", 4)?.id).toBe("kim_cang_bat_hoai");
+    expect(skillForSlot("bao-tay", 4)?.id).toBe("kim_cang_bat_hoai");
     expect(skillSlot("kim_cang_bat_hoai")).toBe(4);
     expect(skillById("thieu_lam_tam_phap")?.slot).toBe(0);
-    expect(skillForSlot("thieu-lam", 0)?.id).toBe("thieu_lam_tam_phap");
+    expect(skillForSlot("bao-tay", 0)?.id).toBe("thieu_lam_tam_phap");
     expect(skillById("nhu_lai_than_chuong")?.slot).toBe(5);
-    expect(skillForSlot("thieu-lam", 5)?.id).toBe("nhu_lai_than_chuong");
+    expect(skillForSlot("bao-tay", 5)?.id).toBe("nhu_lai_than_chuong");
     expect(skillSlot("nhu_lai_than_chuong")).toBe(5);
     expect(skillById("missing")).toBeUndefined();
     expect(skillSlot("missing")).toBe(-1);
@@ -232,7 +245,7 @@ describe("skill catalog", () => {
     expect(skillUnlocked("bogus", 99)).toBe(false);
   });
 
-  it("declares prerequisites that exist inside the same sect", () => {
+  it("declares prerequisites that exist inside the same weapon kit", () => {
     expect(skillRequires("thieu_lam_tam_phap")).toEqual([]);
     expect(skillRequires("dai_tu_di_chuong")).toEqual([{ id: "thieu_lam_tam_phap", level: 1 }]);
     expect(skillRequires("la_han_quyen")).toEqual([]);
@@ -240,16 +253,34 @@ describe("skill catalog", () => {
     expect(skillRequires("kim_cang_bat_hoai")).toEqual([{ id: "la_han_tran", level: 1 }]);
     expect(skillRequires("nhu_lai_than_chuong")).toEqual([{ id: "la_han_tran", level: 1 }]);
 
-    for (const sect of Object.keys(SKILLS_BY_SECT)) {
-      const ids = new Set(skillsForSect(sect).map((skill) => skill.id));
-      for (const skill of skillsForSect(sect)) {
+    for (const weapon of Object.keys(SKILLS_BY_WEAPON)) {
+      const ids = new Set(skillsForWeapon(weapon).map((skill) => skill.id));
+      for (const skill of skillsForWeapon(weapon)) {
         for (const req of skillRequires(skill)) {
-          expect(ids.has(req.id), `${skill.id} requires ${req.id} outside ${sect}`).toBe(true);
+          expect(ids.has(req.id), `${skill.id} requires ${req.id} outside ${weapon}`).toBe(true);
           expect(Number.isInteger(req.level)).toBe(true);
           expect(req.level).toBeGreaterThan(0);
         }
       }
     }
+  });
+
+  it("only knows starter skills for free and learns the rest from books", () => {
+    expect(skillLearned("kiem_khi", [])).toBe(true);
+    expect(skillLearned("dai_tu_di_chuong", [])).toBe(false);
+    expect(skillLearned("dai_tu_di_chuong", ["dai_tu_di_chuong"])).toBe(true);
+
+    // Without the prerequisite learned, a book cannot be studied.
+    expect(skillLearnable("dai_tu_di_chuong", 1, [])).toBe(false);
+    expect(skillLearnable("dai_tu_di_chuong", 1, ["thieu_lam_tam_phap"])).toBe(true);
+    expect(skillLearnable("nhu_lai_than_chuong", 9, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
+      false
+    );
+
+    // Casting requires the skill to be learned (starter skills are free).
+    expect(skillUsable("kiem_khi", 1, [])).toBe(true);
+    expect(skillUsable("dai_tu_di_chuong", 1, [])).toBe(false);
+    expect(skillUsable("dai_tu_di_chuong", 1, ["dai_tu_di_chuong"])).toBe(true);
   });
 
   it("resolves prerequisites when unlocking a skill", () => {
@@ -288,6 +319,27 @@ describe("skill catalog", () => {
         expect(name).not.toBe(skill.id);
         expect(name).not.toBe(skill.nameKey);
       }
+    }
+  });
+
+  it("gives every learnable skill a book that a monster actually drops", () => {
+    const learnable = SKILLS.filter((skill) => !skill.starter).map((skill) => skill.id);
+    const bookSkillIds = new Set(BOOK_ITEMS.map((book) => book.skillId));
+    const droppedSkillIds = new Set(
+      Object.values(MONSTER_BOOK_DROPS).flatMap((group) => group.skills)
+    );
+
+    for (const skillId of learnable) {
+      expect(bookSkillIds.has(skillId), `Missing book for ${skillId}`).toBe(true);
+      expect(droppedSkillIds.has(skillId), `No monster drops the ${skillId} book`).toBe(true);
+    }
+    // Starter skills are never book items.
+    for (const skill of SKILLS.filter((entry) => entry.starter)) {
+      expect(bookSkillIds.has(skill.id)).toBe(false);
+    }
+    // Every drop pool names a real, learnable skill.
+    for (const skillId of droppedSkillIds) {
+      expect(learnable).toContain(skillId);
     }
   });
 });

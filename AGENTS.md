@@ -12,6 +12,7 @@
 - Never make assumptions when a missing requirement could materially affect the implementation.
 - Before writing any source code, define the implementation logic and potential error cases / edge cases.
 - Always use the `/code-review-and-quality` skill to review and fix any code changes.
+- Notify me if any resources are missing; do not draw without permission.
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

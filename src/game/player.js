@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { createHealthBar, layoutHealthBar } from "./healthBarView.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { defaultEquipment } from "./equipment.js";
+import { defaultEquipment, equippedWeaponType } from "./equipment.js";
 import { directionFromVelocity } from "./heroDirections.js";
 import { crossedTarget, shouldSnap, travelStep } from "./clickToMove.js";
 import { HeroRigView, HERO_FOOT_Y } from "./heroRigView.js";
@@ -36,8 +36,8 @@ export class Player {
     this.name = name;
     /** Character gender drives the rig's silhouette ("male" | "female"). */
     this.gender = normalizeGender(gender);
-    /** Sect id selects the skill kit (see skills.js). */
-    this.sect = "thieu-lam";
+    /** Weapon type worn; selects which skill kit may be cast (see weapons.js). */
+    this.weaponType = null;
 
     this.stats = {
       level: 1,
@@ -179,6 +179,7 @@ export class Player {
    */
   applyEquipment(equipment = this.equipment) {
     this.equipment = { ...defaultEquipment(), ...(equipment || {}) };
+    this.weaponType = equippedWeaponType(this.equipment);
     this.rig?.set(this.facingDirection, this.equipment, this.gender);
   }
 
@@ -193,12 +194,12 @@ export class Player {
   }
 
   /**
-   * Switch the skill kit's sect id.
-   * @param {string} sect
+   * Switch the skill kit's weapon type (derived from the worn weapon).
+   * @param {string} weaponType
    */
-  setSect(sect) {
-    this.sect = typeof sect === "string" && sect ? sect : this.sect;
-    return this.sect;
+  setWeaponType(weaponType) {
+    this.weaponType = typeof weaponType === "string" && weaponType ? weaponType : this.weaponType;
+    return this.weaponType;
   }
 
   update(time, delta) {

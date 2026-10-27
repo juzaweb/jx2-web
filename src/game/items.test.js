@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
+  EQUIPMENT_ITEMS,
   INVENTORY_GRID_SIZE,
   STARTER_ITEMS,
   splitSilver,
@@ -82,11 +83,14 @@ describe("inventory quantities", () => {
   });
 
   it("gives the starter kit only catalog-backed, usable items", () => {
-    const catalogIds = new Set(INVENTORY_ITEMS.filter(Boolean).map((item) => item.id));
+    const catalogIds = new Set(
+      [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS].filter(Boolean).map((item) => item.id)
+    );
 
     expect(Object.keys(STARTER_ITEMS).sort()).toEqual([
       "dai-hoan-dan",
       "hoi-thanh-phu",
+      "kiem-lang-khach",
       "kim-sang-duoc"
     ]);
     Object.entries(STARTER_ITEMS).forEach(([id, qty]) => {

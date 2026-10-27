@@ -4,11 +4,12 @@ A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs
 
 ## Features
 - **Modern React UI Overlay:** Decoupled HUD components for Player Vitals (HP/MP/Stamina/EXP/Buff Aura), Minimap Radar & Quest tracker, Giang Ho Chat feed, and Authentic Hotbar Dock.
-- **Mixed Skill & Item Hotbar:** Slots `1`–`9` hold either a consumable or a sect skill. Drag techniques from the `F5` skill tree onto a slot, then press that number to cast.
+- **Weapon-Based Skills & Books:** A hero may only cast the skills of the weapon worn in the `weapon` slot (sword, gloves, saber). Every new character starts with a sword and **Kiếm Khí**; other skills are learned by studying books dropped by monsters, and the gloves/saber themselves drop from late-game monsters.
+- **Mixed Skill & Item Hotbar:** Slots `1`–`9` hold either a consumable or a weapon skill. Drag techniques from the `F5` skill tree onto a slot, then press that number to cast.
 - **Phaser 3 Game Engine:** 60FPS Arcade physics, world map, collision detection, and entity management.
 - **Event-Driven Bridge:** Reactive bi-directional communication between Phaser game loop and React components.
 - **Sound & Combat:** Web Audio API synth effects for attacks, skills, potion drinking, and sound toggle.
-- **Persistent Progress:** Progress, hotbar bindings, the mobile skill/consumable layout, inventory and equipment are saved per character with `localStorage`.
+- **Persistent Progress:** Progress, inventory, equipment and learned skills are server-owned and saved per character; hotbar and mobile skill/consumable bindings are stored per character in `localStorage`.
 - **Responsive & Touch Friendly:** Virtual joystick plus a radial skill fan around the Attack button, and a bindable HP/MP column outside it. Empty slots show `+`, a hold (780 ms, with a filling ring) rebinds one, and every arc button mirrors the desktop cooldown.
 
 ## Getting Started
@@ -49,10 +50,14 @@ Watch mode:
 npm run test:watch
 ```
 
+### Design Notes
+See `docs/weapon-skills.md` for the weapon-kit model, book learning, drop tables and how to add a new skill, weapon or book.
+
 ## Controls
 - **Move:** `W`, `A`, `S`, `D`, Arrow keys, or left-click the map (hold to follow the cursor)
 - **Basic Attack:** `Space` or left-click an enemy
-- **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind.
+- **Kiếm Khí (sword):** a ranged art (840 px) that throws a blade-shaped shard of qi at the victim, exploding in a spreading blast that also damages every monster caught in its 170 px radius for a fraction of the hit. It is the starter skill, so it is cast from the hotbar like any other technique.
+- **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind. A hero may only cast the skills of the weapon in the `weapon` slot; study books dropped by monsters to learn the rest.
 - **Consumables (hotbar `1`–`9`):** drag potions or scrolls from the bag onto a slot, then press the number to use them.
 - **Talk to NPC:** `F`
 - **Character:** `F3` · **Inventory:** `F4` · **Skills:** `F5`
@@ -87,7 +92,10 @@ src/
     ├── bridge.js         # Pub/Sub bridge between React & Phaser
     ├── game.js           # Phaser Scene & game factory
     ├── combat.js         # Combat system, casting and sound synth
-    ├── skills.js         # Sect skill catalog (id, slot, cost, effects)
+    ├── skills.js         # Weapon skill catalog (id, weapon, slot, cost, effects)
+    ├── weapons.js        # Weapon types and weapon-type helpers
+    ├── items.js          # Items: consumables, gear, weapons and generated skill books
+    ├── enemyCatalog.js   # Monsters, rewards and book/weapon drop tables
     ├── quickSlots.js     # Hotbar slots 1-9: item id or `skill:<skillId>`
     ├── mobileSkills.js   # Four per-character mobile skill bindings
     ├── mobileItems.js    # Two per-character mobile consumable bindings

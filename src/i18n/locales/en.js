@@ -155,11 +155,9 @@ export default {
     loading: "Loading...",
     noCharacters: "No characters yet",
     newCharacter: "New character",
-    sect: "Sect",
-    sectThieuLam: "Shaolin",
-    sectNgaMy: "Nga My",
-    sectVoDang: "Wudang",
-    sectNguDoc: "Ngu Doc",
+    gender: "Gender",
+    genderMale: "Male",
+    genderFemale: "Female",
     emptySlot: "(Empty)",
     characterList: "Character list",
     nameLabel: "Name:",
@@ -197,7 +195,8 @@ export default {
     picker: {
       eyebrow: "Assign skill",
       title: "Choose a skill for {hand}",
-      locked: "Requires level {level}"
+      locked: "Requires level {level}",
+      needsBook: "Not learned — study a book"
     },
     mobilePicker: {
       eyebrow: "Assign skill",
@@ -220,7 +219,7 @@ export default {
       }
     },
     modalTitle: "Martial Arts",
-    modalHint: "Sect skill tree. Select a skill for details, then drag it onto hotbar slots 1-9 to bind it to that key.",
+    modalHint: "Skill tree for the equipped weapon. Select a skill for details, then drag it onto hotbar slots 1-9 to bind it to that key. Unlearned skills unlock by studying books dropped by monsters.",
     dragHint: "Drag a skill onto hotbar slots 1-9 to bind it to that number key.",
     bindToKey: "Assign to [{key}]",
     bindLeft: "Assign Left Click",
@@ -231,9 +230,15 @@ export default {
     passiveTag: "Passive",
     regenTag: "Regen {hp} HP/s",
     tree: {
-      requires: "Requires {name} at level {level}",
-      empty: "This sect has no skills yet.",
+      requires: "Learn {name} first",
+      empty: "This weapon has no skills yet.",
       selectHint: "Select a skill tile to see its details."
+    },
+    kiem: {
+      kiemKhi: {
+        name: "Sword Qi",
+        desc: "Starter sword skill: fire a blade of qi at the target. Every new hero knows it."
+      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -379,6 +384,11 @@ export default {
     accessory: "Accessory",
     weapon: "Weapon"
   },
+  weapons: {
+    kiem: "Sword",
+    baoTay: "Gloves",
+    dao: "Saber"
+  },
   bonus: {
     attack: "Physical attack",
     defense: "Physical defense",
@@ -408,6 +418,18 @@ export default {
     }
   },
   item: {
+    "kiem-lang-khach": {
+      name: "Wanderer's Sword",
+      desc: "A plain steel sword for a new wanderer. Only sword skills already studied can be used."
+    },
+    "bao-tay-lang-khach": {
+      name: "Wanderer's Gloves",
+      desc: "Steel-lined leather gloves for close combat. Only glove skills already studied can be used."
+    },
+    "dao-lang-khach": {
+      name: "Wanderer's Saber",
+      desc: "A broad, heavy saber with high damage. Only saber skills already studied can be used."
+    },
     "kim-sang-duoc": {
       name: "Golden Radiance Elixir",
       desc: "A spirit medicine brewed from honeysuckle. Restores +35 Health when drunk."

@@ -34,14 +34,14 @@ import {
   moveQuickSlot,
   skillBinding
 } from "./game/quickSlots.js";
-import { skillsForSect } from "./game/skills.js";
+import { skillsForWeapon } from "./game/skills.js";
 import {
   applyQuantities,
   bagQuantity,
   CONSUMABLE_ITEMS,
   setQuantities as rememberQuantities
 } from "./game/items.js";
-import { defaultEquipment } from "./game/equipment.js";
+import { defaultEquipment, equippedWeaponType } from "./game/equipment.js";
 import { StorageManager } from "./game/storage.js";
 import { SERVER_NAME } from "./game/serverConfig.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
@@ -210,6 +210,9 @@ export function App() {
 
   // Worn equipment (slot -> item id), scoped per character like the bag.
   const [equipment, setEquipment] = useState(() => StorageManager.loadEquipment());
+  // Learned skill ids, mirrored from the server (`skills_sync`). Starter skills
+  // (Kiếm Khí) are always known and are not listed here.
+  const [learnedSkills, setLearnedSkills] = useState([]);
 
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
@@ -223,11 +226,14 @@ export function App() {
     const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
     setQuickSlots(loadedQuickSlots);
     bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
+  }, [activeCharacter?.id]);
 
-    if (activeCharacter?.sect) {
-      bridge.emit(EVENTS.SET_PLAYER_SECT, activeCharacter.sect);
-    }
-  }, [activeCharacter?.id, activeCharacter?.sect]);
+  // The worn weapon decides the skill kit. Tell the scene whenever it changes so
+  // its VFX and cast gate follow the equipment the server published.
+  useEffect(() => {
+    const weaponType = equippedWeaponType(equipment);
+    if (weaponType) bridge.emit(EVENTS.SET_PLAYER_WEAPON, weaponType);
+  }, [equipment]);
 
   const handleAssignQuickSlot = useCallback(
     (targetSlot, itemId) => {
@@ -368,6 +374,12 @@ export function App() {
       if (next?.equipment) setEquipment(next.equipment);
     });
 
+    // Server-authoritative learned skills: replaced wholesale on every sync and
+    // on every successful book study.
+    const unsubSkills = bridge.on(EVENTS.SKILLS_UPDATED, (next) => {
+      setLearnedSkills(Array.isArray(next?.skills) ? next.skills : []);
+    });
+
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
       setIsStarted(true);
       const user = currentUserRef.current;
@@ -408,6 +420,7 @@ export function App() {
       unsubPk();
       unsubInventory();
       unsubEquipment();
+      unsubSkills();
       unsubStarted();
       unsubShopOpened();
       unsubShopResult();
@@ -699,6 +712,7 @@ export function App() {
   const handleLoginSuccess = useCallback((session) => {
     setCurrentUser({ ...session.user, token: session.token });
     setActiveCharacter(null);
+    setLearnedSkills([]);
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
     setEquipment(defaultEquipment());
@@ -721,6 +735,7 @@ export function App() {
     });
 
     setActiveCharacter(character);
+    setLearnedSkills([]);
     // Switch the shared bag store to this character's own inventory before the
     // scene enters the world, so the server fallback can never leak another
     // character's items.
@@ -769,6 +784,7 @@ export function App() {
       setCurrentUser(null);
       setActiveCharacter(null);
       setIsConnectionGated(false);
+      setLearnedSkills([]);
       StorageManager.setUserId(null);
       StorageManager.setCharacterId(null);
       setEquipment(defaultEquipment());
@@ -778,6 +794,10 @@ export function App() {
       bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
     }
   }, [t]);
+
+  // The equipped weapon selects the skill kit shown in the HUD and the F5 tree.
+  const weaponType = equippedWeaponType(equipment) || "kiem";
+  const weaponSkills = skillsForWeapon(weaponType);
 
   return (
     <main id="game-shell">
@@ -855,7 +875,7 @@ export function App() {
           onLogout={handleLogout}
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
-          skills={skillsForSect(activeCharacter?.sect)}
+          skills={weaponSkills}
         />
 
         <MobileControls
@@ -865,7 +885,7 @@ export function App() {
           onAssignSkill={mobileSkillsPicker.open}
           onUseItem={handleUseItem}
           onAssignItem={mobileItemsPicker.open}
-          skills={skillsForSect(activeCharacter?.sect)}
+          skills={weaponSkills}
           skillSlots={mobileSkillsPicker.bindings}
           items={mobileItemOptions}
           itemSlots={mobileItemsPicker.bindings}
@@ -941,8 +961,9 @@ export function App() {
       <SkillsModal
         isOpen={isSkillsOpen}
         onClose={handleCloseSkills}
-        skills={skillsForSect(activeCharacter?.sect)}
-        sect={activeCharacter?.sect || "thieu-lam"}
+        skills={weaponSkills}
+        weapon={weaponType}
+        learnedSkills={learnedSkills}
         level={stats.level}
         quickSlotsMapping={quickSlots}
         onAssignSkill={handleAssignSkill}
@@ -952,8 +973,9 @@ export function App() {
       <MobileSkillPicker
         isOpen={mobileSkillsPicker.isPickerOpen}
         slotIndex={mobileSkillsPicker.pickerIndex ?? 0}
-        skills={skillsForSect(activeCharacter?.sect)}
+        skills={weaponSkills}
         level={stats.level}
+        learnedSkills={learnedSkills}
         selectedSkillId={mobileSkillsPicker.selectedId}
         onSelect={mobileSkillsPicker.select}
         onClear={() => mobileSkillsPicker.select(null)}

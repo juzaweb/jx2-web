@@ -7,7 +7,7 @@
  * test and safe to run during server-side rendering.
  */
 
-import { skillUnlocked } from "./skills.js";
+import { skillUnlocked, skillUsable } from "./skills.js";
 
 /** Side length (px) of one skill tile. */
 export const TREE_TILE = 64;
@@ -20,14 +20,14 @@ const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(v
 const pickSize = (value, fallback) => (isFiniteNumber(value) && value > 0 ? value : fallback);
 
 /**
- * Build the tile/connector layout for one sect's skill list.
+ * Build the tile/connector layout for one kit's skill list.
  *
  * Rows follow prerequisite depth, lanes spread branches horizontally. The first
  * child of a skill keeps its parent's lane so a straight kit renders as a
  * single column; extra children open lanes to the right. A skill may override
  * its lane with `treeLane` for hand-tuned art.
  *
- * @param {Object[]} skills Catalog entries of a single sect.
+ * @param {Object[]} skills Catalog entries of a single weapon kit.
  * @param {{ tile?: number, gapX?: number, gapY?: number }} [options]
  * @returns {{
  *   nodes: { skill: Object, row: number, lane: number, x: number, y: number, depth: number }[],
@@ -55,7 +55,7 @@ export function buildSkillTree(skills = [], options = {}) {
 
   const byId = new Map(entries.map((skill) => [skill.id, skill]));
 
-  /** Prerequisite ids that also live in this sect, in catalog order. */
+  /** Prerequisite ids that also live in this kit, in catalog order. */
   const parentsOf = new Map();
   for (const entry of entries) {
     const requires = Array.isArray(entry.requires) ? entry.requires : [];
@@ -176,15 +176,21 @@ export function buildSkillTree(skills = [], options = {}) {
  *
  * @param {Object[]} skills
  * @param {number} level
+ * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids;
+ *   null keeps the legacy level-only check.
  * @returns {string|null}
  */
-export function initialSelectedId(skills = [], level = 1) {
+export function initialSelectedId(skills = [], level = 1, learned = null) {
   const entries = (Array.isArray(skills) ? skills : [])
     .filter((skill) => skill && typeof skill.id === "string")
     .slice()
     .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0) || a.id.localeCompare(b.id));
 
   if (entries.length === 0) return null;
-  const unlocked = entries.find((skill) => skillUnlocked(skill, level));
+  const isAvailable =
+    learned === null
+      ? (skill) => skillUnlocked(skill, level)
+      : (skill) => skillUsable(skill, level, learned);
+  const unlocked = entries.find(isAvailable);
   return (unlocked || entries[0]).id;
 }

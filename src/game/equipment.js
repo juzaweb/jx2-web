@@ -9,6 +9,7 @@
  */
 
 import { getItemById } from "./items.js";
+import { weaponTypeOfItem } from "./weapons.js";
 
 /**
  * The five equipment slots, in upper-body-to-lower-body render order. `layer`
@@ -155,3 +156,16 @@ export function bonusRows(item) {
       amount
     }));
 }
+
+/**
+ * The weapon type currently worn, or null when the `weapon` slot is empty (or
+ * holds something that is not a weapon).
+ * @param {Record<string, string|null>} equipment
+ * @returns {string|null}
+ */
+export function equippedWeaponType(equipment) {
+  const id = equippedIn(equipment, "weapon");
+  if (!id) return null;
+  return weaponTypeOfItem(getItemById(id));
+}
+

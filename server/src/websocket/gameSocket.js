@@ -42,10 +42,11 @@ import {
   normalizeProgress,
   progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, skillMpCost, skillCooldown, skillUnlocked } from "../../../src/game/skills.js";
+import { skillById, skillMpCost, skillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
-import { getConsumableEffect } from "../../../src/game/items.js";
+import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
+import { equippedWeaponType } from "../../../src/game/equipment.js";
 import { shopPurchase } from "../../../src/game/shop.js";
 import {
   consumeItem,
@@ -627,11 +628,28 @@ export class GameSocketManager {
     const playerId = characterId;
     const displayName = sanitizeStr(character.name || "Lãng Khách", 32);
     const username = displayName;
-    const equipment = readEquipment(characterId);
+    let equipment = readEquipment(characterId);
+
+    // Characters created before weapons existed (and any hero who lost their
+    // weapon) get the starter sword and Kiếm Khí, so the starting kit is always
+    // playable. New characters already receive both at creation time.
+    if (!equipment.weapon) {
+      if (!readBag(characterId)["kiem-lang-khach"]) {
+        grantItem(characterId, "kiem-lang-khach", 1);
+      }
+      const equipped = equipItem(characterId, "kiem-lang-khach");
+      if (equipped.ok) equipment = equipped.equipment;
+    }
+
+    const learnedSkills = store.getLearnedSkills(characterId);
+    if (!learnedSkills.includes("kiem_khi")) {
+      store.addLearnedSkill(characterId, "kiem_khi");
+      learnedSkills.push("kiem_khi");
+    }
 
     // The server is the economy's source of truth: a fresh character starts at
     // level 1; an existing one resumes from its persisted ledger, never from a
-    // client-reported level. The sect and gender come from the stored character.
+    // client-reported level. Gender comes from the stored character.
     const saved = store.getProgress(characterId);
     const progress = saved ? normalizeProgress(saved) : { level: 1, exp: 0, coins: 0, kills: 0 };
     store.setProgress(characterId, progress, displayName);
@@ -722,7 +740,10 @@ export class GameSocketManager {
       attackSpeed: stats.attackSpeed,
       /** Active timed buffs: { stat, amount, until, skillId }. */
       buffs: [],
-      sect: character.sect,
+      /** Weapon type of the worn weapon; decides which skill kit may be cast. */
+      weaponType: equippedWeaponType(equipment),
+      /** Skill ids studied from books (starter skills are always known). */
+      learnedSkills,
       pkFlag: payload.pkFlag === true,
       invulnerableUntil: 0,
       nextBiteAt: 0,
@@ -780,6 +801,7 @@ export class GameSocketManager {
     // recomputing it: bag, worn gear, derived combat stats and vitals.
     this.send(ws, { type: "inventory_sync", payload: { inventory: bag } });
     this.send(ws, { type: "equipment_sync", payload: { equipment } });
+    this.send(ws, { type: "skills_sync", payload: { skills: learnedSkills } });
     this.send(ws, {
       type: "player_stats",
       payload: { id: playerId, ...stats }
@@ -1041,6 +1063,12 @@ export class GameSocketManager {
     if (!player || !player.characterId) return;
 
     const itemId = sanitizeStr(payload.itemId, 64);
+    const bookSkillId = skillIdForBook(itemId);
+    if (bookSkillId) {
+      this.handleLearnSkill(ws, player, itemId, bookSkillId);
+      return;
+    }
+
     const effect = getConsumableEffect(itemId);
     const consumed = consumeItem(player.characterId, itemId, 1);
 
@@ -1100,6 +1128,53 @@ export class GameSocketManager {
   }
 
   /**
+   * Study a skill book: validate the level/prerequisites, consume one copy and
+   * record the skill on the character. The client is told whether the study
+   * succeeded so it can update the skill panel and the bag.
+   * @param {WebSocket} ws
+   * @param {Object} player
+   * @param {string} itemId
+   * @param {string} skillId
+   */
+  handleLearnSkill(ws, player, itemId, skillId) {
+    const skill = skillById(skillId);
+    const learned = Array.isArray(player.learnedSkills)
+      ? player.learnedSkills
+      : store.getLearnedSkills(player.characterId);
+
+    const reject = (reason, extra = {}) => {
+      this.send(ws, {
+        type: "item_result",
+        payload: { ok: false, action: "learn", itemId, skillId, reason, ...extra }
+      });
+    };
+
+    if (!skill) return reject("not_usable");
+    if (skill.starter || learned.includes(skill.id)) return reject("already_learned");
+    if (!skillLearnable(skill, player.level, learned)) {
+      const lock = skillLockReason(skill, player.level, learned);
+      return reject(lock?.kind === "level" ? "level" : "prereq", {
+        level: lock?.level ?? skill.unlockLevel,
+        prereqId: lock?.id || null
+      });
+    }
+
+    const consumed = consumeItem(player.characterId, itemId, 1);
+    if (!consumed.ok) {
+      this.sendInventory(player, consumed.bag);
+      return reject(consumed.reason || "missing_item");
+    }
+
+    player.learnedSkills = store.addLearnedSkill(player.characterId, skill.id);
+    this.sendInventory(player, consumed.bag);
+    this.send(ws, { type: "skills_sync", payload: { skills: player.learnedSkills } });
+    this.send(ws, {
+      type: "item_result",
+      payload: { ok: true, action: "learn", itemId, skillId: skill.id }
+    });
+  }
+
+  /**
    * Equip one bag item. The bag and equipment writes are atomic from the
    * server's point of view, and the client is only told the result.
    * @param {WebSocket} ws
@@ -1121,6 +1196,7 @@ export class GameSocketManager {
     }
 
     player.equipment = result.equipment;
+    player.weaponType = equippedWeaponType(result.equipment);
     this.sendInventory(player, result.bag);
     this.send(ws, { type: "equipment_sync", payload: { equipment: result.equipment } });
     this.sendPlayerStats(player);
@@ -1152,6 +1228,7 @@ export class GameSocketManager {
     }
 
     player.equipment = result.equipment;
+    player.weaponType = equippedWeaponType(result.equipment);
     this.sendInventory(player, result.bag);
     this.send(ws, { type: "equipment_sync", payload: { equipment: result.equipment } });
     this.sendPlayerStats(player);
@@ -1428,7 +1505,7 @@ export class GameSocketManager {
   tickRegen() {
     const now = Date.now();
     this.players.forEach((player) => {
-      const rate = passiveRegenRate(player.sect, player.level);
+      const rate = passiveRegenRate(player.weaponType, player.level, player.learnedSkills);
       const previous = player.regenAt;
       player.regenAt = now;
 
@@ -1476,13 +1553,19 @@ export class GameSocketManager {
     const now = Date.now();
     const requested = skillById(payload.skill);
 
-    // A skill id that exists but belongs to another sect, or is still locked, is
-    // refused instead of silently degrading into a free plain swing.
-    if (requested && requested.sect !== player.sect) {
-      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "sect" } });
+    // A skill id that exists but belongs to another weapon, was never studied, or
+    // is still level-locked is refused instead of silently degrading into a free
+    // plain swing. Passives are refused first: they run on their own and are
+    // never castable, whatever weapon is worn.
+    if (requested?.passive) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "passive" } });
       return;
     }
-    if (requested && !skillUnlocked(requested, player.level)) {
+    if (requested && requested.weapon !== player.weaponType) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "weapon" } });
+      return;
+    }
+    if (requested && !skillUsable(requested, player.level, player.learnedSkills)) {
       this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "locked" } });
       return;
     }
@@ -1588,7 +1671,8 @@ export class GameSocketManager {
     const skill = requestedSkill ? skillById(requestedSkill) : null;
 
     if (skill) {
-      if (skill.sect !== attacker.sect) return null;
+      if (skill.weapon !== attacker.weaponType) return null;
+      if (!skillUsable(skill, attacker.level, attacker.learnedSkills)) return null;
       if (!consumeCastHit(attacker.lastCast, skill, now)) return null;
       return {
         skill,
@@ -2231,8 +2315,15 @@ export class GameSocketManager {
     const now = Date.now();
     const skill = payload.skill ? skillById(payload.skill) : null;
 
-    // A skill id from another sect must never degrade into a free plain swing.
-    if (skill && skill.sect !== player.sect) return;
+    // A skill from another weapon kit (or one the hero never studied) must never
+    // degrade into a free plain swing.
+    if (
+      skill &&
+      (skill.weapon !== player.weaponType ||
+        !skillUsable(skill, player.level, player.learnedSkills))
+    ) {
+      return;
+    }
 
     // Reach/area checks run before the cast's hit budget is consumed, so a
     // mistimed hit cannot burn one of the cast's authorized strikes.
@@ -2330,6 +2421,15 @@ export class GameSocketManager {
   rewardKill(ws, player, enemy) {
     const reward = rollEnemyReward(player.id, enemy);
     this.broadcastToMap(enemy.mapId, { type: "enemy_reward", payload: reward });
+
+    // A dropped skill book goes straight into the credited killer's bag. The
+    // broadcast above only carries it for rendering; the server owns the grant.
+    if (player.characterId && Array.isArray(reward.loot) && reward.loot.length > 0) {
+      for (const drop of reward.loot) {
+        const granted = grantItem(player.characterId, drop.itemId, 1);
+        if (granted.ok) this.sendInventory(player, granted.bag);
+      }
+    }
 
     // The credited killer's ledger is updated here, on the server. The reward
     // broadcast above is only for rendering (drop + float text).

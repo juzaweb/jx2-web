@@ -221,14 +221,15 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(mp.payload.maxMp, 60);
 
     const stats = await client.waitFor((m) => m.type === "player_stats");
-    assert.equal(stats.payload.attack, 24);
+    // Base attack 24 + the starter sword's +6.
+    assert.equal(stats.payload.attack, 30);
     assert.equal(stats.payload.defense, 6);
     assert.equal(stats.payload.maxHp, 100);
     assert.equal(stats.payload.level, 1);
 
     const equipment = await client.waitFor((m) => m.type === "equipment_sync");
     assert.equal(equipment.payload.equipment.armor, null, "forged gear is ignored");
-    assert.equal(equipment.payload.equipment.weapon, null);
+    assert.equal(equipment.payload.equipment.weapon, "kiem-lang-khach");
 
     const bag = await client.waitFor((m) => m.type === "inventory_sync");
     assert.equal(typeof bag.payload.inventory, "object");
@@ -408,9 +409,23 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
-  await t.test("Skill casts are validated (unlock, passive, MP, damage)", async () => {
+  await t.test("Skill casts are validated (weapon, unlock, passive, MP, damage)", async () => {
+    // Give the hero gloves so the bao-tay kit is castable, and learn the skills
+    // the test casts (books are the only way to learn them).
+    store.setInventory("char_skill", { "bao-tay-lang-khach": 1 });
+    store.addLearnedSkill("char_skill", "dai_tu_di_chuong");
+    store.addLearnedSkill("char_skill", "nhu_lai_than_chuong");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_skill", x: 9450, y: 6700 });
+    client.send({ type: "equip_item", payload: { itemId: "bao-tay-lang-khach" } });
+    await client.waitFor(
+      (m) => m.type === "equipment_sync" && m.payload.equipment.weapon === "bao-tay-lang-khach"
+    );
+
+    // A sword skill cannot be cast while gloves are worn.
+    client.send({ type: "player_attack", payload: { skill: "thieu_duong_kiem_phap" } });
+    const wrongWeapon = await client.waitFor((m) => m.type === "skill_rejected");
+    assert.equal(wrongWeapon.payload.reason, "weapon");
 
     // Locked at level 1.
     client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong" } });
@@ -435,11 +450,18 @@ test("WebSocket server-authority suite", async (t) => {
   });
 
   await t.test("Stun is applied by the server and holds the monster still", async () => {
+    // Gloves carry the stun skill; the join hands out a sword.
+    store.setInventory("char_stun", { "bao-tay-lang-khach": 1 });
+    store.addLearnedSkill("char_stun", "dai_tu_di_chuong");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     // Wolf 6 lives at (10500, 8200). A hero 900 units away is inside its aggro
     // range (1050) but well outside its stop distance (260), leaving enough
     // runway that it is still walking when the stun expires.
     await join(client, { characterId: "char_stun", x: 9600, y: 8200 });
+    client.send({ type: "equip_item", payload: { itemId: "bao-tay-lang-khach" } });
+    await client.waitFor(
+      (m) => m.type === "equipment_sync" && m.payload.equipment.weapon === "bao-tay-lang-khach"
+    );
 
     const movesWolf6 = (m) =>
       m.type === "enemy_moved" && m.payload.enemies.some((enemy) => enemy.id === 6);

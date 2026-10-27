@@ -82,13 +82,12 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Tiêu Phong", sect: "nga-my" })
+      body: JSON.stringify({ name: "Tiêu Phong", gender: "female" })
     });
     assert.equal(res.status, 201);
     const json = await res.json();
     assert.equal(json.success, true);
     assert.equal(json.data.character.name, "Tiêu Phong");
-    assert.equal(json.data.character.sect, "nga-my");
     assert.equal(json.data.character.gender, "female");
     assert.equal(json.data.character.level, 1);
     assert.equal(json.data.character.userId, userId);
@@ -98,7 +97,6 @@ describe("Character API Test Suite", () => {
       headers: { Authorization: `Bearer ${token}` }
     }).then((r) => r.json());
     assert.equal(list.data.characters.length, 1);
-    assert.equal(list.data.characters[0].sect, "nga-my");
     assert.equal(list.data.characters[0].gender, "female");
   });
 
@@ -111,7 +109,7 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Tân Thủ", sect: "thieu-lam" })
+      body: JSON.stringify({ name: "Tân Thủ" })
     }).then((r) => r.json());
 
     const bag = await fetch(
@@ -119,6 +117,7 @@ describe("Character API Test Suite", () => {
       { headers: { Authorization: `Bearer ${token}` } }
     ).then((r) => r.json());
 
+    // The starter sword is equipped at creation, so only consumables remain in the bag.
     assert.deepEqual(bag.data.inventory, {
       "kim-sang-duoc": 50,
       "dai-hoan-dan": 50,
@@ -137,7 +136,7 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "AdminHero", sect: "thieu-lam" })
+      body: JSON.stringify({ name: "AdminHero" })
     }).then((r) => r.json());
 
     const bag = await fetch(
@@ -159,7 +158,7 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Lão Luyện", sect: "vo-dang" })
+      body: JSON.stringify({ name: "Lão Luyện", gender: "male" })
     }).then((r) => r.json());
     const characterId = created.data.character.id;
 
@@ -174,7 +173,7 @@ describe("Character API Test Suite", () => {
     assert.deepEqual(bag.data.inventory, { "kim-sang-duoc": 2 });
   });
 
-  test("POST defaults to Thiếu Lâm (male) when sect is omitted", async () => {
+  test("POST defaults to male when gender is omitted", async () => {
     const userId = nextUser();
     const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
@@ -185,11 +184,10 @@ describe("Character API Test Suite", () => {
       },
       body: JSON.stringify({ name: "Vô Danh" })
     }).then((r) => r.json());
-    assert.equal(created.data.character.sect, "thieu-lam");
     assert.equal(created.data.character.gender, "male");
   });
 
-  test("POST persists the chosen sect and derives its gender (400 on invalid)", async () => {
+  test("POST persists the chosen gender (unknown values fall back to male)", async () => {
     const userId = nextUser();
     const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
@@ -198,11 +196,10 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Độc Cô", sect: "ngu-doc" })
+      body: JSON.stringify({ name: "Độc Cô", gender: "male" })
     });
     assert.equal(created.status, 201);
     const json = await created.json();
-    assert.equal(json.data.character.sect, "ngu-doc");
     assert.equal(json.data.character.gender, "male");
 
     const female = await fetch(`${baseUrl}/users/${userId}/characters`, {
@@ -211,9 +208,8 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Nga My Nữ", sect: "nga-my" })
+      body: JSON.stringify({ name: "Nữ Hiệp", gender: "female" })
     }).then((r) => r.json());
-    assert.equal(female.data.character.sect, "nga-my");
     assert.equal(female.data.character.gender, "female");
 
     const bad = await fetch(`${baseUrl}/users/${userId}/characters`, {
@@ -222,9 +218,9 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Sai Môn Phái", sect: "bogus" })
-    });
-    assert.equal(bad.status, 400);
+      body: JSON.stringify({ name: "Sai Giới Tính", gender: "bogus" })
+    }).then((r) => r.json());
+    assert.equal(bad.data.character.gender, "male");
   });
 
   test("POST rejects a duplicate character name in the same account (409)", async () => {
@@ -394,11 +390,9 @@ describe("CharacterDatabase schema migration", () => {
     const [row] = db.listByUser("u1");
     assert.equal(row.name, "Cũ");
     assert.equal(row.gender, "male");
-    assert.equal(row.sect, "thieu-lam");
     assert.equal(row.appearance, 0);
 
-    const created = db.create("u1", "Mới", "nga-my");
-    assert.equal(created.sect, "nga-my");
+    const created = db.create("u1", "Mới", "female");
     assert.equal(created.gender, "female");
 
     db.close();
@@ -439,7 +433,6 @@ describe("CharacterDatabase schema migration", () => {
     const db = new CharacterDatabase(dbPath);
 
     assert.equal(db.listByUser("u3").length, 0, "soft-deleted row is purged");
-    assert.equal(db.listByUser("u4")[0].sect, "nga-my", "legacy female keeps her gender");
     assert.equal(db.listByUser("u4")[0].gender, "female");
     assert.equal(db.listByUser("u1")[0].name, "Trùng", "oldest row keeps the name");
     assert.equal(db.listByUser("u2")[0].name, "Trùng-2", "newer duplicate is renamed");

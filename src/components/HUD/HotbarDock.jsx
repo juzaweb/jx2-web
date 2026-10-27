@@ -76,7 +76,7 @@ export function HotbarDock({
       const useSlot = index + 1;
       const binding = quickSlotsMapping?.[useSlot] || null;
 
-      // A slot holds either a sect skill or a consumable item, so the binding
+      // A slot holds either a weapon skill or a consumable item, so the binding
       // decides which icon and which number-key action it renders.
       const skillId = skillIdFromBinding(binding);
       if (skillId) {

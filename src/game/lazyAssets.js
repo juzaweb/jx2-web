@@ -4,7 +4,7 @@
  * `preload()` used to download every heavy sheet before the world could start:
  * both hero walk sheets and every skill VFX (~1.6 MB of VFX alone), even though
  * a session only ever needs the active character's gender and the VFX of its own
- * sect. These helpers queue a sheet on the running scene loader the first time
+ * weapon kit. These helpers queue a sheet on the running scene loader the first time
  * something actually asks for it.
  *
  * Callers already guard with `textures.exists()`, so a sheet that is still
@@ -17,8 +17,8 @@ import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef } from "./heroBody.j
 import { normalizeGender } from "./gender.js";
 
 /**
- * Skill VFX sprite sheets. A session downloads only the sheets its own sect can
- * cast (see `ensureSectVfx`), plus any sheet a remote player asks for mid-fight.
+ * Skill VFX sprite sheets. A session downloads only the sheets its own weapon can
+ * cast (see `ensureWeaponVfx`), plus any sheet a remote player asks for mid-fight.
  */
 export const VFX_SPRITES = {
   "vfx-la-han-tran": {
@@ -121,14 +121,14 @@ export function ensureOverheadTexture(scene, key) {
 }
 
 /**
- * Queue every VFX sheet and overhead buff image a sect can use, so the first
- * cast already has art. All assets go out in one loader batch; skills without
- * sprite/overhead art queue nothing.
+ * Queue every VFX sheet and overhead buff image a weapon kit can use, so the
+ * first cast already has art. All assets go out in one loader batch; skills
+ * without sprite/overhead art queue nothing.
  * @param {import("phaser").Scene} scene
  * @param {Object[]} [skills]
  * @returns {boolean} `true` when every asset is usable right now
  */
-export function ensureSectVfx(scene, skills = []) {
+export function ensureWeaponVfx(scene, skills = []) {
   let allReady = true;
   let queued = false;
   for (const skill of skills) {

@@ -16,7 +16,7 @@ const makeSkill = (id, slot, requires = []) => ({
 });
 
 describe("buildSkillTree", () => {
-  it("returns an empty layout when the sect has no skills", () => {
+  it("returns an empty layout when the kit has no skills", () => {
     const tree = buildSkillTree([]);
     expect(tree.nodes).toEqual([]);
     expect(tree.edges).toEqual([]);
@@ -68,7 +68,7 @@ describe("buildSkillTree", () => {
     expect(tree.width).toBe(2 * TREE_TILE + TREE_GAP_X);
   });
 
-  it("ignores prerequisites outside the sect", () => {
+  it("ignores prerequisites outside the kit", () => {
     const tree = buildSkillTree([makeSkill("a", 0, [{ id: "missing", level: 1 }])]);
     expect(tree.nodes).toHaveLength(1);
     expect(tree.nodes[0].row).toBe(0);
@@ -114,6 +114,14 @@ describe("initialSelectedId", () => {
   it("prefers the first unlocked skill in slot order", () => {
     expect(initialSelectedId(skills, 1)).toBe("late");
     expect(initialSelectedId(skills, 3)).toBe("early");
+  });
+
+  it("prefers the first learned skill when a learned set is given", () => {
+    // Both are level-unlocked at 5, but only the later slot was studied.
+    expect(initialSelectedId(skills, 5, ["late"])).toBe("late");
+    expect(initialSelectedId(skills, 5, ["early"])).toBe("early");
+    // Nothing learned: the starter tile keeps the fallback behaviour.
+    expect(initialSelectedId(skills, 5, [])).toBe("early");
   });
 
   it("falls back to the first skill and returns null for an empty kit", () => {

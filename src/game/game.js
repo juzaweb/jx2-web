@@ -8,7 +8,7 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, QUICK_ITEMS } from "./items.js";
+import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, isSkillBook, QUICK_ITEMS } from "./items.js";
 import { skillById } from "./skills.js";
 import { translate } from "../i18n/translator.js";
 import { loadQuickSlots, skillIdFromBinding } from "./quickSlots.js";
@@ -58,8 +58,9 @@ const HIT_REJECT_MESSAGES = {
 
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
-import { normalizeSect, skillsForSect } from "./skills.js";
-import { ensureHeroBodyTexture, ensureSectVfx } from "./lazyAssets.js";
+import { skillsForWeapon } from "./skills.js";
+import { MELEE_REACH } from "./combatRules.js";
+import { ensureHeroBodyTexture, ensureWeaponVfx } from "./lazyAssets.js";
 
 export class JiangHuScene extends Phaser.Scene {
   constructor() {
@@ -126,7 +127,7 @@ export class JiangHuScene extends Phaser.Scene {
       this.load.image(key, url);
     }
     // Skill VFX sheets are intentionally not loaded here: they are pulled in on
-    // demand once the hero's sect is known (see ensureSectVfx).
+    // demand once the hero's weapon is known (see ensureWeaponVfx).
   }
 
   create() {
@@ -184,12 +185,8 @@ export class JiangHuScene extends Phaser.Scene {
       initialName,
       initialGender
     );
-    this.player.setSect(normalizeSect(session?.activeCharacter?.sect));
-    // Pull this sect's skill art in the background instead of every VFX sheet.
-    // Sessions without a chosen character (login screen, guests) download none.
-    if (session?.activeCharacter?.sect) {
-      ensureSectVfx(this, skillsForSect(session.activeCharacter.sect));
-    }
+    // The equipped weapon decides the skill kit. The authoritative gear arrives
+    // over `equipment_sync`, which also queues this weapon's VFX.
     this.enemyManager = new EnemyManager(this);
 
     // The roster exists now, so the monster collisions can be wired too.
@@ -299,6 +296,14 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("equipment_sync", (payload) => {
       this.handleEquipmentSync(payload);
+    });
+
+    // Skills studied from books. The server is authoritative: a learned id is
+    // only usable after it lands here.
+    this.networkClient.on("skills_sync", (payload) => {
+      const learned = Array.isArray(payload?.skills) ? payload.skills : [];
+      if (this.combat) this.combat.learnedSkills = new Set(learned);
+      bridge.emit(EVENTS.SKILLS_UPDATED, { skills: learned });
     });
 
     // Result of a server-side use/equip/unequip action.
@@ -532,7 +537,7 @@ export class JiangHuScene extends Phaser.Scene {
     };
     this.isTyping = isTyping;
 
-    // Hotbar quick slots hold either a consumable item or a sect skill, so a
+    // Hotbar quick slots hold either a consumable item or a weapon skill, so a
     // number key both casts bound skills and drinks bound potions.
     this.quickSlots = loadQuickSlots(readSession()?.activeCharacter?.id);
     this.bindSkillKeys();
@@ -582,9 +587,9 @@ export class JiangHuScene extends Phaser.Scene {
           this.quickSlots = { ...this.quickSlots, ...quickSlots };
         }
       }),
-      bridge.on(EVENTS.SET_PLAYER_SECT, (sect) => {
-        this.player?.setSect(normalizeSect(sect));
-        if (sect) ensureSectVfx(this, skillsForSect(sect));
+      bridge.on(EVENTS.SET_PLAYER_WEAPON, (weaponType) => {
+        this.player?.setWeaponType(weaponType);
+        if (weaponType) ensureWeaponVfx(this, skillsForWeapon(weaponType));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
@@ -861,7 +866,7 @@ export class JiangHuScene extends Phaser.Scene {
    * Use a hotbar quick slot or a concrete item id.
    * The numbered bar passes a slot number; the bag passes the item it shows, so
    * using an item never depends on where (or whether) it is bound to a slot.
-   * A slot bound to a sect skill casts it instead.
+   * A slot bound to a weapon skill casts it instead.
    * @param {number|string} slotOrItemId
    */
   useItem(slotOrItemId) {
@@ -890,6 +895,17 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (item.slot) {
       this.equipItem(itemId);
+      return;
+    }
+
+    // A skill book is studied on the server: it validates the level and
+    // prerequisites, consumes one copy and records the skill.
+    if (isSkillBook(itemId)) {
+      if (!this.networkClient?.isConnected) {
+        this.uiBridge.addLog("Cần kết nối máy chủ để học chiêu thức.", "guide");
+        return;
+      }
+      this.networkClient.useItem(itemId);
       return;
     }
 
@@ -1294,6 +1310,11 @@ export class JiangHuScene extends Phaser.Scene {
   handleEquipmentSync(payload = {}) {
     if (!payload.equipment || !this.player) return;
     this.player.applyEquipment(payload.equipment);
+    // A different weapon means a different skill kit: pull its art now and tell
+    // the HUD so the skill panel shows the matching tree.
+    if (this.player.weaponType) {
+      ensureWeaponVfx(this, skillsForWeapon(this.player.weaponType));
+    }
     this.emitEquipment();
     this.uiBridge.updateHud(this.player.stats);
   }
@@ -1310,7 +1331,10 @@ export class JiangHuScene extends Phaser.Scene {
       not_equippable: "Vật phẩm không thể trang bị.",
       unknown_slot: "Ô trang bị không hợp lệ.",
       empty_slot: "Ô trang bị đang trống.",
-      unknown_item: "Vật phẩm không tồn tại."
+      unknown_item: "Vật phẩm không tồn tại.",
+      already_learned: "Bạn đã học chiêu thức này rồi.",
+      level: "Cấp độ chưa đủ để học chiêu thức này.",
+      prereq: "Cần học chiêu thức trước đó trước khi học sách này."
     };
 
     if (payload.ok === false) {
@@ -1328,6 +1352,14 @@ export class JiangHuScene extends Phaser.Scene {
       return;
     }
 
+    if (payload.action === "learn") {
+      const skill = payload.skillId ? skillById(payload.skillId) : null;
+      const name = skill ? translate(skill.nameKey, undefined, skill.id) : "chiêu thức mới";
+      this.uiBridge.addLog(`Đã học ${name}!`, "system");
+      playTone(880, 0.2, "triangle", 0.05);
+      return;
+    }
+
     const itemName = getItemById(payload.itemId)?.name || payload.itemId || payload.slot;
     if (payload.action === "equip") {
       this.uiBridge.addLog(`Đã trang bị ${itemName}.`, "system");
@@ -1337,13 +1369,13 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * Explain a refused cast (foreign sect, locked technique, passive).
+   * Explain a refused cast (foreign weapon, unlearned technique, passive).
    * @param {{skillId?:string, reason?:string}} payload
    */
   handleSkillRejected(payload = {}) {
     const reasons = {
-      sect: "Môn phái không phù hợp với chiêu thức này.",
-      locked: "Cấp độ chưa đủ để dùng chiêu thức này.",
+      weapon: "Vũ khí đang trang bị không dùng được chiêu thức này.",
+      locked: "Bạn chưa học chiêu thức này hoặc cấp độ chưa đủ.",
       passive: "Tâm pháp bị động luôn vận hành, không cần thi triển."
     };
     const skill = payload.skillId ? skillById(payload.skillId) : null;
@@ -1657,9 +1689,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
 
-    // Normal attack fallback (reach matches MELEE_REACH = 280)
-    const attackReach = 280;
-    if (distance <= attackReach) {
+    // Plain sword reach: clicking a monster walks the hero into a swing.
+    if (distance <= MELEE_REACH) {
       this.player.stopMovement?.();
       if (this.combat?.attackReady) {
         this.combat.performAttack();

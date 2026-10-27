@@ -17,7 +17,7 @@ describe("State import API", () => {
     const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, sect: "thieu-lam" })
+      body: JSON.stringify({ name, gender: "male" })
     });
     assert.equal(res.status, 201);
     const json = await res.json();

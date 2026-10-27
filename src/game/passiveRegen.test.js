@@ -6,7 +6,7 @@ import {
   passiveRegenRate,
   regenPerSecond
 } from "./passiveRegen.js";
-import { skillById, skillsForSect } from "./skills.js";
+import { skillById, skillsForWeapon } from "./skills.js";
 
 describe("regenPerSecond", () => {
   it("reads a regen effect out of a catalog skill", () => {
@@ -31,19 +31,21 @@ describe("regenPerSecond", () => {
 });
 
 describe("passiveRegenRate", () => {
-  it("sums the unlocked passive arts of a sect", () => {
-    expect(passiveRegenRate("thieu-lam", 1)).toBe(2);
-    expect(passiveRegenRate("vo-dang", 1)).toBe(0);
-    // Unknown sects normalise to Thiếu Lâm, matching `skillsForSect`.
-    expect(passiveRegenRate("bogus", 1)).toBe(2);
+  it("sums the learned passive arts of a weapon kit", () => {
+    expect(passiveRegenRate("bao-tay", 1, ["thieu_lam_tam_phap"])).toBe(2);
+    expect(passiveRegenRate("kiem", 1, ["thieu_lam_tam_phap"])).toBe(0);
+    // An unlearned passive contributes nothing.
+    expect(passiveRegenRate("bao-tay", 1, [])).toBe(0);
+    // Unknown weapons normalise to the sword kit, which has no passive.
+    expect(passiveRegenRate("bogus", 1, ["thieu_lam_tam_phap"])).toBe(0);
   });
 
   it("ignores a passive the hero has not unlocked yet", () => {
-    expect(passiveRegenRate("thieu-lam", 0)).toBe(0);
+    expect(passiveRegenRate("bao-tay", 0, ["thieu_lam_tam_phap"])).toBe(0);
   });
 
   it("only counts skills flagged as passive", () => {
-    for (const skill of skillsForSect("thieu-lam")) {
+    for (const skill of skillsForWeapon("bao-tay")) {
       if (skill.passive) continue;
       expect(regenPerSecond(skill)).toBe(0);
     }

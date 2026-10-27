@@ -156,11 +156,9 @@ export default {
     loading: "加载中……",
     noCharacters: "暂无角色",
     newCharacter: "新角色",
-    sect: "门派",
-    sectThieuLam: "少林",
-    sectNgaMy: "峨眉",
-    sectVoDang: "武当",
-    sectNguDoc: "五毒",
+    gender: "性别",
+    genderMale: "男",
+    genderFemale: "女",
     emptySlot: "（空）",
     characterList: "角色列表",
     nameLabel: "名称：",
@@ -198,7 +196,8 @@ export default {
     picker: {
       eyebrow: "绑定招式",
       title: "为{hand}选择招式",
-      locked: "需要等级 {level}"
+      locked: "需要等级 {level}",
+      needsBook: "未学习——使用书籍学习"
     },
     mobilePicker: {
       eyebrow: "绑定招式",
@@ -221,7 +220,7 @@ export default {
       }
     },
     modalTitle: "武学面板",
-    modalHint: "门派招式树。选择一个招式查看详情，将它拖到下方快捷栏 1-9 格即可绑定对应按键。",
+    modalHint: "当前武器招式树。选择一个招式查看详情，将它拖到下方快捷栏 1-9 格即可绑定对应按键。未学习的招式需要用怪物掉落的书籍解锁。",
     dragHint: "将招式拖到下方快捷栏 1-9 格即可绑定对应按键。",
     bindToKey: "绑定到 [{key}]",
     bindLeft: "绑定左键",
@@ -232,9 +231,15 @@ export default {
     passiveTag: "被动",
     regenTag: "每秒恢复 {hp} 生命",
     tree: {
-      requires: "需要 {name} 达到 {level} 级",
-      empty: "该门派暂无招式。",
+      requires: "需要先学习 {name}",
+      empty: "该武器暂无招式。",
       selectHint: "选择一个招式格查看详情。"
+    },
+    kiem: {
+      kiemKhi: {
+        name: "剑气",
+        desc: "初始剑法，向目标射出一道剑气。所有新角色都会这一招。"
+      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -380,6 +385,11 @@ export default {
     accessory: "饰品",
     weapon: "武器"
   },
+  weapons: {
+    kiem: "剑",
+    baoTay: "拳套",
+    dao: "刀"
+  },
   bonus: {
     attack: "外功",
     defense: "外防",
@@ -409,6 +419,18 @@ export default {
     }
   },
   item: {
+    "kiem-lang-khach": {
+      name: "浪客之剑",
+      desc: "江湖新手的普通钢剑。只能使用已学会的剑法招式。"
+    },
+    "bao-tay-lang-khach": {
+      name: "浪客拳套",
+      desc: "包钢皮的近战拳套。只能使用已学会的拳套招式。"
+    },
+    "dao-lang-khach": {
+      name: "浪客之刀",
+      desc: "宽重刀身，伤害极高。只能使用已学会的刀法招式。"
+    },
     "kim-sang-duoc": {
       name: "金创药",
       desc: "以金银花炼制的灵药。服用后恢复 +35 生命。"

@@ -1,16 +1,27 @@
 /**
  * Skill catalog shared by the client and the server.
  *
+ * Skills are grouped by the weapon that can use them. A hero may only cast the
+ * skills of the weapon worn in the `weapon` equipment slot (see `weapons.js`),
+ * so there are no sects any more.
+ *
  * Every skill is data: MP cost, cooldown, range/radius and damage multiplier are
  * authoritative and therefore consumed by the server when it validates a cast and
  * computes the resulting damage. The client reads the same table to predict the
  * cost, gate the hotbar and render its VFX.
+ *
+ * Learning: only the starter skill (`starter: true`, Kiếm Khí) is known for
+ * free. Every other skill is learned from a book item dropped by monsters; the
+ * learned ids are persisted per character on the server. `requires` lists the
+ * skills that must already be learned before a book can be studied.
  *
  * A skill's `effects` are applied on a successful hit (or on self when
  * `target === "self"`). Only the effect kinds used by shipped skills are listed
  * here; unknown kinds are ignored, so the catalog can grow without breaking old
  * readers.
  */
+
+import { normalizeWeaponType } from "./weapons.js";
 
 /** Number of skill slots on the client hotbar. */
 export const SKILL_SLOTS = 6;
@@ -19,18 +30,15 @@ export const SKILL_SLOTS = 6;
 export const BASIC_ATTACK_ID = "normal";
 
 /**
- * Thiếu Lâm kit is a palm-technique (chưởng pháp) kit plus the sect's internal
- * art and one fist flurry. The old Thiếu Lâm Võ Tông (TLQ) fist/kick skills and
- * icons are gone.
- *
- * Slot 0 is `thieu_lam_tam_phap`: a passive internal art that is always running
- * (no cast, no MP, no cooldown) and restores `hpPerSecond` health while the hero
- * is alive. See `passiveRegen.js` for the shared regen maths.
+ * Bao tay (fist / glove) kit. Slot 0 is `thieu_lam_tam_phap`: a passive internal
+ * art that is always running (no cast, no MP, no cooldown) and restores
+ * `hpPerSecond` health while the hero is alive. See `passiveRegen.js` for the
+ * shared regen maths.
  */
-const THIEU_LAM_SKILLS = [
+const BAO_TAY_SKILLS = [
   {
     id: "thieu_lam_tam_phap",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 0,
     icon: "/skills/thieu_lam_tam_phap.png",
     glyph: "心",
@@ -49,7 +57,7 @@ const THIEU_LAM_SKILLS = [
   },
   {
     id: "dai_tu_di_chuong",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 1,
     icon: "/skills/dai_tu_di_chuong.png",
     glyph: "掌",
@@ -74,7 +82,7 @@ const THIEU_LAM_SKILLS = [
   },
   {
     id: "la_han_quyen",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 2,
     icon: "/skills/la_han_quyen.png",
     glyph: "拳",
@@ -103,7 +111,7 @@ const THIEU_LAM_SKILLS = [
   },
   {
     id: "la_han_tran",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 3,
     icon: "/skills/la_han_tran.png",
     glyph: "陣",
@@ -135,7 +143,7 @@ const THIEU_LAM_SKILLS = [
   },
   {
     id: "kim_cang_bat_hoai",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 4,
     icon: "/skills/kim_cang_bat_hoai.png",
     glyph: "卍",
@@ -161,7 +169,7 @@ const THIEU_LAM_SKILLS = [
   },
   {
     id: "nhu_lai_than_chuong",
-    sect: "thieu-lam",
+    weapon: "bao-tay",
     slot: 5,
     icon: "/skills/nhu_lai_than_chuong.png",
     glyph: "佛",
@@ -190,10 +198,49 @@ const THIEU_LAM_SKILLS = [
   }
 ];
 
-const VO_DANG_SKILLS = [
+/**
+ * Starter sword skill. Every new hero learns Kiếm Khí and starts with a sword,
+ * so its book is never dropped; `starter: true` also makes it always known.
+ */
+const KIEM_KHI_SKILL = {
+  id: "kiem_khi",
+  weapon: "kiem",
+  slot: 0,
+  icon: "/skills/kiem_khi.png",
+  glyph: "氣",
+  nameKey: "skills.kiem.kiemKhi.name",
+  descKey: "skills.kiem.kiemKhi.desc",
+  unlockLevel: 1,
+  starter: true,
+  mp: 5,
+  cooldown: 2000,
+  target: "enemy",
+  range: 840,
+  radius: 0,
+  mult: 1.1,
+  /**
+   * The blast is real damage, not just decoration: every monster standing in the
+   * burst takes a fraction of the primary hit. `radius` stays 0 because the cast
+   * itself is still aimed at one target — the server resolves the area from
+   * `splashVictims` when the hit lands.
+   */
+  splash: { radius: 170, mult: 0.6, maxTargets: 4 },
+  vfx: {
+    /**
+     * A blade-shaped shard of qi flies from the hero to the victim, then bursts.
+     * `projectile` replaces the gesture arc entirely (see `playSkillCastVfx`), so
+     * there is no `cast` kind: `impact: null` leaves the arrival to the shard.
+     */
+    projectile: "sword",
+    impact: null,
+    color: 0x9be8ff
+  }
+};
+
+const KIEM_VO_DANG_SKILLS = [
   {
     id: "thieu_duong_kiem_phap",
-    sect: "vo-dang",
+    weapon: "kiem",
     slot: 0,
     glyph: "剑",
     nameKey: "skills.voDang.thieuDuongKiemPhap.name",
@@ -208,7 +255,7 @@ const VO_DANG_SKILLS = [
   },
   {
     id: "thai_cuc_quyen",
-    sect: "vo-dang",
+    weapon: "kiem",
     slot: 1,
     glyph: "太",
     requires: [{ id: "thieu_duong_kiem_phap", level: 1 }],
@@ -224,7 +271,7 @@ const VO_DANG_SKILLS = [
   },
   {
     id: "tam_thanh_kiem_phap",
-    sect: "vo-dang",
+    weapon: "kiem",
     slot: 2,
     glyph: "三",
     requires: [{ id: "thai_cuc_quyen", level: 1 }],
@@ -240,7 +287,7 @@ const VO_DANG_SKILLS = [
   },
   {
     id: "toat_hong_quan_khuyet",
-    sect: "vo-dang",
+    weapon: "kiem",
     slot: 3,
     glyph: "罡",
     requires: [{ id: "tam_thanh_kiem_phap", level: 2 }],
@@ -257,10 +304,10 @@ const VO_DANG_SKILLS = [
   }
 ];
 
-const NGA_MY_SKILLS = [
+const KIEM_NGA_MY_SKILLS = [
   {
     id: "nga_my_kiem_phap",
-    sect: "nga-my",
+    weapon: "kiem",
     slot: 0,
     glyph: "剑",
     nameKey: "skills.ngaMy.ngaMyKiemPhap.name",
@@ -275,7 +322,7 @@ const NGA_MY_SKILLS = [
   },
   {
     id: "mong_diep_thoi_tam",
-    sect: "nga-my",
+    weapon: "kiem",
     slot: 1,
     glyph: "蝶",
     requires: [{ id: "nga_my_kiem_phap", level: 1 }],
@@ -291,7 +338,7 @@ const NGA_MY_SKILLS = [
   },
   {
     id: "tu_hang_pho_do",
-    sect: "nga-my",
+    weapon: "kiem",
     slot: 2,
     glyph: "医",
     requires: [{ id: "mong_diep_thoi_tam", level: 1 }],
@@ -308,7 +355,7 @@ const NGA_MY_SKILLS = [
   },
   {
     id: "luu_thuy_khanh_van",
-    sect: "nga-my",
+    weapon: "kiem",
     slot: 3,
     glyph: "云",
     requires: [{ id: "tu_hang_pho_do", level: 2 }],
@@ -325,10 +372,10 @@ const NGA_MY_SKILLS = [
   }
 ];
 
-const NGU_DOC_SKILLS = [
+const DAO_SKILLS = [
   {
     id: "ngu_doc_tam_phap",
-    sect: "ngu-doc",
+    weapon: "dao",
     slot: 0,
     glyph: "毒",
     nameKey: "skills.nguDoc.nguDocTamPhap.name",
@@ -343,7 +390,7 @@ const NGU_DOC_SKILLS = [
   },
   {
     id: "truy_tam_doc",
-    sect: "ngu-doc",
+    weapon: "dao",
     slot: 1,
     glyph: "心",
     requires: [{ id: "ngu_doc_tam_phap", level: 1 }],
@@ -359,7 +406,7 @@ const NGU_DOC_SKILLS = [
   },
   {
     id: "van_doc_chieu_hong",
-    sect: "ngu-doc",
+    weapon: "dao",
     slot: 2,
     glyph: "蛊",
     requires: [{ id: "truy_tam_doc", level: 1 }],
@@ -375,7 +422,7 @@ const NGU_DOC_SKILLS = [
   },
   {
     id: "u_hong_phiet_anh",
-    sect: "ngu-doc",
+    weapon: "dao",
     slot: 3,
     glyph: "影",
     requires: [{ id: "van_doc_chieu_hong", level: 2 }],
@@ -392,35 +439,43 @@ const NGU_DOC_SKILLS = [
   }
 ];
 
-/** All authored skills, in catalog order. */
-export const SKILLS = [...THIEU_LAM_SKILLS, ...VO_DANG_SKILLS, ...NGA_MY_SKILLS, ...NGU_DOC_SKILLS];
+/**
+ * Sword kit: the starter Kiếm Khí plus both sword schools. Slots are renumbered
+ * so the tree renders as one kit (0 = starter, 1-4 = first school, 5-8 = second).
+ */
+const KIEM_SKILLS = [
+  KIEM_KHI_SKILL,
+  ...KIEM_VO_DANG_SKILLS.map((skill, index) => ({ ...skill, slot: index + 1 })),
+  ...KIEM_NGA_MY_SKILLS.map((skill, index) => ({ ...skill, slot: index + 5 }))
+];
 
-/** Skill lists keyed by sect id. */
-export const SKILLS_BY_SECT = {
-  "thieu-lam": THIEU_LAM_SKILLS,
-  "vo-dang": VO_DANG_SKILLS,
-  "nga-my": NGA_MY_SKILLS,
-  "ngu-doc": NGU_DOC_SKILLS
+/** All authored skills, in catalog order. */
+export const SKILLS = [...BAO_TAY_SKILLS, ...KIEM_SKILLS, ...DAO_SKILLS];
+
+/** Skill lists keyed by weapon type id. */
+export const SKILLS_BY_WEAPON = {
+  "bao-tay": BAO_TAY_SKILLS,
+  kiem: KIEM_SKILLS,
+  dao: DAO_SKILLS
 };
 
 const SKILLS_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]));
 const SLOT_INDEX_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill.slot]));
 
 /**
- * Normalise a caller-supplied sect to a known id.
- * @param {*} sect
+ * Normalise a caller-supplied weapon id to a known kit id.
+ * @param {*} weapon
  * @returns {string}
  */
-export const normalizeSect = (sect) =>
-  Object.prototype.hasOwnProperty.call(SKILLS_BY_SECT, sect) ? sect : "thieu-lam";
+export { normalizeWeaponType };
 
 /**
- * All skills authored for a sect, ordered by slot.
- * @param {string} sect
+ * All skills authored for a weapon, ordered by slot.
+ * @param {string} weapon
  * @returns {Object[]}
  */
-export function skillsForSect(sect) {
-  return SKILLS_BY_SECT[normalizeSect(sect)] || [];
+export function skillsForWeapon(weapon) {
+  return SKILLS_BY_WEAPON[normalizeWeaponType(weapon)] || [];
 }
 
 /**
@@ -434,13 +489,13 @@ export function skillById(id) {
 }
 
 /**
- * Skill assigned to a hotbar slot for a sect, if any.
- * @param {string} sect
+ * Skill assigned to a slot of a weapon's kit, if any.
+ * @param {string} weapon
  * @param {number} slot
  * @returns {Object|undefined}
  */
-export function skillForSlot(sect, slot) {
-  return skillsForSect(sect).find((skill) => skill.slot === slot);
+export function skillForSlot(weapon, slot) {
+  return skillsForWeapon(weapon).find((skill) => skill.slot === slot);
 }
 
 /**
@@ -486,6 +541,27 @@ function normalizedLevel(level) {
 /** Depth guard so a malformed (cyclic) catalog can never hang a reader. */
 const MAX_REQUIRE_DEPTH = 8;
 
+/**
+ * Coerce the learned-skill payload into a Set, or null when the caller did not
+ * provide one (legacy level-only callers).
+ * @param {*} learned
+ * @returns {Set<string>|null}
+ */
+function toLearnedSet(learned) {
+  if (learned instanceof Set) return learned;
+  if (Array.isArray(learned)) {
+    return new Set(learned.filter((id) => typeof id === "string"));
+  }
+  return null;
+}
+
+/** Whether `entry` is known, treating starter skills as always known. */
+function knowsEntry(entry, learnedSet) {
+  if (!entry) return false;
+  if (entry.starter === true) return true;
+  return Boolean(learnedSet && learnedSet.has(entry.id));
+}
+
 function isEntryUnlocked(entry, level, depth, seen) {
   if (!entry || depth > MAX_REQUIRE_DEPTH || seen.has(entry.id)) return false;
   if (level < entry.unlockLevel) return false;
@@ -504,7 +580,8 @@ function isEntryUnlocked(entry, level, depth, seen) {
 }
 
 /**
- * Whether a skill is available at the given level, including its prerequisites.
+ * Whether a skill's level and prerequisite levels are satisfied (legacy,
+ * level-only gate used before book learning existed).
  * @param {Object|string} skill
  * @param {number} level
  * @returns {boolean}
@@ -516,23 +593,111 @@ export function skillUnlocked(skill, level) {
 }
 
 /**
+ * Whether the hero knows a skill. Starter skills are always known.
+ * @param {Object|string} skill
+ * @param {Iterable<string>|Set<string>} learned learned skill ids
+ * @returns {boolean}
+ */
+export function skillLearned(skill, learned) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  return knowsEntry(entry, toLearnedSet(learned));
+}
+
+/** Whether a catalog entry is the free starter skill. */
+export function skillStarter(skill) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  return Boolean(entry?.starter);
+}
+
+/**
+ * The first prerequisite of `skill` the hero has not learned yet, or null.
+ * @param {Object|string} skill
+ * @param {Iterable<string>|Set<string>} learned
+ * @returns {{ id: string, nameKey?: string, level: number }|null}
+ */
+export function skillMissingPrereq(skill, learned) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  if (!entry) return null;
+  const learnedSet = toLearnedSet(learned) || new Set();
+
+  for (const req of skillRequires(entry)) {
+    const prerequisite = SKILLS_BY_ID.get(req.id);
+    if (!prerequisite) {
+      return { id: req.id, level: req.level ?? 1 };
+    }
+    if (!knowsEntry(prerequisite, learnedSet)) {
+      return {
+        id: prerequisite.id,
+        nameKey: prerequisite.nameKey,
+        level: prerequisite.unlockLevel
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether a book for this skill can be studied right now: the level is high
+ * enough and every prerequisite is already learned.
+ * @param {Object|string} skill
+ * @param {number} level
+ * @param {Iterable<string>|Set<string>} learned
+ * @returns {boolean}
+ */
+export function skillLearnable(skill, level, learned) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  if (!entry) return false;
+  if (normalizedLevel(level) < entry.unlockLevel) return false;
+  return skillMissingPrereq(entry, learned) === null;
+}
+
+/**
+ * Whether the hero may cast this skill: it is learned (or starter) and the
+ * character level is high enough.
+ * @param {Object|string} skill
+ * @param {number} level
+ * @param {Iterable<string>|Set<string>} learned
+ * @returns {boolean}
+ */
+export function skillUsable(skill, level, learned) {
+  const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
+  if (!entry) return false;
+  if (normalizedLevel(level) < entry.unlockLevel) return false;
+  return knowsEntry(entry, toLearnedSet(learned));
+}
+
+/**
  * Why a skill is still locked, or `null` when the skill is available.
  *
  * `{ kind: "level", level }` means the character level is still too low;
- * `{ kind: "prereq", id, nameKey, level }` means another skill in the tree has
- * to be available first. An unknown skill id also yields `null`; callers must
- * gate availability with `skillUnlocked`, which returns `false` for it.
+ * `{ kind: "prereq", id, nameKey, level }` means another skill must be learned
+ * first; `{ kind: "book" }` means the prerequisites are met but the skill has
+ * not been studied from its book yet. An unknown skill id yields `null`.
+ *
  * @param {Object|string} skill
  * @param {number} level
- * @returns {{ kind: "level"|"prereq", level: number, id?: string, nameKey?: string }|null}
+ * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids;
+ *   pass null for the legacy level-only gate.
+ * @returns {{ kind: "level"|"prereq"|"book", level?: number, id?: string,
+ *   nameKey?: string }|null}
  */
-export function skillLockReason(skill, level) {
+export function skillLockReason(skill, level, learned = null) {
   const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
   if (!entry) return null;
 
   const current = normalizedLevel(level);
   if (current < entry.unlockLevel) {
     return { kind: "level", level: entry.unlockLevel };
+  }
+
+  const learnedSet = toLearnedSet(learned);
+  if (learnedSet) {
+    if (!knowsEntry(entry, learnedSet)) {
+      const missing = skillMissingPrereq(entry, learnedSet);
+      if (missing) return { kind: "prereq", ...missing };
+      return { kind: "book" };
+    }
+    return null;
   }
 
   for (const req of skillRequires(entry)) {

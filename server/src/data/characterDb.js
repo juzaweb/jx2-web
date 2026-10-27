@@ -11,24 +11,24 @@ const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 16;
 
 /**
- * Playable sects. A sect determines the character's gender: only Nga My admits
- * women; Thiếu Lâm, Võ Đang and Ngũ Độc are male.
+ * Playable genders. Sects are gone: a hero's skill kit is decided by the weapon
+ * worn in the `weapon` equipment slot, not by a character class.
  */
-const SECTS = ["thieu-lam", "nga-my", "vo-dang", "ngu-doc"];
-const DEFAULT_SECT = "thieu-lam";
-const SECT_GENDER = {
-  "thieu-lam": "male",
-  "nga-my": "female",
-  "vo-dang": "male",
-  "ngu-doc": "male"
-};
+const GENDERS = ["male", "female"];
+const DEFAULT_GENDER = "male";
 
 /**
- * Normalise an unknown sect to the default.
- * @param {*} sect
+ * Legacy `sect` column value. The column is kept so older databases keep their
+ * shape, but nothing reads it any more.
+ */
+const LEGACY_SECT = "none";
+
+/**
+ * Normalise an unknown gender to the default.
+ * @param {*} gender
  * @returns {string}
  */
-const normalizeSect = (sect) => (SECTS.includes(sect) ? sect : DEFAULT_SECT);
+const normalizeGender = (gender) => (GENDERS.includes(gender) ? gender : DEFAULT_GENDER);
 // SQLite extended result code for a UNIQUE constraint violation.
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 
@@ -80,13 +80,11 @@ const normalizeName = (name) =>
  */
 const mapRow = (row) => {
   if (!row) return null;
-  const sect = normalizeSect(row.sect);
   return {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    sect,
-    gender: SECT_GENDER[sect],
+    gender: normalizeGender(row.gender),
     appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
@@ -367,10 +365,10 @@ export class CharacterDatabase {
    * Create a character for a user.
    * @param {string} userId
    * @param {string} name
-   * @param {string} [sect="thieu-lam"] One of SECTS
+   * @param {"male"|"female"} [gender="male"]
    * @returns {Object} Sanitized character
    */
-  create(userId, name, sect = DEFAULT_SECT) {
+  create(userId, name, gender = DEFAULT_GENDER) {
     if (!isValidUserId(userId)) {
       const err = new Error("Thông tin tài khoản không hợp lệ.");
       err.code = "INVALID_USER";
@@ -390,13 +388,7 @@ export class CharacterDatabase {
       throw err;
     }
 
-    const cleanSect = sect === undefined || sect === null ? DEFAULT_SECT : sect;
-    if (!SECTS.includes(cleanSect)) {
-      const err = new Error(`Môn phái không hợp lệ. Chỉ chấp nhận: ${SECTS.join(", ")}.`);
-      err.code = "INVALID_SECT";
-      throw err;
-    }
-    const cleanGender = SECT_GENDER[cleanSect];
+    const cleanGender = normalizeGender(gender);
 
     if (this.countByUser(userId) >= MAX_CHARACTER_SLOTS) {
       const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
@@ -411,7 +403,7 @@ export class CharacterDatabase {
     const id = `char_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
     try {
-      this.stmtInsert.run(id, userId, cleanName, cleanSect, cleanGender, 1, createdAt, createdAt);
+      this.stmtInsert.run(id, userId, cleanName, LEGACY_SECT, cleanGender, 1, createdAt, createdAt);
     } catch (error) {
       // The unique index is the ultimate guard: a concurrent writer (multiple
       // server processes sharing the file) can slip past the check above.

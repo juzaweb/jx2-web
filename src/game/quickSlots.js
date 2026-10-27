@@ -10,7 +10,7 @@ const STORAGE_PREFIX = "jx2_quick_slots_";
 
 export const QUICK_SLOT_COUNT = 9;
 
-/** Prefix that marks a hotbar binding as a sect skill instead of an item id. */
+/** Prefix that marks a hotbar binding as a weapon skill instead of an item id. */
 export const SKILL_BINDING_PREFIX = "skill:";
 
 /**

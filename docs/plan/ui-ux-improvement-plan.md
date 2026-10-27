@@ -11,7 +11,7 @@
 
 "Giang Hồ" is a browser-playable 2D Wuxia RPG combining a Phaser 3 canvas engine with a React 18 UI overlay. The game delivers an authentic Wuxia aesthetic with parchment modals, CJK icon glyphs, metallic brackets, and classic status bars.
 
-As the gameplay expands across multi-faction sect skills, inventory management, NPC shops, and mobile touch controls, several key UI/UX friction points diminish combat responsiveness and player clarity:
+As the gameplay expands across weapon-based skill kits, inventory management, NPC shops, and mobile touch controls, several key UI/UX friction points diminish combat responsiveness and player clarity:
 
 1. **Targeting & Enemy Combat Feedback:** Lack of an explicit target selection frame / overhead ring and target health HUD, causing ambiguity during target selection and mob combat.
 2. **Skill Cooldown & Resource Readiness:** Cooldown timers render as plain text numbers without radial conic sweep overlays or distinct visual states when MP/Stamina is insufficient for skill execution.
@@ -29,7 +29,7 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 
 1. **Launch & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Managed smoothly in `src/App.jsx` with guest session handling, i18n support (VI/EN), and mobile orientation prompts.
 2. **HUD Overlay:** `PlayerVitals` top-left displays Level, EXP, HP, MP, Stamina, and Martial Aura. `MinimapPanel` top-right shows radar canvas, quest tracker, subzone, and zoom/collapse controls.
-3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 mixed quick-slots (each holds a consumable item or a sect skill), plus system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode). Techniques are dragged from the `F5` skill tree onto a slot and cast with its number key; consumables are dragged from the bag.
+3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 mixed quick-slots (each holds a consumable item or a weapon skill), plus system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode). Techniques are dragged from the `F5` skill tree onto a slot and cast with its number key; consumables are dragged from the bag.
 4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button and four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them). Two consumable buttons (`MobileItemPicker`) sit in their own column outside the fan and are empty until the player binds an item from the bag.
 5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `MobileSkillPicker`, `MobileItemPicker`. Pointer drag support is provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js` (skills and items share the same drag pipeline).
 

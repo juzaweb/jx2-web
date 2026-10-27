@@ -71,6 +71,8 @@ export const EVENTS = {
   GAME_PAUSED: "GAME_PAUSED",
   PK_CHANGED: "PK_CHANGED",
   SKILL_CAST: "SKILL_CAST",
+  /** Server-authoritative learned skill ids (payload: {skills: string[]}). */
+  SKILLS_UPDATED: "SKILLS_UPDATED",
   SHOP_OPENED: "SHOP_OPENED",
   SHOP_RESULT: "SHOP_RESULT",
   /** Socket gate state for the overlay (payload: {connected}). */
@@ -97,6 +99,8 @@ export const EVENTS = {
   ACTION_REQUEST_CITY_MAP: "ACTION_REQUEST_CITY_MAP",
   SET_PLAYER_NAME: "SET_PLAYER_NAME",
   SET_PLAYER_GENDER: "SET_PLAYER_GENDER",
+  /** Ask the scene to use a weapon's skill kit (payload: weaponType). */
+  SET_PLAYER_WEAPON: "SET_PLAYER_WEAPON",
   ACTION_CHAT: "ACTION_CHAT",
   ACTION_GM: "ACTION_GM",
   GM_MODAL_TOGGLE: "GM_MODAL_TOGGLE",

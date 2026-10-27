@@ -3,6 +3,8 @@
  * The catalog itself is static; stack quantities are persisted via src/game/storage.js.
  */
 
+import { SKILLS } from "./skills.js";
+
 /** Keys that would poison a plain-object quantity map if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -97,6 +99,114 @@ export const quanLangKhach = {
 export const INVENTORY_GRID_SIZE = 30;
 
 /**
+ * Weapons the hero can wear. The worn weapon's `weaponType` decides which skill
+ * kit (and therefore which books) the character may use.
+ */
+export const kiemLangKhach = {
+  id: "kiem-lang-khach",
+  name: "Kiếm Lãng Khách",
+  icon: "icon-jian",
+  slot: "weapon",
+  weaponType: "kiem",
+  bonuses: { attack: 6 },
+  desc: "Thanh kiếm thép giang hồ sơ nhập. Tay kiếm dùng được các chiêu kiếm pháp đã học."
+};
+
+export const baoTayLangKhach = {
+  id: "bao-tay-lang-khach",
+  name: "Bao Tay Lãng Khách",
+  icon: "icon-claw",
+  slot: "weapon",
+  weaponType: "bao-tay",
+  bonuses: { attack: 5, attackSpeed: 0.05 },
+  desc: "Bao tay da bọc thép, cận chiến linh hoạt. Chỉ dùng được chiêu bao tay đã học."
+};
+
+export const daoLangKhach = {
+  id: "dao-lang-khach",
+  name: "Đao Lãng Khách",
+  icon: "icon-dao",
+  slot: "weapon",
+  weaponType: "dao",
+  bonuses: { attack: 7 },
+  desc: "Đao bản rộng nặng tay, sát thương cao. Chỉ dùng được chiêu đao pháp đã học."
+};
+
+/**
+ * Book names used for the dropped study items. Books are learned, not cast: the
+ * server consumes the book and records the skill id on the character.
+ * @type {Readonly<Record<string, string>>}
+ */
+const BOOK_NAMES = Object.freeze({
+  thieu_lam_tam_phap: "Thiếu Lâm Tâm Pháp",
+  dai_tu_di_chuong: "Đại Tu Di Chưởng",
+  la_han_quyen: "La Hán Quyền",
+  la_han_tran: "La Hán Trận",
+  kim_cang_bat_hoai: "Kim Cang Bất Hoại",
+  nhu_lai_than_chuong: "Như Lai Thần Chưởng",
+  thieu_duong_kiem_phap: "Thiếu Dương Kiếm Pháp",
+  thai_cuc_quyen: "Thái Cực Quyền",
+  tam_thanh_kiem_phap: "Tam Thanh Kiếm Pháp",
+  toat_hong_quan_khuyet: "Toát Hồng Quân Khuyết",
+  nga_my_kiem_phap: "Nga My Kiếm Pháp",
+  mong_diep_thoi_tam: "Mộng Điệp Thôi Tâm",
+  tu_hang_pho_do: "Từ Hàng Phổ Độ",
+  luu_thuy_khanh_van: "Lưu Thủy Khánh Vân",
+  ngu_doc_tam_phap: "Ngũ Độc Tâm Pháp",
+  truy_tam_doc: "Truy Tâm Độc",
+  van_doc_chieu_hong: "Vạn Độc Triệu Cổ",
+  u_hong_phiet_anh: "U Hồn Phiệt Ảnh"
+});
+
+/**
+ * One book per learnable skill. The starter skill (Kiếm Khí) is not sold or
+ * dropped: every hero already knows it.
+ * @type {ReadonlyArray<{id:string, name:string, icon:string, skillId:string, weapon:string, desc:string}>}
+ */
+export const BOOK_ITEMS = Object.freeze(
+  SKILLS.filter((skill) => !skill.starter).map((skill) => {
+    const name = BOOK_NAMES[skill.id] || skill.id;
+    return Object.freeze({
+      id: `book_${skill.id}`,
+      name: `Sách: ${name}`,
+      icon: "icon-book",
+      skillId: skill.id,
+      weapon: skill.weapon,
+      desc: `Bí kíp ghi chép ${name}. Dùng để học chiêu thức này.`
+    });
+  })
+);
+
+/**
+ * Catalog id of the book that teaches a skill.
+ * @param {string} skillId
+ * @returns {string}
+ */
+export function bookItemId(skillId) {
+  return `book_${skillId}`;
+}
+
+/**
+ * Skill id a book teaches, or null when the id is not a skill book.
+ * @param {string} itemId
+ * @returns {string|null}
+ */
+export function skillIdForBook(itemId) {
+  if (typeof itemId !== "string") return null;
+  const book = BOOK_ITEMS.find((item) => item.id === itemId);
+  return book ? book.skillId : null;
+}
+
+/**
+ * Whether an item id is a learnable skill book.
+ * @param {string} itemId
+ * @returns {boolean}
+ */
+export function isSkillBook(itemId) {
+  return skillIdForBook(itemId) !== null;
+}
+
+/**
  * Split a silver balance into the three display denominations.
  * The server keeps a single silver balance, so copper is always zero until a
  * copper ledger exists.
@@ -121,7 +231,14 @@ const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 /**
  * Standalone equipment items (not included in the starting inventory grid).
  */
-export const EQUIPMENT_ITEMS = [aoLangKhach, nonLangKhach, quanLangKhach];
+export const EQUIPMENT_ITEMS = [
+  aoLangKhach,
+  nonLangKhach,
+  quanLangKhach,
+  kiemLangKhach,
+  baoTayLangKhach,
+  daoLangKhach
+];
 
 /**
  * The bag grid contents. Every entry is an item the player can actually obtain and
@@ -159,6 +276,7 @@ export function getItemById(id) {
     QUICK_ITEMS.find((item) => item.id === id) ||
     INVENTORY_ITEMS.find((item) => item && item.id === id) ||
     EQUIPMENT_ITEMS.find((item) => item && item.id === id) ||
+    BOOK_ITEMS.find((item) => item.id === id) ||
     null
   );
 }
@@ -194,7 +312,9 @@ export function getConsumableEffect(id) {
 export const STARTER_ITEMS = Object.freeze({
   "kim-sang-duoc": 50,
   "dai-hoan-dan": 50,
-  "hoi-thanh-phu": 50
+  "hoi-thanh-phu": 50,
+  // Every hero starts with a sword so the starter Kiếm Khí skill is usable.
+  "kiem-lang-khach": 1
 });
 
 /**
@@ -433,7 +553,7 @@ export function applyQuantities(quantities = defaultQuantities()) {
   const owned = sanitizeQuantities(quantities) || {};
 
   const inventoryItems = [];
-  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS].filter(Boolean).forEach((item) => {
+  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS, ...BOOK_ITEMS].filter(Boolean).forEach((item) => {
     const qty = quantityOf(owned, item.id);
     if (qty > 0) inventoryItems.push({ ...item, qty });
   });

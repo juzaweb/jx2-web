@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillById, skillsForSect, skillMpCost, skillLockReason, skillUnlocked } from "./skills.js";
+import { skillById, skillsForWeapon, skillMpCost, skillLockReason, skillUsable } from "./skills.js";
 import {
   playSkillCastVfx,
   playSkillImpactVfx,
@@ -99,6 +99,8 @@ export class CombatSystem {
     /** Active flurry: { skill, targetId, nextAt, endsAt, hitsLeft, intervalMs, chasing }. */
     this.channel = null;
     this.lastChaseAt = 0;
+    /** Skill ids learned from books; starter skills are implicitly known. */
+    this.learnedSkills = new Set();
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
   }
@@ -261,9 +263,9 @@ export class CombatSystem {
    * @returns {boolean}
    */
   castSkillById(skillId, aim = null) {
-    const skill = skillsForSect(this.player.sect).find((entry) => entry.id === skillId);
+    const skill = skillsForWeapon(this.player.weaponType).find((entry) => entry.id === skillId);
     if (!skill) {
-      this.ui.addLog("Môn phái này chưa có chiêu thức ở ô đó.");
+      this.ui.addLog("Vũ khí đang trang bị không có chiêu thức này.");
       return false;
     }
     return this.castSkill(skill, aim);
@@ -329,7 +331,10 @@ export class CombatSystem {
    * @returns {string}
    */
   skillLockMessage(skill) {
-    const reason = skillLockReason(skill, this.player.stats.level);
+    const reason = skillLockReason(skill, this.player.stats.level, this.learnedSkills);
+    if (reason?.kind === "book") {
+      return "Chưa học chiêu thức này. Dùng sách võ công để học.";
+    }
     if (reason?.kind === "prereq") {
       return `Cần học ${translate(reason.nameKey, undefined, reason.id)} trước.`;
     }
@@ -347,7 +352,7 @@ export class CombatSystem {
     const now = this.scene.time?.now ?? 0;
     const readyAt = this.skillCooldowns.get(skill.id) || 0;
     if (now < readyAt) return false;
-    if (!skillUnlocked(skill, this.player.stats?.level ?? 1)) return false;
+    if (!skillUsable(skill, this.player.stats?.level ?? 1, this.learnedSkills)) return false;
     if ((this.player.stats?.mp ?? 0) < skillMpCost(skill.id)) return false;
     return true;
   }
@@ -370,7 +375,7 @@ export class CombatSystem {
       );
       return false;
     }
-    if (!skillUnlocked(skill, this.player.stats.level)) {
+    if (!skillUsable(skill, this.player.stats.level, this.learnedSkills)) {
       this.ui.addLog(this.skillLockMessage(skill));
       return false;
     }

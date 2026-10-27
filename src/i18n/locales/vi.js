@@ -155,11 +155,9 @@ export default {
     loading: "Đang tải...",
     noCharacters: "Chưa có nhân vật",
     newCharacter: "Nhân vật mới",
-    sect: "Môn phái",
-    sectThieuLam: "Thiếu Lâm",
-    sectNgaMy: "Nga My",
-    sectVoDang: "Võ Đang",
-    sectNguDoc: "Ngũ Độc",
+    gender: "Giới tính",
+    genderMale: "Nam",
+    genderFemale: "Nữ",
     emptySlot: "(Trống)",
     characterList: "Danh sách nhân vật",
     nameLabel: "Tên:",
@@ -197,7 +195,8 @@ export default {
     picker: {
       eyebrow: "Gán chiêu",
       title: "Chọn chiêu cho {hand}",
-      locked: "Cần cấp {level}"
+      locked: "Cần cấp {level}",
+      needsBook: "Chưa học — dùng sách để học"
     },
     mobilePicker: {
       eyebrow: "Gán chiêu",
@@ -220,7 +219,7 @@ export default {
       }
     },
     modalTitle: "Võ Công",
-    modalHint: "Cây chiêu thức môn phái. Chọn một ô để xem chi tiết, kéo chiêu thả vào ô số 1-9 để gán phím nhanh.",
+    modalHint: "Cây chiêu thức theo vũ khí đang trang bị. Chọn một ô để xem chi tiết, kéo chiêu thả vào ô số 1-9 để gán phím nhanh. Chiêu chưa học sẽ mở khoá bằng sách rớt từ quái.",
     dragHint: "Kéo chiêu thức thả vào ô số 1-9 trên thanh dưới để gán phím nhanh.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
@@ -231,9 +230,15 @@ export default {
     passiveTag: "Bị động",
     regenTag: "Hồi {hp} sinh lực/giây",
     tree: {
-      requires: "Cần {name} cấp {level}",
-      empty: "Môn phái này chưa có chiêu thức.",
+      requires: "Cần học {name} trước",
+      empty: "Vũ khí này chưa có chiêu thức.",
       selectHint: "Chọn một ô chiêu thức để xem chi tiết."
+    },
+    kiem: {
+      kiemKhi: {
+        name: "Kiếm Khí",
+        desc: "Chiêu kiếm khởi đầu, phóng một luồng khí kiếm về phía mục tiêu. Mọi nhân vật mới đều biết chiêu này."
+      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -379,6 +384,11 @@ export default {
     accessory: "Trang sức",
     weapon: "Vũ khí"
   },
+  weapons: {
+    kiem: "Kiếm",
+    baoTay: "Bao Tay",
+    dao: "Đao"
+  },
   bonus: {
     attack: "Ngoại công",
     defense: "Ngoại phòng",
@@ -408,6 +418,18 @@ export default {
     }
   },
   item: {
+    "kiem-lang-khach": {
+      name: "Kiếm Lãng Khách",
+      desc: "Thanh kiếm thép giang hồ sơ nhập. Tay kiếm dùng được các chiêu kiếm pháp đã học."
+    },
+    "bao-tay-lang-khach": {
+      name: "Bao Tay Lãng Khách",
+      desc: "Bao tay da bọc thép, cận chiến linh hoạt. Chỉ dùng được chiêu bao tay đã học."
+    },
+    "dao-lang-khach": {
+      name: "Đao Lãng Khách",
+      desc: "Đao bản rộng nặng tay, sát thương cao. Chỉ dùng được chiêu đao pháp đã học."
+    },
     "kim-sang-duoc": {
       name: "Kim Sáng Dược",
       desc: "Linh dược chế từ kim ngân. Hồi phục +35 Sinh lực khi uống."
