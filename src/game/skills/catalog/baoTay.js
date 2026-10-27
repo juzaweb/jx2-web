@@ -151,7 +151,7 @@ export const BAO_TAY_SKILLS = [
     requires: [{ id: "la_han_tran", level: 1 }],
     nameKey: "skills.thieuLam.nhuLaiThanChuong.name",
     descKey: "skills.thieuLam.nhuLaiThanChuong.desc",
-    unlockLevel: 10,
+    unlockLevel: 50,
     mp: 35,
     cooldown: 30000,
     target: "enemy",

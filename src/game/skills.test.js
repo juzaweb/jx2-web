@@ -148,7 +148,7 @@ describe("skill catalog", () => {
       id: "nhu_lai_than_chuong",
       weapon: "bao-tay",
       slot: 5,
-      unlockLevel: 10,
+      unlockLevel: 50,
       mp: 35,
       cooldown: 30000,
       target: "enemy",
@@ -262,8 +262,8 @@ describe("skill catalog", () => {
     expect(skillUnlocked("la_han_tran", 0)).toBe(false);
     expect(skillUnlocked("kim_cang_bat_hoai", 1)).toBe(true);
     expect(skillUnlocked("kim_cang_bat_hoai", 0)).toBe(false);
-    expect(skillUnlocked("nhu_lai_than_chuong", 10)).toBe(true);
-    expect(skillUnlocked("nhu_lai_than_chuong", 9)).toBe(false);
+    expect(skillUnlocked("nhu_lai_than_chuong", 50)).toBe(true);
+    expect(skillUnlocked("nhu_lai_than_chuong", 49)).toBe(false);
     expect(skillUnlocked("bogus", 99)).toBe(false);
   });
 
@@ -297,8 +297,15 @@ describe("skill catalog", () => {
     // Studying any book also needs the level-10 floor, whatever unlockLevel says.
     expect(skillLearnable("dai_tu_di_chuong", 9, ["thieu_lam_tam_phap"])).toBe(false);
     expect(skillLearnable("dai_tu_di_chuong", 10, ["thieu_lam_tam_phap"])).toBe(true);
+    // Như Lai Thần Chưởng keeps its own, much higher requirement.
     expect(skillLearnable("nhu_lai_than_chuong", 9, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
       false
+    );
+    expect(skillLearnable("nhu_lai_than_chuong", 49, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
+      false
+    );
+    expect(skillLearnable("nhu_lai_than_chuong", 50, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
+      true
     );
 
     // Casting requires the skill to be learned (starter skills are free).
