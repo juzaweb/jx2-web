@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { rollEnemyReward } from "../src/rewards.js";
-import { KILL_REWARD } from "../../src/game/items.js";
+import { KILL_REWARD, getItemById } from "../../src/game/items.js";
+import { MONSTER_WEAPON_DROPS } from "../../src/game/enemyCatalog.js";
 
 test("Kill reward suite", async (t) => {
   const enemy = { id: 2, x: 1110.4, y: 589.6, hp: 0, maxHp: 45, isDead: true };
@@ -24,7 +25,7 @@ test("Kill reward suite", async (t) => {
     assert.equal(high.coins, KILL_REWARD.coinsMax);
   });
 
-  await t.test("pays EXP and bạc, plus an optional skill book, inside the documented ranges", () => {
+  await t.test("pays EXP and bạc, plus optional book/weapon loot, inside the documented ranges", () => {
     for (let i = 0; i < 25; i++) {
       const reward = rollEnemyReward("usr_hero", enemy);
 
@@ -85,5 +86,18 @@ test("Kill reward suite", async (t) => {
       early.loot.every((drop) => !drop.itemId.includes("lang-khach")),
       "low-level monsters never drop a weapon"
     );
+  });
+
+  await t.test("maps every weapon drop to a real, equippable weapon item", () => {
+    for (const [monsterId, drop] of Object.entries(MONSTER_WEAPON_DROPS)) {
+      const item = getItemById(drop.itemId);
+      assert.ok(item, `${monsterId} drops unknown item ${drop.itemId}`);
+      assert.equal(item.slot, "weapon", `${drop.itemId} must be a weapon`);
+      assert.ok(item.weaponType, `${drop.itemId} must declare a weaponType`);
+      assert.ok(
+        drop.chance > 0 && drop.chance < 1,
+        `${monsterId} weapon chance must be a probability`
+      );
+    }
   });
 });
