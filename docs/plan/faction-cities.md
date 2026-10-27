@@ -51,8 +51,6 @@ Remaining work is listed under _Not done_.
 
 - [ ] Battlefield objective/scoring (capture points, per-faction score, rewards);
       this needs its own plan because it adds server state.
-- [ ] A way to change faction (currently fixed at creation; no item, no UI,
-      GM-only would need an action).
 - [ ] Book/weapon drops for the level 30–60 species (they pay EXP and coins
       only, so the weapon kits stay unchanged).
 
