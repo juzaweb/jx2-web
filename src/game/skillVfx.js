@@ -311,9 +311,9 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
 }
 
 /**
- * Arrival blast: a white-hot core flash, a ring spreading out to the strike's
- * splash radius and a fan of qi shards thrown outwards. Every piece is one-shot
- * and removes itself when its tween ends.
+ * Arrival blast: white-hot core flash, double crossed sword-qi slashes,
+ * an inner shockwave, an expanding ring matching splash radius, and high-velocity
+ * radial qi shards. Every piece is one-shot and removes itself when its tween ends.
  * @param {Phaser.Scene} scene
  * @param {Object} skill
  * @param {number} x screen X of the impact
@@ -331,40 +331,72 @@ function playSwordQiBlast(scene, skill, x, y, depth) {
     scene.tweens.add({ ...config, onComplete: () => config.targets.destroy() });
   };
 
-  const core = scene.add.circle(x, y, 9, 0xffffff, 0.85).setDepth(depth + 1);
-  spray({ targets: core, scale: 2.6, alpha: 0, duration: 180 });
+  // 1. White-hot Core Flash
+  const core = scene.add.circle(x, y, 12, 0xffffff, 0.95).setDepth(depth + 3);
+  spray({ targets: core, scale: 2.8, alpha: 0, duration: 160, ease: "Quad.easeOut" });
 
-  // An empty fill with a stroke: only the spreading ring is visible. It starts
-  // small and blooms out to the full splash radius.
+  // 2. High-energy Inner Shockwave Ring
+  const innerRing = scene.add
+    .circle(x, y, Math.round(blastRadius * 0.45), 0xdcf6ff, 0)
+    .setStrokeStyle(4, 0xffffff, 0.95)
+    .setScale(0.2)
+    .setDepth(depth + 2);
+  spray({ targets: innerRing, scale: 1.1, alpha: 0, duration: 240, ease: "Quad.easeOut" });
+
+  // 3. Double Crossed Sword-Qi Slashes
+  const slashPoints = [40, 0, 0, -4, -40, 0, 0, 4];
+  const slashAngles = [Math.PI / 4, -Math.PI / 4];
+  for (const slashAngle of slashAngles) {
+    const slash = scene.add
+      .polygon(x, y, slashPoints, 0xffffff, 0.9)
+      .setStrokeStyle(2, color, 0.95)
+      .setRotation(slashAngle)
+      .setScale(0.3)
+      .setDepth(depth + 2);
+    spray({
+      targets: slash,
+      scaleX: 1.6,
+      scaleY: 0.35,
+      alpha: 0,
+      duration: 220,
+      ease: "Quad.easeOut"
+    });
+  }
+
+  // 4. Splash Radius Ring: starts small and blooms out to the full splash radius.
   const ring = scene.add
     .circle(x, y, blastRadius, color, 0)
     .setStrokeStyle(3, color, 0.9)
-    .setScale(0.3)
+    .setScale(0.25)
     .setDepth(depth);
-  spray({ targets: ring, scale: 1, alpha: 0, duration: 360 });
+  spray({ targets: ring, scale: 1, alpha: 0, duration: 380, ease: "Cubic.easeOut" });
 
-  const shardCount = 5;
-  const shardReach = blastRadius * 0.65;
+  // 5. Radial Sword-Qi Shards: 8 sharp energy shards fanning out in 360 degrees
+  const shardCount = 8;
+  const shardReach = blastRadius * 0.72;
   for (let index = 0; index < shardCount; index += 1) {
-    // Start at the top and fan out evenly, so the blast reads in every direction.
     const angle = (Math.PI * 2 * index) / shardCount - Math.PI / 2;
-    const shard = scene.add.circle(x, y, 3.5, color, 0.9).setDepth(depth - 1);
+    const shard = scene.add
+      .circle(x, y, 4, color, 0.95)
+      .setStrokeStyle(1.5, 0xffffff, 0.9)
+      .setDepth(depth + 1);
     spray({
       targets: shard,
       x: x + Math.cos(angle) * shardReach,
       y: y + Math.sin(angle) * shardReach,
-      scale: 0.2,
+      scale: 0.15,
       alpha: 0,
-      duration: 300,
+      duration: 320,
       ease: "Quad.easeOut"
     });
   }
 }
 
 /**
- * Sword-qi projectile: a blade-shaped shard of energy leaves the hero, flies to
- * the aimed point and explodes there. Vector-drawn so a long reach (Kiếm Khí)
- * reads as a thrown art instead of a melee slash played at the caster's feet.
+ * Sword-qi projectile: a multi-layered, razor-sharp crescent blade of energy leaves
+ * the hero, flies to the aimed point and explodes into a slash blast.
+ * Vector-drawn so a long reach (Kiếm Khí) reads as a thrown martial art with
+ * intense speed, luminescence, and trail wake instead of a melee slash.
  * @param {Phaser.Scene} scene
  * @param {Object} skill
  * @param {import("./player.js").Player} player
@@ -389,21 +421,71 @@ function playSwordQiProjectileVfx(scene, skill, player, target, aimPoint) {
   const y0 = start.y - lift;
   const x0 = start.x;
 
-  // A thin double-edged blade: tip at +X, tapered tail. Everything is drawn along
-  // +X and then rotated onto the flight path. The tail is drawn thin on purpose —
-  // it reads as the shard's own streak, so no separate trail sprite is needed.
+  // 1. Outer Translucent Qi Aura
+  const auraPoints = [
+    56, 0,
+    26, -13,
+    -2, -15,
+    -26, -11,
+    -48, -5,
+    -34, 0,
+    -48, 5,
+    -26, 11,
+    -2, 15,
+    26, 13
+  ];
+  const aura = scene.add
+    .polygon(x0, y0, auraPoints, color, 0.28)
+    .setRotation(angle)
+    .setScale(scale)
+    .setDepth(depth - 1);
+
+  // 2. Main Qi Blade: Aerodynamic razor crescent blade with barbed tail
+  const bladePoints = [
+    50, 0,
+    22, -9,
+    -2, -11,
+    -24, -8,
+    -42, -4,
+    -30, 0,
+    -42, 4,
+    -24, 8,
+    -2, 11,
+    22, 9
+  ];
   const blade = scene.add
-    .polygon(x0, y0, [40, 0, 12, -7, -14, -5, -30, -2, -30, 2, -14, 5, 12, 7], color, 0.9)
+    .polygon(x0, y0, bladePoints, color, 0.92)
+    .setStrokeStyle(1.5, 0xdcf6ff, 0.95)
     .setRotation(angle)
     .setScale(scale)
     .setDepth(depth);
+
+  // 3. Core Energy Spine: Slender white-hot spine along the center of the blade
+  const coreSpinePoints = [
+    42, 0,
+    16, -3,
+    -12, -2.5,
+    -26, 0,
+    -12, 2.5,
+    16, 3
+  ];
+  const coreSpine = scene.add
+    .polygon(x0, y0, coreSpinePoints, 0xffffff, 0.95)
+    .setRotation(angle)
+    .setScale(scale)
+    .setDepth(depth + 1);
+
+  // 4. Energy Glows: Inner white core and soft cyan halo
   const glow = scene.add
-    .circle(x0, y0, 13, color, 0.22)
+    .circle(x0, y0, 14 * scale, color, 0.3)
     .setDepth(depth - 1);
+  const coreGlow = scene.add
+    .circle(x0, y0, 7 * scale, 0xffffff, 0.5)
+    .setDepth(depth);
 
   const worldDistance = Math.hypot(aim.x - player.x, aim.y - player.y);
   const travelDuration = Math.max(160, Math.min(520, worldDistance / 1.8));
-  const flying = [blade, glow];
+  const flying = [blade, aura, coreSpine, glow, coreGlow];
 
   scene.tweens.add({
     targets: flying,

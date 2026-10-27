@@ -345,9 +345,13 @@ describe("playSkillCastVfx sword-qi projectile", () => {
 
   it("explodes where it lands and cleans every piece up", () => {
     const { scene, tweenConfigs } = makeScene();
-    const blade = makeSprite();
     const circles = [];
-    scene.add.polygon = vi.fn(() => blade);
+    const polygons = [];
+    scene.add.polygon = vi.fn(() => {
+      const shape = makeSprite();
+      polygons.push(shape);
+      return shape;
+    });
     scene.add.circle = vi.fn(() => {
       const shape = makeSprite();
       circles.push(shape);
@@ -357,13 +361,21 @@ describe("playSkillCastVfx sword-qi projectile", () => {
     playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
 
     const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
+    const preImpactCircleCount = circles.length;
+    const preImpactPolygonCount = polygons.length;
+
     flight.onComplete();
 
-    expect(blade.destroy).toHaveBeenCalled();
+    // The flying projectile layers (aura, blade, core) are cleaned up on arrival.
+    for (const piece of polygons.slice(0, preImpactPolygonCount)) {
+      expect(piece.destroy).toHaveBeenCalled();
+    }
 
-    // The first two circles are the cast pulse and the blade's glow; everything
-    // created from here on belongs to the blast (core, ring and the shards).
-    const blastPieces = circles.slice(2);
+    // Blast pieces include core flash, shockwave rings, sword slashes, and shards.
+    const blastPieces = [
+      ...circles.slice(preImpactCircleCount),
+      ...polygons.slice(preImpactPolygonCount)
+    ];
     expect(blastPieces.length).toBeGreaterThan(4);
 
     const blastTweens = tweenConfigs.slice(tweenConfigs.indexOf(flight) + 1);
