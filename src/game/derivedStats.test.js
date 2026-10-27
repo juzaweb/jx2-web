@@ -89,6 +89,6 @@ describe("deriveCombatStats", () => {
   it("normalizes an invalid level to the progression floor", () => {
     expect(deriveCombatStats({ level: Number.NaN }).level).toBe(1);
     expect(deriveCombatStats({ level: -5 }).level).toBe(1);
-    expect(deriveCombatStats({ level: 9999 }).level).toBe(150);
+    expect(deriveCombatStats({ level: 9999 }).level).toBe(99);
   });
 });

@@ -25,7 +25,7 @@ This document proposes 5 prioritized, evidence-backed features designed to deepe
 
 The implemented gameplay loop follows a classic ARPG structure:
 
-1. **Player Goal:** Advance character level (up to 150), acquire silver coins and rare materials, learn weapon skills from books, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
+1. **Player Goal:** Advance character level (up to 99), acquire silver coins and rare materials, learn weapon skills from books, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
 2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile joystick), casting the skill bound to a hotbar slot (`1`-`9`, assigned by dragging from the `F5` tree), consumable usage from hotbar slots, and talking to shopkeepers (`NPC_DUOC`).
 3. **Challenge / Opposition:** Aggressive and leashed enemy camps (`src/game/enemyCatalog.js`) in Đông Môn Thành (`dongMonThanhMap.js`). Enemies bite, pathfind toward players, and respawn on server ticks.
 4. **Feedback and Rewards:** Server-calculated damage numbers, floaty text, Web Audio synth sounds, EXP bar gains, silver payouts, and server-rolled skill-book/weapon drops (`rollEnemyReward` in `server/src/rewards.js`).

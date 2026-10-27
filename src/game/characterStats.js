@@ -15,9 +15,7 @@ import {
   BASE_CRIT_RATE,
   BASE_DEFENSE
 } from "./combatConfig.js";
-
-const MIN_LEVEL = 1;
-const MAX_LEVEL = 999;
+import { MAX_LEVEL, MIN_LEVEL } from "./progression.js";
 
 const toInt = (value, fallback, min = Number.NEGATIVE_INFINITY) => {
   const n = Number(value);

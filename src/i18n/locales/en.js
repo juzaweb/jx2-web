@@ -478,7 +478,7 @@ export default {
       quickLevel: "Quick Level Milestones",
       addLevel: "Advance Level",
       addExp: "Gain Experience",
-      customLevel: "Custom Level (1 - 150)",
+      customLevel: "Custom Level ({min} - {max})",
       setLevelBtn: "Set Level",
       successSet: "Level set successfully!"
     },

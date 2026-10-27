@@ -5,11 +5,18 @@ import {
   normalizeProgress,
   applyReward,
   progressPayload,
+  NEXT_EXP_GROWTH_BANDS,
   MAX_LEVEL
 } from "./progression.js";
 
+describe("MAX_LEVEL", () => {
+  it("is the designed character level cap", () => {
+    expect(MAX_LEVEL).toBe(99);
+  });
+});
+
 describe("nextExpForLevel", () => {
-  it("follows the 100 * 1.45 curve with per-step flooring", () => {
+  it("follows the 100 * 1.45 curve at the start of the game", () => {
     expect(nextExpForLevel(1)).toBe(100);
     expect(nextExpForLevel(2)).toBe(145);
     expect(nextExpForLevel(3)).toBe(210);
@@ -20,6 +27,26 @@ describe("nextExpForLevel", () => {
   it("clamps out-of-range levels", () => {
     expect(nextExpForLevel(0)).toBe(nextExpForLevel(1));
     expect(nextExpForLevel(9999)).toBe(nextExpForLevel(MAX_LEVEL));
+  });
+});
+
+describe("NEXT_EXP_GROWTH_BANDS", () => {
+  it("covers the whole level range with a cooling-down rate", () => {
+    expect(NEXT_EXP_GROWTH_BANDS.at(-1).upTo).toBe(MAX_LEVEL);
+    const growths = NEXT_EXP_GROWTH_BANDS.map((band) => band.growth);
+    for (let i = 1; i < growths.length; i += 1) {
+      expect(growths[i]).toBeLessThanOrEqual(growths[i - 1]);
+    }
+  });
+
+  it("keeps the run to the cap reachable", () => {
+    let total = 0;
+    for (let level = 1; level < MAX_LEVEL; level += 1) {
+      total += nextExpForLevel(level);
+    }
+    // A flat ×1.45 curve would need ~4×10^17 EXP for level 98 alone.
+    expect(nextExpForLevel(MAX_LEVEL - 1)).toBeLessThan(5_000_000);
+    expect(total).toBeLessThan(50_000_000);
   });
 });
 
@@ -40,6 +67,18 @@ describe("normalizeProgress", () => {
     });
     expect(normalizeProgress({ level: 9999 }).level).toBe(MAX_LEVEL);
     expect(normalizeProgress({})).toEqual({ level: 1, exp: 0, coins: 0, kills: 0 });
+  });
+
+  it("folds an over-cap save back into a full, in-range bar", () => {
+    const legacy = normalizeProgress({ level: 150, exp: 5e16, coins: 10, kills: 4 });
+    expect(legacy.level).toBe(MAX_LEVEL);
+    expect(legacy.exp).toBe(nextExpForLevel(MAX_LEVEL));
+    expect(legacy.exp).toBeLessThan(5_000_000);
+  });
+
+  it("caps EXP at the current level's requirement", () => {
+    expect(normalizeProgress({ level: 2, exp: 9_999 }).exp).toBe(nextExpForLevel(2));
+    expect(normalizeProgress({ level: 2, exp: 30 }).exp).toBe(30);
   });
 });
 
@@ -73,6 +112,17 @@ describe("applyReward", () => {
     const result = applyReward({ level: MAX_LEVEL, exp: 0, coins: 0, kills: 0 }, { exp: 1_000_000 });
     expect(result.level).toBe(MAX_LEVEL);
     expect(result.levelUps).toBe(0);
+    expect(result.exp).toBe(nextExpForLevel(MAX_LEVEL));
+  });
+
+  it("levels all the way to the cap and stops there", () => {
+    const result = applyReward(
+      { level: 1, exp: 0, coins: 0, kills: 0 },
+      { exp: 100_000_000 }
+    );
+    expect(result.level).toBe(MAX_LEVEL);
+    expect(result.levelUps).toBe(MAX_LEVEL - 1);
+    expect(result.exp).toBe(nextExpForLevel(MAX_LEVEL));
   });
 });
 

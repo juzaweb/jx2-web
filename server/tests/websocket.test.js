@@ -745,11 +745,17 @@ test("WebSocket server-authority suite", async (t) => {
 
     const admin = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(admin, { characterId: "char_gm", token: "admin-token" });
-    admin.send({ type: "gm_action", payload: { action: "set_level", level: 99 } });
-    const progress = await admin.waitFor(
+    admin.send({ type: "gm_action", payload: { action: "set_level", level: 500 } });
+    const clamped = await admin.waitFor(
       (m) => m.type === "player_progress" && m.payload.level === 99
     );
-    assert.equal(progress.payload.level, 99);
+    assert.equal(clamped.payload.level, 99);
+
+    admin.send({ type: "gm_action", payload: { action: "set_level", level: 42 } });
+    const applied = await admin.waitFor(
+      (m) => m.type === "player_progress" && m.payload.level === 42
+    );
+    assert.equal(applied.payload.level, 42);
     await admin.close();
   });
 

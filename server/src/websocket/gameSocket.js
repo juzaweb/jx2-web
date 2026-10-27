@@ -38,6 +38,7 @@ import {
   isKnownMap
 } from "../../../src/game/maps/mapRegistry.js";
 import {
+  MAX_LEVEL,
   applyReward,
   normalizeProgress,
   progressPayload
@@ -2077,7 +2078,7 @@ export class GameSocketManager {
 
     switch (action) {
       case "set_level": {
-        const level = clampNum(payload.level, 1, 150, player.progress?.level || 1);
+        const level = clampNum(payload.level, 1, MAX_LEVEL, player.progress?.level || 1);
         if (player.progress) {
           player.progress.level = level;
           player.progress.exp = 0;
@@ -2111,9 +2112,9 @@ export class GameSocketManager {
       }
 
       case "add_level": {
-        const delta = clampNum(payload.levels, 1, 150, 1);
+        const delta = clampNum(payload.levels, 1, MAX_LEVEL, 1);
         const current = player.progress?.level || player.level || 1;
-        const targetLevel = clampNum(current + delta, 1, 150, current);
+        const targetLevel = clampNum(current + delta, 1, MAX_LEVEL, current);
         this.handleGmAction(ws, { action: "set_level", level: targetLevel });
         break;
       }

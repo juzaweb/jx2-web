@@ -479,7 +479,7 @@ export default {
       quickLevel: "快速等级档位",
       addLevel: "提升等级",
       addExp: "获取经验",
-      customLevel: "自选等级 (1 - 150)",
+      customLevel: "自选等级 ({min} - {max})",
       setLevelBtn: "设定等级",
       successSet: "等级设定成功！"
     },

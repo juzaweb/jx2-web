@@ -478,7 +478,7 @@ export default {
       quickLevel: "Mốc cấp nhanh",
       addLevel: "Thăng cấp",
       addExp: "Nhận EXP",
-      customLevel: "Tùy chọn cấp độ (1 - 150)",
+      customLevel: "Tùy chọn cấp độ ({min} - {max})",
       setLevelBtn: "Đặt Cấp",
       successSet: "Đã thiết lập cấp độ thành công!"
     },
