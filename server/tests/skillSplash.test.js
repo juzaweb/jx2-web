@@ -91,3 +91,26 @@ test("a single-target skill does not splash", () => {
   assert.ok(primary.hp < 1000);
   assert.equal(nearby.hp, 1000);
 });
+
+test("Kiếm Khí's blast splashes reduced damage onto monsters caught in it", () => {
+  const primary = wolf("primary", 100);
+  const nearby = wolf("nearby", 250);
+  const far = wolf("far", 1000);
+  const { manager } = makeManager({
+    enemies: [primary, nearby, far],
+    castSkillId: "kiem_khi",
+    playerWeapon: "kiem"
+  });
+
+  manager.handleEnemyHit("ws", { id: "primary", skill: "kiem_khi" });
+
+  const primaryDamage = 1000 - primary.hp;
+  const splashDamage = 1000 - nearby.hp;
+  assert.ok(primaryDamage > 0, "the aimed monster takes the full hit");
+  assert.ok(splashDamage > 0, "a monster inside the burst is damaged too");
+  assert.ok(
+    splashDamage < primaryDamage,
+    "the burst only deals a fraction of the primary hit"
+  );
+  assert.equal(far.hp, 1000, "a monster outside the burst is untouched");
+});

@@ -56,7 +56,7 @@ See `docs/weapon-skills.md` for the weapon-kit model, book learning, drop tables
 ## Controls
 - **Move:** `W`, `A`, `S`, `D`, Arrow keys, or left-click the map (hold to follow the cursor)
 - **Basic Attack:** `Space` or left-click an enemy
-- **Kiếm Khí (sword):** a ranged art (840 px) that throws a blade-shaped shard of qi at the victim. It is the starter skill, so it is cast from the hotbar like any other technique.
+- **Kiếm Khí (sword):** a ranged art (840 px) that throws a blade-shaped shard of qi at the victim, exploding in a spreading blast that also damages every monster caught in its 170 px radius for a fraction of the hit. It is the starter skill, so it is cast from the hotbar like any other technique.
 - **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind. A hero may only cast the skills of the weapon in the `weapon` slot; study books dropped by monsters to learn the rest.
 - **Consumables (hotbar `1`–`9`):** drag potions or scrolls from the bag onto a slot, then press the number to use them.
 - **Talk to NPC:** `F`

@@ -218,6 +218,13 @@ const KIEM_KHI_SKILL = {
   range: 840,
   radius: 0,
   mult: 1.1,
+  /**
+   * The blast is real damage, not just decoration: every monster standing in the
+   * burst takes a fraction of the primary hit. `radius` stays 0 because the cast
+   * itself is still aimed at one target — the server resolves the area from
+   * `splashVictims` when the hit lands.
+   */
+  splash: { radius: 170, mult: 0.6, maxTargets: 4 },
   vfx: {
     /** A blade-shaped shard of qi flies from the hero to the victim, then bursts. */
     projectile: "sword",

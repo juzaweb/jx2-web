@@ -8,6 +8,7 @@
  */
 
 import { clampToRange } from "./aim.js";
+import { splashRadius } from "./combatRules.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { directionVector } from "./heroDirections.js";
 import { ensureVfxTexture } from "./lazyAssets.js";
@@ -310,9 +311,60 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
 }
 
 /**
+ * Arrival blast: a white-hot core flash, a ring spreading out to the strike's
+ * splash radius and a fan of qi shards thrown outwards. Every piece is one-shot
+ * and removes itself when its tween ends.
+ * @param {Phaser.Scene} scene
+ * @param {Object} skill
+ * @param {number} x screen X of the impact
+ * @param {number} y screen Y of the impact
+ * @param {number} depth
+ */
+function playSwordQiBlast(scene, skill, x, y, depth) {
+  const color = skill.vfx?.color || 0x9be8ff;
+  // Ground distance maps 1:1 to screen distance, so the splash radius is also the
+  // on-screen radius: the ring ends exactly where the server stops hitting.
+  const blastRadius = splashRadius(skill) || 90;
+
+  // Fade helper: every piece is one-shot and removes itself when the tween ends.
+  const spray = (config) => {
+    scene.tweens.add({ ...config, onComplete: () => config.targets.destroy() });
+  };
+
+  const core = scene.add.circle(x, y, 9, 0xffffff, 0.85).setDepth(depth + 1);
+  spray({ targets: core, scale: 2.6, alpha: 0, duration: 180 });
+
+  // An empty fill with a stroke: only the spreading ring is visible. It starts
+  // small and blooms out to the full splash radius.
+  const ring = scene.add
+    .circle(x, y, blastRadius, color, 0)
+    .setStrokeStyle(3, color, 0.9)
+    .setScale(0.3)
+    .setDepth(depth);
+  spray({ targets: ring, scale: 1, alpha: 0, duration: 360 });
+
+  const shardCount = 5;
+  const shardReach = blastRadius * 0.65;
+  for (let index = 0; index < shardCount; index += 1) {
+    // Start at the top and fan out evenly, so the blast reads in every direction.
+    const angle = (Math.PI * 2 * index) / shardCount - Math.PI / 2;
+    const shard = scene.add.circle(x, y, 3.5, color, 0.9).setDepth(depth - 1);
+    spray({
+      targets: shard,
+      x: x + Math.cos(angle) * shardReach,
+      y: y + Math.sin(angle) * shardReach,
+      scale: 0.2,
+      alpha: 0,
+      duration: 300,
+      ease: "Quad.easeOut"
+    });
+  }
+}
+
+/**
  * Sword-qi projectile: a blade-shaped shard of energy leaves the hero, flies to
- * the aimed point and bursts there. Vector-drawn so a long reach (Kiếm Khí) reads
- * as a thrown art instead of a melee slash played at the caster's feet.
+ * the aimed point and explodes there. Vector-drawn so a long reach (Kiếm Khí)
+ * reads as a thrown art instead of a melee slash played at the caster's feet.
  * @param {Phaser.Scene} scene
  * @param {Object} skill
  * @param {import("./player.js").Player} player
@@ -361,18 +413,7 @@ function playSwordQiProjectileVfx(scene, skill, player, target, aimPoint) {
     ease: "Quad.easeIn",
     onComplete: () => {
       for (const piece of flying) piece.destroy();
-
-      const burst = scene.add
-        .circle(end.x, end.y - lift, 10, color, 0.5)
-        .setStrokeStyle(3, 0xffffff, 0.9)
-        .setDepth(depth);
-      scene.tweens.add({
-        targets: burst,
-        scale: 3.2,
-        alpha: 0,
-        duration: 240,
-        onComplete: () => burst.destroy()
-      });
+      playSwordQiBlast(scene, skill, end.x, end.y - lift, depth);
     }
   });
 }

@@ -320,6 +320,7 @@ describe("playSkillCastVfx sprite playback", () => {
 describe("playSkillCastVfx sword-qi projectile", () => {
   const kiemKhi = () => ({
     range: 840,
+    splash: { radius: 170, mult: 0.6, maxTargets: 4 },
     vfx: { projectile: "sword", impact: null, color: 0x9be8ff }
   });
 
@@ -342,15 +343,16 @@ describe("playSkillCastVfx sword-qi projectile", () => {
     expect(scene.add.sprite).not.toHaveBeenCalled();
   });
 
-  it("bursts where it lands and cleans the shard up", () => {
+  it("explodes where it lands and cleans every piece up", () => {
     const { scene, tweenConfigs } = makeScene();
     const blade = makeSprite();
-    // Created in order: baseline pulse, blade glow, then the arrival burst.
-    const circles = [makeSprite(), makeSprite(), makeSprite()];
-    let nextCircle = 0;
+    const circles = [];
     scene.add.polygon = vi.fn(() => blade);
-    scene.add.circle = vi.fn(() => circles[nextCircle++]);
-    const burst = circles[2];
+    scene.add.circle = vi.fn(() => {
+      const shape = makeSprite();
+      circles.push(shape);
+      return shape;
+    });
 
     playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
 
@@ -358,12 +360,29 @@ describe("playSkillCastVfx sword-qi projectile", () => {
     flight.onComplete();
 
     expect(blade.destroy).toHaveBeenCalled();
-    const bloom = tweenConfigs[tweenConfigs.length - 1];
-    expect(bloom.targets).toBe(burst);
-    expect(bloom).toMatchObject({ scale: 3.2, alpha: 0 });
 
-    bloom.onComplete();
-    expect(burst.destroy).toHaveBeenCalled();
+    // The first two circles are the cast pulse and the blade's glow; everything
+    // created from here on belongs to the blast (core, ring and the shards).
+    const blastPieces = circles.slice(2);
+    expect(blastPieces.length).toBeGreaterThan(4);
+
+    const blastTweens = tweenConfigs.slice(tweenConfigs.indexOf(flight) + 1);
+    expect(blastTweens).toHaveLength(blastPieces.length);
+
+    // Shards are thrown away from the impact point, so the blast spreads out.
+    const impact = { x: toIso(900, 100).x, y: toIso(900, 100).y - 24 };
+    const thrownShards = blastTweens.filter(
+      (config) => typeof config.x === "number" && (config.x !== impact.x || config.y !== impact.y)
+    );
+    expect(thrownShards.length).toBeGreaterThan(3);
+
+    for (const config of blastTweens) config.onComplete();
+    for (const piece of blastPieces) expect(piece.destroy).toHaveBeenCalled();
+
+    // The ring is drawn at the skill's real splash radius, so the effect ends
+    // exactly where the server stops dealing damage. (Screen px == world px.)
+    const radii = scene.add.circle.mock.calls.map((call) => call[2]);
+    expect(radii).toContain(170);
   });
 
   it("clamps a throw that aims past the art's reach", () => {
