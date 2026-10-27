@@ -13,7 +13,7 @@
  * repeatedly (for example every frame from `showFormation`) is safe.
  */
 
-import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef } from "./heroBody.js";
+import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef, weaponBodyTextureDef } from "./heroBody.js";
 import { normalizeGender } from "./gender.js";
 
 /**
@@ -151,19 +151,41 @@ export function ensureWeaponVfx(scene, skills = []) {
 }
 
 /**
- * Queue the walk sheet for a gender that was not the one loaded at boot.
+ * Queue a body sheet (a gender sheet or one that already holds a weapon).
  * @param {import("phaser").Scene} scene
- * @param {"male"|"female"|string} gender
+ * @param {{ url: string }} def
  * @returns {boolean} `true` when the texture is usable right now
  */
-export function ensureHeroBodyTexture(scene, gender) {
-  const def = HERO_BODY_TEXTURES[normalizeGender(gender)];
+function queueBodySheet(scene, def) {
   if (!def) return false;
   return ensureSpritesheet(scene, def.key, {
     url: def.url,
     frameWidth: HERO_BODY.frameWidth,
     frameHeight: HERO_BODY.frameHeight
   });
+}
+
+/**
+ * Queue the walk sheet for a gender that was not the one loaded at boot.
+ * @param {import("phaser").Scene} scene
+ * @param {"male"|"female"|string} gender
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureHeroBodyTexture(scene, gender) {
+  return queueBodySheet(scene, HERO_BODY_TEXTURES[normalizeGender(gender)]);
+}
+
+/**
+ * Queue the body sheet that already holds the worn weapon (see
+ * WEAPON_BODY_TEXTURES). Weapons without their own sheet - every kit but the
+ * sword for now - resolve to `null` and nothing is queued.
+ * @param {import("phaser").Scene} scene
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureWeaponBodyTexture(scene, gender, weaponType = null) {
+  return queueBodySheet(scene, weaponBodyTextureDef(gender, weaponType));
 }
 
 /**

@@ -6,7 +6,8 @@ import {
   bodyTextureFor,
   equipmentTextureDef,
   equipmentTextureKeyFor,
-  HERO_EQUIPMENT_TEXTURES
+  HERO_EQUIPMENT_TEXTURES,
+  weaponBodyTextureDef
 } from "./heroBody.js";
 
 describe("heroBody", () => {
@@ -68,6 +69,28 @@ describe("heroBody", () => {
       expect(equipmentTextureDef("armor", "unknown-item", "male")).toBeNull();
       expect(equipmentTextureKeyFor("armor", null)).toBeNull();
       expect(equipmentTextureKeyFor("armor", "")).toBeNull();
+    });
+  });
+
+  describe("weapon body sheets", () => {
+    it("swaps the male sheet for the sword art when a sword is worn", () => {
+      expect(bodyTextureFor("male", "kiem")).toBe("hero-body-male-sword");
+      expect(weaponBodyTextureDef("male", "kiem").url).toContain("hero-body-male-sword.png");
+    });
+
+    it("keeps the plain sheet for genders and weapons without weapon art", () => {
+      expect(bodyTextureFor("female", "kiem")).toBe("hero-body-female");
+      expect(bodyTextureFor("male", "dao")).toBe("hero-body-male");
+      expect(bodyTextureFor("male", "bao-tay")).toBe("hero-body-male");
+      expect(bodyTextureFor("male", null)).toBe("hero-body-male");
+      expect(weaponBodyTextureDef("male", "dao")).toBeNull();
+      expect(weaponBodyTextureDef("male", null)).toBeNull();
+    });
+
+    it("adds the weapon slot to the baked slots only for the sword sheet", () => {
+      expect(bakedEquipmentSlots("male", "kiem")).toEqual(["pants", "armor", "helmet", "weapon"]);
+      expect(bakedEquipmentSlots("female", "kiem")).toEqual(["pants", "armor", "helmet"]);
+      expect(bakedEquipmentSlots("male", "bao-tay")).toEqual(["pants", "armor", "helmet"]);
     });
   });
 

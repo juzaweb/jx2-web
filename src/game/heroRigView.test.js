@@ -111,6 +111,7 @@ function makeSpriteScene(availableTextures = ["hero-body-male", "hero-body-femal
     textures: {
       exists: (key) => textureSet.has(key)
     },
+    _textures: textureSet,
     _container: container
   };
 }
@@ -261,6 +262,93 @@ describe("HeroRigView baked body", () => {
 
     expect(view.equipSprites).toEqual({});
     expect(scene._container.children.length).toBeGreaterThan(1);
+  });
+
+  it("swaps to the sword sheet and drops the vector weapon", () => {
+    const scene = makeSpriteScene(["hero-body-male", "hero-body-female", "hero-body-male-sword"]);
+    const view = new HeroRigView(scene);
+
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+    expect(scene._container.children).toHaveLength(1); // body sprite only
+  });
+
+  it("keeps the plain sheet for a non-sword weapon", () => {
+    const scene = makeSpriteScene(["hero-body-male", "hero-body-male-sword"]);
+    const view = new HeroRigView(scene);
+
+    view.set(2, { weapon: "dao-lang-khach" }, "male");
+
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+    expect(scene._container.children.length).toBeGreaterThan(1); // vector weapon drawn
+  });
+
+  it("falls back to the plain sheet while the sword sheet downloads", () => {
+    const scene = makeSpriteScene(["hero-body-male"]);
+    const queues = [];
+    scene.load = {
+      spritesheet: (...args) => queues.push(args),
+      start: () => {},
+      once: () => {}
+    };
+    const view = new HeroRigView(scene);
+
+    view.set(0, { weapon: "kiem-lang-khach" }, "male");
+
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+    expect(scene._container.children.length).toBeGreaterThan(1); // vector weapon drawn
+    expect(queues.map(([key]) => key)).toEqual(["hero-body-male-sword"]);
+    expect(view.pendingSheets.has("hero-body-male-sword")).toBe(true);
+  });
+
+  it("redraws with the sword sheet once the queued download lands", () => {
+    const scene = makeSpriteScene(["hero-body-male"]);
+    const listeners = new Map();
+    scene.load = {
+      spritesheet: () => {},
+      start: () => {},
+      once: (event, callback) => listeners.set(event, callback)
+    };
+    const view = new HeroRigView(scene);
+    view.set(0, { weapon: "kiem-lang-khach" }, "male");
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+
+    scene._textures.add("hero-body-male-sword");
+    listeners.get("filecomplete-spritesheet-hero-body-male-sword")();
+
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+    expect(scene._container.children).toHaveLength(1); // blade is in the art now
+    expect(view.pendingSheets.size).toBe(0);
+  });
+
+  it("listens for the sheet before starting the download", () => {
+    const scene = makeSpriteScene(["hero-body-male"]);
+    const events = [];
+    scene.load = {
+      spritesheet: (key) => events.push(`queue:${key}`),
+      start: () => {},
+      once: (event) => events.push(`once:${event}`)
+    };
+    const view = new HeroRigView(scene);
+
+    view.set(0, { weapon: "kiem-lang-khach" }, "male");
+
+    // A cached file can finish loading immediately, so the listener must exist
+    // before the loader is kicked.
+    expect(events).toEqual([
+      "once:filecomplete-spritesheet-hero-body-male-sword",
+      "queue:hero-body-male-sword"
+    ]);
+  });
+
+  it("does not pin the sheet as pending when the scene has no loader", () => {
+    const scene = makeSpriteScene(["hero-body-male"]);
+    const view = new HeroRigView(scene);
+
+    view.set(0, { weapon: "kiem-lang-khach" }, "male");
+
+    expect(view.pendingSheets.size).toBe(0);
   });
 });
 

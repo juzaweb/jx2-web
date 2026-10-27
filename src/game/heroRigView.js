@@ -1,9 +1,16 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
-import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
-import { HERO_BODY, bakedEquipmentSlots, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
+import { EQUIPMENT_SLOT_KEYS, equippedWeaponType } from "./equipment.js";
+import {
+  HERO_BODY,
+  bakedEquipmentSlots,
+  bodyFrameForDirection,
+  bodyTextureFor,
+  equipmentTextureKeyFor,
+  weaponBodyTextureDef
+} from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
-import { ensureEquipmentTexture } from "./lazyAssets.js";
+import { ensureEquipmentTexture, ensureWeaponBodyTexture } from "./lazyAssets.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
 export const HERO_FOOT_Y = 41;
@@ -20,10 +27,12 @@ const STEP_LIFT = 4;
 /**
  * Phaser adapter for the hero body.
  *
- * Uses the baked gender sheet (see heroBody.js) when it is loaded: four
- * direction rows x four walk frames, played by swapping frames (`animate`).
- * When the sheet is missing it falls back to the vector rig (see heroRig.js)
- * and pivots its tagged limb groups instead.
+ * Uses the baked sheet for the hero's gender when it is loaded - and, when the
+ * worn weapon ships its own art, the sheet that holds that weapon in hand (see
+ * WEAPON_BODY_TEXTURES) - drawing four direction rows x four walk frames and
+ * playing them by swapping frames (`animate`). When the sheet is missing it
+ * falls back to the vector rig (see heroRig.js) and pivots its tagged limb
+ * groups instead.
  *
  * Rig space has its origin at the character's feet, so the container sits at
  * {@link HERO_FOOT_Y} — the same ground offset the shadow uses.
@@ -51,6 +60,10 @@ export class HeroRigView {
     /** While an attack pose is playing, the walk cycle must not overwrite it. */
     this.acting = false;
     this.actionTween = null;
+    /** Body sheets this view queued on the scene loader and is waiting for. */
+    this.pendingSheets = new Set();
+    /** Gear of the last `set` call, so a late sheet can redraw the current look. */
+    this.equipment = {};
   }
 
   /**
@@ -63,14 +76,21 @@ export class HeroRigView {
    */
   set(direction, equipment = {}, gender = "male") {
     const g = normalizeGender(gender);
-    const bodyTexture = bodyTextureFor(g);
-    const usesSprite = Boolean(this.scene.textures?.exists?.(bodyTexture));
-    const key = `${g}|${direction}|${usesSprite ? "sprite" : "rig"}|${slotSignature(equipment)}`;
+    const weaponType = equippedWeaponType(equipment);
+    // Some weapon types ship their own sheet with the blade already in hand.
+    // Until that sheet is decoded the hero keeps the plain gender sheet and the
+    // vector weapon, then this view rebuilds itself (see requestWeaponSheet).
+    const weaponSheet = weaponBodyTextureDef(g, weaponType);
+    const weaponSheetReady = Boolean(weaponSheet && this.hasTexture(weaponSheet.key));
+    const bodyTexture = weaponSheetReady ? weaponSheet.key : bodyTextureFor(g);
+    const usesSprite = this.hasTexture(bodyTexture);
+    const key = `${g}|${direction}|${bodyTexture}|${usesSprite ? "sprite" : "rig"}|${slotSignature(equipment)}`;
     if (key === this.key) return;
     this.key = key;
     this.gender = g;
     this.direction = direction;
     this.pose = poseFor(direction);
+    this.equipment = equipment;
     this.usingSprite = usesSprite;
     this.bodySprite = null;
     this.equipSprites = {};
@@ -82,10 +102,15 @@ export class HeroRigView {
     this.container.x = 0;
     this.groups = {};
 
+    if (weaponSheet && !weaponSheetReady) {
+      this.requestWeaponSheet(weaponSheet.key, weaponType, g);
+    }
+
     if (this.usingSprite) {
       // Slots the sheet already paints are skipped so the body art is not
-      // covered by (or double-drawing) the modular equipment sprites.
-      const bakedSlots = new Set(bakedEquipmentSlots(g));
+      // covered by (or double-drawing) the modular equipment sprites. A
+      // weapon-holding sheet also declares the weapon slot it paints for us.
+      const bakedSlots = new Set(bakedEquipmentSlots(g, weaponSheetReady ? weaponType : null));
       this.frameIndex = bodyFrameForDirection(direction, 0);
       this.bodySprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, bodyTexture, this.frameIndex);
       this.bodySprite.setOrigin(0.5, 1);
@@ -145,6 +170,44 @@ export class HeroRigView {
         });
       }
     }
+  }
+
+  /**
+   * @param {string} key Phaser texture key
+   * @returns {boolean} whether the scene can draw that texture right now
+   */
+  hasTexture(key) {
+    return Boolean(key) && Boolean(this.scene?.textures?.exists?.(key));
+  }
+
+  /**
+   * Queue a weapon-holding body sheet and redraw once it has decoded. Until then
+   * the hero keeps the plain gender sheet with the vector weapon, so the swap
+   * never shows a blank or a vector fallback.
+   * @param {string} sheetKey
+   * @param {string} weaponType
+   * @param {"male"|"female"} gender
+   */
+  requestWeaponSheet(sheetKey, weaponType, gender) {
+    if (this.pendingSheets.has(sheetKey)) return;
+    const loader = this.scene?.load;
+    if (typeof loader?.once !== "function") {
+      // Headless scene (tests): nothing to wait for, so do not pin the key as
+      // pending or the view would never retry.
+      ensureWeaponBodyTexture(this.scene, gender, weaponType);
+      return;
+    }
+    // Listen before starting the download: `ensureWeaponBodyTexture` kicks the
+    // loader, and a cached file can complete before a later listener is attached.
+    this.pendingSheets.add(sheetKey);
+    loader.once(`filecomplete-spritesheet-${sheetKey}`, () => {
+      this.pendingSheets.delete(sheetKey);
+      if (!this.container) return;
+      // Rebuild with whatever the hero wears right now.
+      this.key = null;
+      this.set(this.direction, this.equipment, this.gender);
+    });
+    ensureWeaponBodyTexture(this.scene, gender, weaponType);
   }
 
   /**
@@ -290,6 +353,8 @@ export class HeroRigView {
     this.bodySprite = null;
     this.equipSprites = {};
     this.usingSprite = false;
+    this.pendingSheets.clear();
+    this.equipment = {};
   }
 }
 

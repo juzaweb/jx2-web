@@ -18,6 +18,14 @@ clean cut-out. This script:
 
 before writing the public spritesheets consumed by heroBody.js.
 
+Two alignment layouts are supported. `frame` (default) crops every pose to its
+own bounding box, which suits a bare body. `cell` keeps the fixed 4x4 cell grid
+and anchors each cell on its body: sheets that already hold a weapon have a
+blade sticking out of the silhouette, and cropping to the bbox would slide the
+character around (and make the sword jitter) from frame to frame. The body is
+located by eroding the mask, which removes thin props before measuring, so the
+sword neither shifts the horizontal anchor nor becomes the ground line.
+
 Run: python3 scripts/build_hero_body.py
 """
 
@@ -40,11 +48,21 @@ SOURCES = {
         "path": EXAMPLE / "body-men-v2.png",
         # Source row order: front, right-facing, left-facing, back.
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "frame",
     },
     "hero-body-female.png": {
         "path": EXAMPLE / "body-women-v2.png",
         # Source row order: front, right-facing, left-facing, back.
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "frame",
+    },
+    "hero-body-male-sword.png": {
+        # Male hero with the blade already in hand, so the rig skips the
+        # vector weapon overlay for this sheet (see WEAPON_BODY_TEXTURES).
+        "path": EXAMPLE / "nv-camkiem.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
     },
 }
 
@@ -72,6 +90,14 @@ MIN_COMPONENT = 30
 SOURCE_ALPHA_CUTOFF = 128
 # Pixels trimmed from the cut-out silhouette to drop that rim entirely.
 CUTOUT_ERODE_PX = 1
+# Erosion window used by the `cell` layout to find the body without the blade.
+# `ImageFilter.MinFilter` needs an odd window and erodes by (window - 1) / 2 px,
+# so the soles sit exactly that many pixels below the eroded core.
+CORE_ERODE_PX = 21
+# Transparent gutter kept inside each frame. Spritesheets have no padding, so art
+# that reaches a frame edge gets sampled into the neighbouring pose when the
+# sampler filters across the boundary.
+FRAME_SAFE_MARGIN = 2
 
 
 def _runs(mask):
@@ -265,7 +291,8 @@ def _load_source(source):
     return rgba, downscale
 
 
-def build_sheet(source, row_map):
+def build_frame_sheet(source, row_map):
+    """`frame` layout: crop every pose to its own bbox (bare body sheets)."""
     rgba, downscale = _load_source(source)
     alpha = rgba[..., 3]
     columns, rows = _grid_bands(alpha)
@@ -294,9 +321,166 @@ def build_sheet(source, row_map):
             lift = round((baseline - box[3]) * scale)
             paste_x = CONTENT_CENTER_X - scaled.width // 2
             paste_y = CONTENT_BOTTOM - lift - scaled.height
-            out.alpha_composite(scaled, (col * FRAME_W + paste_x, row * FRAME_H + paste_y))
+            _blit(
+                out,
+                scaled,
+                col * FRAME_W + paste_x,
+                row * FRAME_H + paste_y,
+                (
+                    col * FRAME_W,
+                    row * FRAME_H,
+                    (col + 1) * FRAME_W,
+                    (row + 1) * FRAME_H,
+                ),
+            )
 
     return out
+
+
+def _body_core(alpha):
+    """Foreground mask with thin props eroded away, so a held blade is ignored.
+
+    The body is the thick mass of the sprite; a blade or spear shaft is only a
+    few pixels wide, so eroding by CORE_ERODE_RADIUS removes it entirely.
+    """
+    solid = Image.fromarray(np.where(alpha > 0, 255, 0).astype(np.uint8))
+    return np.asarray(solid.filter(ImageFilter.MinFilter(_core_window()))) > 0
+
+
+def _core_window():
+    """`MinFilter` window for CORE_ERODE_PX; it must be odd."""
+    return CORE_ERODE_PX if CORE_ERODE_PX % 2 else CORE_ERODE_PX + 1
+
+
+def _core_radius():
+    """Pixels `MinFilter` shaves off the silhouette on every side."""
+    return (_core_window() - 1) // 2
+
+
+def _blit(dst, src, x, y, clip=None):
+    """Composite `src` onto `dst` at (x, y), clipped to `clip` (default: `dst`).
+
+    A frame may only ever hold its own pose, so the paste is clipped to the frame
+    rectangle. Without that, a pose whose art overhangs its cell (a blade poking
+    past the cell edge) would bleed into the neighbouring frame and show up as
+    stray pixels above another direction's head.
+    """
+    left, top, right, bottom = clip or (0, 0, dst.width, dst.height)
+    dst_x = max(0, x, left)
+    dst_y = max(0, y, top)
+    dst_right = min(dst.width, right, x + src.width)
+    dst_bottom = min(dst.height, bottom, y + src.height)
+    width = dst_right - dst_x
+    height = dst_bottom - dst_y
+    if width <= 0 or height <= 0:
+        return
+    src_x = dst_x - x
+    src_y = dst_y - y
+    dst.alpha_composite(src.crop((src_x, src_y, src_x + width, src_y + height)), (dst_x, dst_y))
+
+
+def build_cell_sheet(source, row_map):
+    """`cell` layout: keep the source grid and anchor on the body itself.
+
+    Used for sheets that already hold a weapon. Each pose is cropped from its
+    fixed cell, so the spacing the artist drew is preserved, and a single scale
+    is chosen so the widest blade fits inside FRAME_W with FRAME_SAFE_MARGIN to
+    spare. Every pose is then anchored on its own body: the head's centre line
+    lands on the frame centre and the soles land on the shared ground line.
+    Measuring the body (rather than the silhouette) keeps the blade from
+    dragging the character off-centre and from becoming the ground line.
+    """
+    rgba, downscale = _load_source(source)
+    alpha = rgba[..., 3]
+    core = _body_core(alpha)
+    core_radius = _core_radius()
+    source_image = Image.fromarray(rgba, "RGBA")
+
+    height, width = alpha.shape
+    if width % COLS or height % ROWS:
+        raise SystemExit(f"source {source.name} is not an even {COLS}x{ROWS} grid")
+    cell_w = width // COLS
+    cell_h = height // ROWS
+
+    metrics = []
+    for row in range(ROWS):
+        source_row = row_map[row]
+        for col in range(COLS):
+            left = col * cell_w
+            top = source_row * cell_h
+            cell_alpha = alpha[top : top + cell_h, left : left + cell_w]
+            cell_core = core[top : top + cell_h, left : left + cell_w]
+            ys, xs = np.where(cell_alpha > 0)
+            core_y, core_x = np.where(cell_core)
+            if len(xs) == 0 or len(core_x) == 0:
+                raise SystemExit(f"no body found in {source.name} at row {row}, column {col}")
+
+            # Anchor horizontally on the head: it is the one mass the swinging
+            # arms and the blade never merge into, and the whole core's centroid
+            # drifts by more than a dozen source pixels on poses where the arm
+            # touches the torso.
+            core_top = int(core_y.min())
+            core_height = int(core_y.max()) - core_top + 1
+            head = cell_core[core_top : core_top + max(1, core_height // 4)]
+            _, head_x = np.where(head)
+
+            # Anchor vertically on the soles: the core is eroded, so the real
+            # ground sits `core_radius` px below its bottom edge.
+            feet_y = min(cell_h, int(core_y.max()) + 1 + core_radius)
+            body_cx = float(head_x.mean()) if len(head_x) else float(core_x.mean())
+
+            metrics.append(
+                {
+                    "row": row,
+                    "col": col,
+                    "box": (left, top, left + cell_w, top + cell_h),
+                    "height": int(ys.max() - ys.min() + 1),
+                    "body_cx": body_cx,
+                    "feet_y": float(feet_y),
+                    # Widest reach of the silhouette (blade included) measured
+                    # from the body centre; drives the shared scale.
+                    "half_extent": max(
+                        abs(float(xs.min()) - body_cx),
+                        abs(float(xs.max() + 1) - body_cx),
+                    ),
+                }
+            )
+
+    tallest = max(metric["height"] for metric in metrics)
+    widest = max(metric["half_extent"] for metric in metrics)
+    scale = min(CONTENT_H / tallest, (FRAME_W / 2 - FRAME_SAFE_MARGIN) / widest)
+
+    out = Image.new("RGBA", (FRAME_W * COLS, FRAME_H * ROWS), (0, 0, 0, 0))
+    for metric in metrics:
+        cell = source_image.crop(metric["box"])
+        scaled_w = max(1, round(cell.width * scale))
+        scaled_h = max(1, round(cell.height * scale))
+        cell = cell.resize((scaled_w, scaled_h), downscale)
+        centre_x = FRAME_W / 2 - metric["body_cx"] * (scaled_w / cell_w)
+        ground_y = CONTENT_BOTTOM - metric["feet_y"] * (scaled_h / cell_h)
+        frame_x = metric["col"] * FRAME_W
+        frame_y = metric["row"] * FRAME_H
+        _blit(
+            out,
+            cell,
+            frame_x + round(centre_x),
+            frame_y + round(ground_y),
+            (frame_x, frame_y, frame_x + FRAME_W, frame_y + FRAME_H),
+        )
+
+    print(
+        f"  cell layout: tallest={tallest}px widest half-extent={widest:.0f}px "
+        f"-> scale {scale:.4f} (content {tallest * scale:.0f}px of {CONTENT_H}px)"
+    )
+    return out
+
+
+def build_sheet(source, config):
+    """Build one runtime sheet using the layout the source declares."""
+    row_map = config["row_map"]
+    if config.get("align", "frame") == "cell":
+        return build_cell_sheet(source, row_map)
+    return build_frame_sheet(source, row_map)
 
 
 def main():
@@ -305,7 +489,7 @@ def main():
         source = config["path"]
         if not source.exists():
             raise SystemExit(f"missing source sheet: {source}")
-        sheet = build_sheet(source, config["row_map"])
+        sheet = build_sheet(source, config)
         target = PUBLIC / filename
         sheet.save(target, optimize=True)
         print(f"wrote {target.relative_to(ROOT)} ({sheet.width}x{sheet.height})")

@@ -12,11 +12,29 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "7";
+const BODY_ASSET_VERSION = "9";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
   female: { key: "hero-body-female", url: `/hero-body-female.png?v=${BODY_ASSET_VERSION}` }
+};
+
+/**
+ * Body sheets that already paint the weapon in hand, keyed by weapon type then
+ * gender. A sheet listed here replaces the gender sheet while that weapon type
+ * is worn, and it declares the extra slots it draws so the rig stops stacking
+ * its vector weapon on top of the blade (see `bakedSlots`). Only the male hero
+ * ships sword art; other genders keep the plain sheet plus the vector weapon.
+ * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png.
+ */
+export const WEAPON_BODY_TEXTURES = {
+  kiem: {
+    male: {
+      key: "hero-body-male-sword",
+      url: `/hero-body-male-sword.png?v=${BODY_ASSET_VERSION}`,
+      bakedSlots: ["weapon"]
+    }
+  }
 };
 
 /**
@@ -34,10 +52,14 @@ export const BODY_BAKED_SLOTS = {
 
 /**
  * @param {"male"|"female"|string} [gender="male"]
+ * @param {string|null} [weaponType] worn weapon type (see weapons.js)
  * @returns {string[]} equipment slots already drawn into the body sheet
  */
-export function bakedEquipmentSlots(gender = "male") {
-  return BODY_BAKED_SLOTS[normalizeGender(gender)] ?? [];
+export function bakedEquipmentSlots(gender = "male", weaponType = null) {
+  const g = normalizeGender(gender);
+  const base = BODY_BAKED_SLOTS[g] ?? [];
+  const weaponSlots = weaponBodyTextureDef(g, weaponType)?.bakedSlots;
+  return weaponSlots ? [...base, ...weaponSlots] : base;
 }
 
 /**
@@ -154,11 +176,26 @@ export const HERO_BODY = {
 const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 1, 1, 1];
 
 /**
+ * The weapon-holding sheet a gender has for a weapon type, if any.
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {{ key: string, url: string, bakedSlots: string[] }|null}
+ */
+export function weaponBodyTextureDef(gender, weaponType = null) {
+  if (!weaponType) return null;
+  const byGender = WEAPON_BODY_TEXTURES[weaponType];
+  if (!byGender) return null;
+  return byGender[normalizeGender(gender)] ?? null;
+}
+
+/**
  * @param {"male"|"female"} gender
+ * @param {string|null} [weaponType] worn weapon type (see weapons.js)
  * @returns {string} Phaser texture key
  */
-export function bodyTextureFor(gender) {
-  return HERO_BODY_TEXTURES[normalizeGender(gender)].key;
+export function bodyTextureFor(gender, weaponType = null) {
+  const g = normalizeGender(gender);
+  return (weaponBodyTextureDef(g, weaponType) ?? HERO_BODY_TEXTURES[g]).key;
 }
 
 /**
