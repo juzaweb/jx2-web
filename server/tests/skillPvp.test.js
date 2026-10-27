@@ -170,3 +170,51 @@ test("an AoE skill refuses a player outside its cast area", () => {
     "the out-of-area hit is rejected"
   );
 });
+
+test("a faction battlefield lets different camps fight without the PK flag", () => {
+  const { attacker, target, strike } = makeManager("la_han_quyen");
+  attacker.mapId = "trung-nguyen";
+  target.mapId = "trung-nguyen";
+  attacker.pkFlag = false;
+  target.pkFlag = false;
+  attacker.faction = "han";
+  target.faction = "thuc";
+
+  strike();
+
+  assert.ok(target.hp < TARGET_HP, "the enemy camp is damaged");
+});
+
+test("a faction battlefield refuses to turn allies into targets", () => {
+  const { attacker, target, messages, strike } = makeManager("la_han_quyen");
+  attacker.mapId = "trung-nguyen";
+  target.mapId = "trung-nguyen";
+  attacker.pkFlag = true;
+  target.pkFlag = true;
+  attacker.faction = "han";
+  target.faction = "han";
+
+  strike();
+
+  assert.equal(target.hp, TARGET_HP, "same-camp players never damage each other");
+  assert.equal(
+    messages.filter((message) => message.payload?.reason === "same_faction").length,
+    1,
+    "the refusal names the shared camp"
+  );
+});
+
+test("a strike never crosses maps even at the same coordinates", () => {
+  const { target, messages, strike } = makeManager("la_han_quyen");
+  // A body on another map happens to sit inside PvP range in world units.
+  target.mapId = "market";
+
+  strike();
+
+  assert.equal(target.hp, TARGET_HP, "the off-map body is untouched");
+  assert.equal(
+    messages.filter((message) => message.payload?.reason === "target_missing").length,
+    1,
+    "the hit is refused as a missing target"
+  );
+});

@@ -57,11 +57,27 @@ export default {
   cityMap: {
     eyebrow: "城池全貌",
     title: "汴京地图",
+    titleWithName: "{name}地图",
     hint: "按 M 或 Esc 关闭",
     player: "角色",
     enemy: "妖兽",
     remote: "侠客",
     pavilion: "万事通"
+  },
+  maps: {
+    market: "汴京",
+    "dong-mon-thanh": "东门城",
+    "bac-linh": "北岭",
+    "tay-son": "西山",
+    "trung-nguyen": "中原战场",
+    "thuc-thanh": "蜀城",
+    "nguy-thanh": "魏城",
+    "ba-thuc": "巴蜀",
+    "kiem-cac": "剑阁",
+    "nga-mi": "峨眉",
+    "hua-dien": "许田",
+    "nghiep-quan": "邺关",
+    "quan-trung": "关中"
   },
   chat: {
     tabs: {
@@ -159,6 +175,13 @@ export default {
     gender: "性别",
     genderMale: "男",
     genderFemale: "女",
+    factionLabel: "势力：",
+    factionHint: "势力决定你的主城与中央战场上的盟友。",
+    factions: {
+      han: "汉",
+      thuc: "蜀",
+      nguy: "魏"
+    },
     emptySlot: "（空）",
     characterList: "角色列表",
     nameLabel: "名称：",
@@ -509,11 +532,7 @@ export default {
       equipFullSet: "一键穿戴全套"
     },
     teleport: {
-      title: "回城与传送",
-      receiveScroll: "获取 99x 回城符",
-      toMarket: "传送：汴京主城",
-      toDongMonThanh: "传送：东门城野外",
-      toSpawn: "回城（复活点）"
+      receiveScroll: "获取 99x 回城符"
     },
     utility: {
       title: "银两与辅助功能",

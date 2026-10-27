@@ -3,9 +3,10 @@ import { parseEnemyReward } from "./rewardSync.js";
 import { skillById } from "./skills.js";
 import { playSkillImpactVfx } from "./skillVfx.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { canPvpAttack, PVP_ATTACK_RANGE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
+import { canPvpAttack, mayDuel, PVP_ATTACK_RANGE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
-import { isCombatAllowed } from "./maps/mapRegistry.js";
+import { isCombatAllowed, mapPvpMode } from "./maps/mapRegistry.js";
+import { isHostileFaction } from "./factions.js";
 import { MELEE_REACH } from "./combatRules.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { SkillCastController, isPeerTarget } from "./skills/client/castController.js";
@@ -129,6 +130,28 @@ export class CombatSystem {
   }
 
   /**
+   * PvP policy of the map the hero stands on. A faction battlefield opts every
+   * player in; a normal map keeps the PK flag.
+   * @returns {"none"|"flag"|"faction"}
+   */
+  pvpMode() {
+    return mapPvpMode(this.scene?.map || this.scene?.currentMapId);
+  }
+
+  /**
+   * Whether a peer is a legal target under the current map's PvP policy.
+   * @param {Object|null} peer
+   * @returns {boolean}
+   */
+  isDuelTarget(peer) {
+    if (!peer) return false;
+    const mode = this.pvpMode();
+    if (mode === "none") return false;
+    if (mode === "faction") return isHostileFaction(this.player?.faction, peer.faction);
+    return peer.pkFlag === true;
+  }
+
+  /**
    * Milliseconds until the next normal attack, shortened by the attack-speed
    * multiplier (see combatConfig.js).
    * @returns {number}
@@ -235,7 +258,7 @@ export class CombatSystem {
    */
   nearestPvpTarget() {
     const players = this.scene.remotePlayerManager?.getAll?.() || [];
-    return findNearestPvpTarget(this.player, players);
+    return findNearestPvpTarget(this.player, players, PVP_ATTACK_RANGE, this.pvpMode());
   }
 
   /**
@@ -268,8 +291,9 @@ export class CombatSystem {
       return;
     }
 
-    // Nothing to cut in melee: a PK-flagged peer in range is the next best target.
-    const pvpTarget = this.player.pkFlag === true ? this.nearestPvpTarget() : null;
+    // Nothing to cut in melee: a legal duel target in range is the next best
+    // choice (a different camp on the battlefield, a flagged peer elsewhere).
+    const pvpTarget = mayDuel(this.player, this.pvpMode()) ? this.nearestPvpTarget() : null;
     if (pvpTarget) {
       this.performPvpAttack(pvpTarget);
       return;
@@ -489,20 +513,20 @@ export class CombatSystem {
 
   /**
    * The duellist a skill should aim at: the peer under the click, else the locked
-   * PvP target (`scene.pvpTarget`, set by clicking a flagged peer), else the
-   * closest flags-up opponent inside the PvP range. Only a hero flying the PK flag
-   * may acquire one — a peaceful hero never auto-attacks.
+   * PvP target (`scene.pvpTarget`, set by clicking a legal peer), else the closest
+   * legal opponent inside the PvP range. A hero with no way to fight (peaceful on
+   * a flag map) never acquires one.
    * @param {{x:number,y:number}|null} aim
    * @returns {Object|null}
    */
   findPlayerTarget(aim) {
-    if (this.player.pkFlag !== true) return null;
+    if (!mayDuel(this.player, this.pvpMode())) return null;
 
     const underAim = this.aimedPlayerTarget(aim);
     if (underAim) return underAim;
 
     const locked = this.scene.pvpTarget;
-    if (isPeerTarget(locked) && locked.pkFlag === true && locked.container?.active !== false) {
+    if (isPeerTarget(locked) && this.isDuelTarget(locked) && locked.container?.active !== false) {
       return locked;
     }
 
@@ -510,21 +534,20 @@ export class CombatSystem {
     // relevant target. Without this a skill cast next to a duellist flies past
     // them and does nothing, which reads as "skill hits but no HP loss".
     const peers = this.scene.remotePlayerManager?.getAll?.() || [];
-    return findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE);
+    return findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE, this.pvpMode());
   }
 
   /**
-   * The flagged duellist whose drawn body covers `aim`, if any. A peaceful hero
-   * never acquires one — the server would refuse the hit.
+   * The legal duellist whose drawn body covers `aim`, if any.
    * @param {{x:number,y:number}|null} aim
    * @returns {Object|null}
    */
   aimedPlayerTarget(aim) {
-    if (!aim || this.player.pkFlag !== true) return null;
+    if (!aim || !mayDuel(this.player, this.pvpMode())) return null;
 
     const peers = this.scene.remotePlayerManager?.getAll?.() || [];
     const clicked = findPlayerAt(peers, aim.x, aim.y);
-    return clicked?.pkFlag === true ? clicked : null;
+    return this.isDuelTarget(clicked) ? clicked : null;
   }
 
   /**
@@ -563,7 +586,7 @@ export class CombatSystem {
 
   /**
    * Resolve the id stored on a pending approach: a monster or a peer, whichever
-   * still holds it. A peer that left or lowered its PK flag ends the chase.
+   * still holds it. A peer that left or stopped being a legal target ends the chase.
    * @param {string} targetId
    * @returns {Object|null}
    */
@@ -572,7 +595,7 @@ export class CombatSystem {
     if (wolf) return wolf;
 
     const peer = (this.scene.remotePlayerManager?.getAll?.() || []).find((entry) => entry.id === targetId);
-    if (!isPeerTarget(peer) || peer.pkFlag !== true) return null;
+    if (!isPeerTarget(peer) || !this.isDuelTarget(peer)) return null;
     return peer.container?.active === false ? null : peer;
   }
 
@@ -718,9 +741,11 @@ export class CombatSystem {
   }
 
   /**
-   * Strike another player. Both fighters must fly the PK flag. The client only
-   * reports the intent; the server recomputes the damage from its own stats and
-   * applies it to the target's authoritative HP.
+   * Strike another player. The map decides whether that is allowed: a faction
+   * battlefield lets different camps fight without the flag, every other map
+   * still needs both fighters flagged. The client only reports the intent; the
+   * server recomputes the damage from its own stats and applies it to the
+   * target's authoritative HP.
    * @param {import("./remotePlayer.js").RemotePlayer} target
    */
   performPvpAttack(target) {
@@ -735,22 +760,39 @@ export class CombatSystem {
       return;
     }
 
-    // Report the reasons a strike can be refused separately: one catch-all
-    // message made an out-of-range click look like a flag problem.
-    if (this.player.pkFlag !== true) {
-      this.ui.addLog("Hãy bật cờ PK trước khi tấn công người chơi khác.");
-      return;
-    }
-    if (!target || target.pkFlag !== true) {
-      this.ui.addLog(`${target?.displayName || "Đối thủ"} chưa bật cờ PK.`);
-      return;
+    const mode = this.pvpMode();
+    if (mode === "faction") {
+      // Same camp never fights, whatever the PK flags say.
+      if (!isHostileFaction(this.player.faction, target?.faction)) {
+        this.ui.addLog("Đồng minh cùng phe — không thể giao chiến.", "system");
+        return;
+      }
+    } else {
+      // Report the reasons a strike can be refused separately: one catch-all
+      // message made an out-of-range click look like a flag problem.
+      if (this.player.pkFlag !== true) {
+        this.ui.addLog("Hãy bật cờ PK trước khi tấn công người chơi khác.");
+        return;
+      }
+      if (!target || target.pkFlag !== true) {
+        this.ui.addLog(`${target?.displayName || "Đối thủ"} chưa bật cờ PK.`);
+        return;
+      }
     }
 
-    const attacker = { id: this.localPlayerId, pkFlag: true };
-    const defender = { id: target.id, pkFlag: true };
+    const attacker = {
+      id: this.localPlayerId,
+      pkFlag: this.player.pkFlag === true,
+      faction: this.player.faction
+    };
+    const defender = {
+      id: target.id,
+      pkFlag: target.pkFlag === true,
+      faction: target.faction
+    };
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
 
-    if (!canPvpAttack(attacker, defender, distance)) {
+    if (!canPvpAttack(attacker, defender, distance, PVP_ATTACK_RANGE, mode)) {
       this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chém — hãy tiến lại gần.`);
       return;
     }

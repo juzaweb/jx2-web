@@ -233,6 +233,657 @@ export const MONSTERS = {
       }
     }
   },
+
+  // ── Tier 4 — levels 30-44 (Bắc Lĩnh) ─────────────────────────────────────
+  // Phase 1 pays EXP and coins only: no book or weapon drops, so the weapon-kit
+  // content stays unchanged until the new tiers get their own skills.
+  "tuyet-lang": {
+    id: "tuyet-lang",
+    name: "Tuyết Lang",
+    level: 30,
+    maxHp: 470,
+    attack: 30,
+    defense: 13,
+    critRate: 0.12,
+    critDamage: 1.9,
+    exp: 200,
+    coinsMin: 18,
+    coinsMax: 32,
+    visual: {
+      kind: "beast",
+      scale: 1.12,
+      palette: {
+        shadow: 0x0b1012,
+        body: 0xc9d4d8,
+        dark: 0x7d8a92,
+        head: 0xe4edf0,
+        ear: 0x93a1a9,
+        muzzle: 0xf2f7f8,
+        accent: 0x9fdcff,
+        leg: 0x8b989f,
+        tail: 0xb7c2c7
+      }
+    }
+  },
+  "son-tac-dau-linh": {
+    id: "son-tac-dau-linh",
+    name: "Sơn Tặc Đầu Lĩnh",
+    level: 36,
+    maxHp: 620,
+    attack: 36,
+    defense: 17,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 270,
+    coinsMin: 24,
+    coinsMax: 42,
+    visual: {
+      kind: "humanoid",
+      scale: 1.1,
+      palette: {
+        shadow: 0x0b0d0a,
+        body: 0x5a4a2f,
+        dark: 0x322818,
+        head: 0xc9a07a,
+        accent: 0xffb347,
+        leg: 0x3e3421,
+        cloth: 0x8a3a22
+      }
+    }
+  },
+  "hac-hung": {
+    id: "hac-hung",
+    name: "Hắc Hùng",
+    level: 42,
+    maxHp: 820,
+    attack: 44,
+    defense: 22,
+    critRate: 0.08,
+    critDamage: 1.7,
+    exp: 360,
+    coinsMin: 30,
+    coinsMax: 52,
+    visual: {
+      kind: "beast",
+      scale: 1.25,
+      palette: {
+        shadow: 0x07090a,
+        body: 0x2b2b2f,
+        dark: 0x151518,
+        head: 0x3a3a40,
+        ear: 0x232327,
+        muzzle: 0x55555c,
+        accent: 0xff7b5c,
+        leg: 0x1d1d21,
+        tail: 0x333338
+      }
+    }
+  },
+
+  // ── Tier 5 — levels 45-60 (Tây Sơn) ──────────────────────────────────────
+  "kim-giap-binh": {
+    id: "kim-giap-binh",
+    name: "Kim Giáp Binh",
+    level: 45,
+    maxHp: 900,
+    attack: 48,
+    defense: 26,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 420,
+    coinsMin: 34,
+    coinsMax: 58,
+    visual: {
+      kind: "armored",
+      scale: 1.1,
+      palette: {
+        shadow: 0x0d0b06,
+        body: 0xc9a227,
+        dark: 0x8a6d14,
+        head: 0xe0c56a,
+        accent: 0xfff3b0,
+        leg: 0x6c5510,
+        cloth: 0xa62f2f
+      }
+    }
+  },
+  "huyet-ma": {
+    id: "huyet-ma",
+    name: "Huyết Ma",
+    level: 52,
+    maxHp: 1100,
+    attack: 56,
+    defense: 30,
+    critRate: 0.14,
+    critDamage: 2.0,
+    exp: 520,
+    coinsMin: 40,
+    coinsMax: 70,
+    visual: {
+      kind: "humanoid",
+      scale: 1.08,
+      palette: {
+        shadow: 0x0c0507,
+        body: 0x8c1f2f,
+        dark: 0x4a0d18,
+        head: 0xd8a08a,
+        accent: 0xff4d6d,
+        leg: 0x5c1420,
+        cloth: 0x6b0f1c
+      }
+    }
+  },
+  "tay-vuc-kiem-khach": {
+    id: "tay-vuc-kiem-khach",
+    name: "Tây Vực Kiếm Khách",
+    level: 58,
+    maxHp: 1320,
+    attack: 66,
+    defense: 34,
+    critRate: 0.18,
+    critDamage: 2.1,
+    exp: 650,
+    coinsMin: 48,
+    coinsMax: 84,
+    visual: {
+      kind: "humanoid",
+      scale: 1.05,
+      palette: {
+        shadow: 0x090a0c,
+        body: 0x3f4a63,
+        dark: 0x232a3a,
+        head: 0xd0a982,
+        accent: 0x7fd4ff,
+        leg: 0x2b3242,
+        cloth: 0x54627f
+      }
+    }
+  },
+
+  // ── Thục hunting grounds ─────────────────────────────────────────────────
+  // Parallel tiers to Hán's, so every camp can level from its own capital.
+  // Phase 1 pays EXP and coins only: no book or weapon drops.
+  "thuc-lang": {
+    id: "thuc-lang",
+    name: "Thục Lang",
+    level: 5,
+    maxHp: 95,
+    attack: 8,
+    defense: 2,
+    critRate: 0.05,
+    critDamage: 1.5,
+    exp: 20,
+    coinsMin: 2,
+    coinsMax: 6,
+    visual: {
+      kind: "beast",
+      scale: 0.95,
+      palette: {
+        shadow: 0x0b0f0c,
+        body: 0x6f7d63,
+        dark: 0x3b4636,
+        head: 0x8b9a7c,
+        ear: 0x59674c,
+        muzzle: 0xb3bfa1,
+        accent: 0xd7f28a,
+        leg: 0x46523d,
+        tail: 0x7f8c70
+      }
+    }
+  },
+  "truc-xa": {
+    id: "truc-xa",
+    name: "Trúc Xà",
+    level: 15,
+    maxHp: 210,
+    attack: 15,
+    defense: 4,
+    critRate: 0.07,
+    critDamage: 1.6,
+    exp: 50,
+    coinsMin: 6,
+    coinsMax: 13,
+    visual: {
+      kind: "beast",
+      scale: 0.92,
+      palette: {
+        shadow: 0x0a0f0b,
+        body: 0x5f8a4a,
+        dark: 0x33502a,
+        head: 0x7aa85f,
+        ear: 0x476b35,
+        muzzle: 0xb6d49a,
+        accent: 0xe8ff9a,
+        leg: 0x3c5c31,
+        tail: 0x6e9c53
+      }
+    }
+  },
+  "ba-thuc-son-tac": {
+    id: "ba-thuc-son-tac",
+    name: "Ba Thục Sơn Tặc",
+    level: 27,
+    maxHp: 390,
+    attack: 25,
+    defense: 11,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 145,
+    coinsMin: 14,
+    coinsMax: 26,
+    visual: {
+      kind: "humanoid",
+      scale: 1.02,
+      palette: {
+        shadow: 0x0b0e0a,
+        body: 0x4f5c37,
+        dark: 0x2c3520,
+        head: 0xc9a07a,
+        accent: 0xf0b45a,
+        leg: 0x374226,
+        cloth: 0x7a4a2a
+      }
+    }
+  },
+  "kiem-cac-vu-sinh": {
+    id: "kiem-cac-vu-sinh",
+    name: "Kiếm Các Vũ Sinh",
+    level: 30,
+    maxHp: 470,
+    attack: 30,
+    defense: 13,
+    critRate: 0.12,
+    critDamage: 1.9,
+    exp: 200,
+    coinsMin: 18,
+    coinsMax: 32,
+    visual: {
+      kind: "humanoid",
+      scale: 1.04,
+      palette: {
+        shadow: 0x0a0d0b,
+        body: 0x3f6157,
+        dark: 0x243a33,
+        head: 0xd0aa86,
+        accent: 0x8fe3c9,
+        leg: 0x2d443d,
+        cloth: 0x527a6c
+      }
+    }
+  },
+  "thiet-diep-binh": {
+    id: "thiet-diep-binh",
+    name: "Thiết Điệp Binh",
+    level: 36,
+    maxHp: 620,
+    attack: 36,
+    defense: 17,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 270,
+    coinsMin: 24,
+    coinsMax: 42,
+    visual: {
+      kind: "armored",
+      scale: 1.06,
+      palette: {
+        shadow: 0x0a0c0b,
+        body: 0x70806f,
+        dark: 0x424c41,
+        head: 0x8b9a88,
+        accent: 0xa8e6a0,
+        leg: 0x4d584b,
+        cloth: 0x3f5c3a
+      }
+    }
+  },
+  "doc-cong-tu": {
+    id: "doc-cong-tu",
+    name: "Độc Công Tử",
+    level: 42,
+    maxHp: 820,
+    attack: 44,
+    defense: 22,
+    critRate: 0.08,
+    critDamage: 1.7,
+    exp: 360,
+    coinsMin: 30,
+    coinsMax: 52,
+    visual: {
+      kind: "humanoid",
+      scale: 1.02,
+      palette: {
+        shadow: 0x0a080d,
+        body: 0x4c3a62,
+        dark: 0x291f36,
+        head: 0xc9a07a,
+        accent: 0x9dff6b,
+        leg: 0x332744,
+        cloth: 0x3f2f57
+      }
+    }
+  },
+  "nga-mi-kiem-nu": {
+    id: "nga-mi-kiem-nu",
+    name: "Nga Mi Kiếm Nữ",
+    level: 45,
+    maxHp: 900,
+    attack: 48,
+    defense: 26,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 420,
+    coinsMin: 34,
+    coinsMax: 58,
+    visual: {
+      kind: "humanoid",
+      scale: 0.98,
+      palette: {
+        shadow: 0x0a0d0c,
+        body: 0xd8e6df,
+        dark: 0x9aada6,
+        head: 0xe8cfb4,
+        accent: 0x6ff0d0,
+        leg: 0xaebfb8,
+        cloth: 0x5f8f80
+      }
+    }
+  },
+  "bang-tam-yeu": {
+    id: "bang-tam-yeu",
+    name: "Băng Tàm Yêu",
+    level: 52,
+    maxHp: 1100,
+    attack: 56,
+    defense: 30,
+    critRate: 0.14,
+    critDamage: 2.0,
+    exp: 520,
+    coinsMin: 40,
+    coinsMax: 70,
+    visual: {
+      kind: "beast",
+      scale: 1.14,
+      palette: {
+        shadow: 0x0a0f12,
+        body: 0xbcd8e6,
+        dark: 0x7c9aac,
+        head: 0xdceef7,
+        ear: 0x92adbd,
+        muzzle: 0xeffaff,
+        accent: 0x9ff0ff,
+        leg: 0x86a2b2,
+        tail: 0xaac6d4
+      }
+    }
+  },
+  "tu-la-han": {
+    id: "tu-la-han",
+    name: "Tu La Hán",
+    level: 58,
+    maxHp: 1320,
+    attack: 66,
+    defense: 34,
+    critRate: 0.18,
+    critDamage: 2.1,
+    exp: 650,
+    coinsMin: 48,
+    coinsMax: 84,
+    visual: {
+      kind: "armored",
+      scale: 1.12,
+      palette: {
+        shadow: 0x0c0608,
+        body: 0x6d2a34,
+        dark: 0x3d161d,
+        head: 0x9c5560,
+        accent: 0xff8a6b,
+        leg: 0x4a1c24,
+        cloth: 0x571f29
+      }
+    }
+  },
+
+  // ── Ngụy hunting grounds ─────────────────────────────────────────────────
+  // Parallel tiers to Hán's; same EXP/coin-only policy as the Thục tiers.
+  "dien-thu": {
+    id: "dien-thu",
+    name: "Điền Thử",
+    level: 5,
+    maxHp: 90,
+    attack: 8,
+    defense: 2,
+    critRate: 0.05,
+    critDamage: 1.5,
+    exp: 20,
+    coinsMin: 2,
+    coinsMax: 6,
+    visual: {
+      kind: "beast",
+      scale: 0.85,
+      palette: {
+        shadow: 0x0f0c09,
+        body: 0x8a7656,
+        dark: 0x54462f,
+        head: 0xa28d68,
+        ear: 0x6b5a3d,
+        muzzle: 0xcbb894,
+        accent: 0xffd98a,
+        leg: 0x5f4f35,
+        tail: 0x94805e
+      }
+    }
+  },
+  "hoang-lang": {
+    id: "hoang-lang",
+    name: "Hoang Lang",
+    level: 15,
+    maxHp: 205,
+    attack: 15,
+    defense: 4,
+    critRate: 0.07,
+    critDamage: 1.6,
+    exp: 50,
+    coinsMin: 6,
+    coinsMax: 13,
+    visual: {
+      kind: "beast",
+      scale: 1.0,
+      palette: {
+        shadow: 0x0b0b0a,
+        body: 0x9c917c,
+        dark: 0x655d4d,
+        head: 0xb3a891,
+        ear: 0x7a705d,
+        muzzle: 0xd6ccb5,
+        accent: 0xffb35c,
+        leg: 0x6f6655,
+        tail: 0xa79b85
+      }
+    }
+  },
+  "lua-dao-tac": {
+    id: "lua-dao-tac",
+    name: "Lữ Đạo Tặc",
+    level: 27,
+    maxHp: 385,
+    attack: 25,
+    defense: 11,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 145,
+    coinsMin: 14,
+    coinsMax: 26,
+    visual: {
+      kind: "humanoid",
+      scale: 1.02,
+      palette: {
+        shadow: 0x0c0a08,
+        body: 0x6b563c,
+        dark: 0x3d3122,
+        head: 0xc9a07a,
+        accent: 0xd9a04f,
+        leg: 0x4a3c29,
+        cloth: 0x5c6b3a
+      }
+    }
+  },
+  "nghiep-quan-giao-ky": {
+    id: "nghiep-quan-giao-ky",
+    name: "Nghiệp Quan Giáo Kỵ",
+    level: 30,
+    maxHp: 470,
+    attack: 30,
+    defense: 13,
+    critRate: 0.12,
+    critDamage: 1.9,
+    exp: 200,
+    coinsMin: 18,
+    coinsMax: 32,
+    visual: {
+      kind: "armored",
+      scale: 1.08,
+      palette: {
+        shadow: 0x0a0c0f,
+        body: 0x5c6678,
+        dark: 0x353c48,
+        head: 0x7e8899,
+        accent: 0xbcd6ff,
+        leg: 0x414957,
+        cloth: 0x6b2f2f
+      }
+    }
+  },
+  "thiet-thuong-binh": {
+    id: "thiet-thuong-binh",
+    name: "Thiết Thương Binh",
+    level: 36,
+    maxHp: 620,
+    attack: 36,
+    defense: 17,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 270,
+    coinsMin: 24,
+    coinsMax: 42,
+    visual: {
+      kind: "armored",
+      scale: 1.08,
+      palette: {
+        shadow: 0x0a0c0e,
+        body: 0x6c7480,
+        dark: 0x3e444d,
+        head: 0x878f9c,
+        accent: 0xffd27a,
+        leg: 0x4a505a,
+        cloth: 0x424a57
+      }
+    }
+  },
+  "hac-ky-si": {
+    id: "hac-ky-si",
+    name: "Hắc Kỵ Sĩ",
+    level: 42,
+    maxHp: 820,
+    attack: 44,
+    defense: 22,
+    critRate: 0.08,
+    critDamage: 1.7,
+    exp: 360,
+    coinsMin: 30,
+    coinsMax: 52,
+    visual: {
+      kind: "armored",
+      scale: 1.1,
+      palette: {
+        shadow: 0x07080a,
+        body: 0x2d3138,
+        dark: 0x171a1f,
+        head: 0x3a3f48,
+        accent: 0xd94f5c,
+        leg: 0x20242a,
+        cloth: 0x252a31
+      }
+    }
+  },
+  "quan-trung-hiep": {
+    id: "quan-trung-hiep",
+    name: "Quan Trung Hiệp",
+    level: 45,
+    maxHp: 900,
+    attack: 48,
+    defense: 26,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 420,
+    coinsMin: 34,
+    coinsMax: 58,
+    visual: {
+      kind: "humanoid",
+      scale: 1.03,
+      palette: {
+        shadow: 0x090a0d,
+        body: 0x46566e,
+        dark: 0x28323f,
+        head: 0xd0aa86,
+        accent: 0x8fc7ff,
+        leg: 0x303c4c,
+        cloth: 0x5a6c88
+      }
+    }
+  },
+  "dong-trang-thiet-ky": {
+    id: "dong-trang-thiet-ky",
+    name: "Đồng Trang Thiết Kỵ",
+    level: 52,
+    maxHp: 1100,
+    attack: 56,
+    defense: 30,
+    critRate: 0.14,
+    critDamage: 2.0,
+    exp: 520,
+    coinsMin: 40,
+    coinsMax: 70,
+    visual: {
+      kind: "armored",
+      scale: 1.12,
+      palette: {
+        shadow: 0x0c0a07,
+        body: 0xa07a3e,
+        dark: 0x66502a,
+        head: 0xb98e4c,
+        accent: 0xffd88a,
+        leg: 0x735a30,
+        cloth: 0x4d3c1f
+      }
+    }
+  },
+  "quan-trung-ba-vuong": {
+    id: "quan-trung-ba-vuong",
+    name: "Quan Trung Bá Vương",
+    level: 58,
+    maxHp: 1320,
+    attack: 66,
+    defense: 34,
+    critRate: 0.18,
+    critDamage: 2.1,
+    exp: 650,
+    coinsMin: 48,
+    coinsMax: 84,
+    visual: {
+      kind: "humanoid",
+      scale: 1.1,
+      palette: {
+        shadow: 0x090705,
+        body: 0x4a4234,
+        dark: 0x28231a,
+        head: 0xd2a97c,
+        accent: 0xffd76b,
+        leg: 0x342e22,
+        cloth: 0x6b3a2a
+      }
+    }
+  },
 };
 
 /** Every monster id, in catalog order (market wolf first). */

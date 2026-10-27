@@ -26,6 +26,30 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
 const SCHEMA_VERSION = 6;
 
 /**
+ * Column definitions of the `saves` table, shared by the initial CREATE and the
+ * rebuild that relaxes legacy NOT NULL vitals.
+ */
+const SAVES_COLUMNS_SQL = `
+        player_id       TEXT PRIMARY KEY,
+        player_name     TEXT NOT NULL DEFAULT '',
+        level           INTEGER NOT NULL DEFAULT 1,
+        kills           INTEGER NOT NULL DEFAULT 0,
+        coins           INTEGER NOT NULL DEFAULT 0,
+        exp             INTEGER NOT NULL DEFAULT 0,
+        quest_rewarded  INTEGER NOT NULL DEFAULT 0,
+        inventory       TEXT NOT NULL DEFAULT '{}',
+        equipment       TEXT NOT NULL DEFAULT '{}',
+        learned_skills  TEXT NOT NULL DEFAULT '[]',
+        hp              INTEGER,
+        map_id          TEXT,
+        pos_x           REAL,
+        pos_y           REAL,
+        mp              INTEGER,
+        state_imported  INTEGER NOT NULL DEFAULT 0,
+        starter_granted INTEGER NOT NULL DEFAULT 0,
+        updated_at      INTEGER NOT NULL`;
+
+/**
  * Recursively drop prototype-polluting keys from untrusted input.
  * @param {*} value
  * @returns {*}
@@ -89,25 +113,7 @@ export class PlayerDatabase {
     }
 
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS saves (
-        player_id       TEXT PRIMARY KEY,
-        player_name     TEXT NOT NULL DEFAULT '',
-        level           INTEGER NOT NULL DEFAULT 1,
-        kills           INTEGER NOT NULL DEFAULT 0,
-        coins           INTEGER NOT NULL DEFAULT 0,
-        exp             INTEGER NOT NULL DEFAULT 0,
-        quest_rewarded  INTEGER NOT NULL DEFAULT 0,
-        inventory       TEXT NOT NULL DEFAULT '{}',
-        equipment       TEXT NOT NULL DEFAULT '{}',
-        learned_skills  TEXT NOT NULL DEFAULT '[]',
-        hp              INTEGER,
-        map_id          TEXT,
-        pos_x           REAL,
-        pos_y           REAL,
-        mp              INTEGER,
-        state_imported  INTEGER NOT NULL DEFAULT 0,
-        starter_granted INTEGER NOT NULL DEFAULT 0,
-        updated_at      INTEGER NOT NULL
+      CREATE TABLE IF NOT EXISTS saves (${SAVES_COLUMNS_SQL}
       );
       CREATE INDEX IF NOT EXISTS idx_saves_level ON saves(level DESC);
       CREATE INDEX IF NOT EXISTS idx_saves_kills ON saves(kills DESC);
@@ -132,6 +138,12 @@ export class PlayerDatabase {
     addColumn("hp", "INTEGER");
     addColumn("mp", "INTEGER");
     addColumn("state_imported", "INTEGER NOT NULL DEFAULT 0");
+
+    // Older saves declared hp/mp NOT NULL. A fresh character has unknown vitals
+    // until it first joins, and `_writeRow` stores them as NULL, so those rows
+    // could never be created on an old database. Rebuild the table once to match
+    // the current (nullable) schema, preserving every row.
+    this._relaxVitalConstraints();
 
     this._migrate();
 
@@ -288,6 +300,52 @@ export class PlayerDatabase {
     }
 
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
+
+  /**
+   * Rebuild `saves` when a legacy table still marks `hp`/`mp` as NOT NULL.
+   * Structural (not version-driven) so a database that skipped the version bump
+   * is repaired too; running on a current table is a no-op.
+   */
+  _relaxVitalConstraints() {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      // Re-read inside the write transaction: another process may have rebuilt the
+      // table while this one waited for the lock.
+      const columns = this.db.prepare("PRAGMA table_info(saves)").all();
+      const hp = columns.find((column) => column.name === "hp");
+      const mp = columns.find((column) => column.name === "mp");
+      if (hp?.notnull !== 1 && mp?.notnull !== 1) {
+        this.db.exec("COMMIT");
+        return;
+      }
+
+      this.db.exec("DROP TABLE IF EXISTS saves_new;");
+      this.db.exec(`CREATE TABLE saves_new (${SAVES_COLUMNS_SQL});`);
+      // Legacy tables can carry retired columns (position_x, audio_enabled). Copy
+      // only the columns both schemas share, so the rebuild also cleans them up.
+      const targetNames = this.db
+        .prepare("PRAGMA table_info(saves_new)")
+        .all()
+        .map((column) => column.name);
+      const shared = columns
+        .map((column) => column.name)
+        .filter((name) => targetNames.includes(name));
+      const list = shared.join(", ");
+      this.db.exec(`INSERT INTO saves_new (${list}) SELECT ${list} FROM saves;`);
+      this.db.exec("DROP TABLE saves;");
+      this.db.exec("ALTER TABLE saves_new RENAME TO saves;");
+      this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_saves_level ON saves(level DESC);
+        CREATE INDEX IF NOT EXISTS idx_saves_kills ON saves(kills DESC);
+        CREATE INDEX IF NOT EXISTS idx_saves_coins ON saves(coins DESC);
+        CREATE INDEX IF NOT EXISTS idx_saves_exp   ON saves(exp DESC);
+      `);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   _parseInventory(raw) {

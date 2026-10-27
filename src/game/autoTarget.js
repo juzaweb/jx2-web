@@ -8,6 +8,8 @@
  * Kept Phaser-free so it can be unit tested in isolation.
  */
 
+import { isHostileFaction } from "./factions.js";
+
 /**
  * Radius (world px) a candidate may stand in and still be auto-targeted. Roughly
  * three ground tiles — far enough to ring a target you can already hit without
@@ -43,6 +45,8 @@ function isLive(entity) {
  *   enemies?: Array<Object>,
  *   peers?: Array<Object>,
  *   allowPeers?: boolean,
+ *   pvpMode?: "none"|"flag"|"faction",
+ *   selfFaction?: string|null,
  *   selfId?: string|null,
  *   range?: number
  * }} options
@@ -53,6 +57,8 @@ export function pickAutoTarget({
   enemies = [],
   peers = [],
   allowPeers = false,
+  pvpMode = "flag",
+  selfFaction = null,
   selfId = null,
   range = AUTO_TARGET_RANGE
 } = {}) {
@@ -77,8 +83,16 @@ export function pickAutoTarget({
 
   for (const monster of enemies || []) consider(monster, "monster");
   if (allowPeers) {
-    for (const peer of peers || []) {
-      if (peer?.pkFlag === true && peer.id !== selfId) consider(peer, "player");
+    if (pvpMode === "faction") {
+      for (const peer of peers || []) {
+        if (peer?.id === selfId) continue;
+        // On a faction battlefield the camp decides, so the PK flag is irrelevant.
+        if (isHostileFaction(selfFaction, peer?.faction)) consider(peer, "player");
+      }
+    } else if (pvpMode !== "none") {
+      for (const peer of peers || []) {
+        if (peer?.pkFlag === true && peer.id !== selfId) consider(peer, "player");
+      }
     }
   }
 

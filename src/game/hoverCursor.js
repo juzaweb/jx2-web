@@ -11,6 +11,7 @@
 
 import { findEnemyAt } from "./enemy.js";
 import { findPlayerAt } from "./pvpTargeting.js";
+import { isHostileFaction } from "./factions.js";
 
 /** Normal arrow cursor of the game viewport. */
 export const DEFAULT_CURSOR = "default";
@@ -36,13 +37,17 @@ export const ATTACK_CURSOR = 'url("/cursors/dao-attack.png") 3 3, crosshair';
  * @param {Array<object>} players remote peers
  * @param {number} x ground-space x
  * @param {number} y ground-space y
+ * @param {{"none"|"flag"|"faction"}} [options] current map PvP policy
  * @returns {boolean}
  */
-export function isAttackableAt(enemies, players, x, y) {
+export function isAttackableAt(enemies, players, x, y, { pvpMode = "flag", localFaction = null } = {}) {
   if (findEnemyAt(enemies, x, y)) return true;
 
   const player = findPlayerAt(players, x, y);
-  return Boolean(player && player.pkFlag === true);
+  if (!player) return false;
+  if (pvpMode === "none") return false;
+  if (pvpMode === "faction") return isHostileFaction(localFaction, player.faction);
+  return player.pkFlag === true;
 }
 
 /**
@@ -51,10 +56,11 @@ export function isAttackableAt(enemies, players, x, y) {
  * @param {Array<object>} players
  * @param {number} x
  * @param {number} y
+ * @param {{"none"|"flag"|"faction"}} [options]
  * @returns {string}
  */
-export function cursorForGroundPoint(enemies, players, x, y) {
-  return isAttackableAt(enemies, players, x, y) ? ATTACK_CURSOR : DEFAULT_CURSOR;
+export function cursorForGroundPoint(enemies, players, x, y, options) {
+  return isAttackableAt(enemies, players, x, y, options) ? ATTACK_CURSOR : DEFAULT_CURSOR;
 }
 
 /**

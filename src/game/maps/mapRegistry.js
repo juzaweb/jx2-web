@@ -9,6 +9,9 @@
  * safe          true = no monsters spawn when offline
  * noCombat      true = a city safe zone: no PvE or PvP allowed there, whatever
  *               the PK flag says (see isCombatAllowed)
+ * pvpMode       "none" | "flag" | "faction" — how players may fight each other
+ *               ("faction" ignores the PK flag and uses the character's faction)
+ * homeFaction   id of the faction whose capital this city map is
  * bounds        {x0, y0, x1, y1} walkable rectangle; camera + physics clamp to it
  * spawn         {x, y} default / respawn point
  * ground        {rim, fill, tileKey, tileAlpha, pad, regions?, streets?, medallions?}
@@ -26,8 +29,19 @@
  */
 
 import { WORLD_CONFIG } from "../worldConfig.js";
+import { BAC_LINH_MAP } from "./bacLinhMap.js";
+import { BA_THUC_MAP } from "./baThucMap.js";
 import { DONG_MON_THANH_MAP } from "./dongMonThanhMap.js";
+import { HUA_DIEN_MAP } from "./huaDienMap.js";
+import { KIEM_CAC_MAP } from "./kiemCacMap.js";
 import { MARKET_MAP } from "./marketMap.js";
+import { NGA_MI_MAP } from "./ngaMiMap.js";
+import { NGHIEP_QUAN_MAP } from "./nghiepQuanMap.js";
+import { NGUI_THANH_MAP } from "./nguyThanhMap.js";
+import { QUAN_TRUNG_MAP } from "./quanTrungMap.js";
+import { TAY_SON_MAP } from "./taySonMap.js";
+import { THUC_THANH_MAP } from "./thucThanhMap.js";
+import { TRUNG_NGUYEN_MAP } from "./trungNguyenMap.js";
 
 /**
  * @typedef {object} MapDefinition
@@ -35,6 +49,8 @@ import { MARKET_MAP } from "./marketMap.js";
  * @property {string} name
  * @property {boolean} safe
  * @property {boolean} [noCombat]
+ * @property {"none"|"flag"|"faction"} [pvpMode]
+ * @property {string} [homeFaction]
  * @property {{x0:number, y0:number, x1:number, y1:number}} bounds
  * @property {{x:number, y:number}} spawn
  * @property {object} ground
@@ -55,7 +71,18 @@ export const DEFAULT_MAP_ID = "market";
 /** @type {Record<string, import("./mapRegistry.js").MapDefinition>} */
 export const MAPS = Object.freeze({
   market: MARKET_MAP,
-  "dong-mon-thanh": DONG_MON_THANH_MAP
+  "dong-mon-thanh": DONG_MON_THANH_MAP,
+  "bac-linh": BAC_LINH_MAP,
+  "tay-son": TAY_SON_MAP,
+  "trung-nguyen": TRUNG_NGUYEN_MAP,
+  "thuc-thanh": THUC_THANH_MAP,
+  "nguy-thanh": NGUI_THANH_MAP,
+  "ba-thuc": BA_THUC_MAP,
+  "kiem-cac": KIEM_CAC_MAP,
+  "nga-mi": NGA_MI_MAP,
+  "hua-dien": HUA_DIEN_MAP,
+  "nghiep-quan": NGHIEP_QUAN_MAP,
+  "quan-trung": QUAN_TRUNG_MAP
 });
 
 /** Map ids in registry order (useful for validation and docs). */
@@ -102,6 +129,29 @@ export function mapSize(map) {
 export function isCombatAllowed(map) {
   const def = typeof map === "string" ? getMap(map) : map;
   return def?.noCombat !== true;
+}
+
+/** How players may fight each other on a map. */
+export const PVP_MODE = Object.freeze({
+  NONE: "none",
+  FLAG: "flag",
+  FACTION: "faction"
+});
+
+/**
+ * The PvP policy of a map. An explicit `pvpMode` wins; otherwise a city safe
+ * zone has no PvP at all and every other map keeps the legacy PK-flag rule, so
+ * maps authored before factions existed keep working untouched.
+ * @param {import("./mapRegistry.js").MapDefinition|string|null} [map]
+ * @returns {"none"|"flag"|"faction"}
+ */
+export function mapPvpMode(map) {
+  const def = typeof map === "string" ? getMap(map) : map;
+  if (def?.pvpMode === PVP_MODE.NONE || def?.pvpMode === PVP_MODE.FACTION) {
+    return def.pvpMode;
+  }
+  if (def?.noCombat === true) return PVP_MODE.NONE;
+  return PVP_MODE.FLAG;
 }
 
 /**

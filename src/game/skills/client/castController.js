@@ -32,7 +32,7 @@ import {
   isChannelSkill,
   splashRadius
 } from "../../combatRules.js";
-import { PVP_CAST_DISTANCE, canPvpAttack } from "../../pvp.js";
+import { PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, canPvpAttack, mayDuel } from "../../pvp.js";
 import { findNearestPvpTarget } from "../../pvpTargeting.js";
 import { clampToRange } from "../../aim.js";
 import { toIso } from "../../isoProjection.js";
@@ -473,10 +473,15 @@ export class SkillCastController {
     );
     const attacker = {
       id: this.combat.localPlayerId,
-      pkFlag: this.combat.player.pkFlag === true
+      pkFlag: this.combat.player.pkFlag === true,
+      faction: this.combat.player.faction
     };
-    const defender = { id: target.id, pkFlag: target.pkFlag === true };
-    if (!canPvpAttack(attacker, defender, distance)) {
+    const defender = {
+      id: target.id,
+      pkFlag: target.pkFlag === true,
+      faction: target.faction
+    };
+    if (!canPvpAttack(attacker, defender, distance, PVP_ATTACK_RANGE, this.combat.pvpMode?.() || "flag")) {
       this.combat.endChannel(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
       return false;
     }
@@ -516,10 +521,15 @@ export class SkillCastController {
     );
     const attacker = {
       id: this.combat.localPlayerId,
-      pkFlag: this.combat.player.pkFlag === true
+      pkFlag: this.combat.player.pkFlag === true,
+      faction: this.combat.player.faction
     };
-    const defender = { id: target.id, pkFlag: target.pkFlag === true };
-    if (!canPvpAttack(attacker, defender, distance)) {
+    const defender = {
+      id: target.id,
+      pkFlag: target.pkFlag === true,
+      faction: target.faction
+    };
+    if (!canPvpAttack(attacker, defender, distance, PVP_ATTACK_RANGE, this.combat.pvpMode?.() || "flag")) {
       if (log) {
         this.combat.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
       }
@@ -544,10 +554,16 @@ export class SkillCastController {
    * @param {Object} skill
    */
   hintPeacefulDuelist(skill) {
-    if (this.combat.player.pkFlag === true) return;
+    const mode = this.combat.pvpMode?.() || "flag";
+    if (mayDuel(this.combat.player, mode)) return;
 
     const peers = this.combat.scene.remotePlayerManager?.getAll?.() || [];
-    const near = findNearestPvpTarget(this.combat.player, peers, PVP_CAST_DISTANCE);
+    const near = findNearestPvpTarget(
+      this.combat.player,
+      peers,
+      PVP_CAST_DISTANCE,
+      mode
+    );
     if (!near) return;
 
     this.combat.ui.addLog(
@@ -624,15 +640,18 @@ export class SkillCastController {
    * @returns {Object[]}
    */
   resolvePeerTargets(skill, center = null) {
-    if (this.combat.player.pkFlag !== true) return [];
+    const mode = this.combat.pvpMode?.() || "flag";
+    if (!mayDuel(this.combat.player, mode)) return [];
 
     const peers = this.combat.scene.remotePlayerManager?.getAll?.() || [];
     const origin = center || { x: this.combat.player.x, y: this.combat.player.y };
     const distanceToCenter = (peer) =>
       Phaser.Math.Distance.Between(origin.x, origin.y, peer.x, peer.y);
+    const legal = (peer) =>
+      this.combat.isDuelTarget?.(peer) ?? peer?.pkFlag === true;
     return peers
       .filter(
-        (peer) => isPeerTarget(peer) && peer.pkFlag === true && peer.container?.active !== false
+        (peer) => isPeerTarget(peer) && legal(peer) && peer.container?.active !== false
       )
       .filter((peer) => distanceToCenter(peer) <= skill.radius)
       .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));

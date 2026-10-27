@@ -6,6 +6,7 @@ import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 import { LobbyScene } from "../LobbyScene.jsx";
 import { SERVER_NAME } from "../../game/serverConfig.js";
 import { readSession } from "../../game/session.js";
+import { DEFAULT_FACTION, FACTIONS, FACTION_IDS, normalizeFaction } from "../../game/factions.js";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
@@ -22,6 +23,9 @@ const GENDERS = [
 
 const GENDER_BY_KEY = Object.fromEntries(GENDERS.map((gender) => [gender.key, gender]));
 const DEFAULT_GENDER = GENDERS[0];
+
+/** Faction choices, in catalog order. */
+const FACTION_LIST = FACTION_IDS.map((id) => FACTIONS[id]);
 
 const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", zh: "zh-CN" };
 
@@ -59,6 +63,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   const [mode, setMode] = useState("select"); // "select" | "create"
   const [nameInput, setNameInput] = useState("");
   const [genderKey, setGenderKey] = useState(DEFAULT_GENDER.key);
+  const [factionKey, setFactionKey] = useState(DEFAULT_FACTION);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -113,12 +118,17 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
 
   const selected = characters.find((c) => c.id === selectedId) || null;
   const activeGender = GENDER_BY_KEY[genderKey] || DEFAULT_GENDER;
+  const activeFaction = FACTIONS[normalizeFaction(factionKey)] || FACTIONS[DEFAULT_FACTION];
   const selectedGender = selected ? GENDER_BY_KEY[selected.gender] || DEFAULT_GENDER : null;
+  const selectedFaction = selected
+    ? FACTIONS[normalizeFaction(selected.faction)] || FACTIONS[DEFAULT_FACTION]
+    : null;
 
   const handleOpenCreate = () => {
     setMode("create");
     setNameInput("");
     setGenderKey(DEFAULT_GENDER.key);
+    setFactionKey(DEFAULT_FACTION);
     setError("");
     setNotice("");
   };
@@ -146,7 +156,8 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
         user.id,
         cleanName,
         activeGender.key,
-        user?.token || readSession()?.token
+        user?.token || readSession()?.token,
+        factionKey
       );
       const createdId = data?.character?.id;
       await reload();
@@ -222,7 +233,9 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                 <div className="jx2-cs-stage-name">
                   {nameInput.trim() || t("characterSelect.newCharacter")}
                 </div>
-                <div className="jx2-cs-stage-meta">{t(activeGender.labelKey)}</div>
+                <div className="jx2-cs-stage-meta">
+                  {t(activeGender.labelKey)} · {t(`characterSelect.factions.${activeFaction.id}`)}
+                </div>
               </>
             ) : (
               <>
@@ -245,6 +258,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                 {selected && (
                   <div className="jx2-cs-stage-meta">
                     {t((GENDER_BY_KEY[selected.gender] || DEFAULT_GENDER).labelKey)} ·{" "}
+                    {selectedFaction ? t(`characterSelect.factions.${selectedFaction.id}`) : ""} ·{" "}
                     {t("common.level")} {selected.level} · {formatDateTime(selected.createdAt, language)}
                   </div>
                 )}
@@ -274,6 +288,30 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                     </button>
                   ))}
                 </div>
+
+                <label className="jx2-form-label">{t("characterSelect.factionLabel")}</label>
+                <div className="jx2-cs-factions">
+                  {FACTION_LIST.map((faction) => (
+                    <button
+                      key={faction.id}
+                      type="button"
+                      className={`jx2-cs-faction-tile faction-${faction.id} ${
+                        faction.id === activeFaction.id ? "selected" : ""
+                      }`}
+                      onClick={() => setFactionKey(faction.id)}
+                      title={t(`characterSelect.factions.${faction.id}`)}
+                    >
+                      <span className="jx2-cs-faction-glyph">{faction.glyph}</span>
+                      <span className="jx2-cs-faction-label">
+                        {t(`characterSelect.factions.${faction.id}`)}
+                      </span>
+                      <span className="jx2-cs-faction-city">
+                        {t(`maps.${faction.homeMapId}`, undefined, faction.cityName)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="jx2-cs-create-hint">{t("characterSelect.factionHint")}</div>
 
                 <label className="jx2-form-label" htmlFor="jx2-character-name">
                   {t("characterSelect.nameLabel")}
@@ -370,6 +408,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                             <span className="jx2-cs-slot-name">{char.name}</span>
                             <span className="jx2-cs-slot-info">
                               {t((GENDER_BY_KEY[char.gender] || DEFAULT_GENDER).labelKey)} ·{" "}
+                              {t(`characterSelect.factions.${normalizeFaction(char.faction)}`)} ·{" "}
                               {t("common.level")} {char.level}
                             </span>
                             <span className="jx2-cs-slot-date">{formatDateTime(char.createdAt, language)}</span>

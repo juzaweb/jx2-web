@@ -56,12 +56,26 @@ export default {
   },
   cityMap: {
     eyebrow: "TOÀN CẢNH THÀNH TRÌ",
-    title: "Bản Đồ Biện Kinh",
-    hint: "Nhấn M hoặc Esc để đóng",
+    title: "Bản Đồ Biện Kinh",    titleWithName: "Bản Đồ {name}",    hint: "Nhấn M hoặc Esc để đóng",
     player: "Nhân vật",
     enemy: "Yêu thú",
     remote: "Hiệp khách",
     pavilion: "Vạn Sự Thông"
+  },
+  maps: {
+    market: "Biện Kinh",
+    "dong-mon-thanh": "Đông Môn Thành",
+    "bac-linh": "Bắc Lĩnh",
+    "tay-son": "Tây Sơn",
+    "trung-nguyen": "Trung Nguyên Chiến Trường",
+    "thuc-thanh": "Thục Thành",
+    "nguy-thanh": "Ngụy Thành",
+    "ba-thuc": "Ba Thục",
+    "kiem-cac": "Kiếm Các",
+    "nga-mi": "Nga Mi",
+    "hua-dien": "Hứa Điền",
+    "nghiep-quan": "Nghiệp Quan",
+    "quan-trung": "Quan Trung"
   },
   chat: {
     tabs: {
@@ -158,6 +172,13 @@ export default {
     gender: "Giới tính",
     genderMale: "Nam",
     genderFemale: "Nữ",
+    factionLabel: "Phe phái:",
+    factionHint: "Phe quyết định thành nhà và đồng minh trên chiến trường trung tâm.",
+    factions: {
+      han: "Hán",
+      thuc: "Thục",
+      nguy: "Ngụy"
+    },
     emptySlot: "(Trống)",
     characterList: "Danh sách nhân vật",
     nameLabel: "Tên:",
@@ -508,11 +529,7 @@ export default {
       equipFullSet: "Mặc Trọn Bộ Ngay"
     },
     teleport: {
-      title: "Hồi Phù & Truyền Tống",
-      receiveScroll: "Nhận 99x Hồi Thành Phù",
-      toMarket: "Truyền Tống: Biện Kinh",
-      toDongMonThanh: "Truyền Tống: Đông Môn Thành",
-      toSpawn: "Hồi Thành (Điểm hồi sinh)"
+      receiveScroll: "Nhận 99x Hồi Thành Phù"
     },
     utility: {
       title: "Ngân Lượng & Tiện Ích",

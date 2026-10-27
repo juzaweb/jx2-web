@@ -65,6 +65,20 @@ export function portalAt(map, x, y) {
 }
 
 /**
+ * The decorative gate arch containing a ground position, if any. A gate with no
+ * portal is a shut gate: the scene uses this to explain why nothing happened.
+ * @param {{gates?: Array<{x:number,y:number,w:number,h:number}>}} map
+ * @param {number} x
+ * @param {number} y
+ * @returns {?object}
+ */
+export function gateAt(map, x, y) {
+  const gates = map?.gates;
+  if (!Array.isArray(gates)) return null;
+  return gates.find((gate) => isInsideRect(gate, x, y)) || null;
+}
+
+/**
  * Advance the portal state machine by one frame.
  *
  * Returns the next state plus the portal to travel through (or null). The caller

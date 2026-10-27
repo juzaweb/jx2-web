@@ -8,6 +8,10 @@
  */
 
 import { WORLD_TILE } from "./worldConfig.js";
+import { isHostileFaction } from "./factions.js";
+import { PVP_MODE } from "./maps/mapRegistry.js";
+
+export { PVP_MODE };
 
 /**
  * Max distance at which one flagged player can strike another.
@@ -51,25 +55,63 @@ export const PVP_DODGE_MIN_SPEED = 15;
 export const PVP_CAST_DISTANCE = PVP_ATTACK_RANGE - 100;
 
 /**
- * Decide whether one player is allowed to strike another.
- *
- * Both parties must carry the PK flag: a peaceful player can neither attack nor be
- * attacked, which keeps the flag meaningful as an explicit opt-in.
- *
- * @param {{id?:string, pkFlag?:boolean}|null} attacker
- * @param {{id?:string, pkFlag?:boolean}|null} target
- * @param {number} distance - world-space distance between the two players
- * @param {number} [maxRange=PVP_ATTACK_RANGE]
+ * Whether a player is allowed to look for a duel target at all. In a faction
+ * battlefield the map itself opts everyone in; elsewhere the PK flag does.
+ * @param {{pkFlag?:boolean}|null} player
+ * @param {"none"|"flag"|"faction"} [pvpMode]
  * @returns {boolean}
  */
-export function canPvpAttack(attacker, target, distance, maxRange = PVP_ATTACK_RANGE) {
+export function mayDuel(player, pvpMode = PVP_MODE.FLAG) {
+  if (pvpMode === PVP_MODE.NONE) return false;
+  if (pvpMode === PVP_MODE.FACTION) return true;
+  return player?.pkFlag === true;
+}
+
+/**
+ * Whether two players are enemies regardless of distance.
+ *
+ * `flag` keeps the historical rule (both sides opted in). `faction` replaces the
+ * flag with camp hostility: two known, different camps are enemies, and an
+ * unknown camp never is.
+ * @param {{id?:string, pkFlag?:boolean, faction?:string}|null} attacker
+ * @param {{id?:string, pkFlag?:boolean, faction?:string}|null} target
+ * @param {"none"|"flag"|"faction"} [pvpMode]
+ * @returns {boolean}
+ */
+export function pvpFoes(attacker, target, pvpMode = PVP_MODE.FLAG) {
   if (!attacker || !target) return false;
 
   const attackerId = attacker.id;
   const targetId = target.id;
   if (!attackerId || !targetId || attackerId === targetId) return false;
 
-  if (attacker.pkFlag !== true || target.pkFlag !== true) return false;
+  if (pvpMode === PVP_MODE.NONE) return false;
+  if (pvpMode === PVP_MODE.FACTION) return isHostileFaction(attacker.faction, target.faction);
+  return attacker.pkFlag === true && target.pkFlag === true;
+}
+
+/**
+ * Decide whether one player is allowed to strike another.
+ *
+ * Both parties must carry the PK flag on a normal map: a peaceful player can
+ * neither attack nor be attacked, which keeps the flag meaningful as an explicit
+ * opt-in. On a faction battlefield the camp decides instead (see `pvpFoes`).
+ *
+ * @param {{id?:string, pkFlag?:boolean, faction?:string}|null} attacker
+ * @param {{id?:string, pkFlag?:boolean, faction?:string}|null} target
+ * @param {number} distance - world-space distance between the two players
+ * @param {number} [maxRange=PVP_ATTACK_RANGE]
+ * @param {"none"|"flag"|"faction"} [pvpMode="flag"]
+ * @returns {boolean}
+ */
+export function canPvpAttack(
+  attacker,
+  target,
+  distance,
+  maxRange = PVP_ATTACK_RANGE,
+  pvpMode = PVP_MODE.FLAG
+) {
+  if (!pvpFoes(attacker, target, pvpMode)) return false;
 
   if (typeof distance !== "number" || !Number.isFinite(distance)) return false;
   return distance <= maxRange;

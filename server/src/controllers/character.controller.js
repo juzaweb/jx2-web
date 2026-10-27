@@ -41,8 +41,8 @@ export const createCharacter = async (req, res, next) => {
       });
     }
 
-    const { name, gender } = req.body || {};
-    const character = characterDb.create(userId, name, gender);
+    const { name, gender, faction } = req.body || {};
+    const character = characterDb.create(userId, name, gender, faction);
 
     // Every new character starts with the shared starter kit (health potions, mana
     // potions, return-city talismans and a sword). Admin / GM accounts
@@ -67,7 +67,8 @@ export const createCharacter = async (req, res, next) => {
   } catch (error) {
     if (
       error.code === "INVALID_NAME" ||
-      error.code === "INVALID_USER"
+      error.code === "INVALID_USER" ||
+      error.code === "INVALID_FACTION"
     ) {
       return res.status(400).json({ success: false, error: error.message });
     }

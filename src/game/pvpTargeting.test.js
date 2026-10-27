@@ -78,6 +78,19 @@ describe("findNearestPvpTarget", () => {
     expect(findNearestPvpTarget(attacker, [gone])).toBeNull();
   });
 
+  it("offers nobody on a no-PvP map", () => {
+    const flagged = peer("flagged", 10, 0);
+    expect(findNearestPvpTarget(attacker, [flagged], undefined, "none")).toBeNull();
+  });
+
+  it("offers a hostile camp on a faction map without PK flags", () => {
+    const han = { id: "me", x: 0, y: 0, faction: "han" };
+    const enemy = peer("enemy", 10, 0, { pkFlag: false, faction: "thuc" });
+    const ally = peer("ally", 20, 0, { pkFlag: false, faction: "han" });
+
+    expect(findNearestPvpTarget(han, [enemy, ally], undefined, "faction")).toBe(enemy);
+  });
+
   it("tolerates junk input", () => {
     expect(findNearestPvpTarget(null, [])).toBeNull();
     expect(findNearestPvpTarget(attacker, null)).toBeNull();
