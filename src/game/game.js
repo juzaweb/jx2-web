@@ -4,7 +4,7 @@ import { WORLD_POSITION_SCALE, WORLD_SCALE, WORLD_TILE } from "./worldConfig.js"
 import { Player } from "./player.js";
 import { HERO_FOOT_Y } from "./heroRigView.js";
 import { EnemyManager, findEnemyAt } from "./enemy.js";
-import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } from "./combat.js";
+import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone, SAFE_ZONE_LOG } from "./combat.js";
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
@@ -53,7 +53,8 @@ const HIT_REJECT_MESSAGES = {
   iframe: "Đối thủ vừa trúng đòn (bất tử 0,7s) — đòn này bị bỏ.",
   dodged: "Đối thủ đã né đòn (đang chạy ra xa)!",
   target_missing: "Đối thủ không còn trên máy chủ.",
-  damage_invalid: "Sát thương không hợp lệ nên máy chủ đã bỏ."
+  damage_invalid: "Sát thương không hợp lệ nên máy chủ đã bỏ.",
+  safe_zone: SAFE_ZONE_LOG
 };
 
 import { normalizeGender } from "./gender.js";
@@ -449,9 +450,19 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Check if clicking directly on a living monster (target and attack)
+      // Check if clicking directly on a living monster (target and attack). A
+      // city square is a safe zone: there the click only walks the hero, and the
+      // player is told why the monster is left alone.
+      const mayFight = this.canFight();
       const clickedEnemy = findEnemyAt(this.enemyManager?.getAlive() || [], worldX, worldY);
       if (clickedEnemy) {
+        if (!mayFight) {
+          this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
+          this.isPointerMoving = true;
+          this.player.moveTo(clickedEnemy.x, clickedEnemy.y);
+          this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xffdd59);
+          return;
+        }
         this.enemyTarget = clickedEnemy;
         this.isPointerMoving = false;
         this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
@@ -463,6 +474,13 @@ export class JiangHuScene extends Phaser.Scene {
       // hero walks into range and keeps striking until one of the flags drops.
       const clickedPlayer = findPlayerAt(this.remotePlayerManager?.getAll?.() || [], worldX, worldY);
       if (clickedPlayer && clickedPlayer.pkFlag === true) {
+        if (!mayFight) {
+          this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
+          this.isPointerMoving = true;
+          this.player.moveTo(clickedPlayer.x, clickedPlayer.y);
+          this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xffdd59);
+          return;
+        }
         if (this.player.pkFlag === true) {
           this.pvpTarget = clickedPlayer;
         } else {
@@ -1206,13 +1224,28 @@ export class JiangHuScene extends Phaser.Scene {
     // Persist the choice so a reload cannot revert it behind the player's back.
     this.saveGame(false);
 
-    this.uiBridge.addLog(
-      next
-        ? "Đã bật cờ PK — từ nay có thể tỷ thí cùng cao thủ khác."
-        : "Đã tắt cờ PK — trở về trạng thái hòa bình.",
-      "system"
-    );
+    const safeZone = !this.canFight();
+    if (!next) {
+      this.uiBridge.addLog("Đã tắt cờ PK — trở về trạng thái hòa bình.", "system");
+    } else if (safeZone) {
+      this.uiBridge.addLog(
+        "Đã bật cờ PK — nhưng đây là khu vực thành, chưa thể giao chiến. Hãy ra khỏi thành.",
+        "system"
+      );
+    } else {
+      this.uiBridge.addLog("Đã bật cờ PK — từ nay có thể tỷ thí cùng cao thủ khác.", "system");
+    }
     return next;
+  }
+
+  /**
+   * Whether fighting is allowed on the map the hero stands on. The combat system
+   * owns the rule (a city is a safe zone); a scene without one — early boot or a
+   * partial test double — keeps fighting.
+   * @returns {boolean}
+   */
+  canFight() {
+    return this.combat?.canFight?.() ?? true;
   }
 
   /**
@@ -1604,6 +1637,14 @@ export class JiangHuScene extends Phaser.Scene {
     const target = this.pvpTarget;
     if (!target) return;
 
+    // A duel cannot start inside the city: release the lock instead of chasing a
+    // target the server would refuse every strike against.
+    if (!this.canFight()) {
+      this.pvpTarget = null;
+      this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
+      return;
+    }
+
     // A skill already cast at the target is driving the approach; two movement
     // owners would make the hero stutter between the two ranges.
     if (this.combat?.pendingCast) return;
@@ -1654,9 +1695,12 @@ export class JiangHuScene extends Phaser.Scene {
     let cursor = DEFAULT_CURSOR;
     if (this.started && !this.isPaused && !overHud && !steering) {
       const ground = fromIso(pointer.worldX, pointer.worldY);
+      // A safe zone has no attackable body: keep the plain cursor so the player is
+      // never promised a strike the city will refuse.
+      const mayFight = this.canFight();
       cursor = cursorForGroundPoint(
-        this.enemyManager?.getAlive() || [],
-        this.remotePlayerManager?.getAll?.() || [],
+        mayFight ? this.enemyManager?.getAlive() || [] : [],
+        mayFight ? this.remotePlayerManager?.getAll?.() || [] : [],
         ground.x,
         ground.y
       );
@@ -1672,6 +1716,13 @@ export class JiangHuScene extends Phaser.Scene {
   updateEnemyTarget() {
     const target = this.enemyTarget;
     if (!target) return;
+
+    // The city never lets the hero strike, so drop the lock instead of walking
+    // the hero into a target it cannot hit.
+    if (!this.canFight()) {
+      this.enemyTarget = null;
+      return;
+    }
 
     // A skill already cast at the target is driving the approach
     if (this.combat?.pendingCast) return;
@@ -1709,6 +1760,12 @@ export class JiangHuScene extends Phaser.Scene {
    */
   updateAutoTarget() {
     if (!this.autoTargetEnabled) return;
+
+    // No ring in a safe zone: there is nothing the next attack press could hit.
+    if (!this.canFight()) {
+      this.clearAutoTarget();
+      return;
+    }
 
     // A chase already under way owns the ring: re-picking every frame would make
     // the halo hop to whichever monster happens to be closer mid-fight.
@@ -1793,6 +1850,12 @@ export class JiangHuScene extends Phaser.Scene {
   focusAutoTarget() {
     const target = this.autoTarget?.target;
     if (!target) return false;
+
+    if (!this.canFight()) {
+      this.clearAutoTarget();
+      this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
+      return true;
+    }
 
     if (this.autoTarget.kind === "player") {
       // The server refuses every hit from a peaceful hero, so fall through to

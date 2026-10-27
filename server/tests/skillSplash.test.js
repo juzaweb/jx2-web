@@ -14,7 +14,7 @@ function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
     weaponType: playerWeapon,
     level: 10,
     learnedSkills: ["la_han_quyen", "dai_tu_di_chuong"],
-    mapId: "city",
+    mapId: "dong-mon-thanh",
     x: 0,
     y: 0,
     characterId: null,
@@ -48,7 +48,7 @@ function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay" }) {
 
 const wolf = (id, x) => ({
   id,
-  mapId: "city",
+  mapId: "dong-mon-thanh",
   x,
   y: 0,
   hp: 1000,

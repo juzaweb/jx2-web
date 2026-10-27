@@ -12,6 +12,7 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
+import { isCombatAllowed } from "./maps/mapRegistry.js";
 import {
   MELEE_REACH,
   channelDurationMs,
@@ -35,6 +36,12 @@ let audioContext = null;
  * @returns {boolean}
  */
 const isPeerTarget = (target) => Boolean(target) && typeof target.monsterId !== "string";
+
+/**
+ * Why a swing, skill or duel was refused inside a city. Shared with the scene so
+ * the click, the cursor and the combat system all explain the safe zone alike.
+ */
+export const SAFE_ZONE_LOG = "Đây là khu vực thành — nơi an cư, không thể giao chiến.";
 
 export function isAudioEnabled() {
   return audioEnabled;
@@ -112,6 +119,17 @@ export class CombatSystem {
    */
   getEffectiveStats() {
     return this.player?.stats || {};
+  }
+
+  /**
+   * Whether fighting is allowed where the hero stands. A city is a safe zone: a
+   * swing, a skill aimed at a body, and a duel are all refused there, even with
+   * the PK flag raised. The server enforces the same rule, so this only spares
+   * the player a shot the server would drop.
+   * @returns {boolean}
+   */
+  canFight() {
+    return isCombatAllowed(this.scene?.map || this.scene?.currentMapId);
   }
 
   /**
@@ -236,6 +254,10 @@ export class CombatSystem {
   performAttack() {
     if (!this.attackReady) return;
     if (this.channel) return;
+    if (!this.canFight()) {
+      this.ui.addLog(SAFE_ZONE_LOG, "system");
+      return;
+    }
 
     const targetEnemy = this.nearestEnemyInReach();
     if (targetEnemy) {
@@ -289,6 +311,15 @@ export class CombatSystem {
     if (skill.target === "self") {
       this.executeSkill(skill, null);
       return true;
+    }
+
+    // Self buffs and heals still work in town; anything aimed at a body does not.
+    if (!this.canFight()) {
+      this.ui.addLog(
+        `${translate(skill.nameKey, undefined, skill.id)} không thể thi triển trong khu vực thành.`,
+        "system"
+      );
+      return false;
     }
 
     // A cursor sitting on the hero carries no direction; treat it as "no aim".
@@ -1126,6 +1157,10 @@ export class CombatSystem {
   performPvpAttack(target) {
     if (!this.attackReady) return;
     if (this.channel) return;
+    if (!this.canFight()) {
+      this.ui.addLog(SAFE_ZONE_LOG, "system");
+      return;
+    }
     if (!this.scene.networkClient?.isConnected) {
       this.ui.addLog("Cần kết nối máy chủ để tỷ thí cùng cao thủ.");
       return;
@@ -1172,6 +1207,7 @@ export class CombatSystem {
    */
   damageEnemy(wolf, meta = {}) {
     if (!wolf || wolf.isDead) return;
+    if (!this.canFight()) return;
 
     const skill = meta.skill ? skillById(meta.skill) : null;
     if (skill) playSkillImpactVfx(this.scene, wolf.x, wolf.y, skill);

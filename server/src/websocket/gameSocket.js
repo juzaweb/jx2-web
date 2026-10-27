@@ -35,6 +35,7 @@ import {
   MAP_IDS,
   findPortal,
   getMap,
+  isCombatAllowed,
   isKnownMap
 } from "../../../src/game/maps/mapRegistry.js";
 import {
@@ -366,6 +367,11 @@ export class GameSocketManager {
     // Injectable so tests can pin the directional-dodge roll.
     this.random = typeof options.random === "function" ? options.random : Math.random;
 
+    // A city map is a safe zone: no PvE or PvP combat there, whatever the PK
+    // flags say. The legacy-roster harness opts out, because it deliberately
+    // fights inside Biện Kinh to exercise the combat paths.
+    this.combatSafeZones = options.combatSafeZones !== false;
+
     this.setupServer();
     this.startHeartbeat();
     this.startEnemyTick();
@@ -417,6 +423,18 @@ export class GameSocketManager {
   gridFor(mapId) {
     this.rosterFor(mapId);
     return this.enemyGridByMap.get(isKnownMap(mapId) ? mapId : DEFAULT_MAP_ID);
+  }
+
+  /**
+   * Whether the map this player stands on allows combat. A city is a safe zone:
+   * no monster can be struck and no duel can land there, even with both PK flags
+   * raised. Enforced here rather than trusted from the client.
+   * @param {{mapId?:string}|null} player server player object
+   * @returns {boolean}
+   */
+  canFightHere(player) {
+    if (!this.combatSafeZones) return true;
+    return isCombatAllowed(getMap(player?.mapId));
   }
 
   setupServer() {
@@ -1565,6 +1583,12 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
+    // A city is a safe zone: refuse the swing/cast outright so a forged packet
+    // cannot fight inside the walls even with the PK flag raised.
+    if (!this.canFightHere(player)) {
+      return this.rejectHit(ws, "safe_zone");
+    }
+
     const now = Date.now();
     const requested = skillById(payload.skill);
 
@@ -1742,6 +1766,9 @@ export class GameSocketManager {
     const attacker = this.players.get(ws);
     if (!attacker) return;
 
+    // Neither side may fight from or into a city safe zone.
+    if (!this.canFightHere(attacker)) return this.rejectHit(ws, "safe_zone");
+
     // Rate-limit plain swings and one-shot skills per attacker so a spamming
     // client can't amplify one socket into a broadcast storm. A channel's ticks
     // are bounded by its cast's own hit cap, so they are not throttled here.
@@ -1756,6 +1783,9 @@ export class GameSocketManager {
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
     if (!target) return this.rejectHit(ws, "target_missing");
+    if (!this.canFightHere(target)) {
+      return this.rejectHit(ws, "safe_zone", { targetId: target.id });
+    }
 
     const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
 
@@ -2347,6 +2377,9 @@ export class GameSocketManager {
   handleEnemyHit(ws, payload = {}) {
     const player = this.players.get(ws);
     if (!player) return;
+
+    // The city is a safe zone: no monster can be struck there.
+    if (!this.canFightHere(player)) return;
 
     // Enemy ids are per-map, so the roster of the map the attacker stands on is
     // the only one a hit can name.

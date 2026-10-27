@@ -7,6 +7,8 @@
  * id            unique string, used in saves and on the wire
  * name          Vietnamese display name
  * safe          true = no monsters spawn when offline
+ * noCombat      true = a city safe zone: no PvE or PvP allowed there, whatever
+ *               the PK flag says (see isCombatAllowed)
  * bounds        {x0, y0, x1, y1} walkable rectangle; camera + physics clamp to it
  * spawn         {x, y} default / respawn point
  * ground        {rim, fill, tileKey, tileAlpha, pad, regions?, streets?, medallions?}
@@ -32,6 +34,7 @@ import { MARKET_MAP } from "./marketMap.js";
  * @property {string} id
  * @property {string} name
  * @property {boolean} safe
+ * @property {boolean} [noCombat]
  * @property {{x0:number, y0:number, x1:number, y1:number}} bounds
  * @property {{x:number, y:number}} spawn
  * @property {object} ground
@@ -83,6 +86,22 @@ export function getMap(id) {
 export function mapSize(map) {
   const def = typeof map === "string" ? getMap(map) : map || getMap();
   return { width: def.bounds.x1 - def.bounds.x0, height: def.bounds.y1 - def.bounds.y0 };
+}
+
+/**
+ * Whether fighting is allowed on a map. A map flagged `noCombat` is a city safe
+ * zone: neither monsters nor other players can be struck there, even with the PK
+ * flag raised. The client uses this to refuse swings/casts; the server uses it to
+ * refuse `enemy_hit` / `player_hit`, so a forged packet cannot fight in town.
+ *
+ * A missing definition is treated as combat-allowed so callers that have not
+ * loaded a map yet (boot, tests) keep working.
+ * @param {import("./mapRegistry.js").MapDefinition|string|null} [map]
+ * @returns {boolean}
+ */
+export function isCombatAllowed(map) {
+  const def = typeof map === "string" ? getMap(map) : map;
+  return def?.noCombat !== true;
 }
 
 /**
