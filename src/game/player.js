@@ -273,9 +273,14 @@ export class Player {
     });
   }
 
+  /**
+   * Play the normal-attack motion.
+   * @returns {boolean} `true` when the baked swing sheet played (the art already
+   *   contains the slash arc, so the caller must not draw one)
+   */
   playAttackMotion() {
-    if (!this.body) return;
-    this.rig?.attack?.("slash");
+    if (!this.body) return false;
+    const bakedSwing = this.rig?.attack?.("slash") === true;
     this.scene.tweens.add({
       targets: this.body,
       x: 7,
@@ -288,6 +293,7 @@ export class Player {
         if (this.body) this.body.x = 0;
       }
     });
+    return bakedSwing;
   }
 
   /**

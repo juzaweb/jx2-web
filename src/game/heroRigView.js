@@ -1,9 +1,18 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
-import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
-import { HERO_BODY, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
+import { EQUIPMENT_SLOT_KEYS, equippedWeaponType } from "./equipment.js";
+import {
+  HERO_BODY,
+  bakedEquipmentSlots,
+  bodyFrameForDirection,
+  bodyRowForDirection,
+  bodyTextureFor,
+  equipmentTextureKeyFor,
+  weaponAttackTextureDef,
+  weaponBodyTextureDef
+} from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
-import { ensureEquipmentTexture } from "./lazyAssets.js";
+import { ensureEquipmentTexture, ensureWeaponAttackTexture, ensureWeaponBodyTexture } from "./lazyAssets.js";
 
 /** Distance from the rig container origin down to the character's feet (ground). */
 export const HERO_FOOT_Y = 41;
@@ -16,14 +25,17 @@ const ARM_ANGLE = 0.4;
 const ARM_DEPTH_FLOOR = 0.35;
 /** Foot lift (rig units) for the stepping leg, mostly for head-on views. */
 const STEP_LIFT = 4;
-
+/** Milliseconds each swing frame is held; four frames span one strike. */
+const ATTACK_FRAME_MS = 55;
 /**
  * Phaser adapter for the hero body.
  *
- * Uses the baked gender sheet (see heroBody.js) when it is loaded: four
- * direction rows x four walk frames, played by swapping frames (`animate`).
- * When the sheet is missing it falls back to the vector rig (see heroRig.js)
- * and pivots its tagged limb groups instead.
+ * Uses the baked sheet for the hero's gender when it is loaded - and, when the
+ * worn weapon ships its own art, the sheet that holds that weapon in hand (see
+ * WEAPON_BODY_TEXTURES) - drawing four direction rows x four walk frames and
+ * playing them by swapping frames (`animate`). When the sheet is missing it
+ * falls back to the vector rig (see heroRig.js) and pivots its tagged limb
+ * groups instead.
  *
  * Rig space has its origin at the character's feet, so the container sits at
  * {@link HERO_FOOT_Y} — the same ground offset the shadow uses.
@@ -44,6 +56,8 @@ export class HeroRigView {
     this.groups = {};
     /** Baked body sprite, used when the gender sheet is loaded. */
     this.bodySprite = null;
+    /** Texture the body sprite was built with, restored after a swing. */
+    this.bodyTextureKey = null;
     /** Modular equipment sprites (slot -> sprite). */
     this.equipSprites = {};
     this.usingSprite = false;
@@ -51,6 +65,14 @@ export class HeroRigView {
     /** While an attack pose is playing, the walk cycle must not overwrite it. */
     this.acting = false;
     this.actionTween = null;
+    /** Stepper that plays the baked swing frames, if one is running. */
+    this.attackTimer = null;
+    /** Body sheets this view queued on the scene loader and is waiting for. */
+    this.pendingSheets = new Set();
+    /** Gear of the last `set` call, so a late sheet can redraw the current look. */
+    this.equipment = {};
+    /** Weapon type of the last `set` call, which decides the swing sheet. */
+    this.weaponType = null;
   }
 
   /**
@@ -63,33 +85,59 @@ export class HeroRigView {
    */
   set(direction, equipment = {}, gender = "male") {
     const g = normalizeGender(gender);
-    const bodyTexture = bodyTextureFor(g);
-    const usesSprite = Boolean(this.scene.textures?.exists?.(bodyTexture));
-    const key = `${g}|${direction}|${usesSprite ? "sprite" : "rig"}|${slotSignature(equipment)}`;
+    const weaponType = equippedWeaponType(equipment);
+    // Some weapon types ship their own sheet with the blade already in hand.
+    // Until that sheet is decoded the hero keeps the plain gender sheet and the
+    // vector weapon, then this view rebuilds itself (see requestWeaponSheet).
+    const weaponSheet = weaponBodyTextureDef(g, weaponType);
+    const weaponSheetReady = Boolean(weaponSheet && this.hasTexture(weaponSheet.key));
+    const bodyTexture = weaponSheetReady ? weaponSheet.key : bodyTextureFor(g);
+    const usesSprite = this.hasTexture(bodyTexture);
+    const key = `${g}|${direction}|${bodyTexture}|${usesSprite ? "sprite" : "rig"}|${slotSignature(equipment)}`;
     if (key === this.key) return;
     this.key = key;
     this.gender = g;
     this.direction = direction;
     this.pose = poseFor(direction);
+    this.equipment = equipment;
+    this.weaponType = weaponType;
     this.usingSprite = usesSprite;
     this.bodySprite = null;
+    this.bodyTextureKey = null;
     this.equipSprites = {};
     this.actionTween?.stop();
     this.actionTween = null;
+    this.stopAttackTimer();
     this.acting = false;
 
     this.container.removeAll(true);
     this.container.x = 0;
     this.groups = {};
 
+    if (weaponSheet && !weaponSheetReady) {
+      this.requestWeaponSheet(weaponSheet.key, weaponType, g);
+    }
+    // The swing sheet may land later than the walk sheet, so ask for it here
+    // rather than on the first strike.
+    const attackSheet = weaponAttackTextureDef(g, weaponType);
+    if (attackSheet && !this.hasTexture(attackSheet.key)) {
+      this.requestSheet(attackSheet.key, () => ensureWeaponAttackTexture(this.scene, g, weaponType));
+    }
+
     if (this.usingSprite) {
+      // Slots the sheet already paints are skipped so the body art is not
+      // covered by (or double-drawing) the modular equipment sprites. A
+      // weapon-holding sheet also declares the weapon slot it paints for us.
+      const bakedSlots = new Set(bakedEquipmentSlots(g, weaponSheetReady ? weaponType : null));
       this.frameIndex = bodyFrameForDirection(direction, 0);
+      this.bodyTextureKey = bodyTexture;
       this.bodySprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, bodyTexture, this.frameIndex);
       this.bodySprite.setOrigin(0.5, 1);
       this.bodySprite.setScale(HERO_BODY.scale);
       this.container.add(this.bodySprite);
 
       const addEquipSprite = (slot, overrideItemId = null) => {
+        if (bakedSlots.has(slot)) return;
         const itemId = overrideItemId || equipment?.[slot];
         if (!itemId) return;
         const texKey = equipmentTextureKeyFor(slot, itemId, g);
@@ -118,7 +166,7 @@ export class HeroRigView {
       addEquipSprite("armor");
 
       // 2. Procedural vector shapes for any slot not covered by a sprite
-      const excluded = Object.keys(this.equipSprites);
+      const excluded = [...Object.keys(this.equipSprites), ...bakedSlots];
       for (const primitive of buildBodyEquipment({ direction, equipment, excludeSlots: excluded })) {
         const child = createPrimitive(this.scene, primitive);
         if (child) this.container.add(child);
@@ -141,6 +189,55 @@ export class HeroRigView {
         });
       }
     }
+  }
+
+  /**
+   * @param {string} key Phaser texture key
+   * @returns {boolean} whether the scene can draw that texture right now
+   */
+  hasTexture(key) {
+    return Boolean(key) && Boolean(this.scene?.textures?.exists?.(key));
+  }
+
+  /**
+   * Queue a weapon-holding body sheet and redraw once it has decoded. Until then
+   * the hero keeps the plain gender sheet with the vector weapon, so the swap
+   * never shows a blank or a vector fallback.
+   * @param {string} sheetKey
+   * @param {string} weaponType
+   * @param {"male"|"female"} gender
+   */
+  requestWeaponSheet(sheetKey, weaponType, gender) {
+    this.requestSheet(sheetKey, () => ensureWeaponBodyTexture(this.scene, gender, weaponType));
+  }
+
+  /**
+   * Queue `sheetKey` and run `ensure` once a listener is in place. The hero keeps
+   * its current look until the sheet decodes, then this view rebuilds.
+   * @param {string} sheetKey
+   * @param {() => void} ensure queues the actual load
+   * @param {boolean} [rebuild] redraw the hero when the sheet lands
+   */
+  requestSheet(sheetKey, ensure, rebuild = true) {
+    if (this.pendingSheets.has(sheetKey)) return;
+    const loader = this.scene?.load;
+    if (typeof loader?.once !== "function") {
+      // Headless scene (tests): nothing to wait for, so do not pin the key as
+      // pending or the view would never retry.
+      ensure();
+      return;
+    }
+    // Listen before starting the download: `ensure` kicks the loader, and a
+    // cached file can complete before a later listener is attached.
+    this.pendingSheets.add(sheetKey);
+    loader.once(`filecomplete-spritesheet-${sheetKey}`, () => {
+      this.pendingSheets.delete(sheetKey);
+      if (!rebuild || !this.container) return;
+      // Rebuild with whatever the hero wears right now.
+      this.key = null;
+      this.set(this.direction, this.equipment, this.gender);
+    });
+    ensure();
   }
 
   /**
@@ -178,9 +275,25 @@ export class HeroRigView {
 
   /**
    * Play a short melee action pose derived from a skill's VFX type.
+   *
+   * A hero holding a weapon that ships a swing sheet plays that sheet instead:
+   * the art already draws the wind-up, the strike and the slash arc, so the rig
+   * only steps the frames.
    * @param {"slash"|"kick"|"shockwave"|"aura"|string} kind
+   * @returns {boolean} `true` when the baked swing took over (callers may then
+   *   skip their vector slash arc, which the art already contains)
    */
   attack(kind = "slash") {
+    this.actionTween?.stop();
+    this.actionTween = null;
+    this.stopAttackTimer();
+    // A stopped recoil tween leaves the container where it was mid-lurch.
+    if (this.container) this.container.x = 0;
+
+    // Only a slash reads as a sword strike; buffs, kicks and slams keep their
+    // own pose instead of swinging the blade.
+    if (kind === "slash" && this.playBakedSwing()) return true;
+
     const pose = {
       slash: "punch",
       kick: "kick",
@@ -188,7 +301,6 @@ export class HeroRigView {
       aura: "channel"
     }[kind] || "punch";
 
-    this.actionTween?.stop();
     this.acting = true;
 
     if (this.usingSprite) {
@@ -204,7 +316,7 @@ export class HeroRigView {
           if (this.container) this.container.x = 0;
         }
       });
-      return;
+      return false;
     }
 
     const counter = { t: 0 };
@@ -221,6 +333,68 @@ export class HeroRigView {
         this.applyActionPose(pose, 0);
       }
     });
+    return false;
+  }
+
+  /**
+   * Step through the worn weapon's swing sheet, then hand the sprite back to the
+   * walk cycle. Only possible when the hero is drawn from a body sheet - the
+   * vector rig pivots limbs instead.
+   * @returns {boolean} whether the swing sheet is playing
+   */
+  playBakedSwing() {
+    const def = weaponAttackTextureDef(this.gender, this.weaponType);
+    if (!def || !this.usingSprite || !this.bodySprite) return false;
+    // The swing art paints the blade too, so it only fits when the walk pose is
+    // the matching weapon sheet; on the plain sheet the vector weapon would
+    // show a second sword for the length of the swing.
+    const bodySheet = weaponBodyTextureDef(this.gender, this.weaponType);
+    if (this.bodyTextureKey !== bodySheet?.key) return false;
+    if (!this.hasTexture(def.key)) return false;
+    if (typeof this.scene?.time?.addEvent !== "function") return false;
+
+    const row = bodyRowForDirection(this.direction);
+    let frame = 0;
+    // `frames` is both the column count and the swing length in the sheet.
+    const show = () => this.bodySprite?.setTexture(def.key, row * def.frames + frame);
+
+    this.acting = true;
+    show();
+    // Phaser fires `repeat + 1` times, and the last one restores the walk pose.
+    this.attackTimer = this.scene.time.addEvent({
+      delay: ATTACK_FRAME_MS,
+      repeat: def.frames - 1,
+      callback: () => {
+        frame += 1;
+        if (frame < def.frames) {
+          show();
+          return;
+        }
+        // Last tick: back to the walk pose the hero was in.
+        this.attackTimer = null;
+        this.acting = false;
+        this.restoreWalkFrame();
+      }
+    });
+    return true;
+  }
+
+  /** Redraw the walk pose the body sheet was showing before the swing. */
+  restoreWalkFrame() {
+    const key = this.bodyTextureKey ?? bodyTextureFor(this.gender);
+    this.bodySprite?.setTexture(key, this.frameIndex);
+  }
+
+  /**
+   * Stop a swing that is still stepping through its frames and put the walk
+   * pose back, so a cancelled swing cannot leave the hero on a strike frame.
+   */
+  stopAttackTimer() {
+    if (!this.attackTimer) return;
+    this.attackTimer.remove?.(false);
+    this.attackTimer = null;
+    this.acting = false;
+    this.restoreWalkFrame();
   }
 
   /**
@@ -279,6 +453,7 @@ export class HeroRigView {
   destroy() {
     this.actionTween?.stop();
     this.actionTween = null;
+    this.stopAttackTimer();
     if (this.container) {
       this.container.destroy(true);
       this.container = null;
@@ -286,6 +461,10 @@ export class HeroRigView {
     this.bodySprite = null;
     this.equipSprites = {};
     this.usingSprite = false;
+    this.pendingSheets.clear();
+    this.equipment = {};
+    this.weaponType = null;
+    this.bodyTextureKey = null;
   }
 }
 

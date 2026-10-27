@@ -178,6 +178,9 @@ export class RemotePlayer {
    * @param {boolean} facingRight
    */
   playAttack(facingRight = true) {
+    // A peer holding a weapon with swing art plays that instead.
+    if (this.rig?.attack?.("slash") === true) return;
+
     const slashOffsetX = facingRight ? 16 : -16;
     const base = toIso(this.x, this.y);
     const slash = this.scene.add

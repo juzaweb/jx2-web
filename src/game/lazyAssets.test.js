@@ -5,6 +5,8 @@ import {
   ensureEquipmentTexture,
   ensureHeroBodyTexture,
   ensureOverheadTexture,
+  ensureWeaponAttackTexture,
+  ensureWeaponBodyTexture,
   ensureWeaponVfx,
   ensureSpritesheet,
   ensureVfxTexture
@@ -175,6 +177,92 @@ describe("ensureHeroBodyTexture", () => {
     const scene = makeScene({ loaded: ["hero-body-male"] });
 
     expect(ensureHeroBodyTexture(scene, "nope")).toBe(true);
+    expect(scene.calls).toEqual([]);
+  });
+});
+
+describe("ensureWeaponBodyTexture", () => {
+  it("queues the sword sheet for a hero holding a sword", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponBodyTexture(scene, "male", "kiem")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-male-sword",
+        expect.stringContaining("/hero-body-male-sword.png"),
+        { frameWidth: 148, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+
+    const femaleScene = makeScene();
+
+    expect(ensureWeaponBodyTexture(femaleScene, "female", "kiem")).toBe(false);
+    expect(femaleScene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-female-sword",
+        expect.stringContaining("/hero-body-female-sword.png"),
+        { frameWidth: 150, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("queues nothing for weapons without their own sheet", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponBodyTexture(scene, "male", "dao")).toBe(false);
+    expect(ensureWeaponBodyTexture(scene, "female", "dao")).toBe(false);
+    expect(ensureWeaponBodyTexture(scene, "male", null)).toBe(false);
+    expect(scene.calls).toEqual([]);
+  });
+
+  it("returns true when the sword sheet is already loaded", () => {
+    const scene = makeScene({ loaded: ["hero-body-male-sword"] });
+
+    expect(ensureWeaponBodyTexture(scene, "male", "kiem")).toBe(true);
+    expect(scene.calls).toEqual([]);
+  });
+});
+
+describe("ensureWeaponAttackTexture", () => {
+  it("queues the swing sheet with its own frame size", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "male", "kiem")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-male-sword-attack",
+        expect.stringContaining("/hero-body-male-sword-attack.png"),
+        { frameWidth: 192, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("queues the female swing sheet too", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "female", "kiem")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-female-sword-attack",
+        expect.stringContaining("/hero-body-female-sword-attack.png"),
+        { frameWidth: 192, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("queues nothing for looks without swing art", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "female", "dao")).toBe(false);
+    expect(ensureWeaponAttackTexture(scene, "male", "dao")).toBe(false);
     expect(scene.calls).toEqual([]);
   });
 });

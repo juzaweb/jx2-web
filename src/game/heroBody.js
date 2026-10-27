@@ -4,20 +4,98 @@
  * Four rows (front, left, right, back) x four walk frames. The runtime frames
  * are produced by scripts/build_hero_body.py, which re-anchors every frame to a
  * shared ground line and scaling so the body lines up with the old rig's feet,
- * and rebuilds the left row as a mirror of the right row so each row holds one
- * fixed facing.
+ * and reorders the source rows so row 1 always faces left and row 2 always
+ * faces right.
  */
 
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "4";
+const BODY_ASSET_VERSION = "12";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
   female: { key: "hero-body-female", url: `/hero-body-female.png?v=${BODY_ASSET_VERSION}` }
 };
+
+/**
+ * Body sheets that already paint the weapon in hand, keyed by weapon type then
+ * gender. A sheet listed here replaces the gender sheet while that weapon type
+ * is worn, and it declares the extra slots it draws so the rig stops stacking
+ * its vector weapon on top of the blade (see `bakedSlots`). Both genders ship
+ * sword art; any other look keeps the plain sheet plus the vector weapon.
+ * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png (male) and
+ * docs/example/nv-nu-camkiem.png (female).
+ *
+ * Sword frames are wider than the 128px default and hold the same 140px body:
+ * the blade beside the hero needs the room, and drawing it at the plain sheet's
+ * height keeps the hero from shrinking when it draws a weapon. `frameWidth`
+ * must match the PNG geometry produced by the build script.
+ *
+ * `attack` is the matching swing sheet: four frames per direction, the third of
+ * which carries the slash arc. Its frames are wider still because the arc
+ * reaches past the body, and it reuses the walk sheet's scale so the hero does
+ * not change size mid-swing.
+ */
+export const WEAPON_BODY_TEXTURES = {
+  kiem: {
+    male: {
+      key: "hero-body-male-sword",
+      url: `/hero-body-male-sword.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 148,
+      frameHeight: 160,
+      bakedSlots: ["weapon"],
+      attack: {
+        key: "hero-body-male-sword-attack",
+        url: `/hero-body-male-sword-attack.png?v=${BODY_ASSET_VERSION}`,
+        frameWidth: 192,
+        frameHeight: 160,
+        /** Frames per direction in the swing sheet. */
+        frames: 4
+      }
+    },
+    female: {
+      key: "hero-body-female-sword",
+      url: `/hero-body-female-sword.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 150,
+      frameHeight: 160,
+      bakedSlots: ["weapon"],
+      attack: {
+        key: "hero-body-female-sword-attack",
+        url: `/hero-body-female-sword-attack.png?v=${BODY_ASSET_VERSION}`,
+        frameWidth: 192,
+        frameHeight: 160,
+        frames: 4
+      }
+    }
+  }
+};
+
+/**
+ * Equipment slots a gender's body sheet already paints. Both sheets ship a
+ * fully dressed character (hair, tunic, sash, trousers and boots), so stacking
+ * the modular equipment sprites on top of them would double the clothing. Slots
+ * listed here are skipped by the rig for that gender; hands keep their weapon
+ * and accessory overlays because those are not part of the body art.
+ * @type {Record<"male"|"female", string[]>}
+ */
+export const BODY_BAKED_SLOTS = {
+  male: ["pants", "armor", "helmet"],
+  female: ["pants", "armor", "helmet"]
+};
+
+/**
+ * @param {"male"|"female"|string} [gender="male"]
+ * @param {string|null} [weaponType] worn weapon type (see weapons.js)
+ * @returns {string[]} equipment slots already drawn into the body sheet
+ */
+export function bakedEquipmentSlots(gender = "male", weaponType = null) {
+  const g = normalizeGender(gender);
+  const base = BODY_BAKED_SLOTS[g] ?? [];
+  const weaponSlots = weaponBodyTextureDef(g, weaponType)?.bakedSlots;
+  return weaponSlots ? [...base, ...weaponSlots] : base;
+}
 
 /**
  * Modular equipment textures mapping item IDs and gender variants to spritesheet keys and URLs.
@@ -133,11 +211,58 @@ export const HERO_BODY = {
 const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 1, 1, 1];
 
 /**
+ * One frame-stepped animation that ships beside a body sheet.
+ * @typedef {Object} WeaponAttackSheet
+ * @property {string} key Phaser texture key
+ * @property {string} url
+ * @property {number} frameWidth
+ * @property {number} frameHeight
+ * @property {number} frames Frames per direction in the sheet
+ */
+
+/**
+ * A body sheet that already paints the worn weapon.
+ * @typedef {Object} WeaponBodySheet
+ * @property {string} key Phaser texture key
+ * @property {string} url
+ * @property {number} frameWidth Wider than HERO_BODY when the blade needs room
+ * @property {number} frameHeight
+ * @property {string[]} bakedSlots Equipment slots this art already draws
+ * @property {WeaponAttackSheet} [attack] Matching swing animation
+ */
+
+/**
+ * The weapon-holding sheet a gender has for a weapon type, if any.
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {WeaponBodySheet|null}
+ */
+export function weaponBodyTextureDef(gender, weaponType = null) {
+  if (!weaponType) return null;
+  const byGender = WEAPON_BODY_TEXTURES[weaponType];
+  if (!byGender) return null;
+  return byGender[normalizeGender(gender)] ?? null;
+}
+
+/**
+ * The swing sheet a gender and weapon type share, or null when the art has no
+ * swing animation (the rig then keeps its vector arc).
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {WeaponAttackSheet|null}
+ */
+export function weaponAttackTextureDef(gender, weaponType = null) {
+  return weaponBodyTextureDef(gender, weaponType)?.attack ?? null;
+}
+
+/**
  * @param {"male"|"female"} gender
+ * @param {string|null} [weaponType] worn weapon type (see weapons.js)
  * @returns {string} Phaser texture key
  */
-export function bodyTextureFor(gender) {
-  return HERO_BODY_TEXTURES[normalizeGender(gender)].key;
+export function bodyTextureFor(gender, weaponType = null) {
+  const g = normalizeGender(gender);
+  return (weaponBodyTextureDef(g, weaponType) ?? HERO_BODY_TEXTURES[g]).key;
 }
 
 /**

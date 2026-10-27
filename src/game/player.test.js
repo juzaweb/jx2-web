@@ -392,6 +392,26 @@ describe("Player movement controls", () => {
   });
 });
 
+describe("Player attack motion", () => {
+  it("reports the baked swing so the caller skips its vector arc", () => {
+    const scene = createMockScene();
+    const player = new Player(scene, 100, 100);
+    player.rig = { attack: vi.fn(() => true) };
+
+    expect(player.playAttackMotion()).toBe(true);
+    expect(player.rig.attack).toHaveBeenCalledWith("slash");
+    expect(scene.tweens.add).toHaveBeenCalled();
+  });
+
+  it("reports a fallback when the rig cannot play the swing sheet", () => {
+    const scene = createMockScene();
+    const player = new Player(scene, 100, 100);
+    player.rig = { attack: vi.fn(() => false) };
+
+    expect(player.playAttackMotion()).toBe(false);
+  });
+});
+
 describe("Player equipment bonuses", () => {
   const makePlayer = () => new Player(createMockScene(), 100, 100);
   it("ignores a worn id the catalog does not define as equipment", () => {

@@ -13,7 +13,7 @@
  * repeatedly (for example every frame from `showFormation`) is safe.
  */
 
-import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef } from "./heroBody.js";
+import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef, weaponAttackTextureDef, weaponBodyTextureDef } from "./heroBody.js";
 import { normalizeGender } from "./gender.js";
 
 /**
@@ -151,18 +151,62 @@ export function ensureWeaponVfx(scene, skills = []) {
 }
 
 /**
+ * Queue a body sheet (a gender sheet or one that already holds a weapon).
+ * A weapon sheet may use wider frames than the plain sheet, so it declares its
+ * own geometry; both flatten to the same 4x4 grid the rig indexes.
+ * @param {import("phaser").Scene} scene
+ * @param {{ url: string, frameWidth?: number, frameHeight?: number }} def
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+function queueBodySheet(scene, def) {
+  if (!def) return false;
+  return ensureSpritesheet(scene, def.key, {
+    url: def.url,
+    frameWidth: def.frameWidth ?? HERO_BODY.frameWidth,
+    frameHeight: def.frameHeight ?? HERO_BODY.frameHeight
+  });
+}
+
+/**
  * Queue the walk sheet for a gender that was not the one loaded at boot.
  * @param {import("phaser").Scene} scene
  * @param {"male"|"female"|string} gender
  * @returns {boolean} `true` when the texture is usable right now
  */
 export function ensureHeroBodyTexture(scene, gender) {
-  const def = HERO_BODY_TEXTURES[normalizeGender(gender)];
+  return queueBodySheet(scene, HERO_BODY_TEXTURES[normalizeGender(gender)]);
+}
+
+/**
+ * Queue the body sheet that already holds the worn weapon (see
+ * WEAPON_BODY_TEXTURES). Weapons without their own sheet - every kit but the
+ * sword for now - resolve to `null` and nothing is queued.
+ * @param {import("phaser").Scene} scene
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureWeaponBodyTexture(scene, gender, weaponType = null) {
+  return queueBodySheet(scene, weaponBodyTextureDef(gender, weaponType));
+}
+
+/**
+ * Queue the swing sheet that belongs to a weapon's body sheet (see
+ * WEAPON_BODY_TEXTURES.attack). It has its own frame size, so it is queued at
+ * the same time as the body sheet: a hero may swing before the walk sheet has
+ * even been drawn.
+ * @param {import("phaser").Scene} scene
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureWeaponAttackTexture(scene, gender, weaponType = null) {
+  const def = weaponAttackTextureDef(gender, weaponType);
   if (!def) return false;
   return ensureSpritesheet(scene, def.key, {
     url: def.url,
-    frameWidth: HERO_BODY.frameWidth,
-    frameHeight: HERO_BODY.frameHeight
+    frameWidth: def.frameWidth,
+    frameHeight: def.frameHeight
   });
 }
 

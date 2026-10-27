@@ -101,7 +101,9 @@ export class JiangHuScene extends Phaser.Scene {
 
   preload() {
     // Only the active character's walk sheet is needed at boot; the other gender
-    // is queued the first time the player switches (see ensureHeroBodyTexture).
+    // is queued the first time the player switches (see ensureHeroBodyTexture),
+    // and a weapon that ships its own sheet (the sword) is queued by the rig
+    // once the worn gear is known (see HeroRigView.requestWeaponSheet).
     const gender = normalizeGender(readSession()?.activeCharacter?.gender);
     const bodySheet = HERO_BODY_TEXTURES[gender];
     if (!this.textures.exists(bodySheet.key)) {
