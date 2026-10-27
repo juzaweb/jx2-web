@@ -6,7 +6,9 @@ import {
   bodyTextureFor,
   equipmentTextureDef,
   equipmentTextureKeyFor,
+  HERO_BODY,
   HERO_EQUIPMENT_TEXTURES,
+  weaponAttackTextureDef,
   weaponBodyTextureDef
 } from "./heroBody.js";
 
@@ -91,6 +93,22 @@ describe("heroBody", () => {
       expect(bakedEquipmentSlots("male", "kiem")).toEqual(["pants", "armor", "helmet", "weapon"]);
       expect(bakedEquipmentSlots("female", "kiem")).toEqual(["pants", "armor", "helmet"]);
       expect(bakedEquipmentSlots("male", "bao-tay")).toEqual(["pants", "armor", "helmet"]);
+    });
+
+    it("resolves the swing sheet that belongs to the sword art", () => {
+      const def = weaponAttackTextureDef("male", "kiem");
+      expect(def.key).toBe("hero-body-male-sword-attack");
+      expect(def.url).toContain("hero-body-male-sword-attack.png");
+      // Wider frames: the slash arc reaches past the body.
+      expect(def.frameWidth).toBeGreaterThan(HERO_BODY.frameWidth);
+      expect(def.frameHeight).toBe(HERO_BODY.frameHeight);
+      expect(def.frames).toBe(HERO_BODY.columns);
+    });
+
+    it("has no swing sheet for other genders or weapons", () => {
+      expect(weaponAttackTextureDef("female", "kiem")).toBeNull();
+      expect(weaponAttackTextureDef("male", "dao")).toBeNull();
+      expect(weaponAttackTextureDef("male", null)).toBeNull();
     });
   });
 

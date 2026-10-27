@@ -593,6 +593,64 @@ describe("attack speed coefficient", () => {
   });
 });
 
+describe("normal attack swing", () => {
+  /**
+   * @param {boolean} bakedSwing what the hero reports for playAttackMotion()
+   */
+  const makeCombat = (bakedSwing) => {
+    const arcs = [];
+    const scene = {
+      time: { delayedCall: vi.fn(), now: 0 },
+      tweens: { add: vi.fn() },
+      add: {
+        arc: () => {
+          const arc = { destroy() {}, setStrokeStyle: () => arc, setDepth: () => arc };
+          arcs.push(arc);
+          return arc;
+        }
+      },
+      cameras: { main: { width: 100, height: 100, zoom: 1 } },
+      networkClient: { sendAttack: vi.fn() }
+    };
+    const player = {
+      x: 10,
+      y: 20,
+      stats: { attackSpeed: 1 },
+      visual: { scaleX: 1 },
+      pkFlag: false,
+      playAttackMotion: vi.fn(() => bakedSwing)
+    };
+    const ui = { addLog: vi.fn(), updateHud: vi.fn(), updateQuest: vi.fn(), updateInventory: vi.fn() };
+    return { combat: new CombatSystem(scene, player, { getAlive: () => [] }, ui, () => {}), arcs, scene };
+  };
+
+  it("skips the vector arc when the hero's swing sheet played", () => {
+    const { combat, arcs } = makeCombat(true);
+
+    combat.beginAttack();
+
+    expect(arcs).toHaveLength(0);
+  });
+
+  it("draws the vector arc for looks without swing art", () => {
+    const { combat, arcs } = makeCombat(false);
+
+    combat.beginAttack();
+
+    expect(arcs).toHaveLength(1);
+  });
+
+  it("broadcasts the strike either way", () => {
+    const { combat, scene } = makeCombat(true);
+
+    combat.beginAttack();
+
+    expect(scene.networkClient.sendAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ skill: "normal", facingRight: true })
+    );
+  });
+});
+
 describe("skill targeting", () => {
   const peer = (id, x, y, extra = {}) => ({
     id,

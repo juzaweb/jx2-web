@@ -13,7 +13,7 @@
  * repeatedly (for example every frame from `showFormation`) is safe.
  */
 
-import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef, weaponBodyTextureDef } from "./heroBody.js";
+import { HERO_BODY, HERO_BODY_TEXTURES, equipmentTextureDef, weaponAttackTextureDef, weaponBodyTextureDef } from "./heroBody.js";
 import { normalizeGender } from "./gender.js";
 
 /**
@@ -186,6 +186,26 @@ export function ensureHeroBodyTexture(scene, gender) {
  */
 export function ensureWeaponBodyTexture(scene, gender, weaponType = null) {
   return queueBodySheet(scene, weaponBodyTextureDef(gender, weaponType));
+}
+
+/**
+ * Queue the swing sheet that belongs to a weapon's body sheet (see
+ * WEAPON_BODY_TEXTURES.attack). It has its own frame size, so it is queued at
+ * the same time as the body sheet: a hero may swing before the walk sheet has
+ * even been drawn.
+ * @param {import("phaser").Scene} scene
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {boolean} `true` when the texture is usable right now
+ */
+export function ensureWeaponAttackTexture(scene, gender, weaponType = null) {
+  const def = weaponAttackTextureDef(gender, weaponType);
+  if (!def) return false;
+  return ensureSpritesheet(scene, def.key, {
+    url: def.url,
+    frameWidth: def.frameWidth,
+    frameHeight: def.frameHeight
+  });
 }
 
 /**

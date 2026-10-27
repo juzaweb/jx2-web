@@ -152,12 +152,9 @@ export class CombatSystem {
     });
 
     // Trigger physical sword thrust / lunge animation on character body
-    this.player.playAttackMotion?.();
+    const bakedSwing = this.player.playAttackMotion?.() === true;
 
     playTone(260, 0.07, "sawtooth", 0.02);
-
-    const slashOffsetX = facingRight ? 16 : -16;
-    const base = toIso(this.player.x, this.player.y);
 
     // Broadcast attack to other players via network
     this.scene.networkClient?.sendAttack?.({
@@ -166,6 +163,13 @@ export class CombatSystem {
       y: Math.round(this.player.y),
       facingRight
     });
+
+    // A weapon with its own swing sheet already draws the arc, so only fall back
+    // to the vector one for the looks that have no art.
+    if (bakedSwing) return;
+
+    const slashOffsetX = facingRight ? 16 : -16;
+    const base = toIso(this.player.x, this.player.y);
 
     const slash = this.scene.add
       .arc(

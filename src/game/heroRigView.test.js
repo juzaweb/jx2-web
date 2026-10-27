@@ -105,6 +105,12 @@ function makeSpriteScene(availableTextures = ["hero-body-male", "hero-body-femal
           this.frame = frameIndex;
           this.frameSets += 1;
           return this;
+        },
+        setTexture(nextTexture, nextFrame = 0) {
+          this.texture = nextTexture;
+          this.frame = nextFrame;
+          this.textureSets = (this.textureSets ?? 0) + 1;
+          return this;
         }
       })
     },
@@ -298,7 +304,11 @@ describe("HeroRigView baked body", () => {
 
     expect(view.bodySprite.texture).toBe("hero-body-male");
     expect(scene._container.children.length).toBeGreaterThan(1); // vector weapon drawn
-    expect(queues.map(([key]) => key)).toEqual(["hero-body-male-sword"]);
+    // Both the sword pose and its swing sheet are queued up front.
+    expect(queues.map(([key]) => key)).toEqual([
+      "hero-body-male-sword",
+      "hero-body-male-sword-attack"
+    ]);
     expect(view.pendingSheets.has("hero-body-male-sword")).toBe(true);
   });
 
@@ -319,10 +329,9 @@ describe("HeroRigView baked body", () => {
 
     expect(view.bodySprite.texture).toBe("hero-body-male-sword");
     expect(scene._container.children).toHaveLength(1); // blade is in the art now
-    expect(view.pendingSheets.size).toBe(0);
   });
 
-  it("listens for the sheet before starting the download", () => {
+  it("listens for each sheet before starting its download", () => {
     const scene = makeSpriteScene(["hero-body-male"]);
     const events = [];
     scene.load = {
@@ -334,11 +343,13 @@ describe("HeroRigView baked body", () => {
 
     view.set(0, { weapon: "kiem-lang-khach" }, "male");
 
-    // A cached file can finish loading immediately, so the listener must exist
-    // before the loader is kicked.
+    // A cached file can finish loading immediately, so each listener must exist
+    // before its loader is kicked.
     expect(events).toEqual([
       "once:filecomplete-spritesheet-hero-body-male-sword",
-      "queue:hero-body-male-sword"
+      "queue:hero-body-male-sword",
+      "once:filecomplete-spritesheet-hero-body-male-sword-attack",
+      "queue:hero-body-male-sword-attack"
     ]);
   });
 
@@ -349,6 +360,165 @@ describe("HeroRigView baked body", () => {
     view.set(0, { weapon: "kiem-lang-khach" }, "male");
 
     expect(view.pendingSheets.size).toBe(0);
+  });
+});
+
+/**
+ * Phaser timer stub: records every timer and lets a test fire its callback, so a
+ * frame-stepped animation can be walked without a running game loop.
+ * @param {{ scene: object }} opts
+ */
+function attachTimerStub(scene) {
+  const timers = [];
+  scene.time = {
+    addEvent: (config) => {
+      const timer = {
+        config,
+        removed: false,
+        remove() {
+          this.removed = true;
+        },
+        tick(times = 1) {
+          for (let i = 0; i < times; i += 1) config.callback();
+        }
+      };
+      timers.push(timer);
+      return timer;
+    }
+  };
+  return timers;
+}
+
+describe("HeroRigView sword swing", () => {
+  const swordScene = () =>
+    makeSpriteScene(["hero-body-male", "hero-body-male-sword", "hero-body-male-sword-attack"]);
+
+  it("plays the swing sheet and returns to the walk pose", () => {
+    const scene = swordScene();
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male"); // faces right (row 2)
+
+    const played = view.attack("slash");
+
+    expect(played).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword-attack");
+    expect(view.bodySprite.frame).toBe(8); // row 2 * 4 columns + frame 0
+    expect(timers).toHaveLength(1);
+    expect(timers[0].config.delay).toBe(55);
+    // Phaser fires repeat + 1 times: three frames plus the restore tick.
+    expect(timers[0].config.repeat).toBe(3);
+
+    timers[0].tick();
+    expect(view.bodySprite.frame).toBe(9);
+
+    timers[0].tick(3); // finish frames 2 and 3, then restore
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+    expect(view.bodySprite.frame).toBe(8);
+    expect(view.acting).toBe(false);
+  });
+
+  it("walks the whole cycle without leaving the walk cycle suppressed", () => {
+    const scene = swordScene();
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(6, { weapon: "kiem-lang-khach" }, "male");
+
+    view.attack("slash");
+    expect(view.acting).toBe(true);
+    // The walk cycle must not fight the swing for the sprite.
+    view.animate(Math.PI / 2);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword-attack");
+
+    timers[0].tick(4);
+    expect(view.acting).toBe(false);
+    view.animate(Math.PI / 2);
+    expect(view.bodySprite.frame).toBe(5); // row 1 * 4 + walk column 1
+  });
+
+  it("falls back to the vector recoil when the swing sheet is missing", () => {
+    const scene = makeSpriteScene(["hero-body-male", "hero-body-male-sword"]);
+    const tweens = [];
+    scene.tweens = {
+      add: (config) => {
+        tweens.push(config);
+        return { stop() {} };
+      }
+    };
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+
+    expect(view.attack("slash")).toBe(false);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+    expect(tweens).toHaveLength(1);
+  });
+
+  it("falls back when the hero wears a weapon without swing art", () => {
+    const scene = makeSpriteScene(["hero-body-male"]);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "dao-lang-khach" }, "male");
+
+    expect(view.attack("slash")).toBe(false);
+  });
+
+  it("stops a running swing when the look is rebuilt", () => {
+    const scene = swordScene();
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+    view.attack("slash");
+
+    view.set(4, { weapon: "kiem-lang-khach" }, "male"); // turn to the back view
+
+    expect(timers[0].removed).toBe(true);
+    expect(view.attackTimer).toBeNull();
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+  });
+
+  it("keeps the blade sheathed for skills that are not a slash", () => {
+    const scene = swordScene();
+    attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+
+    // A buff or a kick must not become a sword swing.
+    expect(view.attack("aura")).toBe(false);
+    expect(view.attack("kick")).toBe(false);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+  });
+
+  it("cancels a swing back to the walk pose when a non-slash action starts", () => {
+    const scene = swordScene();
+    const timers = attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+    view.attack("slash");
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword-attack");
+
+    view.attack("kick");
+
+    expect(timers[0].removed).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword");
+    expect(view.bodySprite.frame).toBe(8);
+  });
+
+  it("waits for the walk sheet before swinging its attack art", () => {
+    // The swing sheet landed first, so the body still wears the plain sheet
+    // with a vector blade: the baked sword would double it.
+    const scene = makeSpriteScene([
+      "hero-body-male",
+      "hero-body-male-sword-attack"
+    ]);
+    attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+
+    expect(view.attack("slash")).toBe(false);
+    expect(view.bodySprite.texture).toBe("hero-body-male");
   });
 });
 

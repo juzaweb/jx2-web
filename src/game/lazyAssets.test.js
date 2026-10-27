@@ -5,6 +5,7 @@ import {
   ensureEquipmentTexture,
   ensureHeroBodyTexture,
   ensureOverheadTexture,
+  ensureWeaponAttackTexture,
   ensureWeaponBodyTexture,
   ensureWeaponVfx,
   ensureSpritesheet,
@@ -209,6 +210,31 @@ describe("ensureWeaponBodyTexture", () => {
     const scene = makeScene({ loaded: ["hero-body-male-sword"] });
 
     expect(ensureWeaponBodyTexture(scene, "male", "kiem")).toBe(true);
+    expect(scene.calls).toEqual([]);
+  });
+});
+
+describe("ensureWeaponAttackTexture", () => {
+  it("queues the swing sheet with its own frame size", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "male", "kiem")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-male-sword-attack",
+        expect.stringContaining("/hero-body-male-sword-attack.png"),
+        { frameWidth: 192, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("queues nothing for looks without swing art", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "female", "kiem")).toBe(false);
+    expect(ensureWeaponAttackTexture(scene, "male", "dao")).toBe(false);
     expect(scene.calls).toEqual([]);
   });
 });

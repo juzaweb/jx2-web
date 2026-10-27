@@ -26,6 +26,12 @@ character around (and make the sword jitter) from frame to frame. The body is
 located by eroding the mask, which removes thin props before measuring, so the
 sword neither shifts the horizontal anchor nor becomes the ground line.
 
+An animation that is swapped into the same rig (the attack swing) must draw the
+character at exactly the walk sheet's scale, or the hero visibly changes size
+mid-swing. Such a source declares `scale_from`, naming the output whose scale it
+reuses, plus an optional wider `frame_w` when its effect art reaches past the
+body.
+
 Run: python3 scripts/build_hero_body.py
 """
 
@@ -63,6 +69,18 @@ SOURCES = {
         # Source row order: front, right-facing, left-facing, back.
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
         "align": "cell",
+    },
+    "hero-body-male-sword-attack.png": {
+        # Same hero mid-swing, four frames per direction; the third frame holds
+        # the slash arc, which reaches far wider than the body. Frames are
+        # therefore wider than the walk sheet and the pose is drawn at the walk
+        # sheet's scale, so the hero does not change size while attacking.
+        "path": EXAMPLE / "nv-chem.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
+        "frame_w": 192,
+        "scale_from": "hero-body-male-sword.png",
     },
 }
 
@@ -379,16 +397,19 @@ def _blit(dst, src, x, y, clip=None):
     dst.alpha_composite(src.crop((src_x, src_y, src_x + width, src_y + height)), (dst_x, dst_y))
 
 
-def build_cell_sheet(source, row_map):
+def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
     """`cell` layout: keep the source grid and anchor on the body itself.
 
     Used for sheets that already hold a weapon. Each pose is cropped from its
-    fixed cell, so the spacing the artist drew is preserved, and a single scale
-    is chosen so the widest blade fits inside FRAME_W with FRAME_SAFE_MARGIN to
-    spare. Every pose is then anchored on its own body: the head's centre line
-    lands on the frame centre and the soles land on the shared ground line.
-    Measuring the body (rather than the silhouette) keeps the blade from
-    dragging the character off-centre and from becoming the ground line.
+    fixed cell, so the spacing the artist drew is preserved, and every pose is
+    anchored on its own body: the head's centre line lands on the frame centre
+    and the soles land on the shared ground line. Measuring the body (rather than
+    the silhouette) keeps the blade from dragging the character off-centre and
+    from becoming the ground line.
+
+    `scale` overrides the computed one so a companion sheet (the attack swing)
+    renders the hero at the same size as this one. `frame_w` widens the frame for
+    art that reaches further than the body, such as a slash arc.
     """
     rgba, downscale = _load_source(source)
     alpha = rgba[..., 3]
@@ -448,48 +469,75 @@ def build_cell_sheet(source, row_map):
 
     tallest = max(metric["height"] for metric in metrics)
     widest = max(metric["half_extent"] for metric in metrics)
-    scale = min(CONTENT_H / tallest, (FRAME_W / 2 - FRAME_SAFE_MARGIN) / widest)
+    if scale is None:
+        scale = min(CONTENT_H / tallest, (frame_w / 2 - FRAME_SAFE_MARGIN) / widest)
 
-    out = Image.new("RGBA", (FRAME_W * COLS, FRAME_H * ROWS), (0, 0, 0, 0))
+    out = Image.new("RGBA", (frame_w * COLS, FRAME_H * ROWS), (0, 0, 0, 0))
     for metric in metrics:
         cell = source_image.crop(metric["box"])
         scaled_w = max(1, round(cell.width * scale))
         scaled_h = max(1, round(cell.height * scale))
         cell = cell.resize((scaled_w, scaled_h), downscale)
-        centre_x = FRAME_W / 2 - metric["body_cx"] * (scaled_w / cell_w)
+        centre_x = frame_w / 2 - metric["body_cx"] * (scaled_w / cell_w)
         ground_y = CONTENT_BOTTOM - metric["feet_y"] * (scaled_h / cell_h)
-        frame_x = metric["col"] * FRAME_W
+        frame_x = metric["col"] * frame_w
         frame_y = metric["row"] * FRAME_H
         _blit(
             out,
             cell,
             frame_x + round(centre_x),
             frame_y + round(ground_y),
-            (frame_x, frame_y, frame_x + FRAME_W, frame_y + FRAME_H),
+            (frame_x, frame_y, frame_x + frame_w, frame_y + FRAME_H),
         )
 
     print(
-        f"  cell layout: tallest={tallest}px widest half-extent={widest:.0f}px "
-        f"-> scale {scale:.4f} (content {tallest * scale:.0f}px of {CONTENT_H}px)"
+        f"  cell layout: frame {frame_w}x{FRAME_H} tallest={tallest}px "
+        f"widest half-extent={widest:.0f}px -> scale {scale:.4f} "
+        f"(content {tallest * scale:.0f}px of {CONTENT_H}px, "
+        f"reach {widest * scale:.0f}px of {frame_w / 2 - FRAME_SAFE_MARGIN:.0f}px)"
     )
-    return out
+    return out, scale
 
 
-def build_sheet(source, config):
-    """Build one runtime sheet using the layout the source declares."""
+def build_sheet(filename, source, config, shared_scales):
+    """Build one runtime sheet, returning it plus the scale it was drawn at.
+
+    A config may name another output in `scale_from` to reuse that sheet's scale,
+    so an animation that is swapped into the same rig keeps the hero's size.
+    That sheet must already have been built; a typo or a reordering would
+    otherwise silently redraw the hero at a different scale.
+    """
     row_map = config["row_map"]
     if config.get("align", "frame") == "cell":
-        return build_cell_sheet(source, row_map)
-    return build_frame_sheet(source, row_map)
+        scale_from = config.get("scale_from")
+        if scale_from is None:
+            scale = None
+        elif scale_from in shared_scales:
+            scale = shared_scales[scale_from]
+        else:
+            raise SystemExit(
+                f"{filename}: scale_from {scale_from!r} must be built first "
+                "(it has to appear earlier in SOURCES)"
+            )
+        return build_cell_sheet(
+            source,
+            row_map,
+            frame_w=config.get("frame_w", FRAME_W),
+            scale=scale,
+        )
+    return build_frame_sheet(source, row_map), None
 
 
 def main():
     PUBLIC.mkdir(parents=True, exist_ok=True)
+    shared_scales = {}
     for filename, config in SOURCES.items():
         source = config["path"]
         if not source.exists():
             raise SystemExit(f"missing source sheet: {source}")
-        sheet = build_sheet(source, config)
+        sheet, scale = build_sheet(filename, source, config, shared_scales)
+        if scale is not None:
+            shared_scales[filename] = scale
         target = PUBLIC / filename
         sheet.save(target, optimize=True)
         print(f"wrote {target.relative_to(ROOT)} ({sheet.width}x{sheet.height})")

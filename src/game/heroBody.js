@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "9";
+const BODY_ASSET_VERSION = "10";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -26,13 +26,26 @@ export const HERO_BODY_TEXTURES = {
  * its vector weapon on top of the blade (see `bakedSlots`). Only the male hero
  * ships sword art; other genders keep the plain sheet plus the vector weapon.
  * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png.
+ *
+ * `attack` is the matching swing sheet: four frames per direction, the third of
+ * which carries the slash arc. Its frames are wider than the walk sheet because
+ * the arc reaches past the body, and it reuses the walk sheet's scale so the
+ * hero does not change size mid-swing.
  */
 export const WEAPON_BODY_TEXTURES = {
   kiem: {
     male: {
       key: "hero-body-male-sword",
       url: `/hero-body-male-sword.png?v=${BODY_ASSET_VERSION}`,
-      bakedSlots: ["weapon"]
+      bakedSlots: ["weapon"],
+      attack: {
+        key: "hero-body-male-sword-attack",
+        url: `/hero-body-male-sword-attack.png?v=${BODY_ASSET_VERSION}`,
+        frameWidth: 192,
+        frameHeight: 160,
+        /** Frames per direction in the swing sheet. */
+        frames: 4
+      }
     }
   }
 };
@@ -186,6 +199,17 @@ export function weaponBodyTextureDef(gender, weaponType = null) {
   const byGender = WEAPON_BODY_TEXTURES[weaponType];
   if (!byGender) return null;
   return byGender[normalizeGender(gender)] ?? null;
+}
+
+/**
+ * The swing sheet a gender and weapon type share, or null when the art has no
+ * swing animation (the rig then keeps its vector arc).
+ * @param {"male"|"female"|string} gender
+ * @param {string|null} [weaponType]
+ * @returns {{ key: string, url: string, frameWidth: number, frameHeight: number, frames: number }|null}
+ */
+export function weaponAttackTextureDef(gender, weaponType = null) {
+  return weaponBodyTextureDef(gender, weaponType)?.attack ?? null;
 }
 
 /**
