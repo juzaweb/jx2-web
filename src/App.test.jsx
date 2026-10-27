@@ -26,6 +26,29 @@ describe("ConnectionLostOverlay component", () => {
   });
 });
 
+import { usesTouchControls } from "./game/orientation.js";
+
+vi.mock("./game/orientation.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    usesTouchControls: vi.fn(() => false),
+    requestLandscapeFullscreen: vi.fn()
+  };
+});
+
+describe("HUD Panels Mobile Default Collapsed Behavior", () => {
+  it("determines panel default open state according to usesTouchControls()", () => {
+    // Desktop environment (usesTouchControls returns false)
+    vi.mocked(usesTouchControls).mockReturnValue(false);
+    expect(!usesTouchControls()).toBe(true);
+
+    // Mobile/touch environment (usesTouchControls returns true)
+    vi.mocked(usesTouchControls).mockReturnValue(true);
+    expect(!usesTouchControls()).toBe(false);
+  });
+});
+
 describe("Connection Gate Logic helper rules", () => {
   beforeEach(() => {
     vi.useFakeTimers();
