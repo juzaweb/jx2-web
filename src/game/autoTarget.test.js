@@ -129,3 +129,19 @@ describe("pickAutoTarget", () => {
     expect(picked).toBeNull();
   });
 });
+
+describe("autoTarget performance verification", () => {
+  it("executes 10,000 proximity target searches rapidly", () => {
+    const p = player({ x: 500, y: 500 });
+    const enemies = Array.from({ length: 100 }, (_, i) => monster({ id: `wolf-${i}`, x: (i * 17) % 1500, y: (i * 23) % 1500 }));
+    const peers = Array.from({ length: 50 }, (_, i) => peer({ id: `peer-${i}`, x: (i * 19) % 1500, y: (i * 29) % 1500, pkFlag: true }));
+
+    const start = performance.now();
+    for (let i = 0; i < 10000; i++) {
+      pickAutoTarget({ player: p, enemies, peers, allowPeers: true });
+    }
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(150);
+  });
+});

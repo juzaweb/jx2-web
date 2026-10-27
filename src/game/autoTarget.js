@@ -59,14 +59,20 @@ export function pickAutoTarget({
   if (!player || typeof player.x !== "number" || typeof player.y !== "number") return null;
   if (!Number.isFinite(player.x) || !Number.isFinite(player.y)) return null;
 
+  const px = player.x;
+  const py = player.y;
+  const rangeSq = range * range;
   let best = null;
-  let bestDistance = Infinity;
+  let bestDistSq = rangeSq;
+
   const consider = (entity, kind) => {
     if (!isLive(entity)) return;
-    const distance = Math.hypot(entity.x - player.x, entity.y - player.y);
-    if (distance > range || distance >= bestDistance) return;
+    const dx = entity.x - px;
+    const dy = entity.y - py;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > rangeSq || distSq >= bestDistSq) return;
     best = { target: entity, kind };
-    bestDistance = distance;
+    bestDistSq = distSq;
   };
 
   for (const monster of enemies || []) consider(monster, "monster");
