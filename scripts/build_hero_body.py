@@ -1,18 +1,20 @@
 """Turn the 4x4 body sheets in docs/example into runtime spritesheets.
 
-The source art is laid out as four rows (front, left, right, back) with four
-walk frames per row. The source's "left" row is unreliable: its first two
-frames face right and its last two face left, which makes the hero spin when
-the walk cycle plays, so the generated sheet rebuilds that row as a horizontal
-mirror of the consistent "right" row. The generated sheets also carry a
-checkerboard background and uneven margins, so this script:
+The source art is laid out as four rows with four walk frames per row. Source
+sheets do not agree on the order of the two side rows, so each source declares
+which of its rows holds the left-facing and the right-facing walk. The runtime
+sheet always stores the rows as front, left, right, back, which is what
+`ROW_BY_DIRECTION` in heroBody.js expects. Sources may either come with a baked
+checkerboard background or with a real alpha channel; both are normalised to a
+clean cut-out. This script:
 
-1. detects the four column/row bands from the foreground mask,
-2. keys the neutral-gray checkerboard out (with edge matting so no gray fringe
-   survives),
-3. drops stray noise specks,
+1. keys the neutral-gray checkerboard out (with edge matting so no gray fringe
+   survives) when the source is opaque, or reuses its alpha channel when the
+   source is already transparent,
+2. drops stray noise specks,
+3. detects the four column/row bands from the foreground mask,
 4. re-anchors every frame to one ground line and normalises the row scale,
-5. replaces the left row with a mirrored copy of the right row,
+5. reorders the rows so the sheet always reads front, left, right, back,
 
 before writing the public spritesheets consumed by heroBody.js.
 
@@ -23,15 +25,27 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "docs" / "example"
 PUBLIC = ROOT / "public"
 
+# Runtime row order: 0 = front, 1 = left-facing, 2 = right-facing, 3 = back.
+LEFT_ROW = 1
+RIGHT_ROW = 2
+
 SOURCES = {
-    "hero-body-male.png": EXAMPLE / "body-men.png",
-    "hero-body-female.png": EXAMPLE / "body-women.png",
+    "hero-body-male.png": {
+        "path": EXAMPLE / "body-men-v2.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+    },
+    "hero-body-female.png": {
+        "path": EXAMPLE / "body-women.png",
+        # Source row order: front, left-facing, right-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 1, RIGHT_ROW: 2, 3: 3},
+    },
 }
 
 # Frame geometry: keep in sync with the runtime copy in src/game/heroBody.js.
@@ -43,10 +57,6 @@ CONTENT_H = 140
 CONTENT_BOTTOM = FRAME_H
 CONTENT_CENTER_X = FRAME_W // 2
 
-# Row order in the source art: front, left, right, back.
-LEFT_ROW = 1
-RIGHT_ROW = 2
-
 # Checkerboard cells are neutral gray; the art itself is warm-toned. Anything
 # this close to neutral (and this bright) is treated as background.
 BG_MAX_SAT = 22
@@ -56,6 +66,12 @@ BG_MAX_VALUE = 205
 MIN_BAND = 25
 # Connected components smaller than this are speckle noise.
 MIN_COMPONENT = 30
+# Alpha below this becomes fully transparent for cut-out sources. Generated art
+# leaves a pale checkerboard rim around the silhouette; cutting it before the
+# minify keeps the sprite crisp instead of surrounded by a bright halo.
+SOURCE_ALPHA_CUTOFF = 128
+# Pixels trimmed from the cut-out silhouette to drop that rim entirely.
+CUTOUT_ERODE_PX = 1
 
 
 def _runs(mask):
@@ -220,22 +236,37 @@ def _bbox(alpha, band_x, band_y):
     return x0 + int(xs.min()), y0 + int(ys.min()), x0 + int(xs.max()) + 1, y0 + int(ys.max()) + 1
 
 
+def _has_transparency(image):
+    """Whether the source already carries a real alpha cut-out."""
+    if image.mode not in ("RGBA", "LA", "PA"):
+        return False
+    alpha = np.asarray(image.getchannel("A"))
+    return bool((alpha < 255).any())
+
+
 def _load_source(source):
-    rgba = _matte(Image.open(source))
+    """Return the cleaned RGBA source plus the filter to minify it with."""
+    image = Image.open(source)
+    if _has_transparency(image):
+        cutout = image.convert("RGBA")
+        table = [255 if value >= SOURCE_ALPHA_CUTOFF else 0 for value in range(256)]
+        alpha = cutout.getchannel("A").point(table)
+        if CUTOUT_ERODE_PX:
+            size = CUTOUT_ERODE_PX * 2 + 1
+            alpha = alpha.filter(ImageFilter.MinFilter(size))
+        cutout.putalpha(alpha)
+        rgba = np.asarray(cutout).copy()
+        # Area averaging never overshoots, so a cut-out keeps clean edges.
+        downscale = Image.BOX
+    else:
+        rgba = _matte(image)
+        downscale = Image.LANCZOS
     _drop_specks(rgba[..., 3])
-    return rgba
+    return rgba, downscale
 
 
-def _mirror_row(sheet, source_row, target_row):
-    """Replace `target_row` with a horizontally mirrored copy of `source_row`."""
-    for col in range(COLS):
-        box = (col * FRAME_W, source_row * FRAME_H, (col + 1) * FRAME_W, (source_row + 1) * FRAME_H)
-        frame = sheet.crop(box).transpose(Image.FLIP_LEFT_RIGHT)
-        sheet.paste(frame, (col * FRAME_W, target_row * FRAME_H))
-
-
-def build_sheet(source):
-    rgba = _load_source(source)
+def build_sheet(source, row_map):
+    rgba, downscale = _load_source(source)
     alpha = rgba[..., 3]
     columns, rows = _grid_bands(alpha)
     source_image = Image.fromarray(rgba, "RGBA")
@@ -243,10 +274,11 @@ def build_sheet(source):
     out = Image.new("RGBA", (FRAME_W * COLS, FRAME_H * ROWS), (0, 0, 0, 0))
 
     for row in range(ROWS):
+        source_row = row_map[row]
         cells = []
         boxes = []
         for col in range(COLS):
-            box = _bbox(alpha, columns[col], rows[row])
+            box = _bbox(alpha, columns[col], rows[source_row])
             boxes.append(box)
             cells.append(source_image.crop(box))
 
@@ -257,25 +289,23 @@ def build_sheet(source):
         for col, (cell, box) in enumerate(zip(cells, boxes)):
             scaled = cell.resize(
                 (max(1, round(cell.width * scale)), max(1, round(cell.height * scale))),
-                Image.LANCZOS,
+                downscale,
             )
             lift = round((baseline - box[3]) * scale)
             paste_x = CONTENT_CENTER_X - scaled.width // 2
             paste_y = CONTENT_BOTTOM - lift - scaled.height
             out.alpha_composite(scaled, (col * FRAME_W + paste_x, row * FRAME_H + paste_y))
 
-    # The source left row mixes facings; derive it from the clean right row.
-    _mirror_row(out, RIGHT_ROW, LEFT_ROW)
-
     return out
 
 
 def main():
     PUBLIC.mkdir(parents=True, exist_ok=True)
-    for filename, source in SOURCES.items():
+    for filename, config in SOURCES.items():
+        source = config["path"]
         if not source.exists():
             raise SystemExit(f"missing source sheet: {source}")
-        sheet = build_sheet(source)
+        sheet = build_sheet(source, config["row_map"])
         target = PUBLIC / filename
         sheet.save(target, optimize=True)
         print(f"wrote {target.relative_to(ROOT)} ({sheet.width}x{sheet.height})")

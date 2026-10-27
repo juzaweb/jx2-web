@@ -4,20 +4,41 @@
  * Four rows (front, left, right, back) x four walk frames. The runtime frames
  * are produced by scripts/build_hero_body.py, which re-anchors every frame to a
  * shared ground line and scaling so the body lines up with the old rig's feet,
- * and rebuilds the left row as a mirror of the right row so each row holds one
- * fixed facing.
+ * and reorders the source rows so row 1 always faces left and row 2 always
+ * faces right.
  */
 
 import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "4";
+const BODY_ASSET_VERSION = "6";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
   female: { key: "hero-body-female", url: `/hero-body-female.png?v=${BODY_ASSET_VERSION}` }
 };
+
+/**
+ * Equipment slots a gender's body sheet already paints. The male sheet ships a
+ * fully dressed character (hair, tunic, sash, trousers and boots), so stacking
+ * the modular equipment sprites on top of it would double the clothing. Slots
+ * listed here are skipped by the rig for that gender; hands keep their weapon
+ * and accessory overlays because those are not part of the body art.
+ * @type {Record<"male"|"female", string[]>}
+ */
+export const BODY_BAKED_SLOTS = {
+  male: ["pants", "armor", "helmet"],
+  female: []
+};
+
+/**
+ * @param {"male"|"female"|string} [gender="male"]
+ * @returns {string[]} equipment slots already drawn into the body sheet
+ */
+export function bakedEquipmentSlots(gender = "male") {
+  return BODY_BAKED_SLOTS[normalizeGender(gender)] ?? [];
+}
 
 /**
  * Modular equipment textures mapping item IDs and gender variants to spritesheet keys and URLs.

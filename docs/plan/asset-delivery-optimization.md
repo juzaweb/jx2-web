@@ -81,7 +81,7 @@ has a weapon kit; a guest world without a weapon simply casts nothing.
 | `public/tap-hoa.png` | 586 kB | PNG RGBA 727×432 | 586 kB for 727×432 is far above what PNG should produce |
 | `public/duoc-diem.png` | 526 kB | PNG RGBA 714×422 | same |
 | `public/npc-duoc.png` | 254 kB | PNG colormap 2800×520 (7 frames) | already palette-quantized, acceptable |
-| `public/hero-body-male.png` / `-female.png` | 228 kB each | PNG RGBA 512×640 (4×4 frames) | lossless |
+| `public/hero-body-male.png` / `-female.png` | 238 kB / 228 kB | PNG RGBA 512×640 (4×4 frames) | lossless |
 | `public/gach-tile.webp` | 499 kB | WebP VP8 **2752×1536** | **17 MB VRAM** for a repeating tile |
 | `public/gach-seamless.webp` | 202 kB | WebP **5504×420** | **9 MB VRAM** for a repeating tile |
 

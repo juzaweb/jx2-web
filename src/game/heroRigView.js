@@ -1,7 +1,7 @@
 import { buildHero, poseFor, limbPivots } from "./heroRig.js";
 import { normalizeGender } from "./gender.js";
 import { EQUIPMENT_SLOT_KEYS } from "./equipment.js";
-import { HERO_BODY, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
+import { HERO_BODY, bakedEquipmentSlots, bodyFrameForDirection, bodyTextureFor, equipmentTextureKeyFor } from "./heroBody.js";
 import { buildBodyEquipment } from "./heroBodyEquipment.js";
 import { ensureEquipmentTexture } from "./lazyAssets.js";
 
@@ -83,6 +83,9 @@ export class HeroRigView {
     this.groups = {};
 
     if (this.usingSprite) {
+      // Slots the sheet already paints are skipped so the body art is not
+      // covered by (or double-drawing) the modular equipment sprites.
+      const bakedSlots = new Set(bakedEquipmentSlots(g));
       this.frameIndex = bodyFrameForDirection(direction, 0);
       this.bodySprite = this.scene.add.sprite(0, HERO_BODY.footOffsetY, bodyTexture, this.frameIndex);
       this.bodySprite.setOrigin(0.5, 1);
@@ -90,6 +93,7 @@ export class HeroRigView {
       this.container.add(this.bodySprite);
 
       const addEquipSprite = (slot, overrideItemId = null) => {
+        if (bakedSlots.has(slot)) return;
         const itemId = overrideItemId || equipment?.[slot];
         if (!itemId) return;
         const texKey = equipmentTextureKeyFor(slot, itemId, g);
@@ -118,7 +122,7 @@ export class HeroRigView {
       addEquipSprite("armor");
 
       // 2. Procedural vector shapes for any slot not covered by a sprite
-      const excluded = Object.keys(this.equipSprites);
+      const excluded = [...Object.keys(this.equipSprites), ...bakedSlots];
       for (const primitive of buildBodyEquipment({ direction, equipment, excludeSlots: excluded })) {
         const child = createPrimitive(this.scene, primitive);
         if (child) this.container.add(child);

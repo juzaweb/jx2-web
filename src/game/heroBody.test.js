@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bakedEquipmentSlots,
   bodyFrameForDirection,
   bodyRowForDirection,
   bodyTextureFor,
@@ -67,6 +68,21 @@ describe("heroBody", () => {
       expect(equipmentTextureDef("armor", "unknown-item", "male")).toBeNull();
       expect(equipmentTextureKeyFor("armor", null)).toBeNull();
       expect(equipmentTextureKeyFor("armor", "")).toBeNull();
+    });
+  });
+
+  describe("bakedEquipmentSlots", () => {
+    it("lists the clothing slots painted into the male sheet", () => {
+      expect(bakedEquipmentSlots("male")).toEqual(["pants", "armor", "helmet"]);
+    });
+
+    it("leaves every overlay slot active for the female sheet", () => {
+      expect(bakedEquipmentSlots("female")).toEqual([]);
+    });
+
+    it("falls back to male for unknown genders", () => {
+      expect(bakedEquipmentSlots()).toEqual(bakedEquipmentSlots("male"));
+      expect(bakedEquipmentSlots("unknown")).toEqual(bakedEquipmentSlots("male"));
     });
   });
 });
