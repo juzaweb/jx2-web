@@ -14,7 +14,7 @@ function makeManager(skillId, { others = [] } = {}) {
     weaponType: "bao-tay",
     level: 10,
     learnedSkills: ["la_han_quyen", "dai_tu_di_chuong", "nhu_lai_than_chuong"],
-    mapId: "city",
+    mapId: "dong-mon-thanh",
     x: 0,
     y: 0,
     pkFlag: true,
@@ -23,7 +23,7 @@ function makeManager(skillId, { others = [] } = {}) {
   };
   const target = {
     id: "target-1",
-    mapId: "city",
+    mapId: "dong-mon-thanh",
     x: 100,
     y: 0,
     hp: TARGET_HP,
@@ -118,7 +118,7 @@ test("a short-range skill cannot hit a player beyond its own reach", () => {
 test("a landed punch splashes onto nearby flagged players, not peaceful ones", () => {
   const bystander = {
     id: "bystander-1",
-    mapId: "city",
+    mapId: "dong-mon-thanh",
     x: 200,
     y: 0,
     hp: TARGET_HP,
@@ -129,7 +129,7 @@ test("a landed punch splashes onto nearby flagged players, not peaceful ones", (
   };
   const peaceful = {
     id: "peaceful-1",
-    mapId: "city",
+    mapId: "dong-mon-thanh",
     x: 210,
     y: 0,
     hp: TARGET_HP,

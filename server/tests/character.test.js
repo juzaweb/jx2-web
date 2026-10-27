@@ -148,6 +148,40 @@ describe("Character API Test Suite", () => {
     assert.equal(bag.data.inventory["kim-sang-duoc"], 50);
   });
 
+  test("test mode grants the test token to every character and revokes it afterwards", async () => {
+    process.env.TEST_MODE = "true";
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    let characterId;
+    try {
+      const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: "Kiểm Thử" })
+      }).then((r) => r.json());
+      characterId = created.data.character.id;
+
+      const bag = await fetch(`${baseUrl}/inventory/${characterId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then((r) => r.json());
+
+      assert.equal(bag.data.inventory["lenh-bai-test"], 1);
+      assert.equal(bag.data.inventory["lenh-bai-gm"], undefined);
+      assert.equal(bag.data.inventory["kim-sang-duoc"], 50);
+    } finally {
+      delete process.env.TEST_MODE;
+    }
+
+    // Outside test mode the token is stripped, so it never lingers in the bag.
+    const after = await fetch(`${baseUrl}/inventory/${characterId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then((r) => r.json());
+    assert.equal(after.data.inventory["lenh-bai-test"], undefined);
+  });
+
   test("the starter kit is never granted twice and never replaces a played bag", async () => {
     const { store } = await import("../src/data/playerDb.js");
     const userId = nextUser();

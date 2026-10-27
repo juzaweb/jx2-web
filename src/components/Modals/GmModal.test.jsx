@@ -33,8 +33,8 @@ describe("GmModal Component", () => {
     expect(markup).toContain("Cấp 10");
     expect(markup).toContain("Cấp 50");
     expect(markup).toContain("Cấp 73 (Bí Kíp)");
-    expect(markup).toContain("Cấp 99 (Đại Hiệp)");
-    expect(markup).toContain("Max Cấp (150)");
+    expect(markup).toContain("Max Cấp (99)");
+    expect(markup).toContain("Tùy chọn cấp độ (1 - 99)");
     expect(markup).toContain('type="number"');
     expect(markup).toContain("Đặt Cấp");
   });

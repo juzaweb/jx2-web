@@ -451,6 +451,10 @@ export default {
       name: "GM令牌",
       desc: "GM总管至高令牌。可打开管理面板获取等级、恢复气血内力、获取药水与地图传送。"
     },
+    "lenh-bai-test": {
+      name: "测试令牌",
+      desc: "仅在测试模式开启时发放的测试令牌。可打开与GM令牌相同的管理面板。"
+    },
     "ao-lang-khach": {
       name: "浪客青衣",
       desc: "初入江湖所着交领布衣。轻便透气，利于仗剑天涯。"
@@ -479,7 +483,7 @@ export default {
       quickLevel: "快速等级档位",
       addLevel: "提升等级",
       addExp: "获取经验",
-      customLevel: "自选等级 (1 - 150)",
+      customLevel: "自选等级 ({min} - {max})",
       setLevelBtn: "设定等级",
       successSet: "等级设定成功！"
     },

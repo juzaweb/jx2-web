@@ -130,6 +130,9 @@ test("WebSocket server-authority suite", async (t) => {
           path: "/ws",
           enemyRespawnMs: 800,
           enemyTickMs: 50,
+          // This harness deliberately fights inside Biện Kinh with the legacy
+          // roster, so it opts out of the city safe-zone ban.
+          combatSafeZones: false,
           // Deterministic rolls: 0.5 never crits and never rolls a dodge.
           random: () => 0.5,
           // Test authority: two tokens, one owned-character rule.
@@ -449,6 +452,50 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
+  await t.test("Test mode casts spend no MP and start no cooldown", async () => {
+    process.env.TEST_MODE = "true";
+    try {
+      store.setInventory("char_test_mode", { "bao-tay-lang-khach": 1 });
+      store.addLearnedSkill("char_test_mode", "dai_tu_di_chuong");
+
+      const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+      await join(observer, { characterId: "char_test_watch" });
+      const caster = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+      await join(caster, { characterId: "char_test_mode" });
+      caster.send({ type: "equip_item", payload: { itemId: "bao-tay-lang-khach" } });
+      await caster.waitFor(
+        (m) => m.type === "equipment_sync" && m.payload.equipment.weapon === "bao-tay-lang-khach"
+      );
+
+      const castBy = (m) => m.type === "player_attacked" && m.payload.id === "char_test_mode";
+      caster.send({
+        type: "player_attack",
+        payload: { skill: "dai_tu_di_chuong", x: 5300, y: 5000, facingRight: true }
+      });
+      await observer.waitFor(castBy);
+
+      assert.equal(
+        caster.messages.some((m) => m.type === "player_mp" && m.payload.mp !== 60),
+        false,
+        "a test-mode cast never debits the server-owned pool"
+      );
+
+      // Past the attack cadence: only the 6s skill cooldown could refuse this.
+      await sleep(600);
+      caster.send({
+        type: "player_attack",
+        payload: { skill: "dai_tu_di_chuong", x: 5200, y: 5000, facingRight: true }
+      });
+      const again = await observer.waitFor((m) => castBy(m) && m.payload.x === 5200);
+      assert.equal(again.payload.skill, "dai_tu_di_chuong");
+
+      await caster.close();
+      await observer.close();
+    } finally {
+      delete process.env.TEST_MODE;
+    }
+  });
+
   await t.test("Stun is applied by the server and holds the monster still", async () => {
     // Gloves carry the stun skill; the join hands out a sword.
     store.setInventory("char_stun", { "bao-tay-lang-khach": 1 });
@@ -701,12 +748,43 @@ test("WebSocket server-authority suite", async (t) => {
 
     const admin = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(admin, { characterId: "char_gm", token: "admin-token" });
-    admin.send({ type: "gm_action", payload: { action: "set_level", level: 99 } });
-    const progress = await admin.waitFor(
+    admin.send({ type: "gm_action", payload: { action: "set_level", level: 500 } });
+    const clamped = await admin.waitFor(
       (m) => m.type === "player_progress" && m.payload.level === 99
     );
-    assert.equal(progress.payload.level, 99);
+    assert.equal(clamped.payload.level, 99);
+
+    admin.send({ type: "gm_action", payload: { action: "set_level", level: 42 } });
+    const applied = await admin.waitFor(
+      (m) => m.type === "player_progress" && m.payload.level === 42
+    );
+    assert.equal(applied.payload.level, 42);
     await admin.close();
+  });
+
+  await t.test("Test mode lets a regular character use GM actions", async () => {
+    process.env.TEST_MODE = "true";
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    try {
+      await join(client, { characterId: "char_test_gm" });
+      client.send({ type: "gm_action", payload: { action: "set_level", level: 37 } });
+      const applied = await client.waitFor(
+        (m) => m.type === "player_progress" && m.payload.level === 37
+      );
+      assert.equal(applied.payload.level, 37);
+
+      // The authority is checked per action, so turning the mode off takes the
+      // power away from the session that just used it.
+      delete process.env.TEST_MODE;
+      client.send({ type: "gm_action", payload: { action: "set_level", level: 50 } });
+      const err = await client.waitFor(
+        (m) => m.type === "error" && /quyền quản trị GM/.test(m.payload.message)
+      );
+      assert.match(err.payload.message, /quyền quản trị GM/);
+    } finally {
+      delete process.env.TEST_MODE;
+      await client.close();
+    }
   });
 
   await t.test("Un-joined sockets cannot act on the world", async () => {

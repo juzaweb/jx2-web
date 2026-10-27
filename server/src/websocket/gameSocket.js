@@ -35,14 +35,17 @@ import {
   MAP_IDS,
   findPortal,
   getMap,
+  isCombatAllowed,
   isKnownMap
 } from "../../../src/game/maps/mapRegistry.js";
 import {
+  MAX_LEVEL,
   applyReward,
   normalizeProgress,
   progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, skillMpCost, skillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
+import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
+import { isTestMode } from "../../../src/game/testMode.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
 import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
@@ -56,6 +59,7 @@ import {
   readEquipment,
   unequipSlot
 } from "../game/playerBag.js";
+import { syncCommandTokens } from "../game/commandTokens.js";
 
 /**
  * Clean sanitization for player strings
@@ -363,6 +367,11 @@ export class GameSocketManager {
     // Injectable so tests can pin the directional-dodge roll.
     this.random = typeof options.random === "function" ? options.random : Math.random;
 
+    // A city map is a safe zone: no PvE or PvP combat there, whatever the PK
+    // flags say. The legacy-roster harness opts out, because it deliberately
+    // fights inside Biện Kinh to exercise the combat paths.
+    this.combatSafeZones = options.combatSafeZones !== false;
+
     this.setupServer();
     this.startHeartbeat();
     this.startEnemyTick();
@@ -414,6 +423,18 @@ export class GameSocketManager {
   gridFor(mapId) {
     this.rosterFor(mapId);
     return this.enemyGridByMap.get(isKnownMap(mapId) ? mapId : DEFAULT_MAP_ID);
+  }
+
+  /**
+   * Whether the map this player stands on allows combat. A city is a safe zone:
+   * no monster can be struck and no duel can land there, even with both PK flags
+   * raised. Enforced here rather than trusted from the client.
+   * @param {{mapId?:string}|null} player server player object
+   * @returns {boolean}
+   */
+  canFightHere(player) {
+    if (!this.combatSafeZones) return true;
+    return isCombatAllowed(getMap(player?.mapId));
   }
 
   setupServer() {
@@ -667,10 +688,9 @@ export class GameSocketManager {
     store.setVitals(characterId, { hp, mp });
 
     const isAdmin = userDb.isAdmin(userId);
-    let bag = readBag(characterId);
-    if (isAdmin && !bag["lenh-bai-gm"]) {
-      bag = grantItem(characterId, "lenh-bai-gm", 1).bag;
-    }
+    // Admin accounts always hold the GM token; test mode hands every character
+    // the test token, which opens the same panel.
+    const bag = syncCommandTokens(characterId, { isAdmin });
 
     // If this player ID was already connected from an old socket, remove old one
     if (this.playerById.has(playerId)) {
@@ -846,7 +866,6 @@ export class GameSocketManager {
     }
 
     const target = getMap(portal.targetMapId);
-    const roster = this.rosterFor(target.id);
 
     // Leaving: the old map stops seeing this player.
     this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: player.id } }, ws);
@@ -866,25 +885,39 @@ export class GameSocketManager {
     // portal drops the hero back on the map they just left.
     this.persistPosition(player, { force: true });
 
+    this.announceMapArrival(player, ws, target);
+  }
+
+  /**
+   * Announce a server-driven arrival: the mover receives `map_changed` with the
+   * destination's peers and roster, and everyone already there sees them join.
+   * Assumes the player's map and position were already updated.
+   * @param {Object} player
+   * @param {WebSocket|null} ws the player's socket
+   * @param {Object} map destination MapDefinition
+   */
+  announceMapArrival(player, ws, map) {
     const peers = [];
     this.players.forEach((other, clientWs) => {
-      if (clientWs !== ws && other.mapId === target.id) peers.push(this.playerSnapshot(other));
+      if (clientWs !== ws && other.mapId === map.id) peers.push(this.playerSnapshot(other));
     });
 
     this.send(ws, {
       type: "map_changed",
       payload: {
         yourId: player.id,
-        mapId: target.id,
+        mapId: map.id,
         spawn: { x: player.x, y: player.y },
         players: peers,
-        enemies: Array.from(roster.values()).map((enemy) => this.enemySnapshot(enemy))
+        enemies: Array.from(this.rosterFor(map.id).values()).map((enemy) =>
+          this.enemySnapshot(enemy)
+        )
       }
     });
 
-    // Arriving: the new map sees this player.
+    // Arriving: the destination map sees this player.
     this.broadcastToMap(
-      target.id,
+      map.id,
       { type: "player_joined", payload: { player: this.playerSnapshot(player) } },
       ws
     );
@@ -1550,6 +1583,12 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (!player) return;
 
+    // A city is a safe zone: refuse the swing/cast outright so a forged packet
+    // cannot fight inside the walls even with the PK flag raised.
+    if (!this.canFightHere(player)) {
+      return this.rejectHit(ws, "safe_zone");
+    }
+
     const now = Date.now();
     const requested = skillById(payload.skill);
 
@@ -1585,10 +1624,12 @@ export class GameSocketManager {
     if (skill) {
       const readyAt = player.skillReadyAt[skillId] || 0;
       if (now < readyAt) return;
-      player.skillReadyAt[skillId] = now + skillCooldown(skillId);
+      // Test mode reports 0, so the stamp never blocks the next cast.
+      player.skillReadyAt[skillId] = now + effectiveSkillCooldown(skillId);
     }
 
-    const cost = skillMpCost(skillId);
+    // Test mode reports 0, so the in-memory pool is never debited.
+    const cost = effectiveSkillMpCost(skillId);
     if (cost > 0) {
       if (player.mp < cost) {
         // Refuse the cast and resync the caster so its HUD matches the server.
@@ -1725,6 +1766,9 @@ export class GameSocketManager {
     const attacker = this.players.get(ws);
     if (!attacker) return;
 
+    // Neither side may fight from or into a city safe zone.
+    if (!this.canFightHere(attacker)) return this.rejectHit(ws, "safe_zone");
+
     // Rate-limit plain swings and one-shot skills per attacker so a spamming
     // client can't amplify one socket into a broadcast storm. A channel's ticks
     // are bounded by its cast's own hit cap, so they are not throttled here.
@@ -1739,6 +1783,9 @@ export class GameSocketManager {
     const targetEntry = this.playerById.get(payload.targetId);
     const target = targetEntry?.data;
     if (!target) return this.rejectHit(ws, "target_missing");
+    if (!this.canFightHere(target)) {
+      return this.rejectHit(ws, "safe_zone", { targetId: target.id });
+    }
 
     const distance = Math.hypot(attacker.x - target.x, attacker.y - target.y);
 
@@ -1952,29 +1999,24 @@ export class GameSocketManager {
   }
 
   /**
-   * Respawn a defeated player at the fixed Biện Kinh point with full health and
+   * Respawn a defeated player in the home city (Biện Kinh) with full health and
    * announce the defeat. Attacker credit (when any) rides on the broadcast.
+   *
+   * A defeat always returns the hero to the home city, even when they fell on a
+   * hunting map: the old map sees them leave, the home map sees them arrive, and
+   * the victim follows with a `map_changed` carrying the new roster and peers.
    * @param {Object} victim - server player object
    * @param {?Object} attacker
    * @param {"pvp"|"wolf"} source
    */
   respawnPlayer(victim, attacker = null, source = "wolf") {
-    const map = getMap(victim.mapId);
+    const home = getMap(DEFAULT_MAP_ID);
+    const fromMapId = victim.mapId;
+    const crossMap = fromMapId !== home.id;
+    const victimWs = this.playerById.get(victim.id)?.ws || null;
 
     victim.hp = victim.maxHp;
     victim.mp = victim.maxMp;
-    victim.x = map.spawn.x;
-    victim.y = map.spawn.y;
-    victim.vx = 0;
-    victim.vy = 0;
-    victim.lastX = victim.x;
-    victim.lastY = victim.y;
-    victim.lastMoveAt = Date.now();
-    // The respawn point is where the hero will stand next time they log in.
-    this.persistPosition(victim, { force: true });
-    victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
-    this.persistVitals(victim);
-    this.broadcastMp(victim);
 
     const defeatMessage = {
       type: "player_defeated",
@@ -1985,24 +2027,60 @@ export class GameSocketManager {
         attackerName: attacker ? attacker.displayName || attacker.username : null,
         source,
         // Includes the map so the client can follow a respawn that crosses maps.
-        respawn: { mapId: map.id, x: map.spawn.x, y: map.spawn.y }
+        respawn: { mapId: home.id, x: home.spawn.x, y: home.spawn.y }
       }
     };
 
-    // The victim is already teleported, so their own copy is sent directly; the
-    // rest of the map learns of the defeat through the broadcast.
-    const victimWs = this.playerById.get(victim.id)?.ws || null;
+    // Announced while the victim is still standing on the map where they fell, so
+    // the watchers learn of the defeat before their copy of the body disappears.
     this.send(victimWs, defeatMessage);
-    this.broadcastPlayerState(victim, defeatMessage, victimWs);
+    this.broadcastToMap(fromMapId, defeatMessage, victimWs);
 
     // The killer is usually on the same map and got it above; a cross-map strike
     // still owes them their own kill.
-    this.sendToAttackerOffMap(attacker, victim.mapId, defeatMessage);
+    this.sendToAttackerOffMap(attacker, fromMapId, defeatMessage);
 
-    // The players who watched the fight still hold the victim where they fell. Send
-    // them the teleport and the restored HP, otherwise they keep drawing a corpse
-    // with an empty bar (and every later strike is measured against that stale body,
-    // so it is refused as out of range forever).
+    // The hero is leaving this map for the home city: peers drop the corpse now
+    // instead of waiting for a teleport they will never receive.
+    if (crossMap) {
+      this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: victim.id } }, victimWs);
+    }
+
+    victim.mapId = home.id;
+    victim.x = home.spawn.x;
+    victim.y = home.spawn.y;
+    victim.vx = 0;
+    victim.vy = 0;
+    victim.lastX = victim.x;
+    victim.lastY = victim.y;
+    victim.lastMoveAt = Date.now();
+    // A fresh map means fresh aggro; do not carry a bite cooldown across.
+    victim.nextBiteAt = 0;
+    // The respawn point is where the hero will stand next time they log in.
+    this.persistPosition(victim, { force: true });
+    victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
+    this.persistVitals(victim);
+    this.broadcastMp(victim);
+
+    const restoredMessage = {
+      type: "player_hp",
+      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
+    };
+
+    if (crossMap) {
+      // The victim's map is now the home city, so the client swaps maps exactly
+      // like a portal move would and receives the home roster and peers.
+      this.announceMapArrival(victim, victimWs, home);
+      this.send(victimWs, restoredMessage);
+      this.broadcastToMap(home.id, restoredMessage, victimWs);
+      return;
+    }
+
+    // Same map (the hero fell in the home city): the players who watched the
+    // fight still hold the victim where they fell. Send them the teleport and the
+    // restored HP, otherwise they keep drawing a corpse with an empty bar (and
+    // every later strike is measured against that stale body, so it is refused as
+    // out of range forever).
     const movedMessage = {
       type: "player_moved",
       payload: {
@@ -2015,19 +2093,10 @@ export class GameSocketManager {
         stance: victim.stance
       }
     };
-    const restoredMessage = {
-      type: "player_hp",
-      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
-    };
 
-    // Same split as the defeat: the map gets it, the victim was moved to another
-    // map by the respawn and reads its own copy directly.
-    this.broadcastPlayerState(victim, movedMessage, victimWs);
-    this.broadcastPlayerState(victim, restoredMessage, victimWs);
-    this.sendToAttackerOffMap(attacker, victim.mapId, movedMessage);
-    this.sendToAttackerOffMap(attacker, victim.mapId, restoredMessage);
-
-    this.broadcastPlayerState(victim, restoredMessage);
+    this.broadcastToMap(fromMapId, movedMessage, victimWs);
+    this.sendToAttackerOffMap(attacker, fromMapId, movedMessage);
+    this.broadcastToMap(fromMapId, restoredMessage);
   }
 
   /**
@@ -2063,7 +2132,9 @@ export class GameSocketManager {
    */
   handleGmAction(ws, payload = {}) {
     const player = this.players.get(ws);
-    if (!player || !player.isAdmin) {
+    // Test mode deliberately opens the panel to every character; outside it,
+    // the admin flag is the only authority.
+    if (!player || (!player.isAdmin && !isTestMode())) {
       this.send(ws, {
         type: "error",
         payload: { message: "Bạn không có quyền quản trị GM!" }
@@ -2075,7 +2146,7 @@ export class GameSocketManager {
 
     switch (action) {
       case "set_level": {
-        const level = clampNum(payload.level, 1, 150, player.progress?.level || 1);
+        const level = clampNum(payload.level, 1, MAX_LEVEL, player.progress?.level || 1);
         if (player.progress) {
           player.progress.level = level;
           player.progress.exp = 0;
@@ -2109,9 +2180,9 @@ export class GameSocketManager {
       }
 
       case "add_level": {
-        const delta = clampNum(payload.levels, 1, 150, 1);
+        const delta = clampNum(payload.levels, 1, MAX_LEVEL, 1);
         const current = player.progress?.level || player.level || 1;
-        const targetLevel = clampNum(current + delta, 1, 150, current);
+        const targetLevel = clampNum(current + delta, 1, MAX_LEVEL, current);
         this.handleGmAction(ws, { action: "set_level", level: targetLevel });
         break;
       }
@@ -2306,6 +2377,9 @@ export class GameSocketManager {
   handleEnemyHit(ws, payload = {}) {
     const player = this.players.get(ws);
     if (!player) return;
+
+    // The city is a safe zone: no monster can be struck there.
+    if (!this.canFightHere(player)) return;
 
     // Enemy ids are per-map, so the roster of the map the attacker stands on is
     // the only one a hit can name.

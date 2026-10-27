@@ -9,6 +9,7 @@ import {
   getMap,
   isInsideMap,
   isKnownMap,
+  isCombatAllowed,
   mapSize,
   mapWorldConfig
 } from "./mapRegistry.js";
@@ -203,6 +204,15 @@ describe("map registry", () => {
     expect(town.buildings).toEqual(MAPS["dong-mon-thanh"].buildings);
     expect(market.buildings.length).toBeGreaterThan(0);
     expect(town.portals).toEqual(MAPS["dong-mon-thanh"].portals);
+  });
+
+  it("only the home city is a no-combat safe zone", () => {
+    expect(isCombatAllowed("market")).toBe(false);
+    expect(isCombatAllowed(MAPS.market)).toBe(false);
+    expect(isCombatAllowed("dong-mon-thanh")).toBe(true);
+    // Callers that have not loaded a map yet (boot, unit tests) keep fighting.
+    expect(isCombatAllowed(undefined)).toBe(true);
+    expect(isCombatAllowed({ id: "custom", bounds: MAPS.market.bounds })).toBe(true);
   });
 
   it("resolves portals by id for server-side travel validation", () => {

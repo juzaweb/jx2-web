@@ -450,6 +450,10 @@ export default {
       name: "GM Imperial Token",
       desc: "Supreme authority token of the GM. Opens admin control panel to grant levels, vitals, potions and map travel."
     },
+    "lenh-bai-test": {
+      name: "Test Imperial Token",
+      desc: "A test-only token granted while test mode is on. Opens the same admin control panel as the GM token."
+    },
     "ao-lang-khach": {
       name: "Wanderer's Blue Robe",
       desc: "A cross-collar wuxia robe woven from lightweight fabric, ideal for traveling the martial world."
@@ -478,7 +482,7 @@ export default {
       quickLevel: "Quick Level Milestones",
       addLevel: "Advance Level",
       addExp: "Gain Experience",
-      customLevel: "Custom Level (1 - 150)",
+      customLevel: "Custom Level ({min} - {max})",
       setLevelBtn: "Set Level",
       successSet: "Level set successfully!"
     },

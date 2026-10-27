@@ -48,15 +48,33 @@ export const QUICK_ITEMS = [
   }
 ];
 
+/** Catalog id of the GM command token. */
+export const GM_TOKEN_ID = "lenh-bai-gm";
+
+/** Catalog id of the test-mode command token (granted while test mode is on). */
+export const TEST_TOKEN_ID = "lenh-bai-test";
+
 /**
  * Supreme GM command token for admin control and testing.
  */
 export const lenhBaiGm = {
-  id: "lenh-bai-gm",
+  id: GM_TOKEN_ID,
   useSlot: 5,
   name: "Lệnh Bài GM",
   icon: "icon-gm-token",
   desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
+};
+
+/**
+ * Test-mode command token. Every character receives it while `VITE_TEST_MODE`
+ * is on, and it opens the same admin panel as the GM token.
+ */
+export const lenhBaiTest = {
+  id: TEST_TOKEN_ID,
+  useSlot: 5,
+  name: "Lệnh Bài Test",
+  icon: "icon-test-token",
+  desc: "Lệnh bài thử nghiệm, chỉ xuất hiện khi bật chế độ Test. Dùng để mở giao diện quản trị nhân vật giống Lệnh Bài GM."
 };
 
 /**
@@ -251,18 +269,29 @@ export const INVENTORY_ITEMS = [
   daiHoanDan,
   nuNhiHong,
   hoiThanhPhu,
-  lenhBaiGm
+  lenhBaiGm,
+  lenhBaiTest
 ];
+
+/**
+ * Whether an item id is a command token (GM or test) that opens the admin panel
+ * instead of being consumed.
+ * @param {string} itemId
+ * @returns {boolean}
+ */
+export function isCommandToken(itemId) {
+  return itemId === GM_TOKEN_ID || itemId === TEST_TOKEN_ID;
+}
 
 /**
  * Items the player can bind to a mobile action button.
  *
- * Equipment carries a `slot` (it is worn, not used) and the GM token opens a
- * panel instead of being drunk, so neither belongs on a consumable button.
+ * Equipment carries a `slot` (it is worn, not used) and the command tokens open
+ * a panel instead of being drunk, so neither belongs on a consumable button.
  * @type {Array<{id:string, name:string, icon:string, desc:string, useSlot?:number}>}
  */
 export const CONSUMABLE_ITEMS = INVENTORY_ITEMS.filter(
-  (item) => item && item.useSlot && !item.slot && item.id !== "lenh-bai-gm"
+  (item) => item && item.useSlot && !item.slot && !isCommandToken(item.id)
 );
 
 /**
@@ -323,7 +352,7 @@ export const STARTER_ITEMS = Object.freeze({
  */
 export const GM_STARTER_ITEMS = Object.freeze({
   ...STARTER_ITEMS,
-  "lenh-bai-gm": 1
+  [GM_TOKEN_ID]: 1
 });
 
 /**

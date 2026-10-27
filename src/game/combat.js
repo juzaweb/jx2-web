@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillById, skillsForWeapon, skillMpCost, skillLockReason, skillUsable } from "./skills.js";
+import { skillById, skillsForWeapon, effectiveSkillMpCost, effectiveSkillCooldown, skillLockReason, skillUsable } from "./skills.js";
 import {
   playSkillCastVfx,
   playSkillImpactVfx,
@@ -12,6 +12,7 @@ import { directionFromVelocity } from "./heroDirections.js";
 import { toIso, isoDepth } from "./isoProjection.js";
 import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
+import { isCombatAllowed } from "./maps/mapRegistry.js";
 import {
   MELEE_REACH,
   channelDurationMs,
@@ -35,6 +36,12 @@ let audioContext = null;
  * @returns {boolean}
  */
 const isPeerTarget = (target) => Boolean(target) && typeof target.monsterId !== "string";
+
+/**
+ * Why a swing, skill or duel was refused inside a city. Shared with the scene so
+ * the click, the cursor and the combat system all explain the safe zone alike.
+ */
+export const SAFE_ZONE_LOG = "Đây là khu vực thành — nơi an cư, không thể giao chiến.";
 
 export function isAudioEnabled() {
   return audioEnabled;
@@ -112,6 +119,17 @@ export class CombatSystem {
    */
   getEffectiveStats() {
     return this.player?.stats || {};
+  }
+
+  /**
+   * Whether fighting is allowed where the hero stands. A city is a safe zone: a
+   * swing, a skill aimed at a body, and a duel are all refused there, even with
+   * the PK flag raised. The server enforces the same rule, so this only spares
+   * the player a shot the server would drop.
+   * @returns {boolean}
+   */
+  canFight() {
+    return isCombatAllowed(this.scene?.map || this.scene?.currentMapId);
   }
 
   /**
@@ -236,6 +254,10 @@ export class CombatSystem {
   performAttack() {
     if (!this.attackReady) return;
     if (this.channel) return;
+    if (!this.canFight()) {
+      this.ui.addLog(SAFE_ZONE_LOG, "system");
+      return;
+    }
 
     const targetEnemy = this.nearestEnemyInReach();
     if (targetEnemy) {
@@ -289,6 +311,15 @@ export class CombatSystem {
     if (skill.target === "self") {
       this.executeSkill(skill, null);
       return true;
+    }
+
+    // Self buffs and heals still work in town; anything aimed at a body does not.
+    if (!this.canFight()) {
+      this.ui.addLog(
+        `${translate(skill.nameKey, undefined, skill.id)} không thể thi triển trong khu vực thành.`,
+        "system"
+      );
+      return false;
     }
 
     // A cursor sitting on the hero carries no direction; treat it as "no aim".
@@ -353,7 +384,7 @@ export class CombatSystem {
     const readyAt = this.skillCooldowns.get(skill.id) || 0;
     if (now < readyAt) return false;
     if (!skillUsable(skill, this.player.stats?.level ?? 1, this.learnedSkills)) return false;
-    if ((this.player.stats?.mp ?? 0) < skillMpCost(skill.id)) return false;
+    if ((this.player.stats?.mp ?? 0) < effectiveSkillMpCost(skill.id)) return false;
     return true;
   }
 
@@ -379,7 +410,7 @@ export class CombatSystem {
       this.ui.addLog(this.skillLockMessage(skill));
       return false;
     }
-    if (this.player.stats.mp < skillMpCost(skill.id)) {
+    if (this.player.stats.mp < effectiveSkillMpCost(skill.id)) {
       this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
       return false;
     }
@@ -395,10 +426,12 @@ export class CombatSystem {
   executeSkill(skill, target, aimPoint = null) {
     if (!this.canCast(skill)) return;
     const now = this.scene.time?.now ?? 0;
+    // Test mode reports 0, so a whole kit can be cast back to back.
+    const cooldownMs = effectiveSkillCooldown(skill.id);
 
     // Cooldown is a local pacing hint; MP is only mirrored from the server's
     // `player_mp`, so the client never spends a pool it does not own.
-    this.skillCooldowns.set(skill.id, now + skill.cooldown);
+    this.skillCooldowns.set(skill.id, now + cooldownMs);
     // Turn toward the target before the motion starts so the body, the VFX and
     // the packet that peers replay all agree on the direction.
     this.aimAt(target || aimPoint);
@@ -431,7 +464,7 @@ export class CombatSystem {
     bridge.emit(EVENTS.SKILL_CAST, {
       slot: skill.slot,
       skillId: skill.id,
-      cooldown: skill.cooldown,
+      cooldown: cooldownMs,
       readyAt: this.skillCooldowns.get(skill.id)
     });
 
@@ -1124,6 +1157,10 @@ export class CombatSystem {
   performPvpAttack(target) {
     if (!this.attackReady) return;
     if (this.channel) return;
+    if (!this.canFight()) {
+      this.ui.addLog(SAFE_ZONE_LOG, "system");
+      return;
+    }
     if (!this.scene.networkClient?.isConnected) {
       this.ui.addLog("Cần kết nối máy chủ để tỷ thí cùng cao thủ.");
       return;
@@ -1170,6 +1207,7 @@ export class CombatSystem {
    */
   damageEnemy(wolf, meta = {}) {
     if (!wolf || wolf.isDead) return;
+    if (!this.canFight()) return;
 
     const skill = meta.skill ? skillById(meta.skill) : null;
     if (skill) playSkillImpactVfx(this.scene, wolf.x, wolf.y, skill);

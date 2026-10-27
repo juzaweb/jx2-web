@@ -41,6 +41,12 @@ export const MARKET_MAP = {
   /** Peaceful-looking square, but the legacy wolf roster still roams it. */
   safe: false,
   /**
+   * Biện Kinh is the home city, so it is a safe zone: no monster or player can be
+   * struck there, even with the PK flag raised. The old wolf roster above only
+   * exists for harnesses, which opt out of the ban explicitly.
+   */
+  noCombat: true,
+  /**
    * Three legacy spawn points sit outside `bounds`. Rather than move them (and
    * break the pinned server tests) the registry skips the bounds check for this
    * map. New maps must keep every spawn inside their bounds.

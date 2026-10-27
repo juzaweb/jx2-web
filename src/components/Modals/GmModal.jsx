@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { bridge, EVENTS } from "../../game/bridge.js";
+import { MAX_LEVEL, MIN_LEVEL } from "../../game/progression.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 import "../../styles/gm-modal.css";
 
@@ -28,7 +29,7 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
   };
 
   const handleSetLevel = (targetLevel) => {
-    const lvl = Math.max(1, Math.min(150, Math.floor(Number(targetLevel) || 1)));
+    const lvl = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, Math.floor(Number(targetLevel) || 1)));
     emitGmAction("set_level", { level: lvl });
   };
 
@@ -143,8 +144,7 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
                   <button className="gm-btn gold" onClick={() => handleSetLevel(10)}>Cấp 10</button>
                   <button className="gm-btn gold" onClick={() => handleSetLevel(50)}>Cấp 50</button>
                   <button className="gm-btn gold" onClick={() => handleSetLevel(73)}>Cấp 73 (Bí Kíp)</button>
-                  <button className="gm-btn gold" onClick={() => handleSetLevel(99)}>Cấp 99 (Đại Hiệp)</button>
-                  <button className="gm-btn primary" onClick={() => handleSetLevel(150)}>Max Cấp (150)</button>
+                  <button className="gm-btn primary" onClick={() => handleSetLevel(MAX_LEVEL)}>Max Cấp ({MAX_LEVEL})</button>
                 </div>
               </div>
 
@@ -167,16 +167,16 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
               </div>
 
               <div className="gm-section">
-                <span className="gm-section-title">{t("gm.level.customLevel")}</span>
+                <span className="gm-section-title">{t("gm.level.customLevel", { min: MIN_LEVEL, max: MAX_LEVEL })}</span>
                 <div className="gm-input-row">
                   <input
                     type="number"
-                    min="1"
-                    max="150"
+                    min={MIN_LEVEL}
+                    max={MAX_LEVEL}
                     className="gm-input"
                     value={customLevel}
                     onChange={(e) => setCustomLevel(e.target.value)}
-                    placeholder="1 - 150"
+                    placeholder={`${MIN_LEVEL} - ${MAX_LEVEL}`}
                   />
                   <button
                     className="gm-btn primary"

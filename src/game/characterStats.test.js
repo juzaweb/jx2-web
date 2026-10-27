@@ -19,7 +19,7 @@ describe("normalizeLevel", () => {
     expect(normalizeLevel(3.7)).toBe(4);
     expect(normalizeLevel(0)).toBe(1);
     expect(normalizeLevel(-5)).toBe(1);
-    expect(normalizeLevel(100000)).toBe(999);
+    expect(normalizeLevel(100000)).toBe(99);
   });
 });
 

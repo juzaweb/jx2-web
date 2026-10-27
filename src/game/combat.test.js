@@ -13,7 +13,7 @@ vi.mock("phaser", () => ({
   }
 }));
 
-import { CombatSystem } from "./combat.js";
+import { CombatSystem, SAFE_ZONE_LOG } from "./combat.js";
 import { computeDamage } from "./damage.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
@@ -606,7 +606,7 @@ describe("skill targeting", () => {
     ...extra
   });
 
-  const makeCombat = ({ pkFlag = true, pvpTarget = null, wolves = [], peers = [] } = {}) => {
+  const makeCombat = ({ pkFlag = true, pvpTarget = null, wolves = [], peers = [], map = null } = {}) => {
     const player = {
       weaponType: "bao-tay",
       x: 0,
@@ -622,6 +622,7 @@ describe("skill targeting", () => {
       cameras: { main: { width: 1000, height: 1000, zoom: 1 } },
       add: { circle: () => ring },
       tweens: { add: vi.fn() },
+      map,
       pvpTarget,
       remotePlayerManager: { getAll: () => peers },
       networkClient: { isConnected: true, sendPlayerHit: vi.fn(), sendAttack: vi.fn(), sendEnemyHit: vi.fn(), sendMove: vi.fn() }
@@ -848,6 +849,38 @@ describe("skill targeting", () => {
     expect(ui.addLog).not.toHaveBeenCalled();
   });
 
+  it("frees casts from MP and cooldown in test mode", () => {
+    vi.stubEnv("VITE_TEST_MODE", "true");
+    try {
+      const { combat } = makeCombat();
+      const skill = {
+        id: "dai_tu_di_chuong",
+        slot: 1,
+        unlockLevel: 1,
+        mp: 12,
+        cooldown: 6000,
+        radius: 0,
+        range: 6000,
+        mult: 1.3,
+        vfx: {}
+      };
+      combat.applySkill = vi.fn();
+      combat.showFloatText = vi.fn();
+      combat.player.stats.mp = 0;
+
+      expect(combat.isSkillReady(skill)).toBe(true);
+
+      // Two casts at the same instant: no MP gate, and no cooldown is started.
+      combat.executeSkill(skill, null);
+      combat.executeSkill(skill, null);
+
+      expect(combat.applySkill).toHaveBeenCalledTimes(2);
+      expect(combat.skillCooldowns.get(skill.id)).toBe(combat.scene.time.now);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("nearestEnemyInReach prefers scene.enemyTarget if in reach", () => {
     const wolf1 = wolf("wolf1", 100, 0);
     const wolf2 = wolf("wolf2", 50, 0);
@@ -858,6 +891,45 @@ describe("skill targeting", () => {
 
     scene.enemyTarget = null;
     expect(combat.nearestEnemyInReach()).toBe(wolf2);
+  });
+
+  it("refuses a swing, a cast and a duel inside the city safe zone", () => {
+    const city = { id: "market", name: "Biện Kinh", noCombat: true };
+    const flagged = peer("near", 100, 0);
+    const nearWolf = wolf("wolf", 30, 0);
+    const { combat, ui } = makeCombat({ map: city, peers: [flagged], wolves: [nearWolf] });
+
+    combat.performAttack();
+    expect(ui.addLog).toHaveBeenCalledWith(SAFE_ZONE_LOG, "system");
+    expect(combat.scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
+
+    ui.addLog.mockClear();
+    combat.performPvpAttack(flagged);
+    expect(ui.addLog).toHaveBeenCalledWith(SAFE_ZONE_LOG, "system");
+    expect(combat.scene.networkClient.sendPlayerHit).not.toHaveBeenCalled();
+
+    ui.addLog.mockClear();
+    expect(combat.castSkill(skillById("dai_tu_di_chuong"), { x: 100, y: 0 })).toBe(false);
+    expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("khu vực thành"), "system");
+    expect(combat.scene.networkClient.sendEnemyHit).not.toHaveBeenCalled();
+  });
+
+  it("still lets a self buff run inside the city", () => {
+    const city = { id: "market", name: "Biện Kinh", noCombat: true };
+    const { combat } = makeCombat({ map: city });
+    combat.canCast = () => true;
+    combat.executeSkill = vi.fn();
+
+    const buff = { id: "la_han_tran", target: "self", nameKey: "skills.thieuLam.laHanTran.name" };
+    expect(combat.castSkill(buff)).toBe(true);
+    expect(combat.executeSkill).toHaveBeenCalledWith(buff, null);
+  });
+
+  it("keeps fighting allowed on a hunting map", () => {
+    const forest = { id: "dong-mon-thanh", name: "Đông Môn Thành", noCombat: false };
+    const { combat } = makeCombat({ map: forest });
+
+    expect(combat.canFight()).toBe(true);
   });
 });
 

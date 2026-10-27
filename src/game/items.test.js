@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import fs from "node:fs";
 import {
   QUICK_ITEMS,
   INVENTORY_ITEMS,
@@ -17,7 +18,12 @@ import {
   rollKillReward,
   KILL_REWARD,
   CONSUMABLE_EFFECTS,
-  getConsumableEffect
+  getConsumableEffect,
+  CONSUMABLE_ITEMS,
+  GM_TOKEN_ID,
+  TEST_TOKEN_ID,
+  GM_STARTER_ITEMS,
+  isCommandToken
 } from "./items.js";
 
 describe("item catalog", () => {
@@ -98,6 +104,37 @@ describe("inventory quantities", () => {
       expect(Number.isInteger(qty)).toBe(true);
       expect(qty).toBeGreaterThan(0);
     });
+  });
+
+  it("keeps the test token in the catalog but out of the GM starter kit", () => {
+    expect(GM_STARTER_ITEMS[GM_TOKEN_ID]).toBe(1);
+    expect(GM_STARTER_ITEMS[TEST_TOKEN_ID]).toBeUndefined();
+
+    const catalogIds = new Set(INVENTORY_ITEMS.filter(Boolean).map((item) => item.id));
+    expect(catalogIds.has(TEST_TOKEN_ID)).toBe(true);
+  });
+
+  it("treats both command tokens as the same GM panel key", () => {
+    expect(isCommandToken(GM_TOKEN_ID)).toBe(true);
+    expect(isCommandToken(TEST_TOKEN_ID)).toBe(true);
+    expect(isCommandToken("kim-sang-duoc")).toBe(false);
+    expect(isCommandToken(null)).toBe(false);
+  });
+
+  it("gives the test token its own icon artwork", () => {
+    const gm = INVENTORY_ITEMS.find((item) => item?.id === GM_TOKEN_ID);
+    const testToken = INVENTORY_ITEMS.find((item) => item?.id === TEST_TOKEN_ID);
+    expect(testToken.icon).not.toBe(gm.icon);
+
+    // A typo in the icon id would silently render an empty square.
+    const css = fs.readFileSync(new URL("../styles/item-icons.css", import.meta.url), "utf8");
+    expect(css).toContain(`.${testToken.icon} {`);
+  });
+
+  it("keeps command tokens out of the mobile consumable picker", () => {
+    const ids = CONSUMABLE_ITEMS.map((item) => item.id);
+    expect(ids).not.toContain(GM_TOKEN_ID);
+    expect(ids).not.toContain(TEST_TOKEN_ID);
   });
 
   it("only renders owned stacks and pads the grid with empty slots", () => {

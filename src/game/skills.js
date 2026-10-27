@@ -10,6 +10,10 @@
  * computes the resulting damage. The client reads the same table to predict the
  * cost, gate the hotbar and render its VFX.
  *
+ * The cost actually charged is read through `effectiveSkillMpCost` and
+ * `effectiveSkillCooldown`, which zero both in test mode so the client gate and
+ * the server check stay in agreement.
+ *
  * Learning: only the starter skill (`starter: true`, Kiếm Khí) is known for
  * free. Every other skill is learned from a book item dropped by monsters; the
  * learned ids are persisted per character on the server. `requires` lists the
@@ -22,6 +26,7 @@
  */
 
 import { normalizeWeaponType } from "./weapons.js";
+import { isTestMode } from "./testMode.js";
 
 /** Number of skill slots on the client hotbar. */
 export const SKILL_SLOTS = 6;
@@ -517,6 +522,31 @@ export function skillMpCost(skill) {
 export function skillCooldown(skill) {
   const entry = SKILLS_BY_ID.get(skill);
   return entry ? entry.cooldown : 0;
+}
+
+/**
+ * MP a cast actually spends.
+ *
+ * This is the one place test mode waives a casting cost, so the client's hotbar
+ * gate and the server's authoritative check cannot drift apart: in test mode a
+ * skill is effectively free.
+ * @param {string} skill skill id
+ * @returns {number} MP to spend (0 in test mode)
+ */
+export function effectiveSkillMpCost(skill) {
+  return isTestMode() ? 0 : skillMpCost(skill);
+}
+
+/**
+ * Cooldown (ms) a cast actually starts.
+ *
+ * In test mode every skill is ready immediately, so nothing is ever put on
+ * cooldown and the hotbar shows no recovery scrim.
+ * @param {string} skill skill id
+ * @returns {number} cooldown in ms (0 in test mode)
+ */
+export function effectiveSkillCooldown(skill) {
+  return isTestMode() ? 0 : skillCooldown(skill);
 }
 
 /**
