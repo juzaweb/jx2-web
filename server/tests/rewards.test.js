@@ -41,7 +41,7 @@ test("Kill reward suite", async (t) => {
         "y"
       ]);
       assert.ok(Array.isArray(reward.loot));
-      assert.ok(reward.loot.length <= 1);
+      assert.ok(reward.loot.length <= 2, "at most one book and one weapon");
       // An enemy without a monster id falls back to the legacy market wolf, so the
       // historical reward numbers stay exactly what the rest of the suite expects.
       assert.equal(reward.monsterId, "soi-xam");
@@ -51,5 +51,39 @@ test("Kill reward suite", async (t) => {
       assert.ok(reward.coins >= KILL_REWARD.coinsMin);
       assert.ok(reward.coins <= KILL_REWARD.coinsMax);
     }
+  });
+
+  await t.test("drops the weapon kit each late-game monster hands out", () => {
+    const withWeapon = (monsterId, expectedItemId) => {
+      const reward = rollEnemyReward("usr_hero", { id: 9, monsterId, x: 0, y: 0 }, () => 0);
+      assert.ok(
+        reward.loot.some((drop) => drop.itemId === expectedItemId),
+        `${monsterId} should drop ${expectedItemId}`
+      );
+    };
+
+    withWeapon("hac-y-sat-thu", "bao-tay-lang-khach");
+    withWeapon("ma-giao-de-tu", "dao-lang-khach");
+  });
+
+  await t.test("keeps weapon drops rare and only on the mapped monsters", () => {
+    // A roll at the top of the range never drops anything.
+    const dry = rollEnemyReward(
+      "usr_hero",
+      { id: 9, monsterId: "hac-y-sat-thu", x: 0, y: 0 },
+      () => 0.999999
+    );
+    assert.deepEqual(dry.loot, []);
+
+    // Early monsters have no weapon table at all.
+    const early = rollEnemyReward(
+      "usr_hero",
+      { id: 9, monsterId: "son-ca", x: 0, y: 0 },
+      () => 0
+    );
+    assert.ok(
+      early.loot.every((drop) => !drop.itemId.includes("lang-khach")),
+      "low-level monsters never drop a weapon"
+    );
   });
 });

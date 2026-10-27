@@ -277,6 +277,26 @@ export function bookDropsFor(monsterId) {
 }
 
 /**
+ * Weapons a monster can drop. Weapon drops are rarer than books: this is how a
+ * hero switches to a different kit (gloves/saber) and unlocks that weapon's
+ * learned skills.
+ * @type {Readonly<Record<string, { chance: number, itemId: string }>>}
+ */
+export const MONSTER_WEAPON_DROPS = Object.freeze({
+  "hac-y-sat-thu": Object.freeze({ chance: 0.06, itemId: "bao-tay-lang-khach" }),
+  "ma-giao-de-tu": Object.freeze({ chance: 0.08, itemId: "dao-lang-khach" })
+});
+
+/**
+ * Weapon-drop rule for a monster, or null when it drops no weapon.
+ * @param {string} [monsterId]
+ * @returns {{ chance: number, itemId: string }|null}
+ */
+export function weaponDropFor(monsterId) {
+  return MONSTER_WEAPON_DROPS[monsterId] || null;
+}
+
+/**
  * Resolve a monster definition, falling back to the legacy wolf so a stale
  * client or an old save can never crash the roster.
  * @param {string} [id]

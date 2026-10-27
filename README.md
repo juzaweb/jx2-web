@@ -4,7 +4,7 @@ A browser-playable wuxia RPG inspired by classic Vietnamese martial-arts MMORPGs
 
 ## Features
 - **Modern React UI Overlay:** Decoupled HUD components for Player Vitals (HP/MP/Stamina/EXP/Buff Aura), Minimap Radar & Quest tracker, Giang Ho Chat feed, and Authentic Hotbar Dock.
-- **Weapon-Based Skills & Books:** A hero may only cast the skills of the weapon worn in the `weapon` slot (sword, gloves, saber). Every new character starts with a sword and **Kiếm Khí**; other skills are learned by studying books dropped by monsters.
+- **Weapon-Based Skills & Books:** A hero may only cast the skills of the weapon worn in the `weapon` slot (sword, gloves, saber). Every new character starts with a sword and **Kiếm Khí**; other skills are learned by studying books dropped by monsters, and the gloves/saber themselves drop from late-game monsters.
 - **Mixed Skill & Item Hotbar:** Slots `1`–`9` hold either a consumable or a weapon skill. Drag techniques from the `F5` skill tree onto a slot, then press that number to cast.
 - **Phaser 3 Game Engine:** 60FPS Arcade physics, world map, collision detection, and entity management.
 - **Event-Driven Bridge:** Reactive bi-directional communication between Phaser game loop and React components.

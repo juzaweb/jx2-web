@@ -5,8 +5,26 @@
  * whichever client happened to cross 0 HP.
  */
 
-import { bookDropsFor, getMonster, rewardForMonster } from "../../src/game/enemyCatalog.js";
+import {
+  bookDropsFor,
+  getMonster,
+  rewardForMonster,
+  weaponDropFor
+} from "../../src/game/enemyCatalog.js";
 import { bookItemId } from "../../src/game/items.js";
+
+/**
+ * Draw one rng value in [0, 1), accepting either a function or a constant so
+ * tests can pin the roll.
+ * @param {Function|number} rng
+ * @returns {number}
+ */
+const drawRoll = (rng) => {
+  const value = typeof rng === "function" ? rng() : rng;
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(Math.max(value, 0), 0.999999)
+    : 0;
+};
 
 /**
  * Roll the skill book (if any) a monster leaves behind. Uses at most two rng
@@ -19,34 +37,42 @@ export const rollBookDrop = (monsterId, rng = Math.random) => {
   const group = bookDropsFor(monsterId);
   if (!group || !group.skills.length) return null;
 
-  const draw = () => {
-    const value = typeof rng === "function" ? rng() : rng;
-    return typeof value === "number" && Number.isFinite(value)
-      ? Math.min(Math.max(value, 0), 0.999999)
-      : 0;
-  };
-
-  if (draw() >= group.chance) return null;
-  const skillId = group.skills[Math.floor(draw() * group.skills.length)];
+  if (drawRoll(rng) >= group.chance) return null;
+  const skillId = group.skills[Math.floor(drawRoll(rng) * group.skills.length)];
   return { itemId: bookItemId(skillId), skillId };
 };
 
 /**
+ * Roll the weapon (if any) a monster leaves behind. A weapon drop is the only
+ * way to switch kits in play, so it is rarer than a book.
+ * @param {string} monsterId
+ * @param {Function|number} [rng=Math.random]
+ * @returns {{ itemId: string }|null}
+ */
+export const rollWeaponDrop = (monsterId, rng = Math.random) => {
+  const drop = weaponDropFor(monsterId);
+  if (!drop) return null;
+  if (drawRoll(rng) >= drop.chance) return null;
+  return { itemId: drop.itemId };
+};
+
+/**
  * Roll the reward for a defeated enemy. Kills pay EXP, bạc and, occasionally, a
- * skill book.
+ * skill book and/or a weapon.
  * @param {string} attackerId - id of the player whose hit landed the killing blow
  * @param {{id:number, mapId?:string, monsterId?:string, x:number, y:number}} enemy
  * @param {Function|number} [rng=Math.random]
  * @returns {{ enemyId:number, attackerId:string, monsterId:string, name:string,
  *   level:number, x:number, y:number, exp:number, coins:number,
- *   loot: Array<{ itemId: string, skillId: string }> }}
+ *   loot: Array<{ itemId: string, skillId?: string }> }}
  */
 export const rollEnemyReward = (attackerId, enemy, rng = Math.random) => {
   const monster = getMonster(enemy.monsterId);
   // Coins first so a sequence-based rng keeps the historical coin roll, then the
-  // book chance.
+  // book chance, then the rarer weapon chance.
   const payout = rewardForMonster(monster, rng);
   const book = rollBookDrop(monster.id, rng);
+  const weapon = rollWeaponDrop(monster.id, rng);
 
   return {
     enemyId: enemy.id,
@@ -57,6 +83,6 @@ export const rollEnemyReward = (attackerId, enemy, rng = Math.random) => {
     x: Math.round(enemy.x),
     y: Math.round(enemy.y),
     ...payout,
-    loot: book ? [book] : []
+    loot: [book, weapon].filter(Boolean)
   };
 };
