@@ -96,6 +96,27 @@ export const NGUI_THANH_MAP = {
       rect: { x: 3400, y: 7600, w: 1200, h: 400 },
       targetMapId: "trung-nguyen",
       targetSpawn: { x: 10400, y: 6000 }
+    },
+    {
+      id: "north-gate",
+      label: "Nghiệp Quan",
+      rect: { x: 3400, y: 0, w: 1200, h: 400 },
+      targetMapId: "nghiep-quan",
+      targetSpawn: { x: 7600, y: 12800 }
+    },
+    {
+      id: "east-gate",
+      label: "Hứa Điền",
+      rect: { x: 7600, y: 3400, w: 400, h: 1200 },
+      targetMapId: "hua-dien",
+      targetSpawn: { x: 1400, y: 7000 }
+    },
+    {
+      id: "west-gate",
+      label: "Quan Trung",
+      rect: { x: 0, y: 3400, w: 400, h: 1200 },
+      targetMapId: "quan-trung",
+      targetSpawn: { x: 14600, y: 7000 }
     }
   ],
 

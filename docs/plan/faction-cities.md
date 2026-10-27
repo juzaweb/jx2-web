@@ -1,7 +1,7 @@
 # Faction cities, four gates and the central battlefield
 
-Status: **phase 1 implemented**; phase 2 (the other two capitals' hunting
-grounds) not started.
+Status: **phase 2 implemented** (six hunting grounds + all city gates open).
+Remaining work is listed under _Not done_.
 
 ## Task checklist
 
@@ -25,25 +25,27 @@ grounds) not started.
 - [x] Nameplates turn red for an enemy camp on the battlefield.
 - [x] Defeat respawns the hero in their own faction capital.
 - [x] Full-city map title follows the active map.
-- [x] Tests: client 82 files / 840 tests, server 116 tests; `npm run build`
+- [x] Six more hunting grounds so every capital has a full 3–29 / 30–44 / 45–60
+      ladder behind its east, north and west gates (18 new species, 90 spawns
+      per ground).
+- [x] All four gates of Thục Thành and Ngụy Thành are wired.
+- [x] A gate arch with no portal behind it explains itself once per entry
+      (generic safety net; no gate is currently shut).
+- [x] Tests: client 82 files / 842 tests, server 116 tests; `npm run build`
       clean.
 
-### Not done (phase 2+)
+### Not done (phase 3+)
 
-- [ ] Open the north/east/west gates of Thục Thành and Ngụy Thành and ship their
-      six hunting maps (to reach the full 9 hunting grounds).
-- [ ] Feedback when walking into a still-closed gate (today it is a plain arch
-      with no portal, so nothing happens).
 - [ ] Battlefield objective/scoring (capture points, per-faction score, rewards);
       this needs its own plan because it adds server state.
 - [ ] A way to change faction (currently fixed at creation; no item, no UI,
       GM-only would need an action).
 - [ ] Book/weapon drops for the level 30–60 species (they pay EXP and coins
       only, so the weapon kits stay unchanged).
-- [ ] Manual in-game walkthrough: one hero per camp, all four Hán gates, a
-      cross-camp fight on the battlefield, and a defeat returning home.
+- [ ] Manual in-game walkthrough: one hero per camp, every gate, a cross-camp
+      fight on the battlefield, and a defeat returning home.
 - [ ] Optional performance work: load per-map enemy rosters lazily at boot
-      instead of preloading every hunting ground.
+      instead of preloading every hunting ground (13 maps now).
 - [ ] Localised map names (map names are still Vietnamese data strings in every
       locale, matching the pre-existing maps).
 
@@ -58,10 +60,9 @@ grounds) not started.
   from different camps may fight without the PK flag. Same camp never fights.
   Every other map keeps the legacy PK-flag rules, and the three capitals stay
   no-combat safe zones.
-- Phase 1 ships Hán in full and the other two capitals as minimal stubs (herb
-  shop + gates, south gate open). Their north/east/west gates are built but shut
-  until their hunting grounds ship.
-- A defeated hero respawns in **their own faction capital**, on every map.
+- Every capital now has all four gates working. Each of the three non-south
+  gates opens onto a hunting ground covering one tier, so the full ladder is
+  3–29 / 30–44 / 45–60 in every faction (nine hunting grounds in total).- A defeated hero respawns in **their own faction capital**, on every map.
 - No new art: monsters are vector-painted, the battlefield floor is painted in
   code, and the capitals reuse the existing brick/alley/shop art.
 
@@ -74,8 +75,14 @@ grounds) not started.
 | `bac-linh` | Bắc Lĩnh | north gate, levels 30–44, 90 spawns | flag |
 | `tay-son` | Tây Sơn | west gate, levels 45–60, 90 spawns | flag |
 | `trung-nguyen` | Trung Nguyên Chiến Trường | shared battlefield, no monsters | **faction** |
-| `thuc-thanh` | Thục Thành | Thục capital, south gate only | none (safe) |
-| `nguy-thanh` | Ngụy Thành | Ngụy capital, south gate only | none (safe) |
+| `thuc-thanh` | Thục Thành | Thục capital, 4 gates | none (safe) |
+| `ba-thuc` | Ba Thục | Thục east gate, levels 3–29, 90 spawns | flag |
+| `kiem-cac` | Kiếm Các | Thục north gate, levels 30–44, 90 spawns | flag |
+| `nga-mi` | Nga Mi | Thục west gate, levels 45–60, 90 spawns | flag |
+| `nguy-thanh` | Ngụy Thành | Ngụy capital, 4 gates | none (safe) |
+| `hua-dien` | Hứa Điền | Ngụy east gate, levels 3–29, 90 spawns | flag |
+| `nghiep-quan` | Nghiệp Quan | Ngụy north gate, levels 30–44, 90 spawns | flag |
+| `quan-trung` | Quan Trung | Ngụy west gate, levels 45–60, 90 spawns | flag |
 
 Topology is a star: every capital reaches the others only by crossing the
 battlefield through its south gate.
@@ -94,7 +101,8 @@ battlefield through its south gate.
   channel strikes) asks the map for its mode; every server consumer
   (`handlePlayerHit`, splash targets) does the same.
 - `src/game/maps/camps.js` — the camp expander extracted from Đông Môn Thành so
-  all three hunting grounds share one scatter rule.
+  every hunting ground shares one scatter rule; `maps/huntingGround.js` builds
+  the six phase-2 grounds from a small spec (entrance side, groups, palette).
 - Character creation now stores `faction` (`characters.faction`, migrated with a
   `han` default). The join snapshot carries `faction`, so nameplates can show
   enemies red on the battlefield.
@@ -104,7 +112,7 @@ battlefield through its south gate.
 
 ## Verification
 
-1. `npm test` — 82 files / 840 tests.
+1. `npm test` — 82 files / 842 tests.
 2. `npm --prefix server test` — 116 tests.
 3. `npm run build` — clean.
 4. Manual: create one hero per camp; each boots into their own capital; Hán has

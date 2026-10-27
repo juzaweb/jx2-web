@@ -71,7 +71,7 @@ export const TRUNG_NGUYEN_MAP = {
   ],
 
   gates: [
-    { id: "han-gate", x: 5400, y: 250, w: 1200, h: 130, orientation: "horizontal", label: "Hán" },
+    { id: "han-gate", x: 5400, y: 300, w: 1200, h: 130, orientation: "horizontal", label: "Hán" },
     { id: "thuc-gate", x: 250, y: 5300, w: 130, h: 1200, orientation: "vertical", label: "Thục" },
     { id: "nguy-gate", x: 11620, y: 5300, w: 130, h: 1200, orientation: "vertical", label: "Ngụy" }
   ],

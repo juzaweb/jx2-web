@@ -33,7 +33,7 @@ import {
   mapPvpMode,
   mapWorldConfig
 } from "./maps/mapRegistry.js";
-import { createPortalState, portalAt, stepPortalTrigger } from "./maps/portals.js";
+import { createPortalState, gateAt, portalAt, stepPortalTrigger } from "./maps/portals.js";
 import { SHOP_BUILDINGS } from "./marketBuildings.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
@@ -87,6 +87,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.map = getMap(DEFAULT_MAP_ID);
     this.mapConfig = mapWorldConfig(this.map);
     this.portalState = createPortalState();
+    /** Gate the hero is standing in without a portal, so the hint logs once. */
+    this.lockedGateId = null;
     /** Renderer + NPCs + colliders of the map currently loaded. */
     this.stage = null;
   }
@@ -752,9 +754,26 @@ export class JiangHuScene extends Phaser.Scene {
 
   /** One frame of portal detection. */
   updatePortals(time) {
-    if (!this.map?.portals?.length) return;
+    if (!this.player) return;
 
-    const portal = portalAt(this.map, this.player.x, this.player.y);
+    const portal = this.map?.portals?.length
+      ? portalAt(this.map, this.player.x, this.player.y)
+      : null;
+
+    // A gate arch with no portal behind it is a shut gate: say so once per
+    // entry instead of leaving the hero walking into a wall of nothing.
+    if (!portal) {
+      const gate = gateAt(this.map, this.player.x, this.player.y);
+      if (gate && gate.id !== this.lockedGateId) {
+        this.lockedGateId = gate.id;
+        this.uiBridge.addLog("Cổng này chưa mở.", "guide");
+      } else if (!gate) {
+        this.lockedGateId = null;
+      }
+    } else {
+      this.lockedGateId = null;
+    }
+
     const step = stepPortalTrigger(this.portalState, portal, time);
     this.portalState = step.state;
     if (!step.portal) return;
@@ -818,6 +837,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.stage.bindColliders();
 
     this.portalState = createPortalState();
+    this.lockedGateId = null;
     this.drawMapPanels();
     bridge.emit(EVENTS.MAP_CHANGED, { mapId: targetId, name: target.name });
     this.uiBridge.addLog(`Đã đến ${target.name}.`, "system");

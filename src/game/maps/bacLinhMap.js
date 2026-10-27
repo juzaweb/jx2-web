@@ -123,7 +123,7 @@ export const BAC_LINH_MAP = {
     {
       id: "bac-linh-gate",
       x: 7400,
-      y: 13350,
+      y: 13400,
       w: 1200,
       h: 130,
       orientation: "horizontal",

@@ -3,22 +3,22 @@ import { describe, expect, it } from "vitest";
 import { MONSTERS, MONSTER_IDS, getMonster, monstersBetween, rewardForMonster } from "./enemyCatalog.js";
 
 describe("enemy catalog", () => {
-  it("ships the expected number of monsters per level tier and no boss", () => {
-    const tiers = [
-      [1, 10, 2],
-      [11, 20, 2],
-      [21, 29, 2],
-      [30, 44, 3],
-      [45, 60, 3]
+  it("covers every level band with several species and no boss", () => {
+    const bands = [
+      [1, 10],
+      [11, 20],
+      [21, 29],
+      [30, 44],
+      [45, 60]
     ];
 
-    for (const [min, max, count] of tiers) {
-      // `soi-xam` is the legacy market wolf and shares the lowest band; the town
-      // roster is the hunting monsters each tier adds.
-      const inTier = monstersBetween(min, max).filter(
+    for (const [min, max] of bands) {
+      // Three camps share each band now (one per faction plus Hán's older tiers);
+      // the legacy market wolf is scenery, not a hunting species.
+      const inBand = monstersBetween(min, max).filter(
         (monster) => monster.id !== "soi-xam"
       );
-      expect(inTier).toHaveLength(count);
+      expect(inBand.length).toBeGreaterThanOrEqual(3);
     }
 
     expect(MONSTER_IDS.map((id) => MONSTERS[id]).filter((m) => m.isBoss)).toHaveLength(0);

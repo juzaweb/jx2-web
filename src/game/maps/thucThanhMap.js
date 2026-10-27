@@ -100,6 +100,27 @@ export const THUC_THANH_MAP = {
       rect: { x: 3400, y: 7600, w: 1200, h: 400 },
       targetMapId: "trung-nguyen",
       targetSpawn: { x: 1600, y: 6000 }
+    },
+    {
+      id: "north-gate",
+      label: "Kiếm Các",
+      rect: { x: 3400, y: 0, w: 1200, h: 400 },
+      targetMapId: "kiem-cac",
+      targetSpawn: { x: 7600, y: 12800 }
+    },
+    {
+      id: "east-gate",
+      label: "Ba Thục",
+      rect: { x: 7600, y: 3400, w: 400, h: 1200 },
+      targetMapId: "ba-thuc",
+      targetSpawn: { x: 1400, y: 7000 }
+    },
+    {
+      id: "west-gate",
+      label: "Nga Mi",
+      rect: { x: 0, y: 3400, w: 400, h: 1200 },
+      targetMapId: "nga-mi",
+      targetSpawn: { x: 14600, y: 7000 }
     }
   ],
 

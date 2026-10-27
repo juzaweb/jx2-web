@@ -14,7 +14,7 @@ import {
   mapSize,
   mapWorldConfig
 } from "./mapRegistry.js";
-import { isInsideRect, portalAt, stepPortalTrigger } from "./portals.js";
+import { gateAt, isInsideRect, portalAt, stepPortalTrigger } from "./portals.js";
 
 /** Ground rectangle of a map, as a portal-style rect. */
 const boundsRect = (map) => ({
@@ -33,22 +33,58 @@ describe("map registry", () => {
       "tay-son",
       "trung-nguyen",
       "thuc-thanh",
-      "nguy-thanh"
+      "nguy-thanh",
+      "ba-thuc",
+      "kiem-cac",
+      "nga-mi",
+      "hua-dien",
+      "nghiep-quan",
+      "quan-trung"
     ]);
     expect(isKnownMap("trung-nguyen")).toBe(true);
     expect(isKnownMap("thuc-thanh")).toBe(true);
     expect(isKnownMap("nguy-thanh")).toBe(true);
+    expect(isKnownMap("ba-thuc")).toBe(true);
+    expect(isKnownMap("kiem-cac")).toBe(true);
+    expect(isKnownMap("nga-mi")).toBe(true);
+    expect(isKnownMap("hua-dien")).toBe(true);
+    expect(isKnownMap("nghiep-quan")).toBe(true);
+    expect(isKnownMap("quan-trung")).toBe(true);
     expect(isKnownMap("nowhere")).toBe(false);
     expect(getMap("nowhere").id).toBe(DEFAULT_MAP_ID);
   });
 
-  it("gives every city four gates and opens its south gate onto the battlefield", () => {
+  it("gives every city four open gates and opens its south gate onto the battlefield", () => {
     for (const id of ["market", "thuc-thanh", "nguy-thanh"]) {
       const map = MAPS[id];
       expect(map.gates, `${id} must have four gates`).toHaveLength(4);
+      expect(map.portals, `${id} must have four working gates`).toHaveLength(4);
       const south = findPortal(id, "south-gate");
       expect(south, `${id} must wire its south gate`).toBeTruthy();
       expect(south.targetMapId).toBe("trung-nguyen");
+    }
+  });
+
+  it("gives each capital one hunting ground behind every non-south gate", () => {
+    const expected = {
+      market: { "east-gate": "dong-mon-thanh", "north-gate": "bac-linh", "west-gate": "tay-son" },
+      "thuc-thanh": { "east-gate": "ba-thuc", "north-gate": "kiem-cac", "west-gate": "nga-mi" },
+      "nguy-thanh": { "east-gate": "hua-dien", "north-gate": "nghiep-quan", "west-gate": "quan-trung" }
+    };
+
+    for (const [cityId, gates] of Object.entries(expected)) {
+      for (const [portalId, targetId] of Object.entries(gates)) {
+        expect(findPortal(cityId, portalId)?.targetMapId, `${cityId}/${portalId}`).toBe(targetId);
+        expect(MAPS[targetId].pvpMode).toBe("flag");
+      }
+    }
+  });
+
+  it("gives every phase-2 hunting ground three tiers of ninety spawns", () => {
+    const grounds = ["ba-thuc", "kiem-cac", "nga-mi", "hua-dien", "nghiep-quan", "quan-trung"];
+    for (const id of grounds) {
+      expect(MAPS[id].enemySpawns, `${id} spawn count`).toHaveLength(90);
+      expect(MAPS[id].zones, `${id} tier count`).toHaveLength(3);
     }
   });
 
@@ -342,9 +378,13 @@ describe("portal geometry", () => {
     expect(isInsideRect(undefined, 10, 20)).toBe(false);
   });
 
-  it("finds the portal under a ground position", () => {
+  it("finds the portal and the gate under a ground position", () => {
     const map = MAPS["dong-mon-thanh"];
     expect(portalAt(map, 300, 7000)?.id).toBe("west-gate");
     expect(portalAt(map, 3000, 7000)).toBeNull();
+
+    const city = MAPS.market;
+    expect(gateAt(city, 6350, 2650)?.id).toBe("market-north-gate");
+    expect(gateAt(city, 4000, 4000)).toBeNull();
   });
 });

@@ -30,9 +30,15 @@
 
 import { WORLD_CONFIG } from "../worldConfig.js";
 import { BAC_LINH_MAP } from "./bacLinhMap.js";
+import { BA_THUC_MAP } from "./baThucMap.js";
 import { DONG_MON_THANH_MAP } from "./dongMonThanhMap.js";
+import { HUA_DIEN_MAP } from "./huaDienMap.js";
+import { KIEM_CAC_MAP } from "./kiemCacMap.js";
 import { MARKET_MAP } from "./marketMap.js";
+import { NGA_MI_MAP } from "./ngaMiMap.js";
+import { NGHIEP_QUAN_MAP } from "./nghiepQuanMap.js";
 import { NGUI_THANH_MAP } from "./nguyThanhMap.js";
+import { QUAN_TRUNG_MAP } from "./quanTrungMap.js";
 import { TAY_SON_MAP } from "./taySonMap.js";
 import { THUC_THANH_MAP } from "./thucThanhMap.js";
 import { TRUNG_NGUYEN_MAP } from "./trungNguyenMap.js";
@@ -70,7 +76,13 @@ export const MAPS = Object.freeze({
   "tay-son": TAY_SON_MAP,
   "trung-nguyen": TRUNG_NGUYEN_MAP,
   "thuc-thanh": THUC_THANH_MAP,
-  "nguy-thanh": NGUI_THANH_MAP
+  "nguy-thanh": NGUI_THANH_MAP,
+  "ba-thuc": BA_THUC_MAP,
+  "kiem-cac": KIEM_CAC_MAP,
+  "nga-mi": NGA_MI_MAP,
+  "hua-dien": HUA_DIEN_MAP,
+  "nghiep-quan": NGHIEP_QUAN_MAP,
+  "quan-trung": QUAN_TRUNG_MAP
 });
 
 /** Map ids in registry order (useful for validation and docs). */
