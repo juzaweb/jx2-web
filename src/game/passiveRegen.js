@@ -6,7 +6,7 @@
  * framework-free so the game loop only has to feed it elapsed time.
  */
 
-import { skillsForWeapon, skillUsable } from "./skills.js";
+import { skillsForWeapon, skillPassiveRegen, skillUsable } from "./skills.js";
 
 /**
  * HP per second restored by one skill's `regen` effects.
@@ -14,14 +14,7 @@ import { skillsForWeapon, skillUsable } from "./skills.js";
  * @returns {number}
  */
 export function regenPerSecond(skill) {
-  if (!skill || !Array.isArray(skill.effects)) return 0;
-  let rate = 0;
-  for (const effect of skill.effects) {
-    if (effect?.kind !== "regen") continue;
-    const hp = Number(effect.hpPerSecond);
-    if (Number.isFinite(hp) && hp > 0) rate += hp;
-  }
-  return rate;
+  return skillPassiveRegen(skill);
 }
 
 /**

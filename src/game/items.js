@@ -151,30 +151,10 @@ export const daoLangKhach = {
 };
 
 /**
- * Book names used for the dropped study items. Books are learned, not cast: the
- * server consumes the book and records the skill id on the character.
- * @type {Readonly<Record<string, string>>}
+ * Skill books are learned, not cast: the server consumes the book and records
+ * the skill id on the character. Each skill owns its Vietnamese book name
+ * (`book.viName`) and drop tiers, so a new skill needs no edit here.
  */
-const BOOK_NAMES = Object.freeze({
-  thieu_lam_tam_phap: "Thiếu Lâm Tâm Pháp",
-  dai_tu_di_chuong: "Đại Tu Di Chưởng",
-  la_han_quyen: "La Hán Quyền",
-  la_han_tran: "La Hán Trận",
-  kim_cang_bat_hoai: "Kim Cang Bất Hoại",
-  nhu_lai_than_chuong: "Như Lai Thần Chưởng",
-  thieu_duong_kiem_phap: "Thiếu Dương Kiếm Pháp",
-  thai_cuc_quyen: "Thái Cực Quyền",
-  tam_thanh_kiem_phap: "Tam Thanh Kiếm Pháp",
-  toat_hong_quan_khuyet: "Toát Hồng Quân Khuyết",
-  nga_my_kiem_phap: "Nga My Kiếm Pháp",
-  mong_diep_thoi_tam: "Mộng Điệp Thôi Tâm",
-  tu_hang_pho_do: "Từ Hàng Phổ Độ",
-  luu_thuy_khanh_van: "Lưu Thủy Khánh Vân",
-  ngu_doc_tam_phap: "Ngũ Độc Tâm Pháp",
-  truy_tam_doc: "Truy Tâm Độc",
-  van_doc_chieu_hong: "Vạn Độc Triệu Cổ",
-  u_hong_phiet_anh: "U Hồn Phiệt Ảnh"
-});
 
 /**
  * One book per learnable skill. The starter skill (Kiếm Khí) is not sold or
@@ -183,7 +163,7 @@ const BOOK_NAMES = Object.freeze({
  */
 export const BOOK_ITEMS = Object.freeze(
   SKILLS.filter((skill) => !skill.starter).map((skill) => {
-    const name = BOOK_NAMES[skill.id] || skill.id;
+    const name = skill.book?.viName || skill.id;
     return Object.freeze({
       id: `book_${skill.id}`,
       name: `Sách: ${name}`,

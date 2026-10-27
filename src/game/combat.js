@@ -1,41 +1,17 @@
 import * as Phaser from "phaser";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillById, skillsForWeapon, effectiveSkillMpCost, effectiveSkillCooldown, skillLockReason, skillUsable } from "./skills.js";
-import {
-  playSkillCastVfx,
-  playSkillImpactVfx,
-  playRangeIndicator,
-  playTargetMarker
-} from "./skillVfx.js";
-import { clampToRange } from "./aim.js";
-import { directionFromVelocity } from "./heroDirections.js";
+import { skillById } from "./skills.js";
+import { playSkillImpactVfx } from "./skillVfx.js";
 import { toIso, isoDepth } from "./isoProjection.js";
-import { canPvpAttack, PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
+import { canPvpAttack, PVP_ATTACK_RANGE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
 import { findNearestPvpTarget, findPlayerAt } from "./pvpTargeting.js";
 import { isCombatAllowed } from "./maps/mapRegistry.js";
-import {
-  MELEE_REACH,
-  channelDurationMs,
-  channelHitCount,
-  channelIntervalMs,
-  isChannelSkill,
-  splashRadius
-} from "./combatRules.js";
+import { MELEE_REACH } from "./combatRules.js";
 import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
-import { bridge, EVENTS } from "./bridge.js";
-import { translate } from "../i18n/translator.js";
+import { SkillCastController, isPeerTarget } from "./skills/client/castController.js";
 
 let audioEnabled = true;
 let audioContext = null;
-
-/**
- * Monsters carry a catalog id; a peer (RemotePlayer) does not. That difference is
- * what tells the two target kinds apart in a cast — a monster is drawn locally,
- * while a peer's HP is server-owned.
- * @param {*} target
- * @returns {boolean}
- */
-const isPeerTarget = (target) => Boolean(target) && typeof target.monsterId !== "string";
 
 /**
  * Why a swing, skill or duel was refused inside a city. Shared with the scene so
@@ -110,6 +86,26 @@ export class CombatSystem {
     this.learnedSkills = new Set();
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
+
+    /** Skill casting rules and lifecycle (see `skills/client/castController.js`). */
+    this.cast = new SkillCastController(this, { playTone });
+  }
+
+  /**
+   * Skill casting controller.
+   *
+   * Created in the constructor, but tests also build the class with
+   * `Object.create(CombatSystem.prototype)` and hand-assign fields, so the getter
+   * creates it on first use as well.
+   * @returns {SkillCastController}
+   */
+  get cast() {
+    if (!this._cast) this._cast = new SkillCastController(this, { playTone });
+    return this._cast;
+  }
+
+  set cast(value) {
+    this._cast = value;
   }
 
   /**
@@ -285,12 +281,7 @@ export class CombatSystem {
    * @returns {boolean}
    */
   castSkillById(skillId, aim = null) {
-    const skill = skillsForWeapon(this.player.weaponType).find((entry) => entry.id === skillId);
-    if (!skill) {
-      this.ui.addLog("Vũ khí đang trang bị không có chiêu thức này.");
-      return false;
-    }
-    return this.castSkill(skill, aim);
+    return this.cast.castSkillById(skillId, aim);
   }
 
   /**
@@ -300,40 +291,7 @@ export class CombatSystem {
    * @returns {boolean}
    */
   castSkill(skill, aim = null) {
-    if (!skill) return false;
-    // A tâm pháp is always running: it is never cast and never costs MP.
-    if (skill.passive) {
-      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} tự động vận hành.`);
-      return false;
-    }
-    if (!this.canCast(skill)) return false;
-
-    if (skill.target === "self") {
-      this.executeSkill(skill, null);
-      return true;
-    }
-
-    // Self buffs and heals still work in town; anything aimed at a body does not.
-    if (!this.canFight()) {
-      this.ui.addLog(
-        `${translate(skill.nameKey, undefined, skill.id)} không thể thi triển trong khu vực thành.`,
-        "system"
-      );
-      return false;
-    }
-
-    // A cursor sitting on the hero carries no direction; treat it as "no aim".
-    const aimPoint = aim && Math.hypot(aim.x - this.player.x, aim.y - this.player.y) > 1 ? aim : null;
-
-    const target = this.findTarget(aimPoint);
-    if (!target) {
-      // Nothing to hit: the projectile still flies toward where the player aimed.
-      this.executeSkill(skill, null, aimPoint);
-      return true;
-    }
-
-    this.approachAndCast(skill, target);
-    return true;
+    return this.cast.castSkill(skill, aim);
   }
 
   /**
@@ -342,18 +300,7 @@ export class CombatSystem {
    * @param {Object} target
    */
   approachAndCast(skill, target) {
-    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    if (distance <= this.castReach(skill, target)) {
-      this.executeSkill(skill, target);
-      return;
-    }
-
-    this.pendingCast = { skill, targetId: target.id };
-    this.lastChaseAt = 0;
-    this.player.moveTo(target.x, target.y);
-    this.ui.addLog(
-      `Đang tiếp cận mục tiêu để dùng ${translate(skill.nameKey, undefined, skill.id)}...`
-    );
+    return this.cast.approachAndCast(skill, target);
   }
 
   /**
@@ -362,14 +309,7 @@ export class CombatSystem {
    * @returns {string}
    */
   skillLockMessage(skill) {
-    const reason = skillLockReason(skill, this.player.stats.level, this.learnedSkills);
-    if (reason?.kind === "book") {
-      return "Chưa học chiêu thức này. Dùng sách võ công để học.";
-    }
-    if (reason?.kind === "prereq") {
-      return `Cần học ${translate(reason.nameKey, undefined, reason.id)} trước.`;
-    }
-    return `Chiêu này cần đạt cấp ${reason?.level ?? skill.unlockLevel}.`;
+    return this.cast.skillLockMessage(skill);
   }
 
   /**
@@ -379,13 +319,7 @@ export class CombatSystem {
    * @returns {boolean}
    */
   isSkillReady(skill) {
-    if (!skill) return false;
-    const now = this.scene.time?.now ?? 0;
-    const readyAt = this.skillCooldowns.get(skill.id) || 0;
-    if (now < readyAt) return false;
-    if (!skillUsable(skill, this.player.stats?.level ?? 1, this.learnedSkills)) return false;
-    if ((this.player.stats?.mp ?? 0) < effectiveSkillMpCost(skill.id)) return false;
-    return true;
+    return this.cast.isSkillReady(skill);
   }
 
   /**
@@ -394,27 +328,7 @@ export class CombatSystem {
    * @returns {boolean}
    */
   canCast(skill) {
-    const now = this.scene.time?.now ?? 0;
-    if (this.channel) {
-      this.ui.addLog("Đang thi triển liên hoàn chiêu thức, hãy chờ đánh xong.");
-      return false;
-    }
-    const readyAt = this.skillCooldowns.get(skill.id) || 0;
-    if (now < readyAt) {
-      this.ui.addLog(
-        `${translate(skill.nameKey, undefined, skill.id)} còn ${Math.ceil((readyAt - now) / 1000)}s hồi.`
-      );
-      return false;
-    }
-    if (!skillUsable(skill, this.player.stats.level, this.learnedSkills)) {
-      this.ui.addLog(this.skillLockMessage(skill));
-      return false;
-    }
-    if (this.player.stats.mp < effectiveSkillMpCost(skill.id)) {
-      this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
-      return false;
-    }
-    return true;
+    return this.cast.canCast(skill);
   }
 
   /**
@@ -424,77 +338,26 @@ export class CombatSystem {
    * @param {{x:number,y:number}|null} [aimPoint] cursor point when nothing was targeted
    */
   executeSkill(skill, target, aimPoint = null) {
-    if (!this.canCast(skill)) return;
-    const now = this.scene.time?.now ?? 0;
-    // Test mode reports 0, so a whole kit can be cast back to back.
-    const cooldownMs = effectiveSkillCooldown(skill.id);
-
-    // Cooldown is a local pacing hint; MP is only mirrored from the server's
-    // `player_mp`, so the client never spends a pool it does not own.
-    this.skillCooldowns.set(skill.id, now + cooldownMs);
-    // Turn toward the target before the motion starts so the body, the VFX and
-    // the packet that peers replay all agree on the direction.
-    this.aimAt(target || aimPoint);
-
-    this.player.playSkillMotion?.(skill.vfx?.cast);
-    playTone(skill.mult > 1.5 ? 420 : 360, 0.18, "triangle", 0.035);
-    this.showFloatText(
-      this.player.x,
-      this.player.y - 62,
-      translate(skill.nameKey, undefined, skill.id),
-      "#ffe9a8"
-    );
-
-    const aimed = target || aimPoint;
-    // Send the AoE centre so the server can validate each hit against the area
-    // the palm actually lands on instead of the whole cast range.
-    const aimCenter = skill.radius > 0
-      ? this.resolveCastCenter(skill, target, aimPoint)
-      : aimed;
-    this.scene.networkClient?.sendAttack?.({
-      skill: skill.id,
-      x: Math.round(this.player.x),
-      y: Math.round(this.player.y),
-      ...(aimCenter
-        ? { aimX: Math.round(aimCenter.x), aimY: Math.round(aimCenter.y) }
-        : {}),
-      facingRight: aimed ? aimed.x >= this.player.x : this.player.facingDirection !== 6
-    });
-
-    bridge.emit(EVENTS.SKILL_CAST, {
-      slot: skill.slot,
-      skillId: skill.id,
-      cooldown: cooldownMs,
-      readyAt: this.skillCooldowns.get(skill.id)
-    });
-
-    this.applySkill(skill, now, target, aimPoint);
-    this.ui.updateHud(this.player.stats);
+    return this.cast.executeSkill(skill, target, aimPoint);
   }
 
   /**
-   * Distance at which a skill can release. For an AoE the cast range is how far
-   * the centre can be placed, while `radius` only sizes the area; a radius-only
-   * skill (`range: 0`) still releases from its own radius.
+   * Distance at which a skill can release, capped by the camera view.
    * @param {Object} skill
    * @returns {number}
    */
   skillReach(skill) {
-    const reach = Number(skill.range) > 0 ? Number(skill.range) : Number(skill.radius) || 0;
-    return Math.min(reach, this.screenCastRange());
+    return this.cast.skillReach(skill);
   }
 
   /**
-   * Distance a cast at `target` may release from. A peer hit is validated by the
-   * server against the shared PvP range, so a long-range skill still has to close
-   * in before it can land.
+   * Distance a cast at `target` may release from.
    * @param {Object} skill
    * @param {Object} target
    * @returns {number}
    */
   castReach(skill, target) {
-    const reach = this.skillReach(skill);
-    return isPeerTarget(target) ? Math.min(reach, PVP_CAST_DISTANCE) : reach;
+    return this.cast.castReach(skill, target);
   }
 
   /**
@@ -728,177 +591,35 @@ export class CombatSystem {
    * @param {{x:number,y:number}|null} [aimPoint] cursor point when nothing was targeted
    */
   applySkill(skill, now, preferredTarget = null, aimPoint = null) {
-    if (skill.target === "self" || (skill.radius === 0 && skill.range === 0)) {
-      playSkillCastVfx(this.scene, this.player, skill);
-      this.applySelfEffects(skill, now);
-      this.ui.addLog(`${translate(skill.nameKey, undefined, skill.id)} đã thi triển.`);
-      return;
-    }
-
-    // An AoE lands on the chosen point (target, cursor, or the hero when neither
-    // was supplied); a single-target skill resolves around the hero as before.
-    const center = skill.radius > 0
-      ? this.resolveCastCenter(skill, preferredTarget, aimPoint)
-      : null;
-    const preferredPeer = isPeerTarget(preferredTarget) ? preferredTarget : null;
-    const monsters = skill.radius > 0
-      ? this.resolveTargets(skill, center)
-      : (preferredPeer ? [] : (preferredTarget ? [preferredTarget] : this.resolveTargets(skill)));
-    // An AoE hits every flagged player in its area too, not just monsters.
-    const peers = skill.radius > 0
-      ? this.resolvePeerTargets(skill, center)
-      : (preferredPeer ? [preferredPeer] : []);
-    const primary = preferredPeer || peers[0] || monsters[0] || null;
-    // An AoE's art must land on the same centre the damage is resolved around,
-    // even when the nearest victim is offset inside the radius.
-    const vfxTarget = skill.radius > 0 ? center : primary;
-    this.aimAt(vfxTarget || aimPoint);
-    playSkillCastVfx(this.scene, this.player, skill, vfxTarget, aimPoint);
-    if (center) {
-      playRangeIndicator(this.scene, center.x, center.y, skill.radius, skill.vfx?.color);
-    }
-
-    // A channel holds the caster in a five-second flurry. Both monsters and
-    // peers can be its target, each resolved by its own server path per strike.
-    if (isChannelSkill(skill)) {
-      const channelTarget = preferredPeer || monsters[0] || null;
-      if (channelTarget) {
-        this.startChannel(skill, channelTarget, now);
-        return;
-      }
-    }
-
-    if (!monsters.length && !peers.length) {
-      this.hintPeacefulDuelist(skill);
-      return;
-    }
-
-    let hits = 0;
-
-    for (const wolf of monsters) {
-      playTargetMarker(this.scene, wolf.x, wolf.y, skill.vfx?.color);
-      this.damageEnemy(wolf, { skill: skill.id });
-      hits++;
-    }
-
-    // One position sync covers every peer this cast names.
-    if (peers.length > 0) this.syncPosition();
-
-    for (const peer of peers) {
-      if (this.applySkillToPlayer(skill, peer, { log: false, sync: false })) hits++;
-    }
-
-    this.ui.addLog(
-      `${translate(skill.nameKey, undefined, skill.id)} trúng ${hits} mục tiêu!`
-    );
+    return this.cast.applySkill(skill, now, preferredTarget, aimPoint);
   }
 
   /**
-   * Begin a channelled flurry. The hero plants in place and strikes the target
-   * every `intervalMs` until the duration elapses or the player cancels it by
-   * moving. Each strike is an ordinary `enemy_hit` that the server re-validates
-   * against the accepted cast, so the client never mints damage.
+   * Begin a channelled flurry.
    * @param {Object} skill
    * @param {Object} target
    * @param {number} now
    */
   startChannel(skill, target, now) {
-    this.player.stopMovement?.();
-    this.channel = {
-      skill,
-      targetId: target.id,
-      nextAt: now,
-      endsAt: now + channelDurationMs(skill),
-      hitsLeft: channelHitCount(skill),
-      intervalMs: channelIntervalMs(skill),
-      chasing: false
-    };
-    this.ui.addLog(
-      `${translate(skill.nameKey, undefined, skill.id)}: liên hoàn ${this.channel.hitsLeft} quyền!`
-    );
+    return this.cast.startChannel(skill, target, now);
   }
 
   /**
-   * Drive the active flurry. Re-resolves the target every strike so a moving
-   * monster is chased instead of being punched at a stale position.
+   * Drive the active flurry.
    * @param {number} now
    */
   updateChannel(now) {
-    const channel = this.channel;
-    if (!channel) return;
-
-    if (now >= channel.endsAt || channel.hitsLeft <= 0) {
-      this.endChannel();
-      return;
-    }
-    if (now < channel.nextAt) return;
-
-    const target = this.findPendingTarget(channel.targetId);
-    if (!target) {
-      this.endChannel("Mục tiêu đã biến mất.");
-      return;
-    }
-
-    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    if (distance > this.castReach(channel.skill, target)) {
-      // The target stepped away: chase it and retry the same strike shortly.
-      channel.nextAt = now + 150;
-      channel.chasing = true;
-      this.player.moveTo(target.x, target.y);
-      return;
-    }
-
-    if (channel.chasing) {
-      channel.chasing = false;
-      this.player.stopMovement?.();
-      this.syncPosition();
-    }
-
-    this.aimAt(target);
-    this.player.playSkillMotion?.(channel.skill.vfx?.cast);
-    playTone(200, 0.05, "square", 0.018);
-    playTargetMarker(this.scene, target.x, target.y, channel.skill.vfx?.color);
-
-    // The ring marks the area every strike reaches, whatever the target kind:
-    // the server resolves the same splash for monsters and flagged players.
-    const splash = splashRadius(channel.skill);
-    if (splash > 0) {
-      playRangeIndicator(this.scene, target.x, target.y, splash, channel.skill.vfx?.color);
-    }
-
-    if (!this.strikeChannelTarget(target, channel.skill)) return;
-
-    channel.hitsLeft -= 1;
-    channel.nextAt = now + channel.intervalMs;
-    if (channel.hitsLeft <= 0) this.endChannel();
+    return this.cast.updateChannel(now);
   }
 
   /**
-   * Land one strike of a channel on its resolved target. Monsters go through the
-   * enemy-hit path; a peer goes through the PvP path, where the server recomputes
-   * damage and lets this skill's ticks through the target's i-frame.
+   * Land one strike of a channel on its resolved target.
    * @param {Object} target monster or peer
    * @param {Object} skill
    * @returns {boolean} false when the strike can no longer be delivered
    */
   strikeChannelTarget(target, skill) {
-    if (!isPeerTarget(target)) {
-      this.damageEnemy(target, { skill: skill.id });
-      return true;
-    }
-
-    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
-    const defender = { id: target.id, pkFlag: target.pkFlag === true };
-    if (!canPvpAttack(attacker, defender, distance)) {
-      this.endChannel(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
-      return false;
-    }
-
-    playSkillImpactVfx(this.scene, target.x, target.y, skill);
-    this.syncPosition();
-    this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, skill: skill.id });
-    return true;
+    return this.cast.strikeChannelTarget(target, skill);
   }
 
   /**
@@ -906,10 +627,7 @@ export class CombatSystem {
    * @param {string} [message] log line shown when the channel ended early
    */
   endChannel(message) {
-    if (!this.channel) return;
-    this.channel = null;
-    this.player.stopMovement?.();
-    if (message) this.ui.addLog(message);
+    return this.cast.endChannel(message);
   }
 
   /**
@@ -922,142 +640,55 @@ export class CombatSystem {
    *   and the position sync for a multi-target cast
    * @returns {boolean} whether the hit was reported to the server
    */
-  applySkillToPlayer(skill, target, { log = true, sync = true } = {}) {
-    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
-    const attacker = { id: this.localPlayerId, pkFlag: this.player.pkFlag === true };
-    const defender = { id: target.id, pkFlag: target.pkFlag === true };
-    if (!canPvpAttack(attacker, defender, distance)) {
-      if (log) this.ui.addLog(`${target.displayName || "Đối thủ"} ở ngoài tầm chiêu thức.`);
-      return false;
-    }
-
-    playTargetMarker(this.scene, target.x, target.y, skill.vfx?.color);
-
-    if (sync) this.syncPosition();
-    this.scene.networkClient?.sendPlayerHit?.({ targetId: target.id, skill: skill.id });
-
-    if (log) {
-      this.ui.addLog(
-        `${translate(skill.nameKey, undefined, skill.id)} trúng ${target.displayName || "đối thủ"}!`
-      );
-    }
-    return true;
+  applySkillToPlayer(skill, target, options) {
+    return this.cast.applySkillToPlayer(skill, target, options);
   }
 
   /**
-   * Explain a skill that found nothing when the reason is our own PK flag: an
-   * opponent stands in range but a peaceful hero cannot damage them.
+   * Explain a skill that found nothing when the reason is our own PK flag.
    * @param {Object} skill
    */
   hintPeacefulDuelist(skill) {
-    if (this.player.pkFlag === true) return;
-
-    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
-    const near = findNearestPvpTarget(this.player, peers, PVP_ATTACK_RANGE);
-    if (!near) return;
-
-    this.ui.addLog(
-      `${near.displayName || "Đối thủ"} đã bật cờ PK — hãy bật cờ PK của bạn để ${translate(skill.nameKey, undefined, skill.id)} gây sát thương.`
-    );
+    return this.cast.hintPeacefulDuelist(skill);
   }
 
   /**
-   * Centre of an AoE cast: the clicked target, the cursor point, or the hero.
-   * A point beyond the skill's cast range is pulled back to its edge so the
-   * resolved area matches the VFX.
+   * Centre of an AoE cast.
    * @param {Object} skill
    * @param {Object|null} preferredTarget
    * @param {{x:number,y:number}|null} aimPoint
    * @returns {{x:number,y:number}}
    */
   resolveCastCenter(skill, preferredTarget = null, aimPoint = null) {
-    const aimedAt = preferredTarget || aimPoint;
-    if (!aimedAt) return { x: this.player.x, y: this.player.y };
-    return clampToRange(this.player, aimedAt, this.skillReach(skill));
+    return this.cast.resolveCastCenter(skill, preferredTarget, aimPoint);
   }
 
   /**
-   * Enemies this cast can hit: everything inside the AoE radius around `center`
-   * (defaults to the hero), or the nearest enemy inside the single-target range.
-   * Extracted so aiming and hit resolution use exactly the same target set.
+   * Enemies this cast can hit.
    * @param {Object} skill
    * @param {{x:number,y:number}|null} [center] AoE centre
    * @returns {Object[]}
    */
   resolveTargets(skill, center = null) {
-    const alive = this.enemyManager.getAlive();
-
-    if (skill.radius > 0) {
-      const origin = center || { x: this.player.x, y: this.player.y };
-      const radiusSq = skill.radius * skill.radius;
-      const targets = [];
-      for (const wolf of alive) {
-        const dx = wolf.x - origin.x;
-        const dy = wolf.y - origin.y;
-        const distSq = dx * dx + dy * dy;
-        if (distSq <= radiusSq) {
-          targets.push({ wolf, distSq });
-        }
-      }
-      targets.sort((a, b) => a.distSq - b.distSq);
-      return targets.map((t) => t.wolf);
-    }
-
-    const px = this.player.x;
-    const py = this.player.y;
-    const range = this.skillReach(skill);
-    const rangeSq = range * range;
-    let nearest = null;
-    let minSq = rangeSq;
-
-    for (const wolf of alive) {
-      const dx = wolf.x - px;
-      const dy = wolf.y - py;
-      const distSq = dx * dx + dy * dy;
-      if (distSq <= minSq) {
-        minSq = distSq;
-        nearest = wolf;
-      }
-    }
-
-    return nearest ? [nearest] : [];
+    return this.cast.resolveTargets(skill, center);
   }
 
   /**
-   * Flagged players inside a cast's area. An AoE uses the same centre and radius
-   * as its monster resolution so both target kinds are hit by the same cast; a
-   * peaceful hero never auto-acquires a duellist.
+   * Flagged players inside a cast's area.
    * @param {Object} skill
    * @param {{x:number,y:number}|null} [center] AoE centre
    * @returns {Object[]}
    */
   resolvePeerTargets(skill, center = null) {
-    if (this.player.pkFlag !== true) return [];
-
-    const peers = this.scene.remotePlayerManager?.getAll?.() || [];
-    const origin = center || { x: this.player.x, y: this.player.y };
-    const distanceToCenter = (peer) =>
-      Phaser.Math.Distance.Between(origin.x, origin.y, peer.x, peer.y);
-    return peers
-      .filter(
-        (peer) =>
-          isPeerTarget(peer) && peer.pkFlag === true && peer.container?.active !== false
-      )
-      .filter((peer) => distanceToCenter(peer) <= skill.radius)
-      .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));
+    return this.cast.resolvePeerTargets(skill, center);
   }
 
   /**
-   * Turn the hero toward the primary target so the cast VFX and attack motion
-   * visibly point at whoever is about to be hit.
+   * Turn the hero toward the primary target.
    * @param {Object|null} target
    */
   aimAt(target) {
-    if (!target) return;
-    const from = toIso(this.player.x, this.player.y);
-    const to = toIso(target.x, target.y);
-    const direction = directionFromVelocity(to.x - from.x, to.y - from.y);
-    this.player.faceDirection?.(direction);
+    return this.cast.aimAt(target);
   }
 
   /**
@@ -1066,86 +697,20 @@ export class CombatSystem {
    * @param {number} now
    */
   applySelfEffects(skill, now) {
-    const overheadSprite = skill.vfx?.type === "overhead" ? skill.vfx.overhead : null;
-    for (const effect of skill.effects || []) {
-      if (effect.kind === "buff") {
-        this.buffs.push({
-          skillId: skill.id,
-          formationSprite: skill.vfx?.type === "formation" ? skill.vfx.sprite : null,
-          formationScale: skill.vfx?.type === "formation" && typeof skill.vfx.scale === "number" ? skill.vfx.scale : undefined,
-          overheadSprite,
-          overheadScale: overheadSprite && typeof skill.vfx.overheadScale === "number" ? skill.vfx.overheadScale : undefined,
-          overheadOffsetY: overheadSprite && typeof skill.vfx.overheadOffsetY === "number" ? skill.vfx.overheadOffsetY : undefined,
-          stat: effect.stat,
-          amount: effect.amount,
-          until: now + effect.duration
-        });
-      } else if (effect.kind === "heal") {
-        // The server applies the heal when it accepts the cast and broadcasts the
-        // resulting player_hp; the client only plays the VFX.
-      }
-    }
-    if (skill.vfx?.type === "formation" && skill.vfx?.sprite) {
-      if (typeof skill.vfx.scale === "number") {
-        this.player.showFormation?.(skill.vfx.sprite, skill.vfx.scale);
-      } else {
-        this.player.showFormation?.(skill.vfx.sprite);
-      }
-    }
-    if (overheadSprite) {
-      this.player.showOverhead?.(overheadSprite, skill.vfx.overheadScale, skill.vfx.overheadOffsetY);
-    }
+    return this.cast.applySelfEffects(skill, now);
   }
 
   /**
-   * Filter expired buffs and update active formation aura under player feet.
-   * Only prunes and updates when an active buff has reached its expiration timestamp,
-   * avoiding allocations and redundant render state calls in the per-frame game loop.
+   * Filter expired buffs and update active formation aura / overhead seal.
    * @param {number} now
    */
   updateBuffs(now) {
-    if (this.buffs.length === 0) return;
-
-    let hasExpired = false;
-    for (let i = 0; i < this.buffs.length; i++) {
-      if (this.buffs[i].until <= now) {
-        hasExpired = true;
-        break;
-      }
-    }
-    if (!hasExpired) return;
-
-    this.buffs = this.buffs.filter((buff) => buff.until > now);
-    const activeFormation = this.buffs.find((buff) => buff.formationSprite);
-    if (activeFormation) {
-      if (typeof activeFormation.formationScale === "number") {
-        this.player.showFormation?.(activeFormation.formationSprite, activeFormation.formationScale);
-      } else {
-        this.player.showFormation?.(activeFormation.formationSprite);
-      }
-    } else {
-      this.player.hideFormation?.();
-    }
-
-    const activeOverhead = this.buffs.find((buff) => buff.overheadSprite);
-    if (activeOverhead) {
-      this.player.showOverhead?.(
-        activeOverhead.overheadSprite,
-        activeOverhead.overheadScale,
-        activeOverhead.overheadOffsetY
-      );
-    } else {
-      this.player.hideOverhead?.();
-    }
+    return this.cast.updateBuffs(now);
   }
 
-  /**
-   * Clear all active buffs and hide any buff formation rings or overhead seals.
-   */
+  /** Clear all active buffs and hide any buff formation rings or overhead seals. */
   clearBuffs() {
-    this.buffs = [];
-    this.player.hideFormation?.();
-    this.player.hideOverhead?.();
+    return this.cast.clearBuffs();
   }
 
   /**

@@ -121,28 +121,61 @@ sword is never dropped.
 | Layer | File | Responsibility |
 | --- | --- | --- |
 | Weapon ids | `src/game/weapons.js` | `WEAPON_TYPES`, `normalizeWeaponType`, `weaponTypeOfItem`, label keys |
-| Catalog | `src/game/skills.js` | `SKILLS_BY_WEAPON`, `skillsForWeapon`, learned/usable/lock helpers |
-| Items | `src/game/items.js` | weapon items (`weaponType`), generated `BOOK_ITEMS`, book helpers |
+| Catalog | `src/game/skills/catalog/{baoTay,kiem,dao}.js` | one authored array per weapon kit |
+| Registry | `src/game/skills/registry.js` | flat `SKILLS`, `SKILLS_BY_WEAPON`, id/slot lookups |
+| Gating | `src/game/skills/gating.js` | learned / learnable / usable / lock reason |
+| Cost | `src/game/skills/cost.js` | MP and cooldown, with test-mode overrides |
+| Effects | `src/game/skills/effects.js` | shared `buff`/`heal`/`regen` interpretation |
+| Area | `src/game/skills/area.js` | `skillCastReach`, `isInsideCastArea` |
+| Schema | `src/game/skills/schema.js` | `defineSkill`, catalog validation |
+| Presets | `src/game/skills/presets.js` | optional `vfx.preset` recipes, icon convention |
+| Skill tree | `src/game/skills/client/tree.js` | tile/connector layout (`skillTree.js` is a barrel) |
+| VFX | `src/game/skills/client/vfx.js` | vector/sprite cast and impact art (`skillVfx.js` is a barrel) |
+| Client casting | `src/game/skills/client/castController.js` | `SkillCastController`: gating, aim, targeting, channel, buffs |
+| Damage maths | `src/game/skills/damage.js` | `computeSkillDamage`, buffs-to-stats (`skillDamage.js` is a barrel) |
+| Items | `src/game/items.js` | weapon items, generated `BOOK_ITEMS` from `skill.book`, book helpers |
 | Equipment | `src/game/equipment.js` | `equippedWeaponType(equipment)` |
 | Rig | `src/game/heroRig.js` | `weaponKindFor` → `jian` / `claw` / `blade` |
-| Loot tables | `src/game/enemyCatalog.js` | `MONSTER_BOOK_DROPS`, `MONSTER_WEAPON_DROPS` |
+| Loot tables | `src/game/enemyCatalog.js` | `MONSTER_BOOK_CHANCES` + `MONSTER_BOOK_DROPS` derived from `book.dropTiers` |
 | Reward roll | `server/src/rewards.js` | `rollBookDrop`, `rollWeaponDrop`, `rollEnemyReward` |
 | Persistence | `server/src/data/playerDb.js` | `learned_skills` column + getters/setters |
-| Cast gate | `server/src/websocket/gameSocket.js` | weapon/learned/level validation, book study |
+| Server casting | `server/src/game/skillCast.js` | pure `castRejection`, `studyRejection`, `resolveSkillHit`, splash, self effects |
+| Socket wiring | `server/src/websocket/gameSocket.js` | broadcasts, MP/cooldown pools, book consumption |
 | UI | `SkillsModal.jsx`, `MobileSkillPicker.jsx`, `InventoryModal.jsx` | kit tree, learned locks, using books |
+
+`src/game/skills.js` stays as a thin re-export barrel so existing imports (including
+the Node server's) keep working. It must stay free of Phaser/DOM — a test enforces it.
+Client-only modules are not re-exported by the barrel; import them from `skills/client/`.
+
+```
+src/game/skills/
+  catalog/   baoTay.js  kiem.js  dao.js  index.js
+  index.js   registry.js  gating.js  cost.js  effects.js  area.js  schema.js  presets.js
+  damage.js
+  client/    vfx.js  tree.js  castController.js
+src/game/skills.js           # barrel (server-safe)
+src/game/skillVfx.js         # barrel
+src/game/skillTree.js        # barrel
+src/game/skillDamage.js      # barrel
+```
 
 ## 7. Adding content
 
 ### A new skill to an existing kit
 
-1. Add an entry to the right array in `src/game/skills.js` with
-   `weapon`, `slot`, `unlockLevel`, `mp`, `cooldown`, `target`, `range`,
-   `radius`, `mult`, `effects`, `vfx`, `nameKey`/`descKey`.
+1. Add one `defineSkill({...})` entry to the kit array in
+   `src/game/skills/catalog/{baoTay,kiem,dao}.js` with `weapon`, `slot`,
+   `unlockLevel`, `mp`, `cooldown`, `target`, `range`, `radius`, `mult`,
+   `effects`, optional `vfx` (or `vfx: { preset: "palm" }`) and
+   `nameKey`/`descKey`. Learnable skills also declare
+   `book: { viName, dropTiers: [monsterId, ...] }` — that single field drives the
+   book item and the monster drop pool.
 2. Add name/description to `skills.*` in `src/i18n/locales/{vi,en,zh}.js`.
-3. Optional: ship an icon in `public/skills/<id>.png` and set `icon`.
-4. Add the skill id to at least one `MONSTER_BOOK_DROPS` pool (a test enforces
-   this) and add its Vietnamese book name to `BOOK_NAMES` in `src/game/items.js`.
-5. Run `npm test` and `npm run server:test`.
+3. Optional: ship an icon in `public/skills/<id>.png` and set `icon` (the UI
+   falls back to `glyph`).
+4. Run `npm run validate:skills`, `npm test` and `npm run server:test`. The
+   validator fails on a missing translation, book metadata, drop tier, icon,
+   VFX sheet or preset.
 
 ### A new weapon type
 
@@ -159,11 +192,18 @@ sword is never dropped.
 
 - `src/game/skills.test.js` — kit contents/slots, learned/usable/lock rules,
   every learnable skill has a book and a monster that drops it.
+- `src/game/skills/schema.test.js` — catalog structure, translations, assets and
+  the server-safe barrel guard (no Phaser/DOM in the pure modules).
+- `src/game/skills/client/castController.test.js` — reach caps, AoE/peer
+  targeting, buff VFX hints and expiry.
 - `src/game/items.test.js` — starter kit, weapon/book catalog integrity.
 - `src/game/passiveRegen.test.js` — passive regen only from learned arts.
+- `server/tests/skillCast.test.js` — rejection precedence, study reasons,
+  channel hit budget, splash fraction and self effects.
 - `server/tests/rewards.test.js` — book/weapon rolls, catalog-backed weapon ids.
 - `server/tests/websocket.test.js` — weapon-gated casts, passive refusal, book
   study and `skills_sync`.
+- `npm run validate:skills` — content audit (translations, books, drops, assets).
 
 ## 9. Known limitations / follow-ups
 

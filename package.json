@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "validate:skills": "node scripts/validate-skills.js",
     "server": "npm --prefix server start",
     "server:dev": "npm --prefix server run dev",
     "server:test": "npm --prefix server test"
