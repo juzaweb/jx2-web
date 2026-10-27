@@ -848,7 +848,6 @@ export class GameSocketManager {
     }
 
     const target = getMap(portal.targetMapId);
-    const roster = this.rosterFor(target.id);
 
     // Leaving: the old map stops seeing this player.
     this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: player.id } }, ws);
@@ -868,25 +867,39 @@ export class GameSocketManager {
     // portal drops the hero back on the map they just left.
     this.persistPosition(player, { force: true });
 
+    this.announceMapArrival(player, ws, target);
+  }
+
+  /**
+   * Announce a server-driven arrival: the mover receives `map_changed` with the
+   * destination's peers and roster, and everyone already there sees them join.
+   * Assumes the player's map and position were already updated.
+   * @param {Object} player
+   * @param {WebSocket|null} ws the player's socket
+   * @param {Object} map destination MapDefinition
+   */
+  announceMapArrival(player, ws, map) {
     const peers = [];
     this.players.forEach((other, clientWs) => {
-      if (clientWs !== ws && other.mapId === target.id) peers.push(this.playerSnapshot(other));
+      if (clientWs !== ws && other.mapId === map.id) peers.push(this.playerSnapshot(other));
     });
 
     this.send(ws, {
       type: "map_changed",
       payload: {
         yourId: player.id,
-        mapId: target.id,
+        mapId: map.id,
         spawn: { x: player.x, y: player.y },
         players: peers,
-        enemies: Array.from(roster.values()).map((enemy) => this.enemySnapshot(enemy))
+        enemies: Array.from(this.rosterFor(map.id).values()).map((enemy) =>
+          this.enemySnapshot(enemy)
+        )
       }
     });
 
-    // Arriving: the new map sees this player.
+    // Arriving: the destination map sees this player.
     this.broadcastToMap(
-      target.id,
+      map.id,
       { type: "player_joined", payload: { player: this.playerSnapshot(player) } },
       ws
     );
@@ -1956,29 +1969,24 @@ export class GameSocketManager {
   }
 
   /**
-   * Respawn a defeated player at the fixed Biện Kinh point with full health and
+   * Respawn a defeated player in the home city (Biện Kinh) with full health and
    * announce the defeat. Attacker credit (when any) rides on the broadcast.
+   *
+   * A defeat always returns the hero to the home city, even when they fell on a
+   * hunting map: the old map sees them leave, the home map sees them arrive, and
+   * the victim follows with a `map_changed` carrying the new roster and peers.
    * @param {Object} victim - server player object
    * @param {?Object} attacker
    * @param {"pvp"|"wolf"} source
    */
   respawnPlayer(victim, attacker = null, source = "wolf") {
-    const map = getMap(victim.mapId);
+    const home = getMap(DEFAULT_MAP_ID);
+    const fromMapId = victim.mapId;
+    const crossMap = fromMapId !== home.id;
+    const victimWs = this.playerById.get(victim.id)?.ws || null;
 
     victim.hp = victim.maxHp;
     victim.mp = victim.maxMp;
-    victim.x = map.spawn.x;
-    victim.y = map.spawn.y;
-    victim.vx = 0;
-    victim.vy = 0;
-    victim.lastX = victim.x;
-    victim.lastY = victim.y;
-    victim.lastMoveAt = Date.now();
-    // The respawn point is where the hero will stand next time they log in.
-    this.persistPosition(victim, { force: true });
-    victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
-    this.persistVitals(victim);
-    this.broadcastMp(victim);
 
     const defeatMessage = {
       type: "player_defeated",
@@ -1989,24 +1997,60 @@ export class GameSocketManager {
         attackerName: attacker ? attacker.displayName || attacker.username : null,
         source,
         // Includes the map so the client can follow a respawn that crosses maps.
-        respawn: { mapId: map.id, x: map.spawn.x, y: map.spawn.y }
+        respawn: { mapId: home.id, x: home.spawn.x, y: home.spawn.y }
       }
     };
 
-    // The victim is already teleported, so their own copy is sent directly; the
-    // rest of the map learns of the defeat through the broadcast.
-    const victimWs = this.playerById.get(victim.id)?.ws || null;
+    // Announced while the victim is still standing on the map where they fell, so
+    // the watchers learn of the defeat before their copy of the body disappears.
     this.send(victimWs, defeatMessage);
-    this.broadcastPlayerState(victim, defeatMessage, victimWs);
+    this.broadcastToMap(fromMapId, defeatMessage, victimWs);
 
     // The killer is usually on the same map and got it above; a cross-map strike
     // still owes them their own kill.
-    this.sendToAttackerOffMap(attacker, victim.mapId, defeatMessage);
+    this.sendToAttackerOffMap(attacker, fromMapId, defeatMessage);
 
-    // The players who watched the fight still hold the victim where they fell. Send
-    // them the teleport and the restored HP, otherwise they keep drawing a corpse
-    // with an empty bar (and every later strike is measured against that stale body,
-    // so it is refused as out of range forever).
+    // The hero is leaving this map for the home city: peers drop the corpse now
+    // instead of waiting for a teleport they will never receive.
+    if (crossMap) {
+      this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: victim.id } }, victimWs);
+    }
+
+    victim.mapId = home.id;
+    victim.x = home.spawn.x;
+    victim.y = home.spawn.y;
+    victim.vx = 0;
+    victim.vy = 0;
+    victim.lastX = victim.x;
+    victim.lastY = victim.y;
+    victim.lastMoveAt = Date.now();
+    // A fresh map means fresh aggro; do not carry a bite cooldown across.
+    victim.nextBiteAt = 0;
+    // The respawn point is where the hero will stand next time they log in.
+    this.persistPosition(victim, { force: true });
+    victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
+    this.persistVitals(victim);
+    this.broadcastMp(victim);
+
+    const restoredMessage = {
+      type: "player_hp",
+      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
+    };
+
+    if (crossMap) {
+      // The victim's map is now the home city, so the client swaps maps exactly
+      // like a portal move would and receives the home roster and peers.
+      this.announceMapArrival(victim, victimWs, home);
+      this.send(victimWs, restoredMessage);
+      this.broadcastToMap(home.id, restoredMessage, victimWs);
+      return;
+    }
+
+    // Same map (the hero fell in the home city): the players who watched the
+    // fight still hold the victim where they fell. Send them the teleport and the
+    // restored HP, otherwise they keep drawing a corpse with an empty bar (and
+    // every later strike is measured against that stale body, so it is refused as
+    // out of range forever).
     const movedMessage = {
       type: "player_moved",
       payload: {
@@ -2019,19 +2063,10 @@ export class GameSocketManager {
         stance: victim.stance
       }
     };
-    const restoredMessage = {
-      type: "player_hp",
-      payload: { id: victim.id, hp: victim.hp, maxHp: victim.maxHp }
-    };
 
-    // Same split as the defeat: the map gets it, the victim was moved to another
-    // map by the respawn and reads its own copy directly.
-    this.broadcastPlayerState(victim, movedMessage, victimWs);
-    this.broadcastPlayerState(victim, restoredMessage, victimWs);
-    this.sendToAttackerOffMap(attacker, victim.mapId, movedMessage);
-    this.sendToAttackerOffMap(attacker, victim.mapId, restoredMessage);
-
-    this.broadcastPlayerState(victim, restoredMessage);
+    this.broadcastToMap(fromMapId, movedMessage, victimWs);
+    this.sendToAttackerOffMap(attacker, fromMapId, movedMessage);
+    this.broadcastToMap(fromMapId, restoredMessage);
   }
 
   /**
