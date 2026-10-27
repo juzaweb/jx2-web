@@ -450,6 +450,10 @@ export default {
       name: "GM Imperial Token",
       desc: "Supreme authority token of the GM. Opens admin control panel to grant levels, vitals, potions and map travel."
     },
+    "lenh-bai-test": {
+      name: "Test Imperial Token",
+      desc: "A test-only token granted while test mode is on. Opens the same admin control panel as the GM token."
+    },
     "ao-lang-khach": {
       name: "Wanderer's Blue Robe",
       desc: "A cross-collar wuxia robe woven from lightweight fabric, ideal for traveling the martial world."

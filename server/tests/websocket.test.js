@@ -759,6 +759,31 @@ test("WebSocket server-authority suite", async (t) => {
     await admin.close();
   });
 
+  await t.test("Test mode lets a regular character use GM actions", async () => {
+    process.env.TEST_MODE = "true";
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    try {
+      await join(client, { characterId: "char_test_gm" });
+      client.send({ type: "gm_action", payload: { action: "set_level", level: 37 } });
+      const applied = await client.waitFor(
+        (m) => m.type === "player_progress" && m.payload.level === 37
+      );
+      assert.equal(applied.payload.level, 37);
+
+      // The authority is checked per action, so turning the mode off takes the
+      // power away from the session that just used it.
+      delete process.env.TEST_MODE;
+      client.send({ type: "gm_action", payload: { action: "set_level", level: 50 } });
+      const err = await client.waitFor(
+        (m) => m.type === "error" && /quyền quản trị GM/.test(m.payload.message)
+      );
+      assert.match(err.payload.message, /quyền quản trị GM/);
+    } finally {
+      delete process.env.TEST_MODE;
+      await client.close();
+    }
+  });
+
   await t.test("Un-joined sockets cannot act on the world", async () => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
 

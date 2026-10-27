@@ -46,7 +46,8 @@ export const createCharacter = async (req, res, next) => {
 
     // Every new character starts with the shared starter kit (health potions, mana
     // potions, return-city talismans and a sword). Admin / GM accounts
-    // additionally receive the GM command token ("lenh-bai-gm").
+    // additionally receive the GM command token ("lenh-bai-gm"); the test token
+    // is handed out by syncCommandTokens() whenever the bag is served.
     const isAdmin = userDb.isAdmin(userId);
     store.grantStarterItems(character.id, { isAdmin });
 

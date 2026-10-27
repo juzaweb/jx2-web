@@ -4,6 +4,7 @@ import { initGameSocket } from "./websocket/gameSocket.js";
 import { store as playerStore } from "./data/playerDb.js";
 import { characterDb } from "./data/characterDb.js";
 import { userDb } from "./data/userDb.js";
+import { isTestMode } from "../../src/game/testMode.js";
 
 const app = createApp();
 
@@ -28,6 +29,17 @@ const logBanner = () => {
   console.log(`⚡ WebSocket: ws://localhost:${config.port}/ws`);
   console.log(`🗄️  Database:  ${config.dbPath}`);
   console.log("==========================================");
+
+  // Test mode removes the skill cost gates and hands every character the GM
+  // panel token, so a server that boots with it on is not a normal economy.
+  if (isTestMode()) {
+    console.warn("⚠️  TEST MODE IS ON: skills are free and every character holds the test GM token.");
+    if (config.env === "production") {
+      console.warn(
+        "🚨 TEST MODE IS ON IN PRODUCTION: every player can use GM actions. Unset TEST_MODE / VITE_TEST_MODE."
+      );
+    }
+  }
 };
 
 const listen = () => {

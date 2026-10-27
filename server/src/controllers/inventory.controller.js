@@ -1,8 +1,8 @@
-import { store } from "../data/playerDb.js";
 import { characterDb } from "../data/characterDb.js";
 import { userDb } from "../data/userDb.js";
+import { syncCommandTokens } from "../game/commandTokens.js";
 
-export const getInventory = async (req, res, next) => {
+export const getInventory = (req, res, next) => {
   try {
     const { playerId } = req.params;
 
@@ -15,12 +15,7 @@ export const getInventory = async (req, res, next) => {
       });
     }
 
-    let inventory = await store.getInventory(playerId);
-
-    if (userDb.isAdmin(ownerId) && !inventory["lenh-bai-gm"]) {
-      inventory = { ...inventory, "lenh-bai-gm": 1 };
-      await store.setInventory(playerId, inventory);
-    }
+    const inventory = syncCommandTokens(playerId, { isAdmin: userDb.isAdmin(ownerId) });
 
     res.json({
       success: true,

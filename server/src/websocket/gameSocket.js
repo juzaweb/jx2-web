@@ -44,6 +44,7 @@ import {
   progressPayload
 } from "../../../src/game/progression.js";
 import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
+import { isTestMode } from "../../../src/game/testMode.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
 import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
@@ -57,6 +58,7 @@ import {
   readEquipment,
   unequipSlot
 } from "../game/playerBag.js";
+import { syncCommandTokens } from "../game/commandTokens.js";
 
 /**
  * Clean sanitization for player strings
@@ -668,10 +670,9 @@ export class GameSocketManager {
     store.setVitals(characterId, { hp, mp });
 
     const isAdmin = userDb.isAdmin(userId);
-    let bag = readBag(characterId);
-    if (isAdmin && !bag["lenh-bai-gm"]) {
-      bag = grantItem(characterId, "lenh-bai-gm", 1).bag;
-    }
+    // Admin accounts always hold the GM token; test mode hands every character
+    // the test token, which opens the same panel.
+    const bag = syncCommandTokens(characterId, { isAdmin });
 
     // If this player ID was already connected from an old socket, remove old one
     if (this.playerById.has(playerId)) {
@@ -2066,7 +2067,9 @@ export class GameSocketManager {
    */
   handleGmAction(ws, payload = {}) {
     const player = this.players.get(ws);
-    if (!player || !player.isAdmin) {
+    // Test mode deliberately opens the panel to every character; outside it,
+    // the admin flag is the only authority.
+    if (!player || (!player.isAdmin && !isTestMode())) {
       this.send(ws, {
         type: "error",
         payload: { message: "Bạn không có quyền quản trị GM!" }

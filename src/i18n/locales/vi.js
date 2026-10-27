@@ -450,6 +450,10 @@ export default {
       name: "Lệnh Bài GM",
       desc: "Lệnh bài tối cao của Tổng Quản GM. Dùng để mở giao diện quản trị nhân vật, nhận cấp, hồi phục máu mana và dịch chuyển."
     },
+    "lenh-bai-test": {
+      name: "Lệnh Bài Test",
+      desc: "Lệnh bài thử nghiệm, chỉ xuất hiện khi bật chế độ Test. Dùng để mở giao diện quản trị nhân vật giống Lệnh Bài GM."
+    },
     "ao-lang-khach": {
       name: "Lam Y Lãng Khách",
       desc: "Y phục vạt chéo giang hồ sơ nhập. Dệt từ vải thô nhẹ nhàng, tiện lợi cho việc bôn tẩu hành hiệp."

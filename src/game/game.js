@@ -8,7 +8,7 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone } 
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, isSkillBook, QUICK_ITEMS } from "./items.js";
+import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, isSkillBook, isCommandToken, QUICK_ITEMS } from "./items.js";
 import { skillById } from "./skills.js";
 import { translate } from "../i18n/translator.js";
 import { loadQuickSlots, skillIdFromBinding } from "./quickSlots.js";
@@ -909,9 +909,9 @@ export class JiangHuScene extends Phaser.Scene {
       return;
     }
 
-    if (itemId === "lenh-bai-gm") {
+    if (isCommandToken(itemId)) {
       bridge.emit(EVENTS.GM_MODAL_TOGGLE);
-      this.uiBridge.addLog("Đã mở Giao diện Lệnh Bài GM.", "system");
+      this.uiBridge.addLog(`Đã mở Giao diện ${item.name}.`, "system");
       playTone(660, 0.15, "triangle", 0.04);
       return;
     }
