@@ -7,6 +7,7 @@ const makeSprite = () => {
     setOrigin: vi.fn(() => sprite),
     setDepth: vi.fn(() => sprite),
     setScale: vi.fn(() => sprite),
+    setRotation: vi.fn(() => sprite),
     setStrokeStyle: vi.fn(() => sprite),
     play: vi.fn(() => sprite),
     once: vi.fn(() => sprite),
@@ -52,7 +53,11 @@ const makeScene = ({ frameTotal = 5 } = {}) => {
         timers.push({ ms, callback });
       }
     },
-    add: { sprite: () => makeSprite() }
+    add: {
+      sprite: () => makeSprite(),
+      circle: () => makeSprite(),
+      polygon: () => makeSprite()
+    }
   };
   return { scene, animConfigs, tweenConfig, tweenConfigs, timers };
 };
@@ -309,5 +314,66 @@ describe("playSkillCastVfx sprite playback", () => {
     expect(fade).toMatchObject({ targets: impactSprite, alpha: 0, delay: 140, duration: 240 });
     fade.onComplete();
     expect(impactSprite.destroy).toHaveBeenCalled();
+  });
+});
+
+describe("playSkillCastVfx sword-qi projectile", () => {
+  const kiemKhi = () => ({
+    range: 840,
+    vfx: { projectile: "sword", impact: null, color: 0x9be8ff }
+  });
+
+  it("throws a blade shard from the hero to the aimed point", () => {
+    const { scene, tweenConfigs } = makeScene();
+    const blade = makeSprite();
+    scene.add.polygon = vi.fn(() => blade);
+    scene.add.sprite = vi.fn(() => makeSprite());
+
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
+
+    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
+    expect(flight).toBeTruthy();
+    expect(flight.targets).toContain(blade);
+    expect(flight.x).toBe(toIso(900, 100).x);
+    expect(flight.ease).toBe("Quad.easeIn");
+    expect(flight.duration).toBeGreaterThanOrEqual(160);
+    // The shard is a drawn blade, not a sprite sheet.
+    expect(scene.add.polygon).toHaveBeenCalled();
+    expect(scene.add.sprite).not.toHaveBeenCalled();
+  });
+
+  it("bursts where it lands and cleans the shard up", () => {
+    const { scene, tweenConfigs } = makeScene();
+    const blade = makeSprite();
+    // Created in order: baseline pulse, blade glow, then the arrival burst.
+    const circles = [makeSprite(), makeSprite(), makeSprite()];
+    let nextCircle = 0;
+    scene.add.polygon = vi.fn(() => blade);
+    scene.add.circle = vi.fn(() => circles[nextCircle++]);
+    const burst = circles[2];
+
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
+
+    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
+    flight.onComplete();
+
+    expect(blade.destroy).toHaveBeenCalled();
+    const bloom = tweenConfigs[tweenConfigs.length - 1];
+    expect(bloom.targets).toBe(burst);
+    expect(bloom).toMatchObject({ scale: 3.2, alpha: 0 });
+
+    bloom.onComplete();
+    expect(burst.destroy).toHaveBeenCalled();
+  });
+
+  it("clamps a throw that aims past the art's reach", () => {
+    const { scene, tweenConfigs } = makeScene();
+    const blade = makeSprite();
+    scene.add.polygon = vi.fn(() => blade);
+
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 4000, y: 100 });
+
+    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
+    expect(flight.x).toBe(toIso(100 + 840, 100).x);
   });
 });

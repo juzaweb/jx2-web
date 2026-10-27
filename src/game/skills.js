@@ -215,12 +215,15 @@ const KIEM_KHI_SKILL = {
   mp: 5,
   cooldown: 2000,
   target: "enemy",
-  range: 420,
+  range: 840,
   radius: 0,
   mult: 1.1,
   vfx: {
+    /** A blade-shaped shard of qi flies from the hero to the victim, then bursts. */
+    projectile: "sword",
+    /** The hero still swings its arm; `impact: null` leaves the arrival to the shard. */
     cast: "slash",
-    impact: "spark",
+    impact: null,
     color: 0x9be8ff
   }
 };

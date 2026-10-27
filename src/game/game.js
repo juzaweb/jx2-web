@@ -59,6 +59,7 @@ const HIT_REJECT_MESSAGES = {
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
 import { skillsForWeapon } from "./skills.js";
+import { MELEE_REACH } from "./combatRules.js";
 import { ensureHeroBodyTexture, ensureWeaponVfx } from "./lazyAssets.js";
 
 export class JiangHuScene extends Phaser.Scene {
@@ -1688,9 +1689,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
 
-    // Normal attack fallback (reach matches MELEE_REACH = 280)
-    const attackReach = 280;
-    if (distance <= attackReach) {
+    // Plain sword reach: clicking a monster walks the hero into a swing.
+    if (distance <= MELEE_REACH) {
       this.player.stopMovement?.();
       if (this.combat?.attackReady) {
         this.combat.performAttack();

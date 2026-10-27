@@ -39,6 +39,17 @@ and knows **Kiếm Khí** (`kiem_khi`, `starter: true`):
   (grant + equip the starter sword, learn `kiem_khi`), so old saves stay playable.
 - `starter: true` skills bypass the learned check in `skillLearned()`.
 
+### Kiếm Khí
+
+`kiem_khi` reaches **840 px** and its VFX is a vector projectile: `vfx.projectile:
+"sword"` makes `playSkillCastVfx` draw a blade-shaped shard that flies from the hero
+to the aimed point (clamped to `skill.range`) and bursts on arrival. Because the art
+owns its own impact, `vfx.impact` is `null` — no separate spark is spawned at the
+victim.
+
+The art is cast from the hotbar like any other technique; the plain attack
+(`performAttack`, `MELEE_REACH` = 280 px) is unchanged.
+
 ## 3. Learning from books
 
 - One book item exists per learnable skill: `book_<skillId>` (generated in

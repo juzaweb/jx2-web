@@ -310,6 +310,74 @@ function playSpriteCastVfx(scene, skill, player, target, aimPoint = null) {
 }
 
 /**
+ * Sword-qi projectile: a blade-shaped shard of energy leaves the hero, flies to
+ * the aimed point and bursts there. Vector-drawn so a long reach (Kiếm Khí) reads
+ * as a thrown art instead of a melee slash played at the caster's feet.
+ * @param {Phaser.Scene} scene
+ * @param {Object} skill
+ * @param {import("./player.js").Player} player
+ * @param {Object|null} target
+ * @param {{x:number,y:number}|null} aimPoint
+ */
+function playSwordQiProjectileVfx(scene, skill, player, target, aimPoint) {
+  // Same fallback chain as the sprite cast path: a projectile with no reach still
+  // needs a distance to fly.
+  const maxRange = Number(skill.range) || Number(skill.radius) || 90;
+  const aim = resolveAimPoint(scene, player, target, aimPoint, maxRange);
+  const start = baseAt(player.x, player.y);
+  const end = baseAt(aim.x, aim.y);
+  const color = skill.vfx?.color || 0x9be8ff;
+  const scale = Number(skill.vfx?.scale) || 1;
+
+  // The flight is drawn on the ground plane, so the shard rides a little above
+  // the feet and is turned to the screen-space angle of the throw.
+  const lift = 24;
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const depth = Math.max(start.depth, end.depth) + DEPTH_BONUS;
+  const y0 = start.y - lift;
+  const x0 = start.x;
+
+  // A thin double-edged blade: tip at +X, tapered tail. Everything is drawn along
+  // +X and then rotated onto the flight path. The tail is drawn thin on purpose —
+  // it reads as the shard's own streak, so no separate trail sprite is needed.
+  const blade = scene.add
+    .polygon(x0, y0, [40, 0, 12, -7, -14, -5, -30, -2, -30, 2, -14, 5, 12, 7], color, 0.9)
+    .setRotation(angle)
+    .setScale(scale)
+    .setDepth(depth);
+  const glow = scene.add
+    .circle(x0, y0, 13, color, 0.22)
+    .setDepth(depth - 1);
+
+  const worldDistance = Math.hypot(aim.x - player.x, aim.y - player.y);
+  const travelDuration = Math.max(160, Math.min(520, worldDistance / 1.8));
+  const flying = [blade, glow];
+
+  scene.tweens.add({
+    targets: flying,
+    x: end.x,
+    y: end.y - lift,
+    duration: travelDuration,
+    ease: "Quad.easeIn",
+    onComplete: () => {
+      for (const piece of flying) piece.destroy();
+
+      const burst = scene.add
+        .circle(end.x, end.y - lift, 10, color, 0.5)
+        .setStrokeStyle(3, 0xffffff, 0.9)
+        .setDepth(depth);
+      scene.tweens.add({
+        targets: burst,
+        scale: 3.2,
+        alpha: 0,
+        duration: 240,
+        onComplete: () => burst.destroy()
+      });
+    }
+  });
+}
+
+/**
  * Cast animation played at the hero's feet.
  * @param {Phaser.Scene} scene
  * @param {import("./player.js").Player} player
@@ -347,6 +415,14 @@ export function playSkillCastVfx(scene, player, skill, target = null, aimPoint =
     duration: 300,
     onComplete: () => pulse.destroy()
   });
+
+  // A thrown art owns its own flight and impact, so it replaces the gesture arc.
+  // Keyed on the concrete projectile kind: an unknown kind falls through to the
+  // regular cast branches instead of silently drawing a sword.
+  if (skill.vfx.projectile === "sword") {
+    playSwordQiProjectileVfx(scene, skill, player, target, aimPoint);
+    return;
+  }
 
   if (cast === "slash") {
     const arc = scene.add
