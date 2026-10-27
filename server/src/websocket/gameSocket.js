@@ -235,6 +235,14 @@ export const CAST_HIT_WINDOW_MS = HIT_WINDOW_MS;
 /** Maximum follow-up hit messages accepted from one cast (AoE headroom). */
 export const MAX_HITS_PER_CAST = SHARED_MAX_HITS_PER_CAST;
 
+/**
+ * Minimum gap (ms) between position writes to SQLite. The client reports a step
+ * every ~50ms, so writing each one would hammer the ledger for no benefit: a
+ * relog only needs the last resting spot. Server-driven transitions and a
+ * disconnect force a write, so the final point is never lost.
+ */
+const POSITION_PERSIST_MS = 5000;
+
 /** Drop broadcasts to a socket once it has this much unflushed data (backpressure). */
 const MAX_BUFFERED_BYTES = 1_000_000;
 
@@ -663,12 +671,23 @@ export class GameSocketManager {
       }
     }
 
-    // Which map this hero is entering. Unknown ids fall back to the default city.
+    // Where this hero stands. The point the server persisted wins over the join
+    // packet: the client only names the map it believes it is on (a first join,
+    // or a legacy save with no server-side position yet), and even that point is
+    // clamped to the map's bounds. A stored map that no longer exists falls back
+    // to the requested/default city.
     const requestedMapId = sanitizeStr(payload.mapId || "", 64);
-    const mapId = isKnownMap(requestedMapId) ? requestedMapId : DEFAULT_MAP_ID;
+    const storedPosition = store.getPosition(characterId);
+    const storedMapId =
+      storedPosition && isKnownMap(storedPosition.mapId) ? storedPosition.mapId : null;
+    const mapId = storedMapId || (isKnownMap(requestedMapId) ? requestedMapId : DEFAULT_MAP_ID);
     const entryMap = getMap(mapId);
-    const spawnX = clampNum(payload.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x);
-    const spawnY = clampNum(payload.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y);
+    const spawnX = storedMapId
+      ? clampNum(storedPosition.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x)
+      : clampNum(payload.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x);
+    const spawnY = storedMapId
+      ? clampNum(storedPosition.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y)
+      : clampNum(payload.y, entryMap.bounds.y0, entryMap.bounds.y1, entryMap.spawn.y);
 
     const playerData = {
       id: playerId,
@@ -719,6 +738,8 @@ export class GameSocketManager {
       lastMoveAt: Date.now(),
       lastX: spawnX,
       lastY: spawnY,
+      /** Last time this position was written to SQLite (throttled by POSITION_PERSIST_MS). */
+      positionSavedAt: 0,
       /** Passive regen accumulator, billed by the server tick. */
       regenAt: Date.now(),
       regenCarry: 0
@@ -819,6 +840,9 @@ export class GameSocketManager {
     player.lastX = player.x;
     player.lastY = player.y;
     player.lastMoveAt = Date.now();
+    // A map transition must be durable immediately, or a relog right after the
+    // portal drops the hero back on the map they just left.
+    this.persistPosition(player, { force: true });
 
     const peers = [];
     this.players.forEach((other, clientWs) => {
@@ -926,6 +950,9 @@ export class GameSocketManager {
       player.stance = payload.stance === "side" ? "side" : "front";
     }
 
+    // Keep the stored spot close to the live one; the throttle caps the writes.
+    this.persistPosition(player);
+
     // Broadcast the position to the rest of the map: the roster is map-wide, so
     // every client on it already renders this avatar and must keep it moving.
     this.broadcastPlayerState(
@@ -987,6 +1014,7 @@ export class GameSocketManager {
     player.lastX = player.x;
     player.lastY = player.y;
     player.lastMoveAt = Date.now();
+    this.persistPosition(player, { force: true });
 
     this.broadcastPlayerState(player, {
       type: "player_moved",
@@ -1314,6 +1342,36 @@ export class GameSocketManager {
     } catch (err) {
       if (process.env.NODE_ENV !== "test") {
         console.error("[WebSocket] Failed to persist vitals:", err.message);
+      }
+    }
+  }
+
+  /**
+   * Persist the map/position the server currently owns, so a relog or a different
+   * device resumes where the hero stood instead of falling back to the spawn.
+   *
+   * Throttled: the client reports a step every ~50ms, and only the last resting
+   * spot matters, so a plain move writes at most once per `POSITION_PERSIST_MS`.
+   * Server-driven transitions (portal, respawn, GM teleport) and a disconnect
+   * pass `force` so the new spot is never lost. Best-effort: a failed write is
+   * logged but the live position stays correct.
+   * @param {Object} player
+   * @param {{force?:boolean}} [options]
+   */
+  persistPosition(player, { force = false } = {}) {
+    if (!player?.characterId) return;
+    const now = Date.now();
+    if (!force && now - (player.positionSavedAt || 0) < POSITION_PERSIST_MS) return;
+    player.positionSavedAt = now;
+    try {
+      store.setPosition(player.characterId, {
+        mapId: player.mapId,
+        x: player.x,
+        y: player.y
+      });
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[WebSocket] Failed to persist position:", err.message);
       }
     }
   }
@@ -1828,6 +1886,8 @@ export class GameSocketManager {
     victim.lastX = victim.x;
     victim.lastY = victim.y;
     victim.lastMoveAt = Date.now();
+    // The respawn point is where the hero will stand next time they log in.
+    this.persistPosition(victim, { force: true });
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
     this.persistVitals(victim);
     this.broadcastMp(victim);
@@ -2064,6 +2124,7 @@ export class GameSocketManager {
         player.lastX = x;
         player.lastY = y;
         player.lastMoveAt = Date.now();
+        this.persistPosition(player, { force: true });
 
         if (currentMapId !== targetMapId) {
           this.broadcastToMap(currentMapId, { type: "player_left", payload: { id: player.id } }, ws);
@@ -2526,6 +2587,10 @@ export class GameSocketManager {
             console.error("[WebSocket] Failed to persist vitals:", err.message);
           }
         }
+        // The socket is going away, so this is the last chance to record the
+        // spot the hero actually stopped at (the throttled move write may be up
+        // to POSITION_PERSIST_MS behind).
+        this.persistPosition(player, { force: true });
       }
 
       const mapId = player.mapId || DEFAULT_MAP_ID;
