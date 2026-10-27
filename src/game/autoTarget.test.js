@@ -142,6 +142,9 @@ describe("autoTarget performance verification", () => {
     }
     const elapsed = performance.now() - start;
 
-    expect(elapsed).toBeLessThan(150);
+    // Isolated this takes ~30ms. Vitest runs one worker per file (82 of them), so
+    // under full-suite contention the same loop can report several hundred ms;
+    // the bound still catches a quadratic regression without flagging CPU load.
+    expect(elapsed).toBeLessThan(600);
   });
 });

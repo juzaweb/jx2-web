@@ -3,6 +3,7 @@ import {
   canPvpAttack,
   clampPvpDamage,
   dodgeChance,
+  mayDuel,
   rollDodge,
   PVP_ATTACK_RANGE,
   PVP_DODGE_MIN_SPEED,
@@ -37,6 +38,48 @@ describe("canPvpAttack", () => {
     expect(canPvpAttack(flagged("a"), null, 10)).toBe(false);
     expect(canPvpAttack(flagged("a"), flagged("b"), Number.NaN)).toBe(false);
     expect(canPvpAttack({ pkFlag: true }, flagged("b"), 10)).toBe(false);
+  });
+});
+
+describe("faction battlefield PvP", () => {
+  const member = (id, faction, pkFlag = false) => ({ id, faction, pkFlag });
+
+  it("lets two different camps fight without the PK flag", () => {
+    expect(canPvpAttack(member("a", "han"), member("b", "thuc"), 50, undefined, "faction")).toBe(
+      true
+    );
+    expect(canPvpAttack(member("a", "nguy"), member("b", "thuc"), 50, undefined, "faction")).toBe(
+      true
+    );
+  });
+
+  it("never lets allies fight, whatever their flags", () => {
+    expect(canPvpAttack(member("a", "han", true), member("b", "han", true), 10, undefined, "faction")).toBe(
+      false
+    );
+  });
+
+  it("does not treat an unknown camp as hostile", () => {
+    expect(canPvpAttack(member("a", "han"), member("b", undefined), 10, undefined, "faction")).toBe(
+      false
+    );
+    expect(canPvpAttack(member("a", null), member("b", "thuc"), 10, undefined, "faction")).toBe(false);
+  });
+
+  it("keeps the PK-flag rule on a normal map", () => {
+    expect(canPvpAttack(member("a", "han"), member("b", "thuc"), 10, undefined, "flag")).toBe(false);
+  });
+
+  it("never offers a duel target in a no-PvP city", () => {
+    expect(mayDuel(member("a", "han", true), "none")).toBe(false);
+    expect(mayDuel(member("a", "han", true), "flag")).toBe(true);
+    expect(mayDuel(member("a", "han", false), "faction")).toBe(true);
+  });
+
+  it("still enforces the range on a faction battlefield", () => {
+    expect(
+      canPvpAttack(member("a", "han"), member("b", "thuc"), PVP_ATTACK_RANGE + 1, undefined, "faction")
+    ).toBe(false);
   });
 });
 

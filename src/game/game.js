@@ -19,7 +19,8 @@ import { readSession } from "./session.js";
 import { shouldReportPosition } from "./positionSync.js";
 import { toIso, fromIso, isoDepth } from "./isoProjection.js";
 import { findPlayerAt, PVP_CHASE_DISTANCE } from "./pvpTargeting.js";
-import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { mayDuel, PVP_ATTACK_RANGE } from "./pvp.js";
+import { factionHomeMap, isHostileFaction, normalizeFaction } from "./factions.js";
 import { usesTouchControls } from "./orientation.js";
 import { AUTO_TARGET_RANGE, pickAutoTarget } from "./autoTarget.js";
 import { TargetRing } from "./targetRing.js";
@@ -29,6 +30,7 @@ import {
   getMap,
   isInsideMap,
   isKnownMap,
+  mapPvpMode,
   mapWorldConfig
 } from "./maps/mapRegistry.js";
 import { createPortalState, portalAt, stepPortalTrigger } from "./maps/portals.js";
@@ -50,6 +52,7 @@ const HIT_REJECT_MESSAGES = {
   attacker_peaceful: "Bạn đang ở trạng thái Hoà Bình — hãy bật cờ PK rồi đánh lại.",
   target_peaceful: "Đối thủ chưa bật cờ PK — đòn đánh không có hiệu lực.",
   range: "Ngoài tầm tỷ thí — hãy áp sát đối thủ.",
+  same_faction: "Đồng minh cùng phe — không thể giao chiến.",
   iframe: "Đối thủ vừa trúng đòn (bất tử 0,7s) — đòn này bị bỏ.",
   dodged: "Đối thủ đã né đòn (đang chạy ra xa)!",
   target_missing: "Đối thủ không còn trên máy chủ.",
@@ -188,6 +191,8 @@ export class JiangHuScene extends Phaser.Scene {
       initialName,
       initialGender
     );
+    // The camp decides the boot city and, on the battlefield, who is an enemy.
+    this.player.faction = normalizeFaction(session?.activeCharacter?.faction);
     // The equipped weapon decides the skill kit. The authoritative gear arrives
     // over `equipment_sync`, which also queues this weapon's VFX.
     this.enemyManager = new EnemyManager(this);
@@ -232,6 +237,8 @@ export class JiangHuScene extends Phaser.Scene {
 
     // Real-time Multiplayer: Remote Player Manager & WebSocket Network Client
     this.remotePlayerManager = new RemotePlayerManager(this, this.uiBridge);
+    this.remotePlayerManager.setLocalFaction(this.player.faction);
+    this.remotePlayerManager.setPvpMode(this.pvpMode());
     this.networkClient = new NetworkClient();
     this.shopFlow = new ShopFlow({
       player: this.player,
@@ -472,10 +479,12 @@ export class JiangHuScene extends Phaser.Scene {
         return;
       }
 
-      // Clicking a peer that carries the PK flag locks onto it for a duel: the
-      // hero walks into range and keeps striking until one of the flags drops.
+      // Clicking a peer that is a legal duel target locks onto it: the hero walks
+      // into range and keeps striking until one of them leaves or the policy
+      // stops allowing it. On a faction battlefield that is any other camp; on a
+      // normal map it is a PK-flagged player.
       const clickedPlayer = findPlayerAt(this.remotePlayerManager?.getAll?.() || [], worldX, worldY);
-      if (clickedPlayer && clickedPlayer.pkFlag === true) {
+      if (clickedPlayer && this.isDuelCandidate(clickedPlayer)) {
         if (!mayFight) {
           this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
           this.isPointerMoving = true;
@@ -483,7 +492,7 @@ export class JiangHuScene extends Phaser.Scene {
           this.showClickIndicator(clickedPlayer.x, clickedPlayer.y, 0xffdd59);
           return;
         }
-        if (this.player.pkFlag === true) {
+        if (mayDuel(this.player, this.pvpMode())) {
           this.pvpTarget = clickedPlayer;
         } else {
           this.uiBridge.addLog("Mục tiêu đã bật cờ PK — hãy bật cờ PK của bạn để tỷ thí.", "system");
@@ -698,7 +707,38 @@ export class JiangHuScene extends Phaser.Scene {
   resolveInitialMapId(saved) {
     if (this.requestedMapId) return this.requestedMapId;
     if (isKnownMap(saved?.mapId)) return saved.mapId;
-    return DEFAULT_MAP_ID;
+    // A first boot lands in the hero's own capital.
+    const home = factionHomeMap(readSession()?.activeCharacter?.faction);
+    return isKnownMap(home) ? home : DEFAULT_MAP_ID;
+  }
+
+  /**
+   * PvP policy of the map under the hero's feet.
+   * @returns {"none"|"flag"|"faction"}
+   */
+  pvpMode() {
+    return mapPvpMode(this.map);
+  }
+
+  /**
+   * Whether a peer may be dueled under the current map's policy: a different camp
+   * on a faction battlefield, a flagged player everywhere else.
+   * @param {{pkFlag?:boolean, faction?:string}|null} peer
+   * @returns {boolean}
+   */
+  isDuelCandidate(peer) {
+    if (!peer) return false;
+    if (this.pvpMode() === "none") return false;
+    if (this.pvpMode() === "faction") {
+      return isHostileFaction(this.player?.faction, peer.faction);
+    }
+    return peer.pkFlag === true;
+  }
+
+  /** Push the active faction and map PvP policy into the peer renderer. */
+  syncFactionContext() {
+    this.remotePlayerManager?.setLocalFaction?.(this.player?.faction);
+    this.remotePlayerManager?.setPvpMode?.(this.pvpMode());
   }
 
   /** Redraw the radar and the full city map for the active map. */
@@ -761,6 +801,7 @@ export class JiangHuScene extends Phaser.Scene {
     this.currentMapId = targetId;
     this.map = target;
     this.mapConfig = mapWorldConfig(target);
+    this.syncFactionContext();
 
     this.stage = new MapStage(this);
     this.stage.build(target);
@@ -798,6 +839,7 @@ export class JiangHuScene extends Phaser.Scene {
   applyServerWorld(payload = {}) {
     this.enemyManager.clear();
     this.remotePlayerManager.destroy();
+    this.syncFactionContext();
 
     if (payload.yourId) {
       this.remotePlayerManager.handleInitWorld(payload);
@@ -1657,12 +1699,12 @@ export class JiangHuScene extends Phaser.Scene {
       return;
     }
 
-    if (!target.container || target.container.active === false || target.pkFlag !== true) {
+    if (!target.container || target.container.active === false || !this.isDuelCandidate(target)) {
       this.pvpTarget = null;
       return;
     }
 
-    if (this.player.pkFlag !== true) {
+    if (!mayDuel(this.player, this.pvpMode())) {
       this.pvpTarget = null;
       this.uiBridge.addLog("Đã tắt cờ PK — hủy mục tiêu tỷ thí.", "system");
       return;
@@ -1704,7 +1746,8 @@ export class JiangHuScene extends Phaser.Scene {
         mayFight ? this.enemyManager?.getAlive() || [] : [],
         mayFight ? this.remotePlayerManager?.getAll?.() || [] : [],
         ground.x,
-        ground.y
+        ground.y,
+        { pvpMode: this.pvpMode(), localFaction: this.player?.faction || null }
       );
     }
     applyCursor(canvas, cursor);
@@ -1814,7 +1857,9 @@ export class JiangHuScene extends Phaser.Scene {
       // array on every frame, which `getAlive()` would.
       enemies: this.enemyManager?.getAll?.() || [],
       peers: this.remotePlayerManager?.getAll?.() || [],
-      allowPeers: this.player?.pkFlag === true,
+      allowPeers: mayDuel(this.player, this.pvpMode()),
+      pvpMode: this.pvpMode(),
+      selfFaction: this.player?.faction || null,
       range
     });
   }
@@ -1825,7 +1870,7 @@ export class JiangHuScene extends Phaser.Scene {
    */
   lockedAutoTarget() {
     const peer = this.pvpTarget;
-    if (peer && peer.pkFlag === true && peer.container?.active !== false) {
+    if (peer && this.isDuelCandidate(peer) && peer.container?.active !== false) {
       return { target: peer, kind: "player" };
     }
 
@@ -1860,9 +1905,10 @@ export class JiangHuScene extends Phaser.Scene {
     }
 
     if (this.autoTarget.kind === "player") {
-      // The server refuses every hit from a peaceful hero, so fall through to
-      // the normal swing instead of starting a chase that can never land.
-      if (this.player?.pkFlag !== true) return false;
+      // The server refuses every hit from a hero the map does not let fight, so
+      // fall through to the normal swing instead of starting a chase that can
+      // never land.
+      if (!mayDuel(this.player, this.pvpMode())) return false;
       this.pvpTarget = target;
       this.enemyTarget = null;
       this.updatePvpTarget();

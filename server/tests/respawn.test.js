@@ -124,3 +124,22 @@ test("a hero who falls in the home city stays on that map", () => {
   assert.ok(moved, "watchers see the body snapped to the spawn");
   assert.equal(moved.message.payload.id, victim.id);
 });
+
+test("a Thục hero respawns in Thục Thành, not Biện Kinh", () => {
+  const { manager, victim, direct } = makeManager("trung-nguyen");
+  victim.faction = "thuc";
+  const home = getMap("thuc-thanh");
+
+  manager.respawnPlayer(victim, null, "pvp");
+
+  assert.equal(victim.mapId, "thuc-thanh");
+  assert.equal(victim.x, home.spawn.x);
+  assert.equal(victim.y, home.spawn.y);
+
+  const defeat = direct.find((message) => message.type === "player_defeated");
+  assert.deepEqual(defeat.payload.respawn, {
+    mapId: "thuc-thanh",
+    x: home.spawn.x,
+    y: home.spawn.y
+  });
+});

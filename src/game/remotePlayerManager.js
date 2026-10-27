@@ -15,10 +15,36 @@ export class RemotePlayerManager {
     this.uiBridge = uiBridge;
     this.players = new Map(); // key: playerId, value: RemotePlayer
     this.localPlayerId = null;
+    /** Camp of the local hero, used to colour enemies on faction battlefields. */
+    this.localFaction = null;
+    /** PvP policy of the map the group is currently on. */
+    this.pvpMode = "flag";
   }
 
   setLocalPlayerId(id) {
     this.localPlayerId = id;
+  }
+
+  /**
+   * Adopt the local hero's faction and repaint every nameplate.
+   * @param {string|null} faction
+   */
+  setLocalFaction(faction) {
+    this.localFaction = faction || null;
+    this.players.forEach((player) =>
+      player.refreshNameColor?.(this.pvpMode, this.localFaction)
+    );
+  }
+
+  /**
+   * Adopt the current map's PvP policy and repaint every nameplate.
+   * @param {"none"|"flag"|"faction"} mode
+   */
+  setPvpMode(mode) {
+    this.pvpMode = mode || "flag";
+    this.players.forEach((player) =>
+      player.refreshNameColor?.(this.pvpMode, this.localFaction)
+    );
   }
 
   /**
@@ -48,6 +74,7 @@ export class RemotePlayerManager {
     }
 
     const remotePlayer = new RemotePlayer(this.scene, playerData);
+    remotePlayer.refreshNameColor?.(this.pvpMode, this.localFaction);
     this.players.set(playerData.id, remotePlayer);
   }
 
@@ -125,6 +152,7 @@ export class RemotePlayerManager {
     const player = this.players.get(payload.id);
     if (player) {
       player.applyPkFlag(payload.pkFlag === true);
+      player.refreshNameColor?.(this.pvpMode, this.localFaction);
     }
   }
 

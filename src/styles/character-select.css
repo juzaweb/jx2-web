@@ -352,6 +352,80 @@
   letter-spacing: 1px;
 }
 
+.jx2-cs-factions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.jx2-cs-faction-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 82px;
+  cursor: pointer;
+  border: 2px solid #3b4a54;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(28, 36, 44, 0.9), rgba(10, 14, 18, 0.9));
+  transition: all 0.15s ease;
+}
+
+.jx2-cs-faction-tile:hover {
+  border-color: #c9d6e3;
+}
+
+.jx2-cs-faction-glyph {
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff9e6;
+  text-shadow: 0 2px 4px #000;
+}
+
+.jx2-cs-faction-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e6efe9;
+  letter-spacing: 1px;
+}
+
+.jx2-cs-faction-city {
+  font-size: 10px;
+  color: #8aa39d;
+}
+
+.jx2-cs-faction-tile.faction-han {
+  border-color: #7a3b3b;
+}
+
+.jx2-cs-faction-tile.faction-han.selected {
+  border-color: #ff7a72;
+  background: linear-gradient(180deg, rgba(80, 34, 34, 0.95), rgba(30, 10, 10, 0.95));
+  box-shadow: 0 0 12px rgba(217, 83, 79, 0.6);
+}
+
+.jx2-cs-faction-tile.faction-thuc {
+  border-color: #2f6a4c;
+}
+
+.jx2-cs-faction-tile.faction-thuc.selected {
+  border-color: #6fe0a4;
+  background: linear-gradient(180deg, rgba(26, 70, 50, 0.95), rgba(8, 24, 16, 0.95));
+  box-shadow: 0 0 12px rgba(58, 167, 109, 0.6);
+}
+
+.jx2-cs-faction-tile.faction-nguy {
+  border-color: #3b5480;
+}
+
+.jx2-cs-faction-tile.faction-nguy.selected {
+  border-color: #83b4ff;
+  background: linear-gradient(180deg, rgba(28, 48, 86, 0.95), rgba(8, 16, 30, 0.95));
+  box-shadow: 0 0 12px rgba(74, 123, 209, 0.6);
+}
+
 .jx2-cs-create-hint {
   font-size: 11px;
   color: #8aa39d;

@@ -1,10 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 
 export function CityMapModal({ isOpen, onClose }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
+  // The scene announces the active map on boot and on every portal trip.
+  const [mapName, setMapName] = useState("");
+
+  useEffect(() => {
+    return bridge.on(EVENTS.MAP_CHANGED, (payload) => {
+      setMapName(payload?.name || "");
+    });
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -35,7 +43,7 @@ export function CityMapModal({ isOpen, onClose }) {
           ×
         </button>
         <div className="modal-eyebrow">{t("cityMap.eyebrow")}</div>
-        <h2>{t("cityMap.title")}</h2>
+        <h2>{mapName ? t("cityMap.titleWithName", { name: mapName }) : t("cityMap.title")}</h2>
 
         <div className="city-map-view">
           <canvas ref={canvasRef} width={1000} height={1000} className="city-map-canvas" />

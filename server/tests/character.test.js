@@ -100,6 +100,36 @@ describe("Character API Test Suite", () => {
     assert.equal(list.data.characters[0].gender, "female");
   });
 
+  test("POST /users/:id/characters stores the chosen faction", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ name: "Thục Tướng", faction: "thuc" })
+    });
+    assert.equal(res.status, 201);
+    const json = await res.json();
+    assert.equal(json.data.character.faction, "thuc");
+  });
+
+  test("POST /users/:id/characters rejects an unknown faction", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ name: "Vô Phe", faction: "ngo" })
+    });
+    assert.equal(res.status, 400);
+  });
+
   test("a new character starts with the shared starter kit", async () => {
     const userId = nextUser();
     const token = createSessionToken(userId);

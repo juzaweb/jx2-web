@@ -7,7 +7,8 @@
  * can be unit tested in isolation.
  */
 
-import { PVP_ATTACK_RANGE } from "./pvp.js";
+import { PVP_ATTACK_RANGE, PVP_MODE } from "./pvp.js";
+import { isHostileFaction } from "./factions.js";
 
 /**
  * Clickable body box around a remote hero's feet, in world px. The peer is drawn
@@ -81,15 +82,38 @@ export function findPlayerAt(players, x, y) {
 }
 
 /**
- * The closest PK-flagged player within striking range of `attacker`. The
- * attacker's own flag is checked by `canPvpAttack` at strike time, so a peaceful
- * attacker still gets the "turn your flag on first" hint instead of silence.
- * @param {{x:number,y:number,id?:string}|null} attacker
- * @param {Array<{x:number,y:number,id?:string,pkFlag?:boolean}>} players
+ * Whether a peer is a legal duel candidate on this map.
+ *
+ * `flag` maps only offer players who opted in; `faction` maps offer every peer
+ * from a different camp, whether or not either side raised the flag.
+ * @param {{faction?:string}|null} attacker
+ * @param {{pkFlag?:boolean, faction?:string}} player
+ * @param {"none"|"flag"|"faction"} pvpMode
+ * @returns {boolean}
+ */
+export function isDuelCandidate(attacker, player, pvpMode = PVP_MODE.FLAG) {
+  if (pvpMode === PVP_MODE.FACTION) return isHostileFaction(attacker?.faction, player?.faction);
+  return player?.pkFlag === true;
+}
+
+/**
+ * The closest legal duel target within striking range of `attacker`.
+ *
+ * The attacker's own PK flag is checked by `canPvpAttack` at strike time, so a
+ * peaceful attacker in flag mode still gets the "turn your flag on first" hint
+ * instead of silence. On a faction battlefield the camp is enough.
+ * @param {{x:number,y:number,id?:string,faction?:string}|null} attacker
+ * @param {Array<{x:number,y:number,id?:string,pkFlag?:boolean,faction?:string}>} players
  * @param {number} [maxRange=PVP_ATTACK_RANGE]
+ * @param {"none"|"flag"|"faction"} [pvpMode="flag"]
  * @returns {object|null}
  */
-export function findNearestPvpTarget(attacker, players, maxRange = PVP_ATTACK_RANGE) {
+export function findNearestPvpTarget(
+  attacker,
+  players,
+  maxRange = PVP_ATTACK_RANGE,
+  pvpMode = PVP_MODE.FLAG
+) {
   if (!attacker || !Array.isArray(players)) return null;
   if (typeof attacker.x !== "number" || typeof attacker.y !== "number") return null;
 
@@ -97,7 +121,7 @@ export function findNearestPvpTarget(attacker, players, maxRange = PVP_ATTACK_RA
   let bestDistance = Infinity;
   for (const player of players) {
     if (!isLive(player)) continue;
-    if (player.pkFlag !== true) continue;
+    if (!isDuelCandidate(attacker, player, pvpMode)) continue;
     if (attacker.id && player.id === attacker.id) continue;
 
     const distance = Math.hypot(player.x - attacker.x, player.y - attacker.y);

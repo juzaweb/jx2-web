@@ -6,7 +6,7 @@ import { userDb } from "../data/userDb.js";
 import { verifySessionToken } from "../auth/session.js";
 import { clampToRange } from "../../../src/game/aim.js";
 import { stepEnemy, BITE_TUNING } from "../../../src/game/enemyAi.js";
-import { canPvpAttack, dodgeChance, rollDodge, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
+import { canPvpAttack, dodgeChance, rollDodge, PVP_ATTACK_RANGE, PLAYER_IFRAME_MS } from "../../../src/game/pvp.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import {
   applyEnemyControlEffects,
@@ -34,8 +34,14 @@ import {
   findPortal,
   getMap,
   isCombatAllowed,
-  isKnownMap
+  isKnownMap,
+  mapPvpMode
 } from "../../../src/game/maps/mapRegistry.js";
+import {
+  factionHomeMap,
+  isHostileFaction,
+  normalizeFaction
+} from "../../../src/game/factions.js";
 import {
   MAX_LEVEL,
   applyReward,
@@ -442,6 +448,19 @@ export class GameSocketManager {
     return isCombatAllowed(getMap(player?.mapId));
   }
 
+  /**
+   * PvP policy for a player's map. A harness that switches the city safe zone off
+   * is exercising the combat paths, so a no-PvP city becomes a normal flag map
+   * there (the battlefield keeps its faction rule either way).
+   * @param {{mapId?:string}|null} player
+   * @returns {"none"|"flag"|"faction"}
+   */
+  pvpModeFor(player) {
+    const mode = mapPvpMode(getMap(player?.mapId));
+    if (mode === "none" && !this.combatSafeZones) return "flag";
+    return mode;
+  }
+
   setupServer() {
     this.wss.on("connection", (ws, req) => {
       ws.isAlive = true;
@@ -718,12 +737,19 @@ export class GameSocketManager {
     // packet: the client only names the map it believes it is on (a first join,
     // or a legacy save with no server-side position yet), and even that point is
     // clamped to the map's bounds. A stored map that no longer exists falls back
-    // to the requested/default city.
+    // to the requested map, then to the hero's own faction capital.
     const requestedMapId = sanitizeStr(payload.mapId || "", 64);
     const storedPosition = store.getPosition(characterId);
     const storedMapId =
       storedPosition && isKnownMap(storedPosition.mapId) ? storedPosition.mapId : null;
-    const mapId = storedMapId || (isKnownMap(requestedMapId) ? requestedMapId : DEFAULT_MAP_ID);
+    const homeMapId = factionHomeMap(character.faction);
+    const mapId =
+      storedMapId ||
+      (isKnownMap(requestedMapId)
+        ? requestedMapId
+        : isKnownMap(homeMapId)
+          ? homeMapId
+          : DEFAULT_MAP_ID);
     const entryMap = getMap(mapId);
     const spawnX = storedMapId
       ? clampNum(storedPosition.x, entryMap.bounds.x0, entryMap.bounds.x1, entryMap.spawn.x)
@@ -748,6 +774,8 @@ export class GameSocketManager {
       isAdmin,
       // Character gender drives the peer's rig silhouette ("male" | "female").
       gender: character.gender === "female" ? "female" : "male",
+      /** Political camp; decides hostility on a faction battlefield. */
+      faction: normalizeFaction(character.faction),
       characterId,
       progress,
       questRewarded: saved?.questRewarded ?? false,
@@ -951,6 +979,7 @@ export class GameSocketManager {
       stance: player.stance,
       equipment: player.equipment,
       gender: player.gender,
+      faction: player.faction || null,
       level: player.level,
       hp: player.hp,
       maxHp: player.maxHp,
@@ -1757,12 +1786,18 @@ export class GameSocketManager {
     if (hit === null) return this.rejectHit(ws, "no_action");
     if (!(hit.damage > 0)) return this.rejectHit(ws, "damage_invalid");
 
-    if (!canPvpAttack(attacker, target, distance)) {
-      const reason = attacker.pkFlag !== true
-        ? "attacker_peaceful"
-        : target.pkFlag !== true
-          ? "target_peaceful"
-          : "range";
+    const pvpMode = this.pvpModeFor(attacker);
+    if (!canPvpAttack(attacker, target, distance, PVP_ATTACK_RANGE, pvpMode)) {
+      const reason =
+        pvpMode === "faction"
+          ? isHostileFaction(attacker.faction, target.faction)
+            ? "range"
+            : "same_faction"
+          : attacker.pkFlag !== true
+            ? "attacker_peaceful"
+            : target.pkFlag !== true
+              ? "target_peaceful"
+              : "range";
       return this.rejectHit(ws, reason, {
         targetId: target.id,
         distance: Math.round(distance),
@@ -1802,10 +1837,13 @@ export class GameSocketManager {
    * @returns {Object[]} up to `splashMaxTargets(skill)` players
    */
   pvpSplashTargets(attacker, primary, skill) {
+    const pvpMode = this.pvpModeFor(attacker);
     const candidates = [];
     for (const other of this.players.values()) {
       if (other.id === attacker.id || other.id === primary.id) continue;
-      if (other.mapId !== primary.mapId || other.hp <= 0 || other.pkFlag !== true) continue;
+      if (other.mapId !== primary.mapId || other.hp <= 0) continue;
+      const distance = Math.hypot(attacker.x - other.x, attacker.y - other.y);
+      if (!canPvpAttack(attacker, other, distance, PVP_ATTACK_RANGE, pvpMode)) continue;
       candidates.push(other);
     }
     return splashVictims(primary, candidates, skill);
@@ -1827,7 +1865,17 @@ export class GameSocketManager {
 
     for (const victim of victims) {
       const distance = Math.hypot(attacker.x - victim.x, attacker.y - victim.y);
-      if (!canPvpAttack(attacker, victim, distance)) continue;
+      if (
+        !canPvpAttack(
+          attacker,
+          victim,
+          distance,
+          PVP_ATTACK_RANGE,
+          this.pvpModeFor(attacker)
+        )
+      ) {
+        continue;
+      }
 
       const victimStats = this.effectiveStats(victim, now);
       const damage = this.computeSplashDamage(skill, stats, victimStats.defense);
@@ -1936,18 +1984,20 @@ export class GameSocketManager {
   }
 
   /**
-   * Respawn a defeated player in the home city (Biện Kinh) with full health and
+   * Respawn a defeated player in their faction's capital with full health and
    * announce the defeat. Attacker credit (when any) rides on the broadcast.
    *
    * A defeat always returns the hero to the home city, even when they fell on a
-   * hunting map: the old map sees them leave, the home map sees them arrive, and
-   * the victim follows with a `map_changed` carrying the new roster and peers.
+   * hunting map or the battlefield: the old map sees them leave, the home map
+   * sees them arrive, and the victim follows with a `map_changed` carrying the
+   * new roster and peers.
    * @param {Object} victim - server player object
    * @param {?Object} attacker
    * @param {"pvp"|"wolf"} source
    */
   respawnPlayer(victim, attacker = null, source = "wolf") {
-    const home = getMap(DEFAULT_MAP_ID);
+    const homeId = factionHomeMap(victim.faction);
+    const home = getMap(isKnownMap(homeId) ? homeId : DEFAULT_MAP_ID);
     const fromMapId = victim.mapId;
     const crossMap = fromMapId !== home.id;
     const victimWs = this.playerById.get(victim.id)?.ws || null;

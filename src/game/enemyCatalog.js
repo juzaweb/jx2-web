@@ -233,6 +233,172 @@ export const MONSTERS = {
       }
     }
   },
+
+  // ── Tier 4 — levels 30-44 (Bắc Lĩnh) ─────────────────────────────────────
+  // Phase 1 pays EXP and coins only: no book or weapon drops, so the weapon-kit
+  // content stays unchanged until the new tiers get their own skills.
+  "tuyet-lang": {
+    id: "tuyet-lang",
+    name: "Tuyết Lang",
+    level: 30,
+    maxHp: 470,
+    attack: 30,
+    defense: 13,
+    critRate: 0.12,
+    critDamage: 1.9,
+    exp: 200,
+    coinsMin: 18,
+    coinsMax: 32,
+    visual: {
+      kind: "beast",
+      scale: 1.12,
+      palette: {
+        shadow: 0x0b1012,
+        body: 0xc9d4d8,
+        dark: 0x7d8a92,
+        head: 0xe4edf0,
+        ear: 0x93a1a9,
+        muzzle: 0xf2f7f8,
+        accent: 0x9fdcff,
+        leg: 0x8b989f,
+        tail: 0xb7c2c7
+      }
+    }
+  },
+  "son-tac-dau-linh": {
+    id: "son-tac-dau-linh",
+    name: "Sơn Tặc Đầu Lĩnh",
+    level: 36,
+    maxHp: 620,
+    attack: 36,
+    defense: 17,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 270,
+    coinsMin: 24,
+    coinsMax: 42,
+    visual: {
+      kind: "humanoid",
+      scale: 1.1,
+      palette: {
+        shadow: 0x0b0d0a,
+        body: 0x5a4a2f,
+        dark: 0x322818,
+        head: 0xc9a07a,
+        accent: 0xffb347,
+        leg: 0x3e3421,
+        cloth: 0x8a3a22
+      }
+    }
+  },
+  "hac-hung": {
+    id: "hac-hung",
+    name: "Hắc Hùng",
+    level: 42,
+    maxHp: 820,
+    attack: 44,
+    defense: 22,
+    critRate: 0.08,
+    critDamage: 1.7,
+    exp: 360,
+    coinsMin: 30,
+    coinsMax: 52,
+    visual: {
+      kind: "beast",
+      scale: 1.25,
+      palette: {
+        shadow: 0x07090a,
+        body: 0x2b2b2f,
+        dark: 0x151518,
+        head: 0x3a3a40,
+        ear: 0x232327,
+        muzzle: 0x55555c,
+        accent: 0xff7b5c,
+        leg: 0x1d1d21,
+        tail: 0x333338
+      }
+    }
+  },
+
+  // ── Tier 5 — levels 45-60 (Tây Sơn) ──────────────────────────────────────
+  "kim-giap-binh": {
+    id: "kim-giap-binh",
+    name: "Kim Giáp Binh",
+    level: 45,
+    maxHp: 900,
+    attack: 48,
+    defense: 26,
+    critRate: 0.1,
+    critDamage: 1.8,
+    exp: 420,
+    coinsMin: 34,
+    coinsMax: 58,
+    visual: {
+      kind: "armored",
+      scale: 1.1,
+      palette: {
+        shadow: 0x0d0b06,
+        body: 0xc9a227,
+        dark: 0x8a6d14,
+        head: 0xe0c56a,
+        accent: 0xfff3b0,
+        leg: 0x6c5510,
+        cloth: 0xa62f2f
+      }
+    }
+  },
+  "huyet-ma": {
+    id: "huyet-ma",
+    name: "Huyết Ma",
+    level: 52,
+    maxHp: 1100,
+    attack: 56,
+    defense: 30,
+    critRate: 0.14,
+    critDamage: 2.0,
+    exp: 520,
+    coinsMin: 40,
+    coinsMax: 70,
+    visual: {
+      kind: "humanoid",
+      scale: 1.08,
+      palette: {
+        shadow: 0x0c0507,
+        body: 0x8c1f2f,
+        dark: 0x4a0d18,
+        head: 0xd8a08a,
+        accent: 0xff4d6d,
+        leg: 0x5c1420,
+        cloth: 0x6b0f1c
+      }
+    }
+  },
+  "tay-vuc-kiem-khach": {
+    id: "tay-vuc-kiem-khach",
+    name: "Tây Vực Kiếm Khách",
+    level: 58,
+    maxHp: 1320,
+    attack: 66,
+    defense: 34,
+    critRate: 0.18,
+    critDamage: 2.1,
+    exp: 650,
+    coinsMin: 48,
+    coinsMax: 84,
+    visual: {
+      kind: "humanoid",
+      scale: 1.05,
+      palette: {
+        shadow: 0x090a0c,
+        body: 0x3f4a63,
+        dark: 0x232a3a,
+        head: 0xd0a982,
+        accent: 0x7fd4ff,
+        leg: 0x2b3242,
+        cloth: 0x54627f
+      }
+    }
+  },
 };
 
 /** Every monster id, in catalog order (market wolf first). */

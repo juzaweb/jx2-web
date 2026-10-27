@@ -203,7 +203,7 @@ describe("ApiClient", () => {
           "Content-Type": "application/json",
           Authorization: "Bearer token-create-123"
         },
-        body: JSON.stringify({ name: "Độc Cô Cầu Bại", gender: "female" })
+        body: JSON.stringify({ name: "Độc Cô Cầu Bại", gender: "female", faction: "han" })
       })
     );
   });

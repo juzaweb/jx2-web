@@ -3,20 +3,22 @@ import { describe, expect, it } from "vitest";
 import { MONSTERS, MONSTER_IDS, getMonster, monstersBetween, rewardForMonster } from "./enemyCatalog.js";
 
 describe("enemy catalog", () => {
-  it("ships two monsters per level tier and no boss", () => {
+  it("ships the expected number of monsters per level tier and no boss", () => {
     const tiers = [
-      [1, 10],
-      [11, 20],
-      [21, 30]
+      [1, 10, 2],
+      [11, 20, 2],
+      [21, 29, 2],
+      [30, 44, 3],
+      [45, 60, 3]
     ];
 
-    for (const [min, max] of tiers) {
+    for (const [min, max, count] of tiers) {
       // `soi-xam` is the legacy market wolf and shares the lowest band; the town
-      // roster is the pair of hunting monsters each tier adds.
+      // roster is the hunting monsters each tier adds.
       const inTier = monstersBetween(min, max).filter(
         (monster) => monster.id !== "soi-xam"
       );
-      expect(inTier).toHaveLength(2);
+      expect(inTier).toHaveLength(count);
     }
 
     expect(MONSTER_IDS.map((id) => MONSTERS[id]).filter((m) => m.isBoss)).toHaveLength(0);
@@ -30,7 +32,7 @@ describe("enemy catalog", () => {
       expect(monster.id).toBe(id);
       expect(monster.name.length).toBeGreaterThan(0);
       expect(monster.level).toBeGreaterThanOrEqual(1);
-      expect(monster.level).toBeLessThanOrEqual(30);
+      expect(monster.level).toBeLessThanOrEqual(60);
       expect(monster.maxHp).toBeGreaterThan(0);
       expect(monster.attack).toBeGreaterThan(0);
       expect(monster.defense).toBeGreaterThanOrEqual(0);

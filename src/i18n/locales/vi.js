@@ -56,8 +56,7 @@ export default {
   },
   cityMap: {
     eyebrow: "TOÀN CẢNH THÀNH TRÌ",
-    title: "Bản Đồ Biện Kinh",
-    hint: "Nhấn M hoặc Esc để đóng",
+    title: "Bản Đồ Biện Kinh",    titleWithName: "Bản Đồ {name}",    hint: "Nhấn M hoặc Esc để đóng",
     player: "Nhân vật",
     enemy: "Yêu thú",
     remote: "Hiệp khách",
@@ -158,6 +157,13 @@ export default {
     gender: "Giới tính",
     genderMale: "Nam",
     genderFemale: "Nữ",
+    factionLabel: "Phe phái:",
+    factionHint: "Phe quyết định thành nhà và đồng minh trên chiến trường trung tâm.",
+    factions: {
+      han: "Hán",
+      thuc: "Thục",
+      nguy: "Ngụy"
+    },
     emptySlot: "(Trống)",
     characterList: "Danh sách nhân vật",
     nameLabel: "Tên:",

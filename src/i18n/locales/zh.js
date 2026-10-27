@@ -57,6 +57,7 @@ export default {
   cityMap: {
     eyebrow: "城池全貌",
     title: "汴京地图",
+    titleWithName: "{name}地图",
     hint: "按 M 或 Esc 关闭",
     player: "角色",
     enemy: "妖兽",
@@ -159,6 +160,13 @@ export default {
     gender: "性别",
     genderMale: "男",
     genderFemale: "女",
+    factionLabel: "势力：",
+    factionHint: "势力决定你的主城与中央战场上的盟友。",
+    factions: {
+      han: "汉",
+      thuc: "蜀",
+      nguy: "魏"
+    },
     emptySlot: "（空）",
     characterList: "角色列表",
     nameLabel: "名称：",

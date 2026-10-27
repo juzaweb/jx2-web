@@ -10,6 +10,7 @@ import {
   isInsideMap,
   isKnownMap,
   isCombatAllowed,
+  mapPvpMode,
   mapSize,
   mapWorldConfig
 } from "./mapRegistry.js";
@@ -24,11 +25,43 @@ const boundsRect = (map) => ({
 });
 
 describe("map registry", () => {
-  it("registers the market and the eastern town", () => {
-    expect(MAP_IDS).toEqual(["market", "dong-mon-thanh"]);
-    expect(isKnownMap("dong-mon-thanh")).toBe(true);
+  it("registers every city, hunting ground and the battlefield", () => {
+    expect(MAP_IDS).toEqual([
+      "market",
+      "dong-mon-thanh",
+      "bac-linh",
+      "tay-son",
+      "trung-nguyen",
+      "thuc-thanh",
+      "nguy-thanh"
+    ]);
+    expect(isKnownMap("trung-nguyen")).toBe(true);
+    expect(isKnownMap("thuc-thanh")).toBe(true);
+    expect(isKnownMap("nguy-thanh")).toBe(true);
     expect(isKnownMap("nowhere")).toBe(false);
     expect(getMap("nowhere").id).toBe(DEFAULT_MAP_ID);
+  });
+
+  it("gives every city four gates and opens its south gate onto the battlefield", () => {
+    for (const id of ["market", "thuc-thanh", "nguy-thanh"]) {
+      const map = MAPS[id];
+      expect(map.gates, `${id} must have four gates`).toHaveLength(4);
+      const south = findPortal(id, "south-gate");
+      expect(south, `${id} must wire its south gate`).toBeTruthy();
+      expect(south.targetMapId).toBe("trung-nguyen");
+    }
+  });
+
+  it("wires every portal back to the map it came from", () => {
+    for (const id of MAP_IDS) {
+      const map = MAPS[id];
+      for (const portal of map.portals || []) {
+        const reverse = (MAPS[portal.targetMapId]?.portals || []).some(
+          (other) => other.targetMapId === id
+        );
+        expect(reverse, `${id} -> ${portal.targetMapId} needs a return portal`).toBe(true);
+      }
+    }
   });
 
   it("keeps every spawn point inside the walkable rectangle", () => {
@@ -206,19 +239,40 @@ describe("map registry", () => {
     expect(town.portals).toEqual(MAPS["dong-mon-thanh"].portals);
   });
 
-  it("only the home city is a no-combat safe zone", () => {
+  it("only the three capitals are no-combat safe zones", () => {
     expect(isCombatAllowed("market")).toBe(false);
     expect(isCombatAllowed(MAPS.market)).toBe(false);
+    expect(isCombatAllowed("thuc-thanh")).toBe(false);
+    expect(isCombatAllowed("nguy-thanh")).toBe(false);
     expect(isCombatAllowed("dong-mon-thanh")).toBe(true);
+    expect(isCombatAllowed("trung-nguyen")).toBe(true);
     // Callers that have not loaded a map yet (boot, unit tests) keep fighting.
     expect(isCombatAllowed(undefined)).toBe(true);
     expect(isCombatAllowed({ id: "custom", bounds: MAPS.market.bounds })).toBe(true);
   });
 
+  it("only the battlefield uses faction PvP", () => {
+    expect(mapPvpMode("market")).toBe("none");
+    expect(mapPvpMode("thuc-thanh")).toBe("none");
+    expect(mapPvpMode("nguy-thanh")).toBe("none");
+    expect(mapPvpMode("dong-mon-thanh")).toBe("flag");
+    expect(mapPvpMode("bac-linh")).toBe("flag");
+    expect(mapPvpMode("tay-son")).toBe("flag");
+    expect(mapPvpMode("trung-nguyen")).toBe("faction");
+    // A map authored before PvP modes existed keeps the legacy flag rule.
+    expect(mapPvpMode({ id: "legacy", bounds: MAPS.market.bounds })).toBe("flag");
+  });
+
   it("resolves portals by id for server-side travel validation", () => {
     expect(findPortal("market", "east-gate")?.targetMapId).toBe("dong-mon-thanh");
+    expect(findPortal("market", "west-gate")?.targetMapId).toBe("tay-son");
+    expect(findPortal("market", "north-gate")?.targetMapId).toBe("bac-linh");
+    expect(findPortal("market", "south-gate")?.targetMapId).toBe("trung-nguyen");
     expect(findPortal("dong-mon-thanh", "west-gate")?.targetMapId).toBe("market");
-    expect(findPortal("market", "west-gate")).toBeNull();
+    expect(findPortal("trung-nguyen", "han-gate")?.targetMapId).toBe("market");
+    expect(findPortal("trung-nguyen", "thuc-gate")?.targetMapId).toBe("thuc-thanh");
+    expect(findPortal("trung-nguyen", "nguy-gate")?.targetMapId).toBe("nguy-thanh");
+    expect(findPortal("thuc-thanh", "south-gate")?.targetMapId).toBe("trung-nguyen");
     expect(findPortal("market", "missing")).toBeNull();
   });
 });

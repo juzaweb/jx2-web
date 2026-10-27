@@ -46,6 +46,10 @@ export const MARKET_MAP = {
    * exists for harnesses, which opt out of the ban explicitly.
    */
   noCombat: true,
+  /** A city is not a battlefield: faction hostility is decided elsewhere. */
+  pvpMode: "none",
+  /** Biện Kinh is the Hán faction's capital. */
+  homeFaction: "han",
   /**
    * Three legacy spawn points sit outside `bounds`. Rather than move them (and
    * break the pinned server tests) the registry skips the bounds check for this
@@ -89,9 +93,40 @@ export const MARKET_MAP = {
       h: 1200,
       orientation: "vertical",
       label: "Đông Môn"
+    },
+    {
+      id: "market-west-gate",
+      x: 2100,
+      y: 4900,
+      w: 130,
+      h: 1200,
+      orientation: "vertical",
+      label: "Tây Môn"
+    },
+    {
+      id: "market-north-gate",
+      x: 6200,
+      y: 2600,
+      w: 1200,
+      h: 130,
+      orientation: "horizontal",
+      label: "Bắc Môn"
+    },
+    {
+      id: "market-south-gate",
+      x: 6200,
+      y: 9470,
+      w: 1200,
+      h: 130,
+      orientation: "horizontal",
+      label: "Nam Môn"
     }
   ],
 
+  /**
+   * Four gates, one destination each. The south gate is the only road to the
+   * central battlefield; the other three are hunting grounds.
+   */
   portals: [
     {
       id: "east-gate",
@@ -99,6 +134,27 @@ export const MARKET_MAP = {
       rect: { x: 10480, y: 4900, w: 520, h: 1200 },
       targetMapId: "dong-mon-thanh",
       targetSpawn: { x: 1200, y: 7000 }
+    },
+    {
+      id: "west-gate",
+      label: "Tây Sơn",
+      rect: { x: 2100, y: 4900, w: 420, h: 1200 },
+      targetMapId: "tay-son",
+      targetSpawn: { x: 1600, y: 7000 }
+    },
+    {
+      id: "north-gate",
+      label: "Bắc Lĩnh",
+      rect: { x: 6200, y: 2600, w: 1200, h: 420 },
+      targetMapId: "bac-linh",
+      targetSpawn: { x: 7600, y: 12800 }
+    },
+    {
+      id: "south-gate",
+      label: "Trung Nguyên Chiến Trường",
+      rect: { x: 6200, y: 9200, w: 1200, h: 400 },
+      targetMapId: "trung-nguyen",
+      targetSpawn: { x: 6000, y: 1600 }
     }
   ],
 

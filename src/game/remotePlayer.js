@@ -42,6 +42,11 @@ export class RemotePlayer {
     this.hp = Number.isFinite(data.hp) ? data.hp : 100;
     this.maxHp = Number.isFinite(data.maxHp) && data.maxHp > 0 ? data.maxHp : 100;
     this.pkFlag = data.pkFlag === true;
+    /** Faction id (`han`/`thuc`/`nguy`), used to colour enemies on a battlefield. */
+    this.faction = data.faction || null;
+    /** Current nameplate policy, refreshed by the manager on every map change. */
+    this.namePvpMode = "flag";
+    this.nameLocalFaction = null;
     /** Character this avatar belongs to, used to collapse stale duplicates. */
     this.characterId = data.characterId || null;
     /** Gender synced from the server; drives the rig silhouette. */
@@ -126,9 +131,26 @@ export class RemotePlayer {
    */
   applyPkFlag(flagged) {
     this.pkFlag = flagged === true;
-    if (this.nameText) {
-      this.nameText.setColor(this.pkFlag ? "#ff5555" : "#5cfc5c");
+    this.refreshNameColor();
+  }
+
+  /**
+   * Recolour the nameplate for the current map policy. On a faction battlefield
+   * name colour follows the camp (red = enemy, green = ally); everywhere else it
+   * keeps following the PK flag.
+   * @param {"none"|"flag"|"faction"} [pvpMode]
+   * @param {string|null} [localFaction]
+   */
+  refreshNameColor(pvpMode = this.namePvpMode, localFaction = this.nameLocalFaction) {
+    this.namePvpMode = pvpMode;
+    this.nameLocalFaction = localFaction;
+    if (!this.nameText) return;
+
+    let color = this.pkFlag ? "#ff5555" : "#5cfc5c";
+    if (pvpMode === "faction" && localFaction && this.faction) {
+      color = this.faction !== localFaction ? "#ff5555" : "#5cfc5c";
     }
+    this.nameText.setColor(color);
   }
 
   applyStats(stats = {}) {

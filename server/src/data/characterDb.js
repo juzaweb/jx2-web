@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "../config.js";
+import { DEFAULT_FACTION, isFactionId, normalizeFaction } from "../../../src/game/factions.js";
 
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 // Vietnamese-friendly: letters (incl. diacritics), digits, space, hyphen, underscore.
@@ -84,8 +85,7 @@ const mapRow = (row) => {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    gender: normalizeGender(row.gender),
-    appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
+    gender: normalizeGender(row.gender),    faction: normalizeFaction(row.faction),    appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
     lastPlayed: row.last_played
@@ -126,6 +126,7 @@ export class CharacterDatabase {
         name TEXT NOT NULL,
         sect TEXT NOT NULL DEFAULT 'thieu-lam',
         gender TEXT NOT NULL DEFAULT 'male',
+        faction TEXT NOT NULL DEFAULT 'han',
         appearance INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -152,6 +153,12 @@ export class CharacterDatabase {
     if (!columns.includes("appearance")) {
       this.db.exec("ALTER TABLE characters ADD COLUMN appearance INTEGER NOT NULL DEFAULT 0");
     }
+    if (!columns.includes("faction")) {
+      // Every pre-faction save is assigned the Hán capital so nothing is orphaned.
+      this.db.exec(
+        `ALTER TABLE characters ADD COLUMN faction TEXT NOT NULL DEFAULT '${DEFAULT_FACTION}'`
+      );
+    }
     const addedSect = !columns.includes("sect");
     if (addedSect) {
       this.db.exec("ALTER TABLE characters ADD COLUMN sect TEXT NOT NULL DEFAULT 'thieu-lam'");
@@ -170,7 +177,7 @@ export class CharacterDatabase {
     }
 
     this.stmtListByUser = this.db.prepare(
-      "SELECT id, user_id, name, sect, gender, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
+      "SELECT id, user_id, name, sect, gender, faction, appearance, level, created_at, last_played FROM characters WHERE user_id = ? ORDER BY created_at ASC"
     );
     this.stmtCountByUser = this.db.prepare(
       "SELECT COUNT(*) AS count FROM characters WHERE user_id = ?"
@@ -179,10 +186,10 @@ export class CharacterDatabase {
       "SELECT id FROM characters WHERE name = ? COLLATE NOCASE"
     );
     this.stmtFindById = this.db.prepare(
-      "SELECT id, user_id, name, sect, gender, appearance, level, created_at, last_played FROM characters WHERE id = ? AND user_id = ?"
+      "SELECT id, user_id, name, sect, gender, faction, appearance, level, created_at, last_played FROM characters WHERE id = ? AND user_id = ?"
     );
     this.stmtInsert = this.db.prepare(
-      "INSERT INTO characters (id, user_id, name, sect, gender, level, created_at, last_played) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO characters (id, user_id, name, sect, gender, faction, level, created_at, last_played) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     this.stmtDelete = this.db.prepare(
       "DELETE FROM characters WHERE id = ? AND user_id = ?"
@@ -366,9 +373,10 @@ export class CharacterDatabase {
    * @param {string} userId
    * @param {string} name
    * @param {"male"|"female"} [gender="male"]
+   * @param {"han"|"thuc"|"nguy"} [faction="han"]
    * @returns {Object} Sanitized character
    */
-  create(userId, name, gender = DEFAULT_GENDER) {
+  create(userId, name, gender = DEFAULT_GENDER, faction = DEFAULT_FACTION) {
     if (!isValidUserId(userId)) {
       const err = new Error("Thông tin tài khoản không hợp lệ.");
       err.code = "INVALID_USER";
@@ -389,6 +397,12 @@ export class CharacterDatabase {
     }
 
     const cleanGender = normalizeGender(gender);
+    if (!isFactionId(faction)) {
+      const err = new Error("Phe phái không hợp lệ.");
+      err.code = "INVALID_FACTION";
+      throw err;
+    }
+    const cleanFaction = normalizeFaction(faction);
 
     if (this.countByUser(userId) >= MAX_CHARACTER_SLOTS) {
       const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
@@ -403,7 +417,17 @@ export class CharacterDatabase {
     const id = `char_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
     try {
-      this.stmtInsert.run(id, userId, cleanName, LEGACY_SECT, cleanGender, 1, createdAt, createdAt);
+      this.stmtInsert.run(
+        id,
+        userId,
+        cleanName,
+        LEGACY_SECT,
+        cleanGender,
+        cleanFaction,
+        1,
+        createdAt,
+        createdAt
+      );
     } catch (error) {
       // The unique index is the ultimate guard: a concurrent writer (multiple
       // server processes sharing the file) can slip past the check above.

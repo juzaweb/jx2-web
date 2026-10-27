@@ -57,6 +57,7 @@ export default {
   cityMap: {
     eyebrow: "CITY OVERVIEW",
     title: "Bianjing Map",
+    titleWithName: "{name} Map",
     hint: "Press M or Esc to close",
     player: "You",
     enemy: "Monsters",
@@ -158,6 +159,13 @@ export default {
     gender: "Gender",
     genderMale: "Male",
     genderFemale: "Female",
+    factionLabel: "Faction:",
+    factionHint: "Your faction decides your home city and your allies on the central battlefield.",
+    factions: {
+      han: "Han",
+      thuc: "Shu",
+      nguy: "Wei"
+    },
     emptySlot: "(Empty)",
     characterList: "Character list",
     nameLabel: "Name:",

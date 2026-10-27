@@ -48,6 +48,28 @@ const PAINTED_GROUNDS = {
     for (let i = 0; i < 40; i++) {
       g.fillCircle(seeded(i * 5.3 + 2) * size, seeded(i * 6.7 + 3) * size, 1.5);
     }
+  },
+  "ground-battlefield": (g, size) => {
+    g.fillStyle(0x4a4036, 1);
+    g.fillRect(0, 0, size, size);
+
+    // Trampled earth: broad dry patches over a darker base.
+    const tones = [0x554a3d, 0x41372d, 0x5e5142, 0x362d24];
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle(tones[i % tones.length], 0.55);
+      g.fillEllipse(
+        seeded(i * 1.9) * size,
+        seeded(i * 3.1 + 1) * size,
+        8 + seeded(i * 3.7) * 28,
+        6 + seeded(i * 4.3) * 18
+      );
+    }
+
+    // Darker hoof/foot marks and a little ash.
+    g.fillStyle(0x2a231c, 0.6);
+    for (let i = 0; i < 46; i++) {
+      g.fillCircle(seeded(i * 5.9 + 2) * size, seeded(i * 7.1 + 3) * size, 1.8);
+    }
   }
 };
 
