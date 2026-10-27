@@ -617,8 +617,8 @@ export class GameSocketManager {
     // The character id is the canonical player id: it cannot be spoofed, and two
     // tabs of the same character resolve to the same roster entry.
     const playerId = characterId;
-    const displayName = userDb.resolveDisplayName(userId, character.name || "Lãng Khách");
-    const username = sanitizeStr(displayName, 32);
+    const displayName = sanitizeStr(character.name || "Lãng Khách", 32);
+    const username = displayName;
     const equipment = readEquipment(characterId);
 
     // The server is the economy's source of truth: a fresh character starts at
