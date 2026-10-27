@@ -141,7 +141,7 @@ test("WebSocket server-authority suite", async (t) => {
           ownsCharacter: (_userId, characterId) => characterId !== "char_not_owned",
           findCharacter: (_userId, characterId) => ({
             id: characterId,
-            name: characterId,
+            name: characterId === "char_sync" ? "Độc Cô Cầu Bại" : characterId,
             sect: "thieu-lam",
             gender: characterId === "char_female" ? "female" : "male"
           })
@@ -200,6 +200,11 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(init.type, "init_world");
     assert.equal(init.payload.yourId, "char_sync");
     assert.equal(init.payload.players.length, 0);
+
+    // The player's display name and username must match the character's name, not the account's username/displayName.
+    const joinedData = gameSocket.playerById.get("char_sync")?.data;
+    assert.equal(joinedData?.displayName, "Độc Cô Cầu Bại");
+    assert.equal(joinedData?.username, "Độc Cô Cầu Bại");
 
     const progress = await client.waitFor((m) => m.type === "player_progress");
     assert.equal(progress.payload.level, 1);
