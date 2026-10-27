@@ -53,7 +53,7 @@ import {
   isSessionUser,
   clearSession
 } from "./game/session.js";
-import { requestLandscapeFullscreen, isMobileDevice } from "./game/orientation.js";
+import { requestLandscapeFullscreen, isMobileDevice, usesTouchControls } from "./game/orientation.js";
 
 // Phaser + the whole game scene graph live behind this boundary so the login and
 // lobby UI never wait for the ~1.2 MB engine bundle to download and parse.
@@ -159,10 +159,10 @@ export function App() {
   const [isMinimapZoomed, setIsMinimapZoomed] = useState(false);
   const [isCityMapOpen, setIsCityMapOpen] = useState(false);
   const [isGmOpen, setIsGmOpen] = useState(false);
-  // Both side panels start open so a fresh entry into the world already shows
-  // the map and the chat channel without a manual click.
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const [isMinimapOpen, setIsMinimapOpen] = useState(true);
+  // Side panels start open on desktop, but minimized on mobile/touch controls
+  // to avoid cluttering small touch displays.
+  const [isChatOpen, setIsChatOpen] = useState(() => !usesTouchControls());
+  const [isMinimapOpen, setIsMinimapOpen] = useState(() => !usesTouchControls());
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [pkEnabled, setPkEnabled] = useState(false);
   const [quickSlots, setQuickSlots] = useState(() =>
@@ -707,10 +707,11 @@ export function App() {
 
   const handleCharacterStart = useCallback(async (character) => {
     requestLandscapeFullscreen();
-    // Entering the world opens the map and the chat channel by default; the
-    // player can still close either one with its × button.
-    setIsMinimapOpen(true);
-    setIsChatOpen(true);
+    // Entering the world opens the map and chat by default on desktop, or minimizes
+    // them on mobile/touch devices.
+    const isTouch = usesTouchControls();
+    setIsMinimapOpen(!isTouch);
+    setIsChatOpen(!isTouch);
     setIsConnectionGated(false);
 
     writeSession({
