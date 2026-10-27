@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { resolveSkillIcon } from "../game/skills.js";
 
 /**
  * Renders a skill's icon image, falling back to its glyph when the catalog has
@@ -6,7 +7,7 @@ import React, { useEffect, useState } from "react";
  * the kit that is not authored yet).
  */
 export function SkillIcon({ skill, className = "", fallback = "?" }) {
-  const icon = skill?.icon || "";
+  const icon = resolveSkillIcon(skill) || "";
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {

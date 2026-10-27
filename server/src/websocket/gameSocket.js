@@ -20,11 +20,9 @@ import {
   MAX_HITS_PER_CAST as SHARED_MAX_HITS_PER_CAST,
   MELEE_REACH,
   attackIntervalFor,
-  consumeCastHit,
   hasSplash,
   isChannelSkill,
   maxTravelDistance,
-  splashMultiplier,
   splashVictims
 } from "../../../src/game/combatRules.js";
 import { advanceRegen, billableDeltaMs, passiveRegenRate } from "../../../src/game/passiveRegen.js";
@@ -44,10 +42,17 @@ import {
   normalizeProgress,
   progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
+import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable } from "../../../src/game/skills.js";
 import { isTestMode } from "../../../src/game/testMode.js";
-import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
+import {
+  applyCastSelfEffects,
+  castRejection,
+  isInsideCastArea as isTargetInsideCastArea,
+  resolveSkillHit,
+  splashDamage,
+  studyRejection
+} from "../game/skillCast.js";
 import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
 import { equippedWeaponType } from "../../../src/game/equipment.js";
 import { shopPurchase } from "../../../src/game/shop.js";
@@ -1182,14 +1187,10 @@ export class GameSocketManager {
       });
     };
 
-    if (!skill) return reject("not_usable");
-    if (skill.starter || learned.includes(skill.id)) return reject("already_learned");
-    if (!skillLearnable(skill, player.level, learned)) {
-      const lock = skillLockReason(skill, player.level, learned);
-      return reject(lock?.kind === "level" ? "level" : "prereq", {
-        level: lock?.level ?? skill.unlockLevel,
-        prereqId: lock?.id || null
-      });
+    const rejection = studyRejection(skill, player.level, learned);
+    if (rejection) {
+      const { reason, ...extra } = rejection;
+      return reject(reason, extra);
     }
 
     const consumed = consumeItem(player.characterId, itemId, 1);
@@ -1494,32 +1495,7 @@ export class GameSocketManager {
    * @param {number} now
    */
   applySkillSelfEffects(player, skill, now) {
-    let statsChanged = false;
-    let healed = 0;
-
-    for (const effect of skill.effects || []) {
-      if (effect?.kind === "buff") {
-        const amount = Number(effect.amount) || 0;
-        const duration = Number(effect.duration) || 0;
-        if (!effect.stat || duration <= 0) continue;
-        player.buffs.push({
-          skillId: skill.id,
-          stat: effect.stat,
-          amount,
-          until: now + duration
-        });
-        statsChanged = true;
-      } else if (effect?.kind === "heal") {
-        const flat = Number(effect.amount) || 0;
-        const pct = Number(effect.pctMaxHp) || 0;
-        const amount = Math.round(flat + player.maxHp * pct);
-        if (amount > 0) {
-          const before = player.hp;
-          player.hp = Math.min(player.maxHp, player.hp + amount);
-          healed += player.hp - before;
-        }
-      }
-    }
+    const { statsChanged, healed } = applyCastSelfEffects(player, skill, now);
 
     if (statsChanged) this.sendPlayerStats(player);
     if (healed > 0) {
@@ -1596,20 +1572,9 @@ export class GameSocketManager {
     // is still level-locked is refused instead of silently degrading into a free
     // plain swing. Passives are refused first: they run on their own and are
     // never castable, whatever weapon is worn.
-    if (requested?.passive) {
-      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "passive" } });
-      return;
-    }
-    if (requested && requested.weapon !== player.weaponType) {
-      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "weapon" } });
-      return;
-    }
-    if (requested && !skillUsable(requested, player.level, player.learnedSkills)) {
-      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "locked" } });
-      return;
-    }
-    if (requested?.passive) {
-      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: "passive" } });
+    const rejection = castRejection(requested, player);
+    if (rejection) {
+      this.send(ws, { type: "skill_rejected", payload: { skillId: requested.id, reason: rejection } });
       return;
     }
 
@@ -1709,32 +1674,14 @@ export class GameSocketManager {
    */
   resolveHitDamage(attacker, defenderDefense, requestedSkill, now) {
     const attackerStats = this.effectiveStats(attacker, now);
-    const skill = requestedSkill ? skillById(requestedSkill) : null;
-
-    if (skill) {
-      if (skill.weapon !== attacker.weaponType) return null;
-      if (!skillUsable(skill, attacker.level, attacker.learnedSkills)) return null;
-      if (!consumeCastHit(attacker.lastCast, skill, now)) return null;
-      return {
-        skill,
-        attackerStats,
-        damage: computeSkillDamage(
-          skill,
-          attackerStats,
-          { defense: defenderDefense },
-          this.random
-        ).damage
-      };
-    }
-
-    const swing = attacker.lastSwing;
-    if (!swing || swing.used || now - swing.at > HIT_WINDOW_MS) return null;
-    swing.used = true;
-    return {
-      skill: null,
+    return resolveSkillHit(
+      attacker,
       attackerStats,
-      damage: computeDamage(attackerStats, { defense: defenderDefense }, this.random).damage
-    };
+      defenderDefense,
+      requestedSkill,
+      now,
+      this.random
+    );
   }
 
   /**
@@ -1747,11 +1694,7 @@ export class GameSocketManager {
    * @returns {boolean}
    */
   isInsideCastArea(cast, skill, target, fallback) {
-    if (!(skill?.radius > 0) || cast?.skillId !== skill.id) return true;
-    const center = cast.aim || fallback;
-    return (
-      Math.hypot(center.x - target.x, center.y - target.y) <= skill.radius + HIT_RADIUS_SLACK
-    );
+    return isTargetInsideCastArea(cast, skill, target, fallback);
   }
 
   /**
@@ -1905,13 +1848,7 @@ export class GameSocketManager {
    * @returns {number}
    */
   computeSplashDamage(skill, attackerStats, defenderDefense) {
-    return computeSkillDamage(
-      skill,
-      attackerStats,
-      { defense: defenderDefense },
-      this.random,
-      splashMultiplier(skill)
-    ).damage;
+    return splashDamage(skill, attackerStats, defenderDefense, this.random);
   }
 
   /**

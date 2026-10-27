@@ -11,6 +11,8 @@
  * 3-9 coins so the existing server reward tests keep their expectations.
  */
 
+import { SKILLS } from "./skills.js";
+
 /**
  * @typedef {object} MonsterVisual
  * @property {"beast"|"humanoid"|"armored"|"boss"} kind
@@ -237,35 +239,42 @@ export const MONSTERS = {
 export const MONSTER_IDS = Object.keys(MONSTERS);
 
 /**
+ * Probability that a kill drops one book, per monster. The book *pool* itself is
+ * derived from each skill's `book.dropTiers`, so adding a skill to a hunting
+ * tier only touches the skill entry (in `skills/catalog/`).
+ * @type {Readonly<Record<string, number>>}
+ */
+export const MONSTER_BOOK_CHANCES = Object.freeze({
+  "son-ca": 0.03,
+  "soi-xam": 0.03,
+  "da-lang": 0.04,
+  "lam-tac": 0.05,
+  "hac-y-sat-thu": 0.06,
+  "thiet-giap-binh": 0.08,
+  "ma-giao-de-tu": 0.1
+});
+
+/**
  * Skill books each monster can drop, grouped by the hunting tier it belongs to.
- * The starter skill (Kiếm Khí) is never in a pool: every hero already knows it.
+ * The starter skill (Kiếm Khí) has no book and is therefore never in a pool.
  * `chance` is the probability that a kill drops one book from the pool.
  * @type {Readonly<Record<string, { chance: number, skills: string[] }>>}
  */
-export const MONSTER_BOOK_DROPS = Object.freeze({
-  "son-ca": Object.freeze({ chance: 0.03, skills: ["thieu_duong_kiem_phap", "nga_my_kiem_phap"] }),
-  "soi-xam": Object.freeze({ chance: 0.03, skills: ["thieu_lam_tam_phap", "dai_tu_di_chuong"] }),
-  "da-lang": Object.freeze({
-    chance: 0.04,
-    skills: ["la_han_quyen", "thai_cuc_quyen", "mong_diep_thoi_tam", "ngu_doc_tam_phap", "truy_tam_doc"]
-  }),
-  "lam-tac": Object.freeze({
-    chance: 0.05,
-    skills: ["la_han_tran", "tam_thanh_kiem_phap", "tu_hang_pho_do", "van_doc_chieu_hong"]
-  }),
-  "hac-y-sat-thu": Object.freeze({
-    chance: 0.06,
-    skills: ["kim_cang_bat_hoai", "toat_hong_quan_khuyet", "luu_thuy_khanh_van", "u_hong_phiet_anh"]
-  }),
-  "thiet-giap-binh": Object.freeze({
-    chance: 0.08,
-    skills: ["nhu_lai_than_chuong", "tam_thanh_kiem_phap", "van_doc_chieu_hong"]
-  }),
-  "ma-giao-de-tu": Object.freeze({
-    chance: 0.1,
-    skills: ["nhu_lai_than_chuong", "kim_cang_bat_hoai", "u_hong_phiet_anh"]
-  })
-});
+export const MONSTER_BOOK_DROPS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(MONSTER_BOOK_CHANCES).map(([monsterId, chance]) => [
+      monsterId,
+      Object.freeze({
+        chance,
+        skills: Object.freeze(
+          SKILLS.filter((skill) => skill.book?.dropTiers?.includes(monsterId)).map(
+            (skill) => skill.id
+          )
+        )
+      })
+    ])
+  )
+);
 
 /**
  * Book-drop group for a monster, or null when it drops none.
