@@ -797,6 +797,11 @@ export class JiangHuScene extends Phaser.Scene {
       this.loadMap(serverMapId, payload.spawn, { notifyServer: false });
     } else if (payload.spawn) {
       this.player.setSpawn(payload.spawn);
+      // The server's point is authoritative: a relog resumes the stored spot,
+      // which can differ from the locally saved one. Without this the client
+      // would keep reporting the stale point, and the server would refuse it as
+      // a jump and snap the hero back on the next tick.
+      this.player.setPosition(payload.spawn.x, payload.spawn.y);
     }
 
     this.applyServerWorld(payload);

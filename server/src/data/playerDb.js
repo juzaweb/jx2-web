@@ -20,8 +20,9 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  *  2 — clears the hard-coded demo bags that every character used to start with.
  *  3 — hands the starter kit to characters left with an empty bag.
  *  4 — adds server-owned equipment, persisted HP/MP and the one-time state-import flag.
+ *  5 — adds the persisted map/position, so a relog resumes where the hero stood.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 /**
  * Recursively drop prototype-polluting keys from untrusted input.
@@ -98,6 +99,9 @@ export class PlayerDatabase {
         inventory       TEXT NOT NULL DEFAULT '{}',
         equipment       TEXT NOT NULL DEFAULT '{}',
         hp              INTEGER,
+        map_id          TEXT,
+        pos_x           REAL,
+        pos_y           REAL,
         mp              INTEGER,
         state_imported  INTEGER NOT NULL DEFAULT 0,
         starter_granted INTEGER NOT NULL DEFAULT 0,
@@ -117,6 +121,9 @@ export class PlayerDatabase {
       this.db.exec(`ALTER TABLE saves ADD COLUMN ${name} ${definition}`);
       saveColumns.push({ name });
     };
+    addColumn("map_id", "TEXT");
+    addColumn("pos_x", "REAL");
+    addColumn("pos_y", "REAL");
     addColumn("starter_granted", "INTEGER NOT NULL DEFAULT 0");
     addColumn("equipment", "TEXT NOT NULL DEFAULT '{}'");
     addColumn("hp", "INTEGER");
@@ -154,6 +161,9 @@ export class PlayerDatabase {
     );
     this.stmtUpdateEquipment = this.db.prepare(
       "UPDATE saves SET equipment = ?, updated_at = ? WHERE player_id = ?"
+    );
+    this.stmtUpdatePosition = this.db.prepare(
+      "UPDATE saves SET map_id = ?, pos_x = ?, pos_y = ?, updated_at = ? WHERE player_id = ?"
     );
     this.stmtMarkStateImported = this.db.prepare(
       "UPDATE saves SET state_imported = 1, updated_at = ? WHERE player_id = ?"
@@ -240,6 +250,9 @@ export class PlayerDatabase {
    * Version 4 adds the server-owned equipment, vitals and state-import columns;
    * the ALTER TABLE guard above already created them, so the bump only records
    * that the schema is current.
+   *
+   * Version 5 adds the persisted map/position columns, also created by the
+   * ALTER TABLE guard above.
    *
    * Running once is enforced by the version check, so real items acquired later
    * are never touched again.
@@ -429,6 +442,43 @@ export class PlayerDatabase {
     const mp = asCount(vitals.mp, 0);
     this.stmtUpdateVitals.run(hp, mp, Date.now(), playerId);
     return this.getVitals(playerId);
+  }
+
+  // --- Server-owned position ---
+
+  /**
+   * Persisted map/position for a character, or null when it was never stored.
+   * The caller validates the map id and clamps the point to that map's bounds.
+   * @param {string} playerId
+   * @returns {{mapId:string, x:number, y:number}|null}
+   */
+  getPosition(playerId) {
+    const row = this.stmtGet.get(playerId);
+    if (!row) return null;
+    const mapId = typeof row.map_id === "string" && row.map_id ? row.map_id : null;
+    const x = Number.isFinite(row.pos_x) ? row.pos_x : null;
+    const y = Number.isFinite(row.pos_y) ? row.pos_y : null;
+    if (!mapId || x === null || y === null) return null;
+    return { mapId, x, y };
+  }
+
+  /**
+   * Persist where the hero stands, creating the ledger row on first write.
+   * A malformed point is ignored rather than stored, so a bad write can never
+   * overwrite a good position with NULLs.
+   * @param {string} playerId
+   * @param {{mapId:string, x:number, y:number}} position
+   * @returns {{mapId:string, x:number, y:number}|null} the stored point (null when the input was malformed)
+   */
+  setPosition(playerId, position = {}) {
+    const mapId = asName(position.mapId).slice(0, 64);
+    const x = typeof position.x === "number" && Number.isFinite(position.x) ? position.x : null;
+    const y = typeof position.y === "number" && Number.isFinite(position.y) ? position.y : null;
+    if (!mapId || x === null || y === null) return this.getPosition(playerId);
+
+    this._ensureRow(playerId);
+    this.stmtUpdatePosition.run(mapId, x, y, Date.now(), playerId);
+    return this.getPosition(playerId);
   }
 
   // --- Server-owned equipment ---

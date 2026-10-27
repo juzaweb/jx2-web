@@ -14,7 +14,7 @@ regen, HP/MP, inventory, equipment, position validation, and the login policy.
 | 1 — Server persistence and identity | done | schema v4 (`equipment`/`hp`/`mp`/`state_imported`), `playerBag.js`, authenticated join, `POST /api/state/import` |
 | 2 — Server combat authority | done | custom swing/cast authorisation, derived stats, server ticks regen and buffs, `player_stats` outbound |
 | 3 — Server inventory/equipment/consumables | done | `use_item` / `equip_item` / `unequip_slot`, `inventory_sync`, `equipment_sync`, persisted vitals |
-| 4 — Movement validation | done | `maxTravelDistance` with snap-back; server teleports reset the baseline |
+| 4 — Movement validation | done | `maxTravelDistance` with snap-back; server teleports reset the baseline; the map/position is persisted per character and restored on join |
 | 5 — Client rewrite | done | join packet trimmed to token + character; damage numbers come from the server echo |
 | 6 — Tests, docs, cleanup | done | rewritten WS/Auth tests, `state.test.js`, dead offline/loot code removed |
 

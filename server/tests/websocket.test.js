@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocket } from "ws";
 import { MARKET_NPCS } from "../../src/game/marketLayout.js";
-import { DEFAULT_MAP_ID, getMap } from "../../src/game/maps/mapRegistry.js";
+import { DEFAULT_MAP_ID, MAP_IDS, getMap } from "../../src/game/maps/mapRegistry.js";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -328,6 +328,60 @@ test("WebSocket server-authority suite", async (t) => {
 
     await client.close();
     await observer.close();
+  });
+
+  await t.test("Position is persisted server-side and restored on rejoin", async () => {
+    const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(observer, { characterId: "char_pos_watch", x: 5300, y: 5000 });
+
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_pos", x: 5000, y: 5000 });
+
+    // A legitimate step is accepted, broadcast and written to the ledger.
+    client.send({ type: "player_move", payload: { x: 5080, y: 5020, vx: 120, vy: 0 } });
+    const moved = await observer.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "char_pos"
+    );
+    assert.equal(moved.payload.x, 5080);
+
+    // A rejected teleport must not overwrite the stored spot.
+    client.send({ type: "player_move", payload: { x: 9000, y: 5000, vx: 0, vy: 0 } });
+    await client.waitFor(
+      (m) => m.type === "player_moved" && m.payload.id === "char_pos" && m.payload.x === 5080
+    );
+    assert.deepEqual(store.getPosition("char_pos"), {
+      mapId: DEFAULT_MAP_ID,
+      x: 5080,
+      y: 5020
+    });
+
+    await client.close();
+
+    // Rejoining with a stale client point resumes the server's stored one.
+    const again = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const init = await join(again, { characterId: "char_pos", x: 5000, y: 5000 });
+    assert.equal(init.type, "init_world");
+    assert.equal(init.payload.mapId, DEFAULT_MAP_ID);
+    assert.equal(init.payload.spawn.x, 5080);
+    assert.equal(init.payload.spawn.y, 5020);
+
+    await again.close();
+    await observer.close();
+  });
+
+  await t.test("A stored map and position win over the join packet", async () => {
+    const otherMapId = MAP_IDS.find((id) => id !== DEFAULT_MAP_ID);
+    const otherMap = getMap(otherMapId);
+    const stored = { mapId: otherMapId, x: otherMap.spawn.x, y: otherMap.spawn.y };
+    store.setPosition("char_stored_map", stored);
+
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const init = await join(client, { characterId: "char_stored_map", x: 5000, y: 5000 });
+    assert.equal(init.type, "init_world");
+    assert.equal(init.payload.mapId, otherMapId);
+    assert.deepEqual(init.payload.spawn, { x: stored.x, y: stored.y });
+
+    await client.close();
   });
 
   await t.test("Monster damage is authoritative (client damage is ignored)", async () => {
