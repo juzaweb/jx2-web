@@ -19,7 +19,7 @@ Recorded with `npm run build` and a production preview (`vite preview`) plus
 | Largest JS chunk | 1,642.76 kB | 1,196.46 kB (`phaser`, lazy) | unchanged (engine floor) |
 | Engine chunk blocking first paint | yes | no (behind `React.lazy`) | no |
 | Image bytes fetched before the world runs | ~6.0 MB | ~2.7 MB | ≤ 3 MB |
-| Skill VFX fetched on boot | 1.56 MB (always) | 0 for a session without a sect; sect sheets only | per-sect only |
+| Skill VFX fetched on boot | 1.56 MB (always) | 0 for a session without a weapon; weapon sheets only | per-weapon only |
 | Hero walk sheets fetched on boot | both genders (456 kB) | active gender only (228 kB) | 1 sheet |
 
 Phaser is resolved from `dist/phaser.esm.js`: **one pre-bundled ES module**
@@ -38,8 +38,8 @@ Files: `vite.config.js`, `src/App.jsx`.
   never waits for the engine.
 - `chunkSizeWarningLimit: 1400` exists only because the single engine chunk
   exceeds the default 500 kB; do not raise it further.
-- Lazy mounting is behaviourally safe: `game.js` re-seeds name, gender, sect,
-  quick slots and skill loadout from `readSession()` + `StorageManager` inside
+- Lazy mounting is behaviourally safe: `game.js` re-seeds name, gender, weapon
+  kit, quick slots and skill loadout from `readSession()` + `StorageManager` inside
   `create()`, and `App` re-emits `SET_PLAYER_NAME` on `GAME_STARTED`. Bridge
   events emitted before the scene mounts are not replayed, so **any new
   `React → Phaser` event must be derived from storage or re-emitted**, not
@@ -56,9 +56,9 @@ Rules implemented:
   queued by `ensureHeroBodyTexture()` on `SET_PLAYER_GENDER`; the change is
   applied on the loader's `complete` event, so the hero keeps its current look
   until the sheet arrives.
-- Skill VFX are **not** preloaded. `ensureSectVfx(scene, skillsForSect(sect))`
-  runs in `create()` and on `SET_PLAYER_SECT`, only when the session actually has
-  a sect, and queues every sheet in a single loader batch.
+- Skill VFX are **not** preloaded. `ensureWeaponVfx(scene, skillsForWeapon(weapon))`
+  runs in `handleEquipmentSync` and on `SET_PLAYER_WEAPON`, only when a weapon is
+  equipped, and queues every sheet in a single loader batch.
 - Per-use fallbacks (`playSkillCastVfx`, `Player.showFormation`,
   `RemotePlayer.showFormation`) call `ensureVfxTexture()`; every consumer already
   bails out when `textures.exists()` is false, so a sheet in flight simply skips
@@ -66,9 +66,9 @@ Rules implemented:
 - The loader dedupes by texture key, so repeated calls (formation retries every
   frame) are free.
 
-Follow-up (not blocking): VFX are only fetched when a sect is known. If a guest
-can receive a sect without a server session, confirm `SET_PLAYER_SECT` is emitted
-for it, otherwise that player would cast skills without VFX.
+Follow-up (not blocking): VFX are only fetched once a weapon is equipped. Joins
+back-fill the starter sword and publish `equipment_sync`, so a character always
+has a weapon kit; a guest world without a weapon simply casts nothing.
 
 ## 4. Phase 3 — reduce image weight (pending, needs art review)
 
@@ -122,7 +122,7 @@ reserves the full 256² even when mostly empty).
 ### 4.3 Acceptance criteria
 
 - Initial image transfer ≤ 1.2 MB for a logged-in character (currently ~2.7 MB).
-- Per-sect VFX payload ≤ 400 kB.
+- Per-weapon VFX payload ≤ 400 kB.
 - No visible quality regression on the plaza, walkway, both shops, NPC, hero in
   all 8 directions, and both VFX animations.
 - `npm test` and `npm run build` stay green; build still prints no chunk warning.
@@ -149,7 +149,7 @@ These files ship in `public/` but are not requested by the runtime:
 ## 6. Verification
 
 ```bash
-npm test          # 55 files / 441 tests
+npm test          # 79 files / 745 tests
 npm run build     # expect no >500 kB warning, phaser chunk stays lazy
 npm run dev       # manual visual check
 ```
@@ -166,7 +166,7 @@ Two traps that invalidated an early measurement:
 1. The PWA service worker serves the **previous** build from precache. Unregister
    it and clear `caches` before measuring a fresh `dist`.
 2. `vite preview` has no `/api` proxy, so a stored session fails backend
-   validation, is cleared, and the app falls back to a guest world. Sect-dependent
+   validation, is cleared, and the app falls back to a guest world. Weapon-dependent
    measurements need `npm run dev` with the backend running.
 
 ## 7. Open questions
