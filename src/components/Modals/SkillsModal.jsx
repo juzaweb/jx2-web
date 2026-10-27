@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import {
   MAX_SKILL_LEVEL,
+  characterLevelForSkillLevel,
   skillAtLevel,
   skillFundsShortfall,
   skillLevelBonus,
@@ -82,6 +83,11 @@ export function SkillsModal({
   const upgradeShortfall = upgradeCost
     ? skillFundsShortfall(upgradeCost, { coins, exp })
     : null;
+  /** Character level the next rank demands, or null when the art is maxed. */
+  const nextLevelRequired = upgradeCost
+    ? characterLevelForSkillLevel(selectedSkill, selectedLevel + 1)
+    : null;
+  const levelTooLow = nextLevelRequired !== null && level < nextLevelRequired;
   /** HP/s an always-on art restores at its current level; 0 for every cast skill. */
   const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill, selectedLevel) : 0;
 
@@ -298,6 +304,13 @@ export function SkillsModal({
                     })}
                   </span>
                 )}
+                {nextLevelRequired !== null && (
+                  <span
+                    className={`skills-stat-chip skills-req-chip${levelTooLow ? " unmet" : ""}`}
+                  >
+                    {t("skills.reqLevelTag", { level: nextLevelRequired })}
+                  </span>
+                )}
               </div>
 
               {/* Levelling: the server owns the price and the debit; the panel
@@ -308,14 +321,16 @@ export function SkillsModal({
                     <button
                       type="button"
                       className="skills-upgrade-btn"
-                      disabled={Boolean(upgradeShortfall)}
+                      disabled={Boolean(upgradeShortfall) || levelTooLow}
                       title={
-                        upgradeShortfall
-                          ? t("skills.upgradeShort", {
-                              coins: upgradeCost.coins,
-                              exp: upgradeCost.exp
-                            })
-                          : t("skills.upgradeHint")
+                        levelTooLow
+                          ? t("skills.levelShort", { level: nextLevelRequired })
+                          : upgradeShortfall
+                            ? t("skills.upgradeShort", {
+                                coins: upgradeCost.coins,
+                                exp: upgradeCost.exp
+                              })
+                            : t("skills.upgradeHint")
                       }
                       onClick={() => onUpgradeSkill?.(selectedSkill.id)}
                     >

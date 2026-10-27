@@ -46,13 +46,16 @@ export {
 
 export {
   MAX_SKILL_LEVEL,
+  MIN_CHARACTER_LEVEL_TO_LEARN,
   SKILL_LEVEL_BONUS_PER_LEVEL,
-  SKILL_UPGRADE_COINS_PER_LEVEL,
-  SKILL_UPGRADE_EXP_PER_LEVEL,
+  SKILL_LEVELS_PER_CHARACTER_LEVEL,
+  SKILL_UPGRADE_COINS_FACTOR,
+  SKILL_UPGRADE_EXP_FACTOR,
   normalizeSkillLevel,
   skillLevelOf,
   skillLevelScale,
   skillLevelBonus,
+  characterLevelForSkillLevel,
   scaleSkillEffect,
   skillAtLevel,
   skillUpgradeCost,

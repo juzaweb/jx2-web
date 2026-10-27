@@ -37,7 +37,11 @@ describe("skillLockLabel", () => {
     expect(skillLockLabel(gated, 1, null, t)).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
   });
 
-  it("labels an unlearned skill as needing a book", () => {
-    expect(skillLockLabel(skillById("la_han_quyen"), 1, [], t)).toBe("skills.picker.needsBook");
+  it("labels an unlearned skill as needing a book once the study floor is met", () => {
+    // Studying any book needs character level 10, so a lower hero sees the gate.
+    expect(skillLockLabel(skillById("la_han_quyen"), 1, [], t)).toBe("level:10");
+    expect(skillLockLabel(skillById("la_han_quyen"), 10, [], t)).toBe(
+      "skills.picker.needsBook"
+    );
   });
 });

@@ -1471,7 +1471,7 @@ export class JiangHuScene extends Phaser.Scene {
       empty_slot: "Ô trang bị đang trống.",
       unknown_item: "Vật phẩm không tồn tại.",
       already_learned: "Bạn đã học chiêu thức này rồi.",
-      level: "Cấp độ chưa đủ để học chiêu thức này.",
+      level: "Cấp độ nhân vật chưa đủ cho chiêu thức này.",
       prereq: "Cần học chiêu thức trước đó trước khi học sách này.",
       not_learned: "Bạn chưa học chiêu thức này.",
       max_level: "Chiêu thức đã đạt cấp tối đa.",

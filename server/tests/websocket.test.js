@@ -698,7 +698,7 @@ test("WebSocket server-authority suite", async (t) => {
   });
 
   await t.test("Skill upgrades debit the ledger and persist the level", async () => {
-    store.setProgress("char_skill", { level: 10, exp: 500, coins: 500, kills: 0 }, "char_skill");
+    store.setProgress("char_skill", { level: 20, exp: 500, coins: 500, kills: 0 }, "char_skill");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_skill", x: 5000, y: 5000 });
 
@@ -732,7 +732,7 @@ test("WebSocket server-authority suite", async (t) => {
   });
 
   await t.test("A skill upgrade the hero cannot pay for is refused", async () => {
-    store.setProgress("char_broke", { level: 10, exp: 0, coins: 0, kills: 0 }, "char_broke");
+    store.setProgress("char_broke", { level: 20, exp: 0, coins: 0, kills: 0 }, "char_broke");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_broke", x: 5000, y: 5000 });
 

@@ -363,6 +363,17 @@
   border-color: rgba(210, 140, 70, 0.5);
 }
 
+/* Character level the next rank demands; red when the hero is still too low. */
+.skills-req-chip {
+  color: #cbb78d;
+  border-color: rgba(140, 111, 61, 0.35);
+}
+
+.skills-req-chip.unmet {
+  color: #ff9f7a;
+  border-color: rgba(255, 140, 110, 0.5);
+}
+
 /* Upgrade control: label on the left, silver + EXP price on the right. */
 .skills-upgrade {
   margin-top: 2px;

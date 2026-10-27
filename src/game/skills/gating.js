@@ -2,12 +2,14 @@
  * Skill learning and cast gating.
  *
  * A hero only knows the starter skill for free; every other skill is learned
- * from a book, and `requires` lists the skills that must already be learned.
+ * from a book (character level 10+), and `requires` lists the skills that must
+ * already be learned. Casting a known art is gated by its own `unlockLevel`.
  * These helpers are shared by the client (hotbar/tree gates) and the server
  * (authoritative cast and book validation).
  */
 
 import { SKILLS_BY_ID } from "./registry.js";
+import { characterLevelForSkillLevel } from "./levels.js";
 
 /**
  * Prerequisite list of a skill (empty when it is a tree root).
@@ -127,8 +129,8 @@ export function skillMissingPrereq(skill, learned) {
 }
 
 /**
- * Whether a book for this skill can be studied right now: the level is high
- * enough and every prerequisite is already learned.
+ * Whether a book for this skill can be studied right now: the character level is
+ * high enough (never below the study floor) and every prerequisite is learned.
  * @param {Object|string} skill
  * @param {number} level
  * @param {Iterable<string>|Set<string>} learned
@@ -137,7 +139,7 @@ export function skillMissingPrereq(skill, learned) {
 export function skillLearnable(skill, level, learned) {
   const entry = typeof skill === "string" ? SKILLS_BY_ID.get(skill) : skill;
   if (!entry) return false;
-  if (normalizedLevel(level) < entry.unlockLevel) return false;
+  if (normalizedLevel(level) < characterLevelForSkillLevel(entry, 1)) return false;
   return skillMissingPrereq(entry, learned) === null;
 }
 
@@ -176,13 +178,21 @@ export function skillLockReason(skill, level, learned = null) {
   if (!entry) return null;
 
   const current = normalizedLevel(level);
-  if (current < entry.unlockLevel) {
-    return { kind: "level", level: entry.unlockLevel };
+  const learnedSet = toLearnedSet(learned);
+  const known = knowsEntry(entry, learnedSet);
+
+  // An art the hero does not know yet is gated by its book requirement (the
+  // catalog level, floored at the study minimum); a known art only by its own
+  // unlockLevel, so a legacy save that learned early stays castable.
+  const requiredLevel = learnedSet && !known
+    ? characterLevelForSkillLevel(entry, 1)
+    : entry.unlockLevel;
+  if (current < requiredLevel) {
+    return { kind: "level", level: requiredLevel };
   }
 
-  const learnedSet = toLearnedSet(learned);
   if (learnedSet) {
-    if (!knowsEntry(entry, learnedSet)) {
+    if (!known) {
       const missing = skillMissingPrereq(entry, learnedSet);
       if (missing) return { kind: "prereq", ...missing };
       return { kind: "book" };

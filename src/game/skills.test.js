@@ -294,7 +294,9 @@ describe("skill catalog", () => {
 
     // Without the prerequisite learned, a book cannot be studied.
     expect(skillLearnable("dai_tu_di_chuong", 1, [])).toBe(false);
-    expect(skillLearnable("dai_tu_di_chuong", 1, ["thieu_lam_tam_phap"])).toBe(true);
+    // Studying any book also needs the level-10 floor, whatever unlockLevel says.
+    expect(skillLearnable("dai_tu_di_chuong", 9, ["thieu_lam_tam_phap"])).toBe(false);
+    expect(skillLearnable("dai_tu_di_chuong", 10, ["thieu_lam_tam_phap"])).toBe(true);
     expect(skillLearnable("nhu_lai_than_chuong", 9, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
       false
     );

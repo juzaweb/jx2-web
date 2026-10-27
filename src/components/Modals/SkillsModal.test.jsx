@@ -71,7 +71,7 @@ describe("SkillsModal Component", () => {
   it("distinguishes unlocked and locked tiles", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={mockSkills} level={5} learnedSkills={["test_skill_1"]} />
+        <SkillsModal isOpen={true} skills={mockSkills} level={12} learnedSkills={["test_skill_1"]} />
       </I18nProvider>
     );
 
@@ -112,7 +112,7 @@ describe("SkillsModal Component", () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={gated} level={1} />
+        <SkillsModal isOpen={true} skills={gated} level={10} />
       </I18nProvider>
     );
 
@@ -144,7 +144,7 @@ describe("SkillsModal Component", () => {
         <SkillsModal
           isOpen={true}
           skills={mockSkills}
-          level={5}
+          level={30}
           learnedSkills={["test_skill_1"]}
           skillLevels={{ test_skill_1: 5 }}
           coins={10000}
@@ -157,10 +157,32 @@ describe("SkillsModal Component", () => {
     expect(markup).toContain("+40% hiệu quả");
     // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68
     expect(markup).toContain("ST: 168%");
+    // Rank 6 costs 20 * 36 silver and demands character level 10 + 4 * 5.
+    expect(markup).toContain("Cần cấp 30");
     expect(markup).toContain('class="skills-upgrade-btn"');
     expect(markup).not.toContain('class="skills-upgrade-btn" disabled');
     expect(markup).toContain("Nâng cấp — Cấp 6");
-    expect(markup).toContain("40 bạc");
+    expect(markup).toContain("720 bạc");
+  });
+
+  it("blocks an upgrade the hero's character level does not allow", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={29}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 5 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+
+    expect(markup).toContain("Cần cấp 30");
+    expect(markup).toContain("skills-req-chip unmet");
+    expect(markup).toContain('class="skills-upgrade-btn" disabled');
   });
 
   it("disables an unaffordable upgrade and marks a maxed skill", () => {

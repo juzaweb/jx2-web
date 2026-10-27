@@ -10,7 +10,7 @@ import {
   studyRejection,
   upgradeRejection
 } from "../src/game/skillCast.js";
-import { MAX_SKILL_LEVEL, skillById } from "../../src/game/skills.js";
+import { MAX_SKILL_LEVEL, characterLevelForSkillLevel, skillById } from "../../src/game/skills.js";
 
 /** A server player object with just the fields the cast rules read. */
 const player = (overrides = {}) => ({
@@ -55,7 +55,9 @@ describe("server skill cast rules", () => {
     const gated = skillById("tam_thanh_kiem_phap");
     assert.equal(studyRejection(gated, 10, [])?.reason, "prereq");
     assert.equal(studyRejection(gated, 1, ["thai_cuc_quyen"])?.reason, "level");
-    assert.equal(studyRejection(gated, 2, ["thai_cuc_quyen"]), null);
+    // Studying needs character level 10 at minimum, whatever unlockLevel says.
+    assert.equal(studyRejection(gated, 9, ["thai_cuc_quyen"])?.reason, "level");
+    assert.equal(studyRejection(gated, 10, ["thai_cuc_quyen"]), null);
   });
 
   it("applies buffs and heals to the caster", () => {
@@ -209,17 +211,50 @@ describe("server skill cast rules", () => {
     });
     assert.equal(upgradeRejection(skill, maxed)?.reason, "max_level");
 
-    const broke = player({ learnedSkills: ["kiem_khi"], progress: { coins: 0, exp: 0 } });
+    const broke = player({ level: 20, learnedSkills: ["kiem_khi"], progress: { coins: 0, exp: 0 } });
     assert.equal(upgradeRejection(skill, broke)?.reason, "coins");
 
-    const noExp = player({ learnedSkills: ["kiem_khi"], progress: { coins: 1e6, exp: 0 } });
+    const noExp = player({
+      level: 20,
+      learnedSkills: ["kiem_khi"],
+      progress: { coins: 1e6, exp: 0 }
+    });
     assert.equal(upgradeRejection(skill, noExp)?.reason, "exp");
 
     const rich = player({
+      level: 20,
       learnedSkills: ["kiem_khi"],
       skillLevels: { kiem_khi: 1 },
       progress: { coins: 1e6, exp: 1e6 }
     });
     assert.equal(upgradeRejection(skill, rich), null);
+  });
+
+  it("gates each skill rank behind a minimum character level", () => {
+    const skill = skillById("kiem_khi");
+    const progress = { coins: 1e6, exp: 1e6 };
+
+    // Rank 2 needs character level 14, rank 6 needs 30 (study floor 10 + 4 * 5).
+    assert.equal(characterLevelForSkillLevel(skill, 6), 30);
+
+    const tooLow = player({
+      level: 29,
+      learnedSkills: ["kiem_khi"],
+      skillLevels: { kiem_khi: 5 },
+      progress
+    });
+    const gated = upgradeRejection(skill, tooLow);
+    assert.equal(gated?.reason, "level");
+    assert.equal(gated.level, 30);
+    assert.equal(gated.skillLevel, 6);
+    assert.equal(gated.current, 29);
+
+    const highEnough = player({
+      level: 30,
+      learnedSkills: ["kiem_khi"],
+      skillLevels: { kiem_khi: 5 },
+      progress
+    });
+    assert.equal(upgradeRejection(skill, highEnough), null);
   });
 });

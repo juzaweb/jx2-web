@@ -267,6 +267,8 @@ export default {
     upgradeShort: "需要 {coins} 银两和 {exp} 经验",
     upgradeHint: "消耗银两与经验提升该技能等级。",
     maxLevel: "已达最高等级（{max}）",
+    reqLevelTag: "需等级 {level}",
+    levelShort: "提升此技能需要角色等级 {level}",
     tree: {
       requires: "需要先学习 {name}",
       empty: "该武器暂无招式。",

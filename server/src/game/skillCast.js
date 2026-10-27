@@ -14,6 +14,7 @@
 
 import {
   applySelfEffects,
+  characterLevelForSkillLevel,
   isInsideCastArea,
   skillAtLevel,
   skillById,
@@ -96,14 +97,16 @@ export function applyCastSelfEffects(player, skill, now) {
  * Why a skill cannot be levelled up right now, or null when it can.
  *
  * A skill must already be learned (starter skills count), below the maximum
- * level, and the character's ledger must hold the silver and EXP the next level
- * costs. The server calls this before debiting anything.
+ * rank, the character must be high enough level for the rank being bought, and
+ * the ledger must hold the silver and EXP it costs. The server calls this before
+ * debiting anything.
  *
  * @param {Object|null|undefined} skill resolved catalog entry
  * @param {{ level?: number, learnedSkills?: string[], skillLevels?: Record<string, number>,
  *   progress?: { coins?: number, exp?: number }|null }} player
- * @returns {{ reason: "not_usable"|"not_learned"|"max_level"|"coins"|"exp",
- *   level?: number, coins?: number, exp?: number,
+ * @returns {{ reason: "not_usable"|"not_learned"|"max_level"|"level"|"coins"|"exp",
+ *   level?: number, skillLevel?: number, current?: number,
+ *   coins?: number, exp?: number,
  *   required?: { coins: number, exp: number } }|null}
  */
 export function upgradeRejection(skill, player) {
@@ -113,6 +116,19 @@ export function upgradeRejection(skill, player) {
   const current = skillLevelOf(player?.skillLevels, skill.id);
   const cost = skillUpgradeCost(current);
   if (!cost) return { reason: "max_level", level: current };
+
+  // Every rank demands a higher character level than the previous one, so the
+  // hero's level gates the rank independently of what the ledger can pay.
+  const characterLevel = Math.floor(Number(player?.level) || 1);
+  const requiredLevel = characterLevelForSkillLevel(skill, current + 1);
+  if (characterLevel < requiredLevel) {
+    return {
+      reason: "level",
+      level: requiredLevel,
+      skillLevel: current + 1,
+      current: characterLevel
+    };
+  }
 
   const funds = skillFundsShortfall(cost, player?.progress);
   if (funds) {

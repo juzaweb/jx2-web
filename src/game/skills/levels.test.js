@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   MAX_SKILL_LEVEL,
+  MIN_CHARACTER_LEVEL_TO_LEARN,
   SKILL_LEVEL_BONUS_PER_LEVEL,
-  SKILL_UPGRADE_COINS_PER_LEVEL,
-  SKILL_UPGRADE_EXP_PER_LEVEL,
+  SKILL_LEVELS_PER_CHARACTER_LEVEL,
+  SKILL_UPGRADE_COINS_FACTOR,
+  SKILL_UPGRADE_EXP_FACTOR,
+  characterLevelForSkillLevel,
   normalizeSkillLevel,
   scaleSkillEffect,
   skillAtLevel,
@@ -73,18 +76,22 @@ describe("skill level scaling", () => {
 });
 
 describe("skill upgrade price", () => {
-  it("grows with the level being bought and stops at the cap", () => {
-    const first = skillUpgradeCost(1);
-    const second = skillUpgradeCost(2);
-    expect(first.coins).toBeGreaterThan(0);
-    expect(first.exp).toBeGreaterThan(0);
-    expect(second.coins).toBeGreaterThan(first.coins);
-    expect(second.exp).toBeGreaterThan(first.exp);
+  it("grows with the square of the level being bought and stops at the cap", () => {
+    // Rank 2 costs 20 * 2² / 30 * 2², rank 10 costs 20 * 10² / 30 * 10².
+    expect(skillUpgradeCost(1)).toEqual({ coins: 80, exp: 120 });
+    expect(skillUpgradeCost(2)).toEqual({ coins: 180, exp: 270 });
+    expect(skillUpgradeCost(9)).toEqual({ coins: 2000, exp: 3000 });
     expect(skillUpgradeCost(MAX_SKILL_LEVEL)).toBeNull();
-    // Studying a book buys level 1 at the base tier price.
+
+    const first = skillUpgradeCost(1);
+    const last = skillUpgradeCost(9);
+    // Quadratic, not linear: the last rank costs 25x the first one.
+    expect(last.coins / first.coins).toBeCloseTo(25);
+
+    // Studying a book buys rank 1, the cheapest step in the same curve.
     expect(skillLearnCost()).toEqual({
-      coins: SKILL_UPGRADE_COINS_PER_LEVEL,
-      exp: SKILL_UPGRADE_EXP_PER_LEVEL
+      coins: SKILL_UPGRADE_COINS_FACTOR,
+      exp: SKILL_UPGRADE_EXP_FACTOR
     });
   });
 
@@ -95,5 +102,34 @@ describe("skill upgrade price", () => {
     expect(skillFundsShortfall(cost, { coins: 79, exp: 500 })?.reason).toBe("coins");
     expect(skillFundsShortfall(cost, { coins: 500, exp: 119 })?.reason).toBe("exp");
     expect(skillFundsShortfall(null, { coins: 0, exp: 0 })).toBeNull();
+  });
+});
+
+describe("character level per skill rank", () => {
+  it("floors every rank at the level-10 study minimum, then adds 4 levels per rank", () => {
+    const starter = skillById("kiem_khi");
+    expect(starter.unlockLevel).toBe(1);
+    // The book's own level is below the study floor, so the floor wins.
+    expect(characterLevelForSkillLevel(starter, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
+    expect(characterLevelForSkillLevel(starter, 2)).toBe(
+      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL
+    );
+    expect(characterLevelForSkillLevel(starter, MAX_SKILL_LEVEL)).toBe(
+      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL * (MAX_SKILL_LEVEL - 1)
+    );
+
+    // A catalog entry that unlocks later than the floor keeps its own level.
+    expect(characterLevelForSkillLevel({ unlockLevel: 15 }, 1)).toBe(15);
+    expect(characterLevelForSkillLevel({ unlockLevel: 15 }, 2)).toBe(
+      15 + SKILL_LEVELS_PER_CHARACTER_LEVEL
+    );
+
+    // A bare number is accepted too, and junk clamps to the study floor.
+    expect(characterLevelForSkillLevel(20, 1)).toBe(20);
+    expect(characterLevelForSkillLevel(5, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
+    expect(characterLevelForSkillLevel(null, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
+    expect(characterLevelForSkillLevel({}, 99)).toBe(
+      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL * (MAX_SKILL_LEVEL - 1)
+    );
   });
 });

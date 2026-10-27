@@ -266,6 +266,8 @@ export default {
     upgradeShort: "Requires {coins} silver and {exp} EXP",
     upgradeHint: "Spend silver and EXP to raise this skill's level.",
     maxLevel: "Max level reached ({max})",
+    reqLevelTag: "Requires Lv {level}",
+    levelShort: "Character level {level} required to raise this skill",
     tree: {
       requires: "Learn {name} first",
       empty: "This weapon has no skills yet.",

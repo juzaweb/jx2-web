@@ -264,6 +264,8 @@ export default {
     upgradeShort: "Cần {coins} bạc và {exp} EXP",
     upgradeHint: "Tiêu bạc và kinh nghiệm để tăng cấp chiêu thức.",
     maxLevel: "Đã đạt cấp tối đa ({max})",
+    reqLevelTag: "Cần cấp {level}",
+    levelShort: "Cần cấp nhân vật {level} để nâng cấp chiêu thức này",
     tree: {
       requires: "Cần học {name} trước",
       empty: "Vũ khí này chưa có chiêu thức.",

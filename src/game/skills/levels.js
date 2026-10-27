@@ -2,8 +2,10 @@
  * Skill levels: the 1..10 progression of a learned skill.
  *
  * A skill is studied at level 1 and can be raised to {@link MAX_SKILL_LEVEL}; each
- * level strengthens the art (damage multiplier and effect magnitudes) and costs
- * silver plus EXP from the character's current ledger.
+ * level strengthens the art (damage multiplier and effect magnitudes), demands a
+ * higher character level and costs silver plus EXP from the current ledger. The
+ * price grows with the square of the level, so the last ranks are committed
+ * investment rather than a cheap step.
  *
  * Kept pure and Phaser/DOM-free: the client renders these numbers and the server
  * bills and authorizes them through the very same functions, so the two sides can
@@ -16,11 +18,24 @@ export const MAX_SKILL_LEVEL = 10;
 /** Damage/effect gain per level above the first (+10% each, +90% at level 10). */
 export const SKILL_LEVEL_BONUS_PER_LEVEL = 0.1;
 
-/** Silver charged per target level (`targetLevel * this`). */
-export const SKILL_UPGRADE_COINS_PER_LEVEL = 40;
+/**
+ * Minimum character level before any book can be studied. A hero below this
+ * level can only use the starter art; every book waits for level 10.
+ */
+export const MIN_CHARACTER_LEVEL_TO_LEARN = 10;
 
-/** EXP charged per target level (`targetLevel * this`). */
-export const SKILL_UPGRADE_EXP_PER_LEVEL = 60;
+/**
+ * Character levels each extra skill rank demands. Rank 1 costs nothing beyond
+ * the entry requirement, so rank `n` needs
+ * `max(unlockLevel, MIN_CHARACTER_LEVEL_TO_LEARN) + 4 * (n - 1)`.
+ */
+export const SKILL_LEVELS_PER_CHARACTER_LEVEL = 4;
+
+/** Silver charged for a target level: `factor * targetLevel²` (20/80/…/2.000). */
+export const SKILL_UPGRADE_COINS_FACTOR = 20;
+
+/** EXP charged for a target level: `factor * targetLevel²` (30/120/…/3.000). */
+export const SKILL_UPGRADE_EXP_FACTOR = 30;
 
 const toInt = (value) => {
   const n = Number(value);
@@ -133,11 +148,31 @@ export function skillAtLevel(skill, level = 1) {
 }
 
 /**
+ * Minimum character level needed to hold a skill at `skillLevel`.
+ *
+ * Rank 1 is the gate for studying the book: the catalog's own `unlockLevel`, but
+ * never below {@link MIN_CHARACTER_LEVEL_TO_LEARN} (10). Every further rank adds
+ * {@link SKILL_LEVELS_PER_CHARACTER_LEVEL} character levels, so a rank-10 art
+ * needs a hero at least 36 levels past the book's requirement.
+ *
+ * @param {{ unlockLevel?: number }|number} skill skill entry, or its unlockLevel
+ * @param {number} skillLevel
+ * @returns {number}
+ */
+export function characterLevelForSkillLevel(skill, skillLevel) {
+  const unlock = Number(typeof skill === "object" ? skill?.unlockLevel : skill);
+  const catalogLevel = Number.isFinite(unlock) && unlock > 0 ? Math.floor(unlock) : 1;
+  const base = Math.max(MIN_CHARACTER_LEVEL_TO_LEARN, catalogLevel);
+  return base + SKILL_LEVELS_PER_CHARACTER_LEVEL * (normalizeSkillLevel(skillLevel) - 1);
+}
+
+/**
  * Silver and EXP needed to raise a skill from `currentLevel` to the next level,
  * or null when it is already at {@link MAX_SKILL_LEVEL}.
  *
- * The price grows with the level being bought, so the last levels are a real
- * investment: the whole 1 -> 10 climb costs 40..400 silver per step.
+ * The price grows with the square of the level being bought, so the high ranks
+ * cost a multiple of the first ones: 80/120 silver/EXP for rank 2, 2.000/3.000
+ * for rank 10.
  * @param {number} currentLevel
  * @returns {{ coins: number, exp: number }|null}
  */
@@ -146,19 +181,20 @@ export function skillUpgradeCost(currentLevel) {
   if (level >= MAX_SKILL_LEVEL) return null;
   const target = level + 1;
   return {
-    coins: SKILL_UPGRADE_COINS_PER_LEVEL * target,
-    exp: SKILL_UPGRADE_EXP_PER_LEVEL * target
+    coins: SKILL_UPGRADE_COINS_FACTOR * target * target,
+    exp: SKILL_UPGRADE_EXP_FACTOR * target * target
   };
 }
 
 /**
- * Silver and EXP needed to study a book the first time (buying level 1).
+ * Silver and EXP needed to study a book the first time (buying rank 1, the
+ * cheapest rank in the curve).
  * @returns {{ coins: number, exp: number }}
  */
 export function skillLearnCost() {
   return {
-    coins: SKILL_UPGRADE_COINS_PER_LEVEL,
-    exp: SKILL_UPGRADE_EXP_PER_LEVEL
+    coins: SKILL_UPGRADE_COINS_FACTOR,
+    exp: SKILL_UPGRADE_EXP_FACTOR
   };
 }
 
