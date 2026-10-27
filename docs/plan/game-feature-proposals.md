@@ -1,9 +1,9 @@
 # Game Feature Proposals
 
-- **Date:** 2025-05-18
-- **Project / engine:** React 18, Vite, Phaser 3 (Arcade Physics), Node.js / WebSocket server authority
+- **Date:** 2026-10-27
+- **Project / engine:** React 19, Vite, Phaser 3 (Arcade Physics), Node.js / WebSocket server authority
 - **Genre / target platform:** Browser-playable isometric 2.5D wuxia RPG (PC desktop & mobile web browser)
-- **Development stage:** Playable Alpha / Content Expansion (2 functional maps, 6-slot skill architecture, server-authoritative combat)
+- **Development stage:** Playable Alpha / Content Expansion (2 functional maps: Biện Kinh & Đông Môn Thành; 6-slot skill architecture; server-authoritative combat)
 - **Audit scope:** `src/game/` (progression, equipment, items, skills, shop, combat, maps, worldManager), `src/components/` (HUD, Modals, MobileControls), `server/src/` (gameSocket, rewards, enemy loop), and `docs/`
 - **Limitations:** Live high-concurrency multiplayer latency (>200ms) was not benchmarked in real network conditions; art assets are constrained to programmatically generated vector graphics and existing sprite sheets.
 
@@ -14,8 +14,8 @@ Giang Hồ is a React and Phaser 3 browser wuxia RPG inspired by classic Vietnam
 While core combat and navigation are functional, current playability faces four distinct design gaps:
 1. **Economic Sink & Upgrading Void:** Monsters drop silver coins and rare materials like Huyễn Kim Thạch (`DROP_TABLE` in `src/game/items.js`), but coins are only spent on basic potions at Dược Sư and Huyễn Kim Thạch has no usage.
 2. **Combat Usability in Dense Camps:** Đông Môn Thành features 18 camps with 15 monsters each (270 total). Target selection lacks a visual lock indicator and range preview ring, leading to ambiguous target selection during dense fights.
-3. **Incomplete Skill Kits:** Thiếu Lâm has a rebuilt 6-slot palm kit (`thieu-lam-chuong-phap.md`), but Võ Đang, Nga My, and Ngũ Độc remain on 4-skill placeholder catalogs without full 6-slot progression.
-4. **Short-Term Goal Absence:** Aside from grinding monster camps for EXP, players lack structured daily objectives. The HUD minimap has a Quest Tracker stub (`MinimapPanel.jsx`), but no repeatable quest engine exists.
+3. **Incomplete Skill Kits:** Thiếu Lâm has a rebuilt 6-slot palm kit (`docs/plan/thieu-lam-chuong-phap.md`), but Võ Đang, Nga My, and Ngũ Độc remain on 4-skill placeholder catalogs without full 6-slot progression.
+4. **Short-Term Goal Absence:** Aside from grinding monster camps for EXP, players lack structured daily objectives. The HUD minimap has a Quest Tracker stub (`src/components/HUD/MinimapPanel.jsx`), but no repeatable quest engine exists.
 
 This document proposes 5 prioritized, evidence-backed features designed to deepen the core loop without introducing feature bloat or scope creep.
 
@@ -27,7 +27,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 1. **Player Goal:** Advance character level (up to 150), acquire silver coins and rare materials, unlock sect martial arts, and conquer higher-level monster camps (from level 3 Sơn Cẩu up to level 29 Ma Giáo Đệ Tử).
 2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile joystick), casting the skill bound to a hotbar slot (`1`-`9`, assigned by dragging from the `F5` tree), consumable usage from hotbar slots, and talking to shopkeepers (`NPC_DUOC`).
-3. **Challenge / Opposition:** Aggressive and leashed enemy camps (`src/game/enemyCatalog.js`) in Đông Môn Thành (`dongMonThanhMap.js`). Enemies bite, pathfind toward players, and respawn on server ticks.
+3. **Challenge / Opposition:** Aggressive and leashed enemy camps (`src/game/enemyCatalog.js`) in Đông Môn Thành (`src/game/maps/dongMonThanhMap.js`). Enemies bite, pathfind toward players, and respawn on server ticks.
 4. **Feedback and Rewards:** Server-calculated damage numbers, floaty text, Web Audio synth sounds, EXP bar gains, silver payouts, and item drop rolls (`rollDrop()` in `src/game/items.js`).
 5. **Progression and Persistence:** Level vitals calculated in `src/game/progression.js`, equipment stat bonuses derived in `src/game/equipment.js` (`attack`, `defense`, `maxHp`, `maxMp`, `critRate`, `accuracy`), and `localStorage` / WebSocket sync via `src/game/storage.js` and `server/src/websocket/gameSocket.js`.
 
@@ -60,7 +60,7 @@ The implemented gameplay loop follows a classic ARPG structure:
   - Stat multiplier applied in `deriveEquipmentBonuses()` in `src/game/equipment.js`.
   - Simple visual enhancement level indicator (`+1` .. `+6` badge) on equipment slots.
 - **Optional extensions:**
-  - Visual glowing aura / particle effect on character rig for +7 and above weapons (`heroRigView.js`).
+  - Visual glowing aura / particle effect on character rig for +7 and above weapons (`src/game/heroRigView.js`).
   - Protection talismans to prevent downgrades on higher tiers (+7 to +10).
 - **Dependencies:** `src/game/equipment.js`, `src/game/items.js`, `server/src/websocket/gameSocket.js`.
 - **Risks and trade-offs:** Must be server-authoritative to prevent cheated upgrades. Requires clear UI feedback for success/failure.
@@ -70,8 +70,8 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] Enhancing item updates `deriveEquipmentBonuses()` with upgraded stat values.
   - [ ] Server validates silver and material balance before confirming enhancement.
   - [ ] Failed attempts deduct materials without destroying or corrupting equipped item.
-- **Validation plan:** Unit test enhancement logic in `equipment.test.js`; integration test server websocket handler with mock silver/material quantities.
-- **Evidence:** `src/game/items.js` defines `huyen-kim-thach` in `DROP_TABLE` (weight 5), but it currently has no usage in `shop.js` or `equipment.js`.
+- **Validation plan:** Unit test enhancement logic in `src/game/equipment.test.js`; integration test server websocket handler with mock silver/material quantities.
+- **Evidence:** `src/game/items.js` defines `huyen-kim-thach` in `DROP_TABLE` (weight 5), but it currently has no usage in `src/game/shop.js` or `src/game/equipment.js`.
 - **Assumptions / open questions:** Enhancement values are flat additions to `bonuses` object.
 
 ---
@@ -85,12 +85,12 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Core loop connection:** Improves combat precision and skill responsiveness during intense hunting sessions.
 - **MVP scope:**
   - Active target state stored in Phaser scene (`JiangHuScene.activeTarget`).
-  - Ground ring graphic rendered under active target in `src/game/healthBarView.js` or dedicated target indicator component.
+  - Ground ring graphic rendered under active target in `src/game/healthBarView.js` or dedicated target indicator component (`src/game/targetRing.js`).
   - Skill cast targets `activeTarget` if valid and alive; falls back to cursor or auto-proximity when no target is locked.
   - Pressing `Tab` or clicking empty ground selects nearest target or clears selection.
 - **Optional extensions:**
   - Target portrait HUD widget displaying target HP %, level, and monster name.
-  - Mobile auto-target locking button in `MobileControls.jsx`.
+  - Mobile auto-target locking button in `src/components/MobileControls.jsx`.
 - **Dependencies:** `src/game/combat.js`, `src/game/healthBarView.js`, `src/game/game.js`.
 - **Risks and trade-offs:** Must handle target death and despawn cleanly without leaving dangling references or crashing render loops.
 - **Effort:** S — Pure client-side targeting and rendering additions.
@@ -99,7 +99,7 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] Casting targeted skills (`target === "enemy"`) directs the skill to the locked target if alive and within bounds.
   - [ ] Target ring automatically disappears when the target dies or leaves sight range (leashing/despawn).
   - [ ] Pressing `Tab` cycles through visible hostiles within 400px radius.
-- **Validation plan:** Manual verification in Đông Môn Thành camps; unit test target resolution in `combat.test.js`.
+- **Validation plan:** Manual verification in Đông Môn Thành camps; unit test target resolution in `src/game/combat.test.js`.
 - **Evidence:** `src/game/combat.js` (`resolveTargets`) currently resolves nearest enemy in radius or cursor location without persistent target lock state.
 - **Assumptions / open questions:** Target lock is client-side visual and selection logic; damage calculations remain server-authoritative.
 
@@ -126,7 +126,7 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] Every sect has exactly 6 unique skills occupying slots 0 through 5.
   - [ ] All skills have valid unlock levels, MP costs, cooldowns, and range parameters.
   - [ ] All skill names and descriptions resolve in VI, EN, and ZH locales without missing keys.
-  - [ ] Catalog invariants pass in `skills.test.js` for all 4 sects.
+  - [ ] Catalog invariants pass in `src/game/skills.test.js` for all 4 sects.
 - **Validation plan:** Run `npm test` covering catalog invariants; verify each new skill can be dragged from the `F5` tree onto a hotbar slot and cast with its number key, and assigned to a mobile arc button.
 - **Evidence:** `docs/plan/sect-skills.md` details exact planned skill specifications for Võ Đang, Nga My, and Ngũ Độc.
 - **Assumptions / open questions:** Initial Ngũ Độc implementation uses existing `slow`/`stun`/`heal`/`buff` mechanics before engine v2 DoT ticks.
@@ -143,7 +143,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **MVP scope:**
   - Single active bounty contract state stored on server (`playerData.activeBounty`).
   - Server listens to `enemy_killed` events and updates bounty counter.
-  - HUD Quest Tracker in `MinimapPanel.jsx` displays active objective and progress text.
+  - HUD Quest Tracker in `src/components/HUD/MinimapPanel.jsx` displays active objective and progress text.
   - Reward payout handled via existing `applyReward()` in `src/game/progression.js`.
 - **Optional extensions:**
   - Tiered bounties based on player level (Level 3-8, Level 9-18, Level 19-29).
@@ -157,7 +157,7 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] Contract completion allows turning in for bonus EXP, silver, and material reward.
   - [ ] Bounty state survives disconnects and map transitions.
 - **Validation plan:** Unit test bounty progression helper; test websocket event handlers for bounty claim.
-- **Evidence:** `MinimapPanel.jsx` has a dedicated "Nhiệm vụ" (Quest) tab container stub, currently displaying static placeholder text.
+- **Evidence:** `src/components/HUD/MinimapPanel.jsx` has a dedicated "Nhiệm vụ" (Quest) tab container stub, currently displaying static placeholder text.
 - **Assumptions / open questions:** Bounties are repeatable contracts without complex branching narrative.
 
 ---
@@ -171,11 +171,11 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Core loop connection:** End-game combat test for peak character progression.
 - **MVP scope:**
   - Add `ma-giao-truong-lao` entry to `src/game/enemyCatalog.js` with special visual tint/scale.
-  - Place single boss spawn in `dongMonThanhMap.js` at Camp 18 center.
+  - Place single boss spawn in `src/game/maps/dongMonThanhMap.js` at Camp 18 center.
   - Server-authoritative 180s respawn timer and high-value reward payout in `server/src/rewards.js`.
 - **Optional extensions:**
   - Boss telegraphing visual effect (red ground circle before AoE attack).
-  - Server-wide defeat announcement chat broadcast in `ChatPanel.jsx`.
+  - Server-wide defeat announcement chat broadcast in `src/components/HUD/ChatPanel.jsx`.
 - **Dependencies:** `src/game/enemyCatalog.js`, `src/game/maps/dongMonThanhMap.js`, `server/src/websocket/gameSocket.js`.
 - **Risks and trade-offs:** Boss must be leashed properly to Camp 18 so it cannot be lured to the map entry portal.
 - **Effort:** S — Enemy catalog addition, map spawn placement, and reward tuning.
@@ -195,12 +195,12 @@ The implemented gameplay loop follows a classic ARPG structure:
 ### Next
 High-value, well-understood features ready for immediate implementation:
 1. **Target Selection & Visual Lock Indicator [P1]:** Low risk, immediate combat clarity improvement.
-2. **Remaining Sect Skill Kits (Võ Đang, Nga My, Ngũ Độc) [P1]:** Fulfills core class identity, fully designed in `sect-skills.md`.
+2. **Remaining Sect Skill Kits (Võ Đang, Nga My, Ngũ Độc) [P1]:** Fulfills core class identity, fully designed in `docs/plan/sect-skills.md`.
 3. **Equipment Enhancement System [P1]:** Connects existing `huyen-kim-thach` drops and silver to character power progression.
 
 ### Validate first
 Features requiring gameplay balance check or technical spike:
-1. **Daily Bounty Quest System [P2]:** Validate UI presentation in `MinimapPanel.jsx` and server bounty persistence model.
+1. **Daily Bounty Quest System [P2]:** Validate UI presentation in `src/components/HUD/MinimapPanel.jsx` and server bounty persistence model.
 2. **Elite Boss Encounter [P2]:** Playtest Camp 18 stat tuning to ensure boss challenge is rewarding without being impossible solo.
 
 ### Later
@@ -253,7 +253,7 @@ Longer-term expansions and future content iterations:
 
 ## Deferred ideas
 
-- **Real-Time PvP Arena / Guild Wars:** Out of scope for current single-player / co-op focus; existing duel mechanics in `pvp.js` suffice for current stage.
+- **Real-Time PvP Arena / Guild Wars:** Out of scope for current single-player / co-op focus; existing duel mechanics in `src/game/pvp.js` suffice for current stage.
 - **Auction House / Trade Market:** Excessive complexity for current player count; NPC shop and direct drops meet economy needs.
 - **Gacha / Paid Loot Boxes:** Explicitly rejected to preserve authentic wuxia RPG mechanics and avoid manipulative monetization loops.
 
