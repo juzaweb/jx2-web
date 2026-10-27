@@ -42,7 +42,7 @@ import {
   normalizeProgress,
   progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, skillMpCost, skillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
+import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable, skillLearnable, skillLockReason } from "../../../src/game/skills.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
 import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
@@ -1585,10 +1585,12 @@ export class GameSocketManager {
     if (skill) {
       const readyAt = player.skillReadyAt[skillId] || 0;
       if (now < readyAt) return;
-      player.skillReadyAt[skillId] = now + skillCooldown(skillId);
+      // Test mode reports 0, so the stamp never blocks the next cast.
+      player.skillReadyAt[skillId] = now + effectiveSkillCooldown(skillId);
     }
 
-    const cost = skillMpCost(skillId);
+    // Test mode reports 0, so the in-memory pool is never debited.
+    const cost = effectiveSkillMpCost(skillId);
     if (cost > 0) {
       if (player.mp < cost) {
         // Refuse the cast and resync the caster so its HUD matches the server.

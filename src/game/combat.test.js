@@ -848,6 +848,38 @@ describe("skill targeting", () => {
     expect(ui.addLog).not.toHaveBeenCalled();
   });
 
+  it("frees casts from MP and cooldown in test mode", () => {
+    vi.stubEnv("VITE_TEST_MODE", "true");
+    try {
+      const { combat } = makeCombat();
+      const skill = {
+        id: "dai_tu_di_chuong",
+        slot: 1,
+        unlockLevel: 1,
+        mp: 12,
+        cooldown: 6000,
+        radius: 0,
+        range: 6000,
+        mult: 1.3,
+        vfx: {}
+      };
+      combat.applySkill = vi.fn();
+      combat.showFloatText = vi.fn();
+      combat.player.stats.mp = 0;
+
+      expect(combat.isSkillReady(skill)).toBe(true);
+
+      // Two casts at the same instant: no MP gate, and no cooldown is started.
+      combat.executeSkill(skill, null);
+      combat.executeSkill(skill, null);
+
+      expect(combat.applySkill).toHaveBeenCalledTimes(2);
+      expect(combat.skillCooldowns.get(skill.id)).toBe(combat.scene.time.now);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("nearestEnemyInReach prefers scene.enemyTarget if in reach", () => {
     const wolf1 = wolf("wolf1", 100, 0);
     const wolf2 = wolf("wolf2", 50, 0);

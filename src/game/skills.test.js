@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { translateFor } from "../i18n/translator.js";
@@ -13,6 +13,8 @@ import {
   skillForSlot,
   skillMpCost,
   skillCooldown,
+  effectiveSkillMpCost,
+  effectiveSkillCooldown,
   skillRequires,
   skillLockReason,
   skillUnlocked,
@@ -229,6 +231,26 @@ describe("skill catalog", () => {
     expect(skillMpCost("normal")).toBe(0);
     expect(skillMpCost("__proto__")).toBe(0);
     expect(skillCooldown("bogus")).toBe(0);
+  });
+
+  it("keeps the catalog costs in normal play", () => {
+    vi.stubEnv("VITE_TEST_MODE", "false");
+    try {
+      expect(effectiveSkillMpCost("nhu_lai_than_chuong")).toBe(35);
+      expect(effectiveSkillCooldown("nhu_lai_than_chuong")).toBe(30000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("waives both casting costs in test mode", () => {
+    vi.stubEnv("VITE_TEST_MODE", "true");
+    try {
+      expect(effectiveSkillMpCost("nhu_lai_than_chuong")).toBe(0);
+      expect(effectiveSkillCooldown("nhu_lai_than_chuong")).toBe(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("gates skills by level", () => {

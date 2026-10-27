@@ -449,6 +449,50 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
+  await t.test("Test mode casts spend no MP and start no cooldown", async () => {
+    process.env.TEST_MODE = "true";
+    try {
+      store.setInventory("char_test_mode", { "bao-tay-lang-khach": 1 });
+      store.addLearnedSkill("char_test_mode", "dai_tu_di_chuong");
+
+      const observer = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+      await join(observer, { characterId: "char_test_watch" });
+      const caster = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+      await join(caster, { characterId: "char_test_mode" });
+      caster.send({ type: "equip_item", payload: { itemId: "bao-tay-lang-khach" } });
+      await caster.waitFor(
+        (m) => m.type === "equipment_sync" && m.payload.equipment.weapon === "bao-tay-lang-khach"
+      );
+
+      const castBy = (m) => m.type === "player_attacked" && m.payload.id === "char_test_mode";
+      caster.send({
+        type: "player_attack",
+        payload: { skill: "dai_tu_di_chuong", x: 5300, y: 5000, facingRight: true }
+      });
+      await observer.waitFor(castBy);
+
+      assert.equal(
+        caster.messages.some((m) => m.type === "player_mp" && m.payload.mp !== 60),
+        false,
+        "a test-mode cast never debits the server-owned pool"
+      );
+
+      // Past the attack cadence: only the 6s skill cooldown could refuse this.
+      await sleep(600);
+      caster.send({
+        type: "player_attack",
+        payload: { skill: "dai_tu_di_chuong", x: 5200, y: 5000, facingRight: true }
+      });
+      const again = await observer.waitFor((m) => castBy(m) && m.payload.x === 5200);
+      assert.equal(again.payload.skill, "dai_tu_di_chuong");
+
+      await caster.close();
+      await observer.close();
+    } finally {
+      delete process.env.TEST_MODE;
+    }
+  });
+
   await t.test("Stun is applied by the server and holds the monster still", async () => {
     // Gloves carry the stun skill; the join hands out a sword.
     store.setInventory("char_stun", { "bao-tay-lang-khach": 1 });

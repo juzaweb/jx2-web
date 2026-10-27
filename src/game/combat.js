@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { parseEnemyReward } from "./rewardSync.js";
-import { skillById, skillsForWeapon, skillMpCost, skillLockReason, skillUsable } from "./skills.js";
+import { skillById, skillsForWeapon, effectiveSkillMpCost, effectiveSkillCooldown, skillLockReason, skillUsable } from "./skills.js";
 import {
   playSkillCastVfx,
   playSkillImpactVfx,
@@ -353,7 +353,7 @@ export class CombatSystem {
     const readyAt = this.skillCooldowns.get(skill.id) || 0;
     if (now < readyAt) return false;
     if (!skillUsable(skill, this.player.stats?.level ?? 1, this.learnedSkills)) return false;
-    if ((this.player.stats?.mp ?? 0) < skillMpCost(skill.id)) return false;
+    if ((this.player.stats?.mp ?? 0) < effectiveSkillMpCost(skill.id)) return false;
     return true;
   }
 
@@ -379,7 +379,7 @@ export class CombatSystem {
       this.ui.addLog(this.skillLockMessage(skill));
       return false;
     }
-    if (this.player.stats.mp < skillMpCost(skill.id)) {
+    if (this.player.stats.mp < effectiveSkillMpCost(skill.id)) {
       this.ui.addLog("Nội lực không đủ để thi triển chiêu thức.");
       return false;
     }
@@ -395,10 +395,12 @@ export class CombatSystem {
   executeSkill(skill, target, aimPoint = null) {
     if (!this.canCast(skill)) return;
     const now = this.scene.time?.now ?? 0;
+    // Test mode reports 0, so a whole kit can be cast back to back.
+    const cooldownMs = effectiveSkillCooldown(skill.id);
 
     // Cooldown is a local pacing hint; MP is only mirrored from the server's
     // `player_mp`, so the client never spends a pool it does not own.
-    this.skillCooldowns.set(skill.id, now + skill.cooldown);
+    this.skillCooldowns.set(skill.id, now + cooldownMs);
     // Turn toward the target before the motion starts so the body, the VFX and
     // the packet that peers replay all agree on the direction.
     this.aimAt(target || aimPoint);
@@ -431,7 +433,7 @@ export class CombatSystem {
     bridge.emit(EVENTS.SKILL_CAST, {
       slot: skill.slot,
       skillId: skill.id,
-      cooldown: skill.cooldown,
+      cooldown: cooldownMs,
       readyAt: this.skillCooldowns.get(skill.id)
     });
 
