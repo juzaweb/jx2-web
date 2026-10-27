@@ -520,6 +520,24 @@ describe("HeroRigView sword swing", () => {
     expect(view.attack("slash")).toBe(false);
     expect(view.bodySprite.texture).toBe("hero-body-male");
   });
+
+  it("swings the female sword art for a female hero", () => {
+    const scene = makeSpriteScene([
+      "hero-body-female",
+      "hero-body-female-sword",
+      "hero-body-female-sword-attack"
+    ]);
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "female");
+    expect(view.bodySprite.texture).toBe("hero-body-female-sword");
+
+    expect(view.attack("slash")).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-female-sword-attack");
+
+    timers[0].tick(4);
+    expect(view.bodySprite.texture).toBe("hero-body-female-sword");
+  });
 });
 
 describe("HeroRigView modular clothing overlays", () => {

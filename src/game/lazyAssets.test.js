@@ -182,7 +182,7 @@ describe("ensureHeroBodyTexture", () => {
 });
 
 describe("ensureWeaponBodyTexture", () => {
-  it("queues the sword sheet for a male hero holding a sword", () => {
+  it("queues the sword sheet for a hero holding a sword", () => {
     const scene = makeScene();
 
     expect(ensureWeaponBodyTexture(scene, "male", "kiem")).toBe(false);
@@ -191,17 +191,30 @@ describe("ensureWeaponBodyTexture", () => {
         "spritesheet",
         "hero-body-male-sword",
         expect.stringContaining("/hero-body-male-sword.png"),
-        { frameWidth: 128, frameHeight: 160 }
+        { frameWidth: 148, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+
+    const femaleScene = makeScene();
+
+    expect(ensureWeaponBodyTexture(femaleScene, "female", "kiem")).toBe(false);
+    expect(femaleScene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-female-sword",
+        expect.stringContaining("/hero-body-female-sword.png"),
+        { frameWidth: 150, frameHeight: 160 }
       ],
       ["start"]
     ]);
   });
 
-  it("queues nothing for weapons or genders without their own sheet", () => {
+  it("queues nothing for weapons without their own sheet", () => {
     const scene = makeScene();
 
     expect(ensureWeaponBodyTexture(scene, "male", "dao")).toBe(false);
-    expect(ensureWeaponBodyTexture(scene, "female", "kiem")).toBe(false);
+    expect(ensureWeaponBodyTexture(scene, "female", "dao")).toBe(false);
     expect(ensureWeaponBodyTexture(scene, "male", null)).toBe(false);
     expect(scene.calls).toEqual([]);
   });
@@ -230,10 +243,25 @@ describe("ensureWeaponAttackTexture", () => {
     ]);
   });
 
-  it("queues nothing for looks without swing art", () => {
+  it("queues the female swing sheet too", () => {
     const scene = makeScene();
 
     expect(ensureWeaponAttackTexture(scene, "female", "kiem")).toBe(false);
+    expect(scene.calls).toEqual([
+      [
+        "spritesheet",
+        "hero-body-female-sword-attack",
+        expect.stringContaining("/hero-body-female-sword-attack.png"),
+        { frameWidth: 192, frameHeight: 160 }
+      ],
+      ["start"]
+    ]);
+  });
+
+  it("queues nothing for looks without swing art", () => {
+    const scene = makeScene();
+
+    expect(ensureWeaponAttackTexture(scene, "female", "dao")).toBe(false);
     expect(ensureWeaponAttackTexture(scene, "male", "dao")).toBe(false);
     expect(scene.calls).toEqual([]);
   });

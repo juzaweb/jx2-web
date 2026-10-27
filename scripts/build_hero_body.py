@@ -29,13 +29,18 @@ sword neither shifts the horizontal anchor nor becomes the ground line.
 An animation that is swapped into the same rig (the attack swing) must draw the
 character at exactly the walk sheet's scale, or the hero visibly changes size
 mid-swing. Such a source declares `scale_from`, naming the output whose scale it
-reuses, plus an optional wider `frame_w` when its effect art reaches past the
-body.
+reuses.
+
+Cell sheets are drawn at the plain sheet's body height and declare a `frame_w`
+wide enough to hold the blade, so a hero keeps its size when it draws a weapon.
+`frame_w` is mirrored in src/game/heroBody.js and the script refuses to build a
+sheet whose blade does not fit instead of silently shrinking the character.
 
 Run: python3 scripts/build_hero_body.py
 """
 
 from collections import deque
+from math import ceil
 from pathlib import Path
 
 import numpy as np
@@ -69,6 +74,8 @@ SOURCES = {
         # Source row order: front, right-facing, left-facing, back.
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
         "align": "cell",
+        # Wider than FRAME_W: the dangling blade has to fit at full body height.
+        "frame_w": 148,
     },
     "hero-body-male-sword-attack.png": {
         # Same hero mid-swing, four frames per direction; the third frame holds
@@ -81,6 +88,23 @@ SOURCES = {
         "align": "cell",
         "frame_w": 192,
         "scale_from": "hero-body-male-sword.png",
+    },
+    "hero-body-female-sword.png": {
+        # Female counterpart of hero-body-male-sword.png, same layout.
+        "path": EXAMPLE / "nv-nu-camkiem.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
+        "frame_w": 150,
+    },
+    "hero-body-female-sword-attack.png": {
+        # Female swing sheet; see hero-body-male-sword-attack.png above.
+        "path": EXAMPLE / "nv-nu-chem.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
+        "frame_w": 192,
+        "scale_from": "hero-body-female-sword.png",
     },
 }
 
@@ -397,7 +421,7 @@ def _blit(dst, src, x, y, clip=None):
     dst.alpha_composite(src.crop((src_x, src_y, src_x + width, src_y + height)), (dst_x, dst_y))
 
 
-def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
+def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None, label=None):
     """`cell` layout: keep the source grid and anchor on the body itself.
 
     Used for sheets that already hold a weapon. Each pose is cropped from its
@@ -407,9 +431,10 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
     the silhouette) keeps the blade from dragging the character off-centre and
     from becoming the ground line.
 
-    `scale` overrides the computed one so a companion sheet (the attack swing)
-    renders the hero at the same size as this one. `frame_w` widens the frame for
-    art that reaches further than the body, such as a slash arc.
+    The body is drawn at the plain sheet's height (CONTENT_H) and `frame_w` is
+    the frame width that must hold the blade beside it. `scale` overrides the
+    height so a companion sheet (the attack swing) renders the hero at the same
+    size as this one.
     """
     rgba, downscale = _load_source(source)
     alpha = rgba[..., 3]
@@ -455,11 +480,11 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
                     "row": row,
                     "col": col,
                     "box": (left, top, left + cell_w, top + cell_h),
-                    "height": int(ys.max() - ys.min() + 1),
+                    "core_height": core_height,
                     "body_cx": body_cx,
                     "feet_y": float(feet_y),
                     # Widest reach of the silhouette (blade included) measured
-                    # from the body centre; drives the shared scale.
+                    # from the body centre; drives the frame width.
                     "half_extent": max(
                         abs(float(xs.min()) - body_cx),
                         abs(float(xs.max() + 1) - body_cx),
@@ -467,10 +492,22 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
                 }
             )
 
-    tallest = max(metric["height"] for metric in metrics)
+    # Scale on the body, not the silhouette: a raised blade would otherwise
+    # shrink the hero on the frames that hold it high.
+    tallest = max(metric["core_height"] for metric in metrics)
     widest = max(metric["half_extent"] for metric in metrics)
     if scale is None:
-        scale = min(CONTENT_H / tallest, (frame_w / 2 - FRAME_SAFE_MARGIN) / widest)
+        scale = CONTENT_H / tallest
+    # The frame width is a contract with the runtime (WEAPON_BODY_TEXTURES
+    # loads the sheet with it), so too narrow a frame is an error, not a silent
+    # resize.
+    needed_w = 2 * ceil(widest * scale + FRAME_SAFE_MARGIN)
+    if needed_w > frame_w:
+        raise SystemExit(
+            f"{label or source.name}: the blade needs a {needed_w}px frame "
+            f"(declared {frame_w}px); raise `frame_w` in SOURCES and mirror it "
+            "in src/game/heroBody.js"
+        )
 
     out = Image.new("RGBA", (frame_w * COLS, FRAME_H * ROWS), (0, 0, 0, 0))
     for metric in metrics:
@@ -491,9 +528,9 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None):
         )
 
     print(
-        f"  cell layout: frame {frame_w}x{FRAME_H} tallest={tallest}px "
+        f"  cell layout: frame {frame_w}x{FRAME_H} core={tallest}px "
         f"widest half-extent={widest:.0f}px -> scale {scale:.4f} "
-        f"(content {tallest * scale:.0f}px of {CONTENT_H}px, "
+        f"(core {tallest * scale:.0f}px tall, "
         f"reach {widest * scale:.0f}px of {frame_w / 2 - FRAME_SAFE_MARGIN:.0f}px)"
     )
     return out, scale
@@ -524,6 +561,7 @@ def build_sheet(filename, source, config, shared_scales):
             row_map,
             frame_w=config.get("frame_w", FRAME_W),
             scale=scale,
+            label=filename,
         )
     return build_frame_sheet(source, row_map), None
 

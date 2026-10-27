@@ -152,16 +152,18 @@ export function ensureWeaponVfx(scene, skills = []) {
 
 /**
  * Queue a body sheet (a gender sheet or one that already holds a weapon).
+ * A weapon sheet may use wider frames than the plain sheet, so it declares its
+ * own geometry; both flatten to the same 4x4 grid the rig indexes.
  * @param {import("phaser").Scene} scene
- * @param {{ url: string }} def
+ * @param {{ url: string, frameWidth?: number, frameHeight?: number }} def
  * @returns {boolean} `true` when the texture is usable right now
  */
 function queueBodySheet(scene, def) {
   if (!def) return false;
   return ensureSpritesheet(scene, def.key, {
     url: def.url,
-    frameWidth: HERO_BODY.frameWidth,
-    frameHeight: HERO_BODY.frameHeight
+    frameWidth: def.frameWidth ?? HERO_BODY.frameWidth,
+    frameHeight: def.frameHeight ?? HERO_BODY.frameHeight
   });
 }
 

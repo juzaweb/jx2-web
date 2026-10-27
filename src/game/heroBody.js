@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "10";
+const BODY_ASSET_VERSION = "12";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -23,20 +23,28 @@ export const HERO_BODY_TEXTURES = {
  * Body sheets that already paint the weapon in hand, keyed by weapon type then
  * gender. A sheet listed here replaces the gender sheet while that weapon type
  * is worn, and it declares the extra slots it draws so the rig stops stacking
- * its vector weapon on top of the blade (see `bakedSlots`). Only the male hero
- * ships sword art; other genders keep the plain sheet plus the vector weapon.
- * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png.
+ * its vector weapon on top of the blade (see `bakedSlots`). Both genders ship
+ * sword art; any other look keeps the plain sheet plus the vector weapon.
+ * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png (male) and
+ * docs/example/nv-nu-camkiem.png (female).
+ *
+ * Sword frames are wider than the 128px default and hold the same 140px body:
+ * the blade beside the hero needs the room, and drawing it at the plain sheet's
+ * height keeps the hero from shrinking when it draws a weapon. `frameWidth`
+ * must match the PNG geometry produced by the build script.
  *
  * `attack` is the matching swing sheet: four frames per direction, the third of
- * which carries the slash arc. Its frames are wider than the walk sheet because
- * the arc reaches past the body, and it reuses the walk sheet's scale so the
- * hero does not change size mid-swing.
+ * which carries the slash arc. Its frames are wider still because the arc
+ * reaches past the body, and it reuses the walk sheet's scale so the hero does
+ * not change size mid-swing.
  */
 export const WEAPON_BODY_TEXTURES = {
   kiem: {
     male: {
       key: "hero-body-male-sword",
       url: `/hero-body-male-sword.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 148,
+      frameHeight: 160,
       bakedSlots: ["weapon"],
       attack: {
         key: "hero-body-male-sword-attack",
@@ -44,6 +52,20 @@ export const WEAPON_BODY_TEXTURES = {
         frameWidth: 192,
         frameHeight: 160,
         /** Frames per direction in the swing sheet. */
+        frames: 4
+      }
+    },
+    female: {
+      key: "hero-body-female-sword",
+      url: `/hero-body-female-sword.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 150,
+      frameHeight: 160,
+      bakedSlots: ["weapon"],
+      attack: {
+        key: "hero-body-female-sword-attack",
+        url: `/hero-body-female-sword-attack.png?v=${BODY_ASSET_VERSION}`,
+        frameWidth: 192,
+        frameHeight: 160,
         frames: 4
       }
     }
@@ -189,10 +211,31 @@ export const HERO_BODY = {
 const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 1, 1, 1];
 
 /**
+ * One frame-stepped animation that ships beside a body sheet.
+ * @typedef {Object} WeaponAttackSheet
+ * @property {string} key Phaser texture key
+ * @property {string} url
+ * @property {number} frameWidth
+ * @property {number} frameHeight
+ * @property {number} frames Frames per direction in the sheet
+ */
+
+/**
+ * A body sheet that already paints the worn weapon.
+ * @typedef {Object} WeaponBodySheet
+ * @property {string} key Phaser texture key
+ * @property {string} url
+ * @property {number} frameWidth Wider than HERO_BODY when the blade needs room
+ * @property {number} frameHeight
+ * @property {string[]} bakedSlots Equipment slots this art already draws
+ * @property {WeaponAttackSheet} [attack] Matching swing animation
+ */
+
+/**
  * The weapon-holding sheet a gender has for a weapon type, if any.
  * @param {"male"|"female"|string} gender
  * @param {string|null} [weaponType]
- * @returns {{ key: string, url: string, bakedSlots: string[] }|null}
+ * @returns {WeaponBodySheet|null}
  */
 export function weaponBodyTextureDef(gender, weaponType = null) {
   if (!weaponType) return null;
@@ -206,7 +249,7 @@ export function weaponBodyTextureDef(gender, weaponType = null) {
  * swing animation (the rig then keeps its vector arc).
  * @param {"male"|"female"|string} gender
  * @param {string|null} [weaponType]
- * @returns {{ key: string, url: string, frameWidth: number, frameHeight: number, frames: number }|null}
+ * @returns {WeaponAttackSheet|null}
  */
 export function weaponAttackTextureDef(gender, weaponType = null) {
   return weaponBodyTextureDef(gender, weaponType)?.attack ?? null;
