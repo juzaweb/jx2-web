@@ -42,9 +42,9 @@ SOURCES = {
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
     },
     "hero-body-female.png": {
-        "path": EXAMPLE / "body-women.png",
-        # Source row order: front, left-facing, right-facing, back.
-        "row_map": {0: 0, LEFT_ROW: 1, RIGHT_ROW: 2, 3: 3},
+        "path": EXAMPLE / "body-women-v2.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
     },
 }
 

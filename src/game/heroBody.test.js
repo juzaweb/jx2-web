@@ -76,8 +76,8 @@ describe("heroBody", () => {
       expect(bakedEquipmentSlots("male")).toEqual(["pants", "armor", "helmet"]);
     });
 
-    it("leaves every overlay slot active for the female sheet", () => {
-      expect(bakedEquipmentSlots("female")).toEqual([]);
+    it("lists the clothing slots painted into the female sheet", () => {
+      expect(bakedEquipmentSlots("female")).toEqual(["pants", "armor", "helmet"]);
     });
 
     it("falls back to male for unknown genders", () => {

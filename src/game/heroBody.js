@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "6";
+const BODY_ASSET_VERSION = "7";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -20,16 +20,16 @@ export const HERO_BODY_TEXTURES = {
 };
 
 /**
- * Equipment slots a gender's body sheet already paints. The male sheet ships a
+ * Equipment slots a gender's body sheet already paints. Both sheets ship a
  * fully dressed character (hair, tunic, sash, trousers and boots), so stacking
- * the modular equipment sprites on top of it would double the clothing. Slots
+ * the modular equipment sprites on top of them would double the clothing. Slots
  * listed here are skipped by the rig for that gender; hands keep their weapon
  * and accessory overlays because those are not part of the body art.
  * @type {Record<"male"|"female", string[]>}
  */
 export const BODY_BAKED_SLOTS = {
   male: ["pants", "armor", "helmet"],
-  female: []
+  female: ["pants", "armor", "helmet"]
 };
 
 /**

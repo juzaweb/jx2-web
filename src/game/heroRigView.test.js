@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HeroRigView } from "./heroRigView.js";
-import { HERO_BODY } from "./heroBody.js";
+import { BODY_BAKED_SLOTS, HERO_BODY } from "./heroBody.js";
 
 /** Minimal Phaser scene stub: enough shape factories for the rig view. */
 function makeShape() {
@@ -211,14 +211,14 @@ describe("HeroRigView baked body", () => {
     expect(view.bodySprite.frame).toBe(8);
   });
 
-  it("draws equipment overlays on the baked body", () => {
+  it("draws weapon overlays on the female sheet", () => {
     const scene = makeSpriteScene();
     const view = new HeroRigView(scene);
 
-    view.set(2, { armor: "cam-y-bao", helmet: "tu-kim-quan" }, "female");
+    view.set(2, { weapon: "dao-lang-khach" }, "female");
 
+    expect(view.equipSprites).toEqual({});
     expect(scene._container.children.length).toBeGreaterThan(1);
-    expect(view.key).toContain("cam-y-bao");
   });
 
   it("skips the clothing slots baked into the male sheet", () => {
@@ -237,6 +237,22 @@ describe("HeroRigView baked body", () => {
     expect(view.key).toContain("ao-lang-khach");
   });
 
+  it("skips the clothing slots baked into the female sheet", () => {
+    const scene = makeSpriteScene([
+      "hero-body-female",
+      "hero-armor-lang-khach-female",
+      "hero-pants-lang-khach-male",
+      "hero-hat-non-mang"
+    ]);
+    const view = new HeroRigView(scene);
+
+    view.set(2, { armor: "ao-lang-khach", pants: "quan-lang-khach", helmet: "non-mang" }, "female");
+
+    expect(view.equipSprites).toEqual({});
+    expect(scene._container.children).toHaveLength(1); // body sprite only
+    expect(view.key).toContain("ao-lang-khach");
+  });
+
   it("keeps weapon and accessory overlays on the male sheet", () => {
     const scene = makeSpriteScene();
     const view = new HeroRigView(scene);
@@ -245,6 +261,18 @@ describe("HeroRigView baked body", () => {
 
     expect(view.equipSprites).toEqual({});
     expect(scene._container.children.length).toBeGreaterThan(1);
+  });
+});
+
+describe("HeroRigView modular clothing overlays", () => {
+  // Both shipped body sheets already paint the clothing, so the baked-slot
+  // table is cleared for this suite to keep the optional overlay path covered.
+  const baked = { ...BODY_BAKED_SLOTS };
+  beforeEach(() => {
+    BODY_BAKED_SLOTS.female = [];
+  });
+  afterEach(() => {
+    Object.assign(BODY_BAKED_SLOTS, baked);
   });
 
   it("instantiates modular equipment sprites when matching textures exist", () => {
