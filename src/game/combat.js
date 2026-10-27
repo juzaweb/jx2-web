@@ -182,25 +182,30 @@ export class CombatSystem {
   nearestEnemyInReach() {
     const locked = this.scene?.enemyTarget;
     if (locked && !locked.isDead && locked.active !== false) {
-      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, locked.x, locked.y);
-      if (dist <= MELEE_REACH) {
+      const dx = locked.x - this.player.x;
+      const dy = locked.y - this.player.y;
+      if (dx * dx + dy * dy <= MELEE_REACH * MELEE_REACH) {
         return locked;
       }
     }
 
-    const candidates = this.enemyManager
-      .getAlive()
-      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) < MELEE_REACH);
+    const px = this.player.x;
+    const py = this.player.y;
+    const reachSq = MELEE_REACH * MELEE_REACH;
+    let closest = null;
+    let minSq = reachSq;
 
-    if (!candidates.length) return null;
+    for (const wolf of this.enemyManager.getAlive()) {
+      const dx = wolf.x - px;
+      const dy = wolf.y - py;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < minSq) {
+        minSq = distSq;
+        closest = wolf;
+      }
+    }
 
-    candidates.sort(
-      (a, b) =>
-        Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
-        Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
-    );
-
-    return candidates[0];
+    return closest;
   }
 
   /**
@@ -536,15 +541,22 @@ export class CombatSystem {
    * @returns {Object|null}
    */
   aimedEnemyTarget(aim) {
-    const clicked = this.enemyManager
-      .getAlive()
-      .filter((wolf) => Phaser.Math.Distance.Between(aim.x, aim.y, wolf.x, wolf.y) <= 150)
-      .sort(
-        (a, b) =>
-          Phaser.Math.Distance.Between(aim.x, aim.y, a.x, a.y) -
-          Phaser.Math.Distance.Between(aim.x, aim.y, b.x, b.y)
-      );
-    return clicked[0] || null;
+    const px = aim.x;
+    const py = aim.y;
+    const maxSq = 150 * 150;
+    let closest = null;
+    let minSq = maxSq;
+
+    for (const wolf of this.enemyManager.getAlive()) {
+      const dx = wolf.x - px;
+      const dy = wolf.y - py;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= minSq) {
+        minSq = distSq;
+        closest = wolf;
+      }
+    }
+    return closest;
   }
 
   /**
@@ -552,15 +564,22 @@ export class CombatSystem {
    * @returns {Object|null}
    */
   nearestEnemyTarget() {
-    const nearest = this.enemyManager
-      .getAlive()
-      .filter((wolf) => Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y) <= 600)
-      .sort(
-        (a, b) =>
-          Phaser.Math.Distance.Between(this.player.x, this.player.y, a.x, a.y) -
-          Phaser.Math.Distance.Between(this.player.x, this.player.y, b.x, b.y)
-      );
-    return nearest[0] || null;
+    const px = this.player.x;
+    const py = this.player.y;
+    const maxSq = 600 * 600;
+    let closest = null;
+    let minSq = maxSq;
+
+    for (const wolf of this.enemyManager.getAlive()) {
+      const dx = wolf.x - px;
+      const dy = wolf.y - py;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= minSq) {
+        minSq = distSq;
+        closest = wolf;
+      }
+    }
+    return closest;
   }
 
   /**
@@ -932,19 +951,37 @@ export class CombatSystem {
 
     if (skill.radius > 0) {
       const origin = center || { x: this.player.x, y: this.player.y };
-      const distanceToCenter = (wolf) =>
-        Phaser.Math.Distance.Between(origin.x, origin.y, wolf.x, wolf.y);
-      return alive
-        .filter((wolf) => distanceToCenter(wolf) <= skill.radius)
-        .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));
+      const radiusSq = skill.radius * skill.radius;
+      const targets = [];
+      for (const wolf of alive) {
+        const dx = wolf.x - origin.x;
+        const dy = wolf.y - origin.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= radiusSq) {
+          targets.push({ wolf, distSq });
+        }
+      }
+      targets.sort((a, b) => a.distSq - b.distSq);
+      return targets.map((t) => t.wolf);
     }
 
-    const playerDistanceTo = (wolf) =>
-      Phaser.Math.Distance.Between(this.player.x, this.player.y, wolf.x, wolf.y);
+    const px = this.player.x;
+    const py = this.player.y;
     const range = this.skillReach(skill);
-    const nearest = alive
-      .filter((wolf) => playerDistanceTo(wolf) <= range)
-      .sort((a, b) => playerDistanceTo(a) - playerDistanceTo(b))[0];
+    const rangeSq = range * range;
+    let nearest = null;
+    let minSq = rangeSq;
+
+    for (const wolf of alive) {
+      const dx = wolf.x - px;
+      const dy = wolf.y - py;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= minSq) {
+        minSq = distSq;
+        nearest = wolf;
+      }
+    }
+
     return nearest ? [nearest] : [];
   }
 
