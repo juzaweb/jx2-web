@@ -226,10 +226,12 @@ const KIEM_KHI_SKILL = {
    */
   splash: { radius: 170, mult: 0.6, maxTargets: 4 },
   vfx: {
-    /** A blade-shaped shard of qi flies from the hero to the victim, then bursts. */
+    /**
+     * A blade-shaped shard of qi flies from the hero to the victim, then bursts.
+     * `projectile` replaces the gesture arc entirely (see `playSkillCastVfx`), so
+     * there is no `cast` kind: `impact: null` leaves the arrival to the shard.
+     */
     projectile: "sword",
-    /** The hero still swings its arm; `impact: null` leaves the arrival to the shard. */
-    cast: "slash",
     impact: null,
     color: 0x9be8ff
   }

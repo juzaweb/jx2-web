@@ -866,7 +866,7 @@ export class JiangHuScene extends Phaser.Scene {
    * Use a hotbar quick slot or a concrete item id.
    * The numbered bar passes a slot number; the bag passes the item it shows, so
    * using an item never depends on where (or whether) it is bound to a slot.
-   * A slot bound to a sect skill casts it instead.
+   * A slot bound to a weapon skill casts it instead.
    * @param {number|string} slotOrItemId
    */
   useItem(slotOrItemId) {
@@ -1369,7 +1369,7 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   /**
-   * Explain a refused cast (foreign sect, locked technique, passive).
+   * Explain a refused cast (foreign weapon, unlearned technique, passive).
    * @param {{skillId?:string, reason?:string}} payload
    */
   handleSkillRejected(payload = {}) {

@@ -456,7 +456,7 @@ describe("CombatSystem kill rewards", () => {
 describe("CombatSystem hand assignments and self-skill gating", () => {
   const makeCombat = () => {
     const player = {
-      sect: "thieu-lam",
+      weaponType: "bao-tay",
       stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100 },
       x: 100,
       y: 100
@@ -710,7 +710,7 @@ describe("skill targeting", () => {
     const { combat, scene } = makeCombat();
     const skill = {
       id: "nhu_lai_than_chuong",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 5,
       nameKey: "skills.thieuLam.nhuLaiThanChuong.name",
       unlockLevel: 10,
@@ -743,7 +743,7 @@ describe("skill targeting", () => {
     const { combat, scene } = makeCombat();
     const skill = {
       id: "dai_tu_di_chuong",
-      sect: "thieu-lam",
+      weapon: "bao-tay",
       slot: 1,
       nameKey: "skills.thieuLam.daiTuDiChuong.name",
       unlockLevel: 1,
@@ -862,15 +862,15 @@ describe("skill targeting", () => {
 });
 
 describe("CombatSystem passive art ownership", () => {
-  const makePlayer = (sect = "thieu-lam", hp = 50) => ({
-    sect,
+  const makePlayer = (weaponType = "bao-tay", hp = 50) => ({
+    weaponType,
     x: 0,
     y: 0,
     stats: { level: 1, hp, maxHp: 100, mp: 60, maxMp: 60 }
   });
 
-  const makeCombat = ({ sect = "thieu-lam", hp = 50 } = {}) => {
-    const player = makePlayer(sect, hp);
+  const makeCombat = ({ weaponType = "bao-tay", hp = 50 } = {}) => {
+    const player = makePlayer(weaponType, hp);
     const scene = {
       time: { now: 0 },
       networkClient: { isConnected: true }
@@ -924,7 +924,7 @@ describe("CombatSystem channelled flurry", () => {
 
   const makeCombat = ({ wolves = [], peers = [] } = {}) => {
     const player = {
-      sect: "thieu-lam",
+      weaponType: "bao-tay",
       x: 0,
       y: 0,
       pkFlag: true,

@@ -570,47 +570,6 @@ export class PlayerDatabase {
     return this.setLearnedSkills(playerId, [...learned, skillId]);
   }
 
-  // --- Learned skills ---
-
-  /**
-   * Skill ids the character has learned. Starter skills are not stored; readers
-   * treat them as always known.
-   * @param {string} playerId
-   * @returns {string[]}
-   */
-  getLearnedSkills(playerId) {
-    const row = this.stmtGet.get(playerId);
-    return row ? this._parseLearned(row.learned_skills) : [];
-  }
-
-  /**
-   * Replace the learned-skill list, dropping duplicates and non-strings.
-   * @param {string} playerId
-   * @param {string[]} skills
-   * @returns {string[]}
-   */
-  setLearnedSkills(playerId, skills = []) {
-    this._ensureRow(playerId);
-    const clean = Array.from(
-      new Set((Array.isArray(skills) ? skills : []).filter((id) => typeof id === "string" && id))
-    );
-    this.stmtUpdateLearned.run(JSON.stringify(clean), Date.now(), playerId);
-    return clean;
-  }
-
-  /**
-   * Record one newly learned skill. Returns the merged list.
-   * @param {string} playerId
-   * @param {string} skillId
-   * @returns {string[]}
-   */
-  addLearnedSkill(playerId, skillId) {
-    if (typeof skillId !== "string" || !skillId) return this.getLearnedSkills(playerId);
-    const learned = this.getLearnedSkills(playerId);
-    if (learned.includes(skillId)) return learned;
-    return this.setLearnedSkills(playerId, [...learned, skillId]);
-  }
-
   /**
    * Whether this character has already imported a legacy local save.
    * @param {string} playerId

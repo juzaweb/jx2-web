@@ -102,7 +102,8 @@ portals, quest claim.
 
 ### Phase 2 — Server combat authority
 
-1. `handlePlayerAttack`: accept only owned and unlocked skills (`skillUnlocked`),
+1. `handlePlayerAttack`: accept only skills of the worn weapon that the hero has
+   learned and levelled (`skillUsable` + `skill.weapon === player.weaponType`),
    derive attack cadence from attack speed, apply self heal/buff effects on the
    server, record `lastCast` / `lastSwing`.
 2. `handleEnemyHit`: normal attacks recompute with `computeDamage(derived, enemy)`,

@@ -37,7 +37,10 @@ export function SkillsModal({
   const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   const tree = useMemo(() => buildSkillTree(skills), [skills]);
-  const defaultId = useMemo(() => initialSelectedId(skills, level), [skills, level]);
+  const defaultId = useMemo(
+    () => initialSelectedId(skills, level, learnedSkills),
+    [skills, level, learnedSkills]
+  );
   const selectedId = skills.some((skill) => skill?.id === pickedId) ? pickedId : defaultId;
   const selectedSkill = skills.find((skill) => skill?.id === selectedId) || null;
 
