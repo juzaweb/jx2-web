@@ -2,7 +2,10 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { promisify } from "node:util";
 import { config } from "../config.js";
+
+const scryptAsync = promisify(crypto.scrypt);
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 const MIN_PASSWORD_LENGTH = 6;
@@ -91,7 +94,7 @@ export class UserDatabase {
    * @param {string} [role="player"]
    * @returns {Object} Sanitized user profile
    */
-  register(username, password, displayName = "", role = "player") {
+  async register(username, password, displayName = "", role = "player") {
     if (!username || typeof username !== "string" || !USERNAME_REGEX.test(username.trim())) {
       const err = new Error("Tên tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.");
       err.code = "INVALID_USERNAME";
@@ -123,7 +126,8 @@ export class UserDatabase {
       : username.trim();
 
     const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");
+    const derivedKey = await scryptAsync(password, salt, 64);
+    const passwordHash = derivedKey.toString("hex");
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
 
@@ -148,7 +152,7 @@ export class UserDatabase {
    * @param {string} password
    * @returns {Object} Sanitized user profile
    */
-  login(username, password) {
+  async login(username, password) {
     if (
       !username ||
       !password ||
@@ -170,8 +174,7 @@ export class UserDatabase {
       throw err;
     }
 
-    const candidateHash = crypto.scryptSync(password, user.salt, 64).toString("hex");
-    const candidateBuf = Buffer.from(candidateHash, "hex");
+    const candidateBuf = await scryptAsync(password, user.salt, 64);
     const storedBuf = Buffer.from(user.password_hash, "hex");
 
     if (candidateBuf.length !== storedBuf.length || !crypto.timingSafeEqual(candidateBuf, storedBuf)) {

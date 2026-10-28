@@ -119,7 +119,7 @@ test("WebSocket server-authority suite", async (t) => {
     ({ userDb } = await import("../src/data/userDb.js"));
 
     // An admin account is required for the GM tests
-    adminUserId = userDb.register("admin_ws_test", "123456", "Quản Trị Viên", "admin").id;
+    adminUserId = (await userDb.register("admin_ws_test", "123456", "Quản Trị Viên", "admin")).id;
 
     const app = createApp();
     server = http.createServer(app);
