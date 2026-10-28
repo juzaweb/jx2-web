@@ -723,8 +723,12 @@ export class GameSocketManager {
         // would otherwise delete the registration we are about to overwrite, and
         // announce a player_left for the very player that just reconnected.
         existing.ws.__superseded = true;
+        // Tell the old client why before closing: otherwise it treats this as a
+        // dropped network and keeps auto-reconnecting, kicking the new device in
+        // a tug-of-war that leaves both players frozen on the connection gate.
+        this.send(existing.ws, { type: "session_superseded", payload: {} });
         try {
-          existing.ws.close();
+          existing.ws.close(4001, "superseded");
         } catch {
           // ignore
         }

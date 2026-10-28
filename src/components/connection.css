@@ -83,6 +83,47 @@
   font-style: italic;
 }
 
+.connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.connection-button {
+  min-width: 132px;
+  padding: 10px 16px;
+  border: 2px solid #d4af37;
+  background: #361b18;
+  color: #f7e8c6;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.connection-button:hover,
+.connection-button:focus-visible {
+  background: #d4af37;
+  color: #241710;
+  outline: none;
+}
+
+.connection-button--secondary {
+  border-color: #8e7343;
+  background: transparent;
+  color: #d5d9d2;
+}
+
+.connection-button--secondary:hover,
+.connection-button--secondary:focus-visible {
+  background: #8e7343;
+  border-color: #8e7343;
+  color: #14100c;
+}
+
 @keyframes connection-spin {
   to {
     transform: rotate(360deg);

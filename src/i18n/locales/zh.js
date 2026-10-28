@@ -18,7 +18,14 @@ export default {
     eyebrow: "江湖中斷",
     title: "连接已断开",
     desc: "无法连接至{server}服务器。为保护您的进度，行走已暂停。",
-    hint: "正在自动重新连接，请稍候。"
+    hint: "正在自动重新连接，请稍候。",
+    retry: "立即重试",
+    relogin: "重新登录",
+    reasons: {
+      auth: "登录会话已失效，请重新登录以继续。",
+      character: "该角色不再属于此账号，请重新登录。",
+      superseded: "该账号正在其他设备上登录，角色已暂时离开江湖。"
+    }
   },
   language: {
     label: "语言",

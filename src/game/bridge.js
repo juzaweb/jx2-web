@@ -77,6 +77,11 @@ export const EVENTS = {
   SHOP_RESULT: "SHOP_RESULT",
   /** Socket gate state for the overlay (payload: {connected}). */
   NETWORK_STATE: "NETWORK_STATE",
+  /**
+   * The connection cannot recover on its own (rejected join / same character on
+   * another device). Payload: {reason: "auth"|"character"|"superseded"}.
+   */
+  CONNECTION_ISSUE: "CONNECTION_ISSUE",
 
   // React -> Phaser
   ACTION_START: "ACTION_START",
@@ -107,5 +112,9 @@ export const EVENTS = {
   /** Fired after the hero arrives on a new map (payload: {mapId, name}). */
   MAP_CHANGED: "MAP_CHANGED",
   /** Fired when the server refuses a portal move. */
-  MAP_CHANGE_REJECTED: "MAP_CHANGE_REJECTED"
+  MAP_CHANGE_REJECTED: "MAP_CHANGE_REJECTED",
+  /** Ask the scene to retry the socket now, bypassing reconnect backoff. */
+  ACTION_RETRY_CONNECTION: "ACTION_RETRY_CONNECTION",
+  /** Leave the world: stop the socket (and its auto-reconnect) until the next join. */
+  ACTION_LEAVE_WORLD: "ACTION_LEAVE_WORLD"
 };

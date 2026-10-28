@@ -256,6 +256,26 @@ test("WebSocket server-authority suite", async (t) => {
     await observer.close();
   });
 
+  await t.test("A second socket for the same character supersedes the old one", async () => {
+    const first = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(first, { characterId: "char_supersede" });
+
+    // Register the close listener before the supersede lands, or the code is lost.
+    const closed = new Promise((resolve) => first.ws.on("close", (code) => resolve(code)));
+
+    const second = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    const init = await join(second, { characterId: "char_supersede" });
+    assert.equal(init.type, "init_world");
+
+    // The old client is told why, so it stops auto-reconnecting instead of
+    // stealing the character back in an endless loop.
+    const notice = await first.waitFor((m) => m.type === "session_superseded");
+    assert.ok(notice);
+    assert.equal(await closed, 4001);
+
+    await second.close();
+  });
+
   await t.test("Multiplayer broadcast: move, attack, chat, and leave", async () => {
     const client1 = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     const client2 = await createTestClient(`ws://127.0.0.1:${port}/ws`);

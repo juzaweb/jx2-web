@@ -152,6 +152,9 @@ export function App() {
   // itself and this overlay covers the HUD until the reconnect lands.
   const [isNetworkConnected, setIsNetworkConnected] = useState(false);
   const [isConnectionGated, setIsConnectionGated] = useState(false);
+  // Non-null when the socket cannot recover on its own (invalid session,
+  // character gone, or the same account took over from another device).
+  const [connectionIssue, setConnectionIssue] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
@@ -408,6 +411,10 @@ export function App() {
       setIsNetworkConnected(!!state?.connected);
     });
 
+    const unsubConnectionIssue = bridge.on(EVENTS.CONNECTION_ISSUE, (issue) => {
+      setConnectionIssue(issue || null);
+    });
+
     const unsubGmModal = bridge.on(EVENTS.GM_MODAL_TOGGLE, () => {
       setIsGmOpen((prev) => !prev);
     });
@@ -425,6 +432,7 @@ export function App() {
       unsubShopOpened();
       unsubShopResult();
       unsubNetwork();
+      unsubConnectionIssue();
       unsubGmModal();
     };
   }, []);
@@ -433,13 +441,18 @@ export function App() {
   // so a normal handshake never flashes it. The scene freezes itself at once;
   // this only governs what the player is told.
   useEffect(() => {
+    // A terminal issue has no auto-recovery to wait for, so cover the HUD at once.
+    if (connectionIssue) {
+      setIsConnectionGated(true);
+      return undefined;
+    }
     if (isNetworkConnected || !activeCharacter) {
       setIsConnectionGated(false);
       return undefined;
     }
     const timer = setTimeout(() => setIsConnectionGated(true), CONNECTION_GATE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isNetworkConnected, activeCharacter]);
+  }, [isNetworkConnected, activeCharacter, connectionIssue]);
 
   // Closing the help overlay also lifts the pause it applied. Opening a docked
   // panel (character / inventory) dismisses help the same way.
@@ -712,6 +725,7 @@ export function App() {
   const handleLoginSuccess = useCallback((session) => {
     setCurrentUser({ ...session.user, token: session.token });
     setActiveCharacter(null);
+    setConnectionIssue(null);
     setLearnedSkills([]);
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
@@ -727,6 +741,7 @@ export function App() {
     setIsMinimapOpen(!isTouch);
     setIsChatOpen(!isTouch);
     setIsConnectionGated(false);
+    setConnectionIssue(null);
 
     writeSession({
       ...(readSession() || {}),
@@ -778,22 +793,37 @@ export function App() {
     });
   }, []);
 
+  // Drop the current session and return to the login screen. No confirmation:
+  // this is reached from a connection gate the player cannot dismiss otherwise.
+  const resetToLogin = useCallback(() => {
+    clearSession();
+    setCurrentUser(null);
+    setActiveCharacter(null);
+    setIsConnectionGated(false);
+    setConnectionIssue(null);
+    setLearnedSkills([]);
+    StorageManager.setUserId(null);
+    StorageManager.setCharacterId(null);
+    setEquipment(defaultEquipment());
+    setIsLoginOpen(true);
+    bridge.emit(EVENTS.SET_PLAYER_GENDER, "male");
+    bridge.emit(EVENTS.SET_PLAYER_NAME, t("app.defaultPlayerName"));
+    bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+    // Emit last: SET_PLAYER_NAME re-joins, and the leave must win so the socket
+    // stops reconnecting while the login screen is up.
+    bridge.emit(EVENTS.ACTION_LEAVE_WORLD);
+  }, [t]);
+
+  const handleRetryConnection = useCallback(() => {
+    setConnectionIssue(null);
+    bridge.emit(EVENTS.ACTION_RETRY_CONNECTION);
+  }, []);
+
   const handleLogout = useCallback(() => {
     if (window.confirm(t("app.confirmLogout"))) {
-      clearSession();
-      setCurrentUser(null);
-      setActiveCharacter(null);
-      setIsConnectionGated(false);
-      setLearnedSkills([]);
-      StorageManager.setUserId(null);
-      StorageManager.setCharacterId(null);
-      setEquipment(defaultEquipment());
-      setIsLoginOpen(true);
-      bridge.emit(EVENTS.SET_PLAYER_GENDER, "male");
-      bridge.emit(EVENTS.SET_PLAYER_NAME, t("app.defaultPlayerName"));
-      bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+      resetToLogin();
     }
-  }, [t]);
+  }, [resetToLogin, t]);
 
   // The equipped weapon selects the skill kit shown in the HUD and the F5 tree.
   const weaponType = equippedWeaponType(equipment) || "kiem";
@@ -1001,7 +1031,12 @@ export function App() {
       />
 
       {/* Hard connection gate: the world stays frozen until the socket is back */}
-      <ConnectionLostOverlay visible={!!activeCharacter && isConnectionGated} />
+      <ConnectionLostOverlay
+        visible={!!activeCharacter && isConnectionGated}
+        issue={connectionIssue?.reason || null}
+        onRetry={handleRetryConnection}
+        onRelogin={resetToLogin}
+      />
     </main>
   );
 }

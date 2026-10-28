@@ -18,7 +18,14 @@ export default {
     eyebrow: "GIANG HỒ GIÁN ĐOẠN",
     title: "Mất kết nối",
     desc: "Không thể liên lạc với máy chủ {server}. Hành tẩu tạm dừng để bảo toàn dữ liệu.",
-    hint: "Đang tự động kết nối lại — vui lòng chờ trong giây lát."
+    hint: "Đang tự động kết nối lại — vui lòng chờ trong giây lát.",
+    retry: "Thử lại ngay",
+    relogin: "Đăng nhập lại",
+    reasons: {
+      auth: "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại để tiếp tục.",
+      character: "Nhân vật không còn thuộc tài khoản này. Vui lòng đăng nhập lại.",
+      superseded: "Tài khoản đang được đăng nhập ở một thiết bị khác. Nhân vật đã tạm rời giang hồ."
+    }
   },
   language: {
     label: "Ngôn ngữ",

@@ -104,4 +104,133 @@ describe("NetworkClient", () => {
       client.send("player_move", { x: 50, y: 50 });
     }).not.toThrow();
   });
+
+  it("stops reconnecting when the server reports this session was superseded", () => {
+    const superseded = vi.fn();
+    client.on("superseded", superseded);
+    client.isConnected = true;
+    client.ws = { readyState: 1, send: vi.fn(), close: vi.fn() };
+
+    client.handleRawMessage(JSON.stringify({ type: "session_superseded", payload: {} }));
+
+    expect(superseded).toHaveBeenCalledTimes(1);
+    expect(client.superseded).toBe(true);
+    expect(client.shouldReconnect).toBe(false);
+  });
+
+  it("announces a superseded session only once across message and close code", () => {
+    const handler = vi.fn();
+    client.on("superseded", handler);
+
+    client.handleRawMessage(JSON.stringify({ type: "session_superseded", payload: {} }));
+    client.handleClose({ code: 4001 });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("suspend stops the socket but keeps listeners for the next login", () => {
+    const socket = {
+      readyState: 1,
+      close: vi.fn(),
+      onopen: () => {},
+      onmessage: () => {},
+      onclose: () => {},
+      onerror: () => {}
+    };
+    const handler = vi.fn();
+    client.ws = socket;
+    client.isConnected = true;
+    client.on("connected", handler);
+
+    client.suspend();
+
+    expect(client.isConnected).toBe(false);
+    expect(client.ws).toBeNull();
+    expect(client.shouldReconnect).toBe(false);
+    expect(socket.close).toHaveBeenCalledTimes(1);
+    // Listeners survive so the same instance can serve the next character.
+    expect(client.listeners.has("connected")).toBe(true);
+    client.emit("connected", {});
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts a stalled handshake and schedules a retry", () => {
+    vi.useFakeTimers();
+    const originalWebSocket = globalThis.WebSocket;
+    const instances = [];
+    class FakeWebSocket {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSED = 3;
+      constructor(url) {
+        this.url = url;
+        this.readyState = FakeWebSocket.CONNECTING;
+        this.onopen = null;
+        this.onmessage = null;
+        this.onclose = null;
+        this.onerror = null;
+        instances.push(this);
+      }
+      send() {}
+      close() {
+        this.readyState = FakeWebSocket.CLOSED;
+      }
+    }
+    globalThis.WebSocket = FakeWebSocket;
+
+    try {
+      const errors = vi.fn();
+      client.on("error", errors);
+
+      client.connect();
+      expect(instances).toHaveLength(1);
+
+      // Nothing opened within the handshake window: the socket is abandoned.
+      vi.advanceTimersByTime(client.connectTimeoutMs);
+      expect(errors).toHaveBeenCalled();
+      expect(client.isReconnecting).toBe(true);
+
+      // Backoff then retries instead of sitting dead forever.
+      vi.advanceTimersByTime(client.baseReconnectDelayMs);
+      expect(instances).toHaveLength(2);
+    } finally {
+      globalThis.WebSocket = originalWebSocket;
+      vi.useRealTimers();
+    }
+  });
+
+  it("retryNow clears a superseded state and reconnects at once", () => {
+    vi.useFakeTimers();
+    const originalWebSocket = globalThis.WebSocket;
+    const instances = [];
+    class FakeWebSocket {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSED = 3;
+      constructor(url) {
+        this.url = url;
+        this.readyState = FakeWebSocket.CONNECTING;
+        instances.push(this);
+      }
+      send() {}
+      close() {
+        this.readyState = FakeWebSocket.CLOSED;
+      }
+    }
+    globalThis.WebSocket = FakeWebSocket;
+
+    try {
+      client.superseded = true;
+      client.shouldReconnect = false;
+
+      client.retryNow();
+
+      expect(client.superseded).toBe(false);
+      expect(client.shouldReconnect).toBe(true);
+      expect(instances).toHaveLength(1);
+    } finally {
+      globalThis.WebSocket = originalWebSocket;
+      vi.useRealTimers();
+    }
+  });
 });

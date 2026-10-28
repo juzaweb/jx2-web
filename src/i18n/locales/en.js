@@ -18,7 +18,14 @@ export default {
     eyebrow: "JIANGHU DISCONNECTED",
     title: "Connection Lost",
     desc: "Cannot reach the {server} server. Your journey is paused to protect your progress.",
-    hint: "Reconnecting automatically — please wait a moment."
+    hint: "Reconnecting automatically — please wait a moment.",
+    retry: "Retry now",
+    relogin: "Log in again",
+    reasons: {
+      auth: "Your session is no longer valid. Please log in again to continue.",
+      character: "This character no longer belongs to your account. Please log in again.",
+      superseded: "This account is playing on another device. The character has left the world."
+    }
   },
   language: {
     label: "Language",

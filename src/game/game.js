@@ -250,6 +250,9 @@ export class JiangHuScene extends Phaser.Scene {
     });
 
     this.networkClient.on("init_world", (payload) => {
+      // A completed join proves the session recovered; drop any stale terminal
+      // issue so the gate never stays up over a healthy world.
+      bridge.emit(EVENTS.CONNECTION_ISSUE, null);
       this.handleInitWorld(payload);
     });
 
@@ -412,11 +415,24 @@ export class JiangHuScene extends Phaser.Scene {
       }
     });
 
-    this.networkClient.on("disconnected", () => {
+    this.networkClient.on("disconnected", (payload) => {
       this.setConnectionBlocked(true);
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
-        this.uiBridge.addLog("Mất kết nối máy chủ. Đang tự động kết nối lại...", "system");
+        this.uiBridge.addLog(
+          payload?.superseded
+            ? "Tài khoản vừa đăng nhập ở một thiết bị khác. Nhân vật tạm rời giang hồ."
+            : "Mất kết nối máy chủ. Đang tự động kết nối lại...",
+          "system"
+        );
       }
+    });
+
+    // The same character joined from another device. Reconnecting would drag the
+    // character back and forth between the two clients, so surface a terminal
+    // issue and let the player log in again instead.
+    this.networkClient.on("superseded", () => {
+      this.setConnectionBlocked(true);
+      bridge.emit(EVENTS.CONNECTION_ISSUE, { reason: "superseded" });
     });
 
     // Publish the closed gate before the handshake, so React can cover the HUD
@@ -641,6 +657,13 @@ export class JiangHuScene extends Phaser.Scene {
       }),
       bridge.on(EVENTS.ACTION_SAVE, () => this.saveGame(true)),
       bridge.on(EVENTS.ACTION_RESET, () => this.resetGame()),
+      bridge.on(EVENTS.ACTION_RETRY_CONNECTION, () => {
+        this.networkClient?.retryNow?.();
+      }),
+      bridge.on(EVENTS.ACTION_LEAVE_WORLD, () => {
+        this.networkClient?.suspend?.();
+        this.setConnectionBlocked(true);
+      }),
       bridge.on(EVENTS.ACTION_TOGGLE_AUDIO, () => {
         const isEnabled = toggleAudio();
         this.uiBridge.updateSoundButton(isEnabled);
@@ -1500,8 +1523,12 @@ export class JiangHuScene extends Phaser.Scene {
       auth: "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.",
       character: "Nhân vật không thuộc tài khoản này."
     };
+    const reason = payload.reason === "character" ? "character" : "auth";
     this.uiBridge.addLog(reasons[payload.reason] || "Máy chủ từ chối kết nối.", "system");
     this.setConnectionBlocked(true);
+    // The socket is still open, so no `disconnected` event will fire and the
+    // auto-reconnect never runs. Without telling React, this gate is a dead end.
+    bridge.emit(EVENTS.CONNECTION_ISSUE, { reason });
   }
 
   /**
@@ -1603,16 +1630,27 @@ export class JiangHuScene extends Phaser.Scene {
   }
 
   sendNetworkJoin() {
-    if (!this.player || !this.networkClient?.isConnected) return;
+    if (!this.player || !this.networkClient) return;
 
     // The server identifies a player by their verified character id, so adopt
     // that identity locally too: kill attribution and hit rejections carry it,
     // and guest sessions are no longer a thing.
     const session = readSession();
     const characterId = session?.activeCharacter?.id || null;
+    // No character means we are at the login/selection screen. Joining anyway
+    // would send a null token and get the socket rejected.
+    if (!characterId) return;
 
     this.remotePlayerManager.setLocalPlayerId(characterId);
     this.combat.setLocalPlayerId(characterId);
+
+    // Re-login after a terminal gate (superseded / rejected session) starts from
+    // a stopped client. Without waking it, the new join would be written to a
+    // closed socket and the player would sit on the gate again forever.
+    if (!this.networkClient.isConnected) {
+      this.networkClient.connect();
+    }
+
     this.networkClient.join({
       token: session?.token || null,
       characterId,

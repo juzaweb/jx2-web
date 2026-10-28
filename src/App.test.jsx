@@ -87,6 +87,32 @@ describe("ConnectionLostOverlay component", () => {
     expect(markup).toContain("Mất kết nối");
     expect(markup).toContain("connection-overlay");
   });
+
+  it("offers retry and relogin actions for a plain network drop", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <ConnectionLostOverlay visible={true} onRetry={() => {}} onRelogin={() => {}} />
+      </I18nProvider>
+    );
+    expect(markup).toContain("Thử lại ngay");
+    expect(markup).toContain("Đăng nhập lại");
+  });
+
+  it("offers only relogin when the session cannot recover on its own", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <ConnectionLostOverlay
+          visible={true}
+          issue="superseded"
+          onRetry={() => {}}
+          onRelogin={() => {}}
+        />
+      </I18nProvider>
+    );
+    expect(markup).toContain("thiết bị khác");
+    expect(markup).not.toContain("Thử lại ngay");
+    expect(markup).toContain("Đăng nhập lại");
+  });
 });
 
 describe("Connection Gate Logic helper rules", () => {
