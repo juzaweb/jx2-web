@@ -428,7 +428,10 @@ export class JiangHuScene extends Phaser.Scene {
       }
     });
 
+    let hasLoggedDisconnect = false;
+
     this.networkClient.on("connected", () => {
+      hasLoggedDisconnect = false;
       // Open the gate first: the world may move as soon as the server is there.
       this.setConnectionBlocked(false);
       this.sendNetworkJoin();
@@ -440,12 +443,21 @@ export class JiangHuScene extends Phaser.Scene {
     this.networkClient.on("disconnected", (payload) => {
       this.setConnectionBlocked(true);
       if (this.uiBridge && typeof this.uiBridge.addLog === "function") {
-        this.uiBridge.addLog(
-          payload?.superseded
-            ? "Tài khoản vừa đăng nhập ở một thiết bị khác. Nhân vật tạm rời giang hồ."
-            : "Mất kết nối máy chủ. Đang tự động kết nối lại...",
-          "system"
-        );
+        if (payload?.superseded) {
+          if (!hasLoggedDisconnect) {
+            hasLoggedDisconnect = true;
+            this.uiBridge.addLog(
+              "Tài khoản vừa đăng nhập ở một thiết bị khác. Nhân vật tạm rời giang hồ.",
+              "system"
+            );
+          }
+        } else if (!hasLoggedDisconnect) {
+          hasLoggedDisconnect = true;
+          this.uiBridge.addLog(
+            "Mất kết nối máy chủ. Đang tự động kết nối lại...",
+            "system"
+          );
+        }
       }
     });
 
@@ -454,6 +466,13 @@ export class JiangHuScene extends Phaser.Scene {
     // issue and let the player log in again instead.
     this.networkClient.on("superseded", () => {
       this.setConnectionBlocked(true);
+      if (this.uiBridge && typeof this.uiBridge.addLog === "function" && !hasLoggedDisconnect) {
+        hasLoggedDisconnect = true;
+        this.uiBridge.addLog(
+          "Tài khoản vừa đăng nhập ở một thiết bị khác. Nhân vật tạm rời giang hồ.",
+          "system"
+        );
+      }
       bridge.emit(EVENTS.CONNECTION_ISSUE, { reason: "superseded" });
     });
 

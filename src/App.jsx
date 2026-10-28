@@ -8,7 +8,6 @@ import { MobileControls } from "./components/MobileControls.jsx";
 import { MobileSkillPicker } from "./components/MobileSkillPicker.jsx";
 import { MobileItemPicker } from "./components/MobileItemPicker.jsx";
 import { useMobileSlotPicker } from "./components/hooks/useMobileSlotPicker.js";
-import { ConnectionLostOverlay } from "./components/ConnectionLostOverlay.jsx";
 import { HelpModal } from "./components/Modals/HelpModal.jsx";
 import { InventoryModal } from "./components/Modals/InventoryModal.jsx";
 import { CharacterModal } from "./components/Modals/CharacterModal.jsx";
@@ -84,13 +83,6 @@ const isGuestSession = (session) =>
   session?.token === "offline-guest-token" ||
   String(session?.user?.id || "").startsWith("guest_");
 
-/**
- * Grace period before the connection gate is shown. The scene seeds its gate as
- * closed on every entry, so a perfectly healthy handshake also reports "down"
- * for a few frames — without this delay every login would flash "Mất kết nối".
- */
-const CONNECTION_GATE_DELAY_MS = 3000;
-
 /** True while the user is typing in a chat/modal field, where shortcuts must not fire. */
 const isTypingTarget = (target) => {
   const tag = target?.tagName;
@@ -149,13 +141,6 @@ export function App() {
     return null;
   });
   const [isStarted, setIsStarted] = useState(true);
-  // Gameplay is gated on the socket: while it is down the Phaser scene freezes
-  // itself and this overlay covers the HUD until the reconnect lands.
-  const [isNetworkConnected, setIsNetworkConnected] = useState(false);
-  const [isConnectionGated, setIsConnectionGated] = useState(false);
-  // Non-null when the socket cannot recover on its own (invalid session,
-  // character gone, or the same account took over from another device).
-  const [connectionIssue, setConnectionIssue] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isCharacterOpen, setIsCharacterOpen] = useState(false);
@@ -426,11 +411,13 @@ export function App() {
     });
 
     const unsubNetwork = bridge.on(EVENTS.NETWORK_STATE, (state) => {
-      setIsNetworkConnected(!!state?.connected);
+      if (!state?.connected) {
+        setIsChatOpen(true);
+      }
     });
 
-    const unsubConnectionIssue = bridge.on(EVENTS.CONNECTION_ISSUE, (issue) => {
-      setConnectionIssue(issue || null);
+    const unsubConnectionIssue = bridge.on(EVENTS.CONNECTION_ISSUE, () => {
+      setIsChatOpen(true);
     });
 
     const unsubGmModal = bridge.on(EVENTS.GM_MODAL_TOGGLE, () => {
@@ -455,23 +442,6 @@ export function App() {
       unsubGmModal();
     };
   }, []);
-
-  // Show the gate only once the socket has stayed down past the grace period,
-  // so a normal handshake never flashes it. The scene freezes itself at once;
-  // this only governs what the player is told.
-  useEffect(() => {
-    // A terminal issue has no auto-recovery to wait for, so cover the HUD at once.
-    if (connectionIssue) {
-      setIsConnectionGated(true);
-      return undefined;
-    }
-    if (isNetworkConnected || !activeCharacter) {
-      setIsConnectionGated(false);
-      return undefined;
-    }
-    const timer = setTimeout(() => setIsConnectionGated(true), CONNECTION_GATE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [isNetworkConnected, activeCharacter, connectionIssue]);
 
   // Closing the help overlay also lifts the pause it applied. Opening a docked
   // panel (character / inventory) dismisses help the same way.
@@ -583,10 +553,6 @@ export function App() {
     const handleKeyDown = (e) => {
       if (isTypingTarget(e.target)) return;
       if (e.repeat) return;
-
-      // The connection gate owns the screen: no shortcut may open a panel over
-      // it while the socket is down.
-      if (activeCharacter && isConnectionGated) return;
 
       // The shop is a focused modal: only Escape leaves it, so global panel
       // shortcuts cannot open a hidden window underneath the counter.
@@ -719,7 +685,6 @@ export function App() {
     isHelpOpen,
     isCityMapOpen,
     isLoginOpen,
-    isConnectionGated,
     handleClearTarget,
     activeCharacter,
     currentUser,
@@ -813,8 +778,6 @@ export function App() {
     const isTouch = usesTouchControls();
     setIsMinimapOpen(!isTouch);
     setIsChatOpen(!isTouch);
-    setIsConnectionGated(false);
-    setConnectionIssue(null);
 
     writeSession({
       ...(readSession() || {}),
@@ -873,8 +836,6 @@ export function App() {
     clearSession();
     setCurrentUser(null);
     setActiveCharacter(null);
-    setIsConnectionGated(false);
-    setConnectionIssue(null);
     setLearnedSkills([]);
     setSkillLevels({});
     StorageManager.setUserId(null);
@@ -888,11 +849,6 @@ export function App() {
     // stops reconnecting while the login screen is up.
     bridge.emit(EVENTS.ACTION_LEAVE_WORLD);
   }, [t]);
-
-  const handleRetryConnection = useCallback(() => {
-    setConnectionIssue(null);
-    bridge.emit(EVENTS.ACTION_RETRY_CONNECTION);
-  }, []);
 
   const handleLogout = useCallback(() => {
     if (window.confirm(t("app.confirmLogout"))) {
@@ -1116,14 +1072,6 @@ export function App() {
         isOpen={isGmOpen}
         onClose={() => setIsGmOpen(false)}
         stats={stats}
-      />
-
-      {/* Hard connection gate: the world stays frozen until the socket is back */}
-      <ConnectionLostOverlay
-        visible={!!activeCharacter && isConnectionGated}
-        issue={connectionIssue?.reason || null}
-        onRetry={handleRetryConnection}
-        onRelogin={resetToLogin}
       />
     </main>
   );

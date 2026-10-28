@@ -205,6 +205,44 @@ describe("JiangHuScene connection gate", () => {
     expect(scene.isPaused).toBe(false);
     expect(scene.physics.resume).toHaveBeenCalledTimes(1);
   });
+
+  it("logs disconnect to chat once without spamming on repeated retry drops", () => {
+    const addLog = vi.fn();
+    let hasLoggedDisconnect = false;
+    const onDisconnected = (payload) => {
+      if (payload?.superseded) {
+        addLog("Tài khoản vừa đăng nhập ở một thiết bị khác. Nhân vật tạm rời giang hồ.", "system");
+        return;
+      }
+      if (!hasLoggedDisconnect) {
+        hasLoggedDisconnect = true;
+        addLog("Mất kết nối máy chủ. Đang tự động kết nối lại...", "system");
+      }
+    };
+    const onConnected = () => {
+      hasLoggedDisconnect = false;
+      addLog("Đã kết nối máy chủ Giang Hồ — Trực tuyến.", "system");
+    };
+
+    // First disconnect
+    onDisconnected({});
+    expect(addLog).toHaveBeenCalledTimes(1);
+    expect(addLog).toHaveBeenLastCalledWith("Mất kết nối máy chủ. Đang tự động kết nối lại...", "system");
+
+    // Repeated retry drops while still disconnected do not spam chat
+    onDisconnected({});
+    onDisconnected({});
+    expect(addLog).toHaveBeenCalledTimes(1);
+
+    // Reconnected
+    onConnected();
+    expect(addLog).toHaveBeenCalledTimes(2);
+    expect(addLog).toHaveBeenLastCalledWith("Đã kết nối máy chủ Giang Hồ — Trực tuyến.", "system");
+
+    // Next drop logs again
+    onDisconnected({});
+    expect(addLog).toHaveBeenCalledTimes(3);
+  });
 });
 
 /** Minimal scene scope that satisfies useItem() without Phaser. */

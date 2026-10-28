@@ -66,6 +66,17 @@ describe("App Minimap and Chat Mobile/Desktop Default States", () => {
     expect(markup).not.toContain('id="minimap-panel"');
     expect(markup).not.toContain('id="chat-panel"');
   });
+
+  it("never renders connection-overlay modal in App shell", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <App />
+      </I18nProvider>
+    );
+
+    expect(markup).not.toContain("connection-overlay");
+    expect(markup).not.toContain("connection-card");
+  });
 });
 
 describe("ConnectionLostOverlay component", () => {
