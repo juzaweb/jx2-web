@@ -96,7 +96,7 @@ test("server-authoritative PK bots", async (t) => {
     ({ initGameSocket } = await import("../src/websocket/gameSocket.js"));
     ({ BotRoster } = await import("../src/game/botRoster.js"));
     const { userDb } = await import("../src/data/userDb.js");
-    adminUserId = userDb.register("admin_bot_test", "123456", "Bot Admin", "admin").id;
+    adminUserId = (await userDb.register("admin_bot_test", "123456", "Bot Admin", "admin")).id;
 
     server = http.createServer(createApp());
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

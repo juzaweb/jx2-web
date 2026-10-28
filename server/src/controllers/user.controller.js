@@ -20,7 +20,7 @@ export const registerUser = async (req, res, next) => {
       });
     }
 
-    const user = userDb.register(username, password, displayName);
+    const user = await userDb.register(username, password, displayName);
     const token = createSessionToken(user.id);
 
     return res.status(201).json({
@@ -67,7 +67,7 @@ export const loginUser = async (req, res, next) => {
       });
     }
 
-    const user = userDb.login(username, password);
+    const user = await userDb.login(username, password);
     const token = createSessionToken(user.id);
 
     return res.status(200).json({

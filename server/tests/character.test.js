@@ -157,7 +157,7 @@ describe("Character API Test Suite", () => {
 
   test("an admin account receives the GM item in the starter kit", async () => {
     const { userDb } = await import("../src/data/userDb.js");
-    const adminUser = userDb.register("admin_char_test", "123456", "AdminChar", "admin");
+    const adminUser = await userDb.register("admin_char_test", "123456", "AdminChar", "admin");
     const token = createSessionToken(adminUser.id);
 
     const created = await fetch(`${baseUrl}/users/${adminUser.id}/characters`, {
