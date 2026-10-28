@@ -42,6 +42,7 @@ Your task is to implement or update a skill into the game according to `docs/wea
 > **Quy tắc phân loại Asset cho chiêu thức:**
 > - **Chiêu thức Chủ động (Kiếm pháp, Đao pháp, Quyền pháp, Chưởng pháp, Trận pháp, Tuyệt kỹ):** Đầy đủ **2 Prompt** (1 Icon + 1 VFX Sprite Sheet).
 > - **Chiêu thức Tâm Pháp Bị động (*Thiếu Lâm Tâm Pháp*):** **CHỈ CÓ 1 Prompt (Icon)**, hoàn toàn **KHÔNG CÓ VFX Sprite Sheet** vì là nội công bị động tự vận hành ngầm trong cơ thể.
+> - **Quy chuẩn Icon:** Thiết kế **không viền (borderless, no frame)** tràn viền (full bleed) để khung hiển thị UI trong game (`HotbarDock` / slot chiêu thức) tự quản lý viền và bo góc, tránh bị trùng lặp 2 lớp viền.
 
 ---
 
@@ -52,7 +53,7 @@ Your task is to implement or update a skill into the game according to `docs/wea
 #### 1. Thiếu Lâm Tâm Pháp (`thieu_lam_tam_phap` - Slot 0, Nội công bị động hồi máu)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of ancient Shaolin internal breathing art (Thiếu Lâm Tâm Pháp), Wuxia style. A serene silhouette of a meditating monk in golden lotus posture, surrounded by gentle golden vital energy waves and warm inner light particles. Dark brown parchment background with an antique brass square frame with Buddhist swastika corner filigree. Centered composition, clean UI vector feel, 8k --ar 1:1 --v 6.0
+A 2D game skill icon of ancient Shaolin internal breathing art (Thiếu Lâm Tâm Pháp), Wuxia style. A serene silhouette of a meditating monk in golden lotus posture, surrounded by gentle golden vital energy waves and warm inner light particles. Dark brown parchment background, borderless, no frame. Centered composition, clean UI vector feel, 8k --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):** *Không có* — Chiêu thức Tâm Pháp (Nội công / Bị động) tự động vận hành trong cơ thể, không có VFX Sprite Sheet thi triển trên sàn đấu.
 
@@ -61,7 +62,7 @@ A 2D game skill icon of ancient Shaolin internal breathing art (Thiếu Lâm Tâ
 #### 2. Đại Tu Di Chưởng (`dai_tu_di_chuong` - Slot 1, Chưởng lực tầm xa gây choáng)
 * **Prompt 1 (Icon):**
 ```text
-A high-detail 2D game skill icon of the Great Sumeru Palm (Đại Tu Di Chưởng), Chinese Wuxia fantasy style. A heavy metallic bronze-gold palm bursting forward with thunderous momentum, surrounded by intense kinetic wind shockwaves and glowing Sanskrit glyphs. Deep obsidian parchment background, heavy square Tibetan bronze frame with dragon relief. High contrast, sharp icon clarity at 64x64, mobile RPG asset --ar 1:1 --v 6.0 --style raw
+A high-detail 2D game skill icon of the Great Sumeru Palm (Đại Tu Di Chưởng), Chinese Wuxia fantasy style. A heavy metallic bronze-gold palm bursting forward with thunderous momentum, surrounded by intense kinetic wind shockwaves and glowing Sanskrit glyphs. Deep obsidian parchment background, borderless, no frame. High contrast, sharp icon clarity at 64x64, mobile RPG asset --ar 1:1 --v 6.0 --style raw --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -73,7 +74,7 @@ A 2D game VFX sprite sheet of a flying golden palm energy projectile and impact 
 #### 3. La Hán Quyền (`la_han_quyen` - Slot 2, Liên hoàn quyền đả kích)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Arhat Fist barrage (La Hán Quyền), martial arts style. A pair of glowing clenched bronze gauntlet fists striking forward at blinding speed, enveloped in fiery golden impact sparks, motion speed lines, and sacred prayer bead trails. Dark slate background, ornate square hammered copper border with cloud patterns. Crisp game UI asset, dynamic action pose --ar 1:1 --v 6.0
+A 2D game skill icon of Arhat Fist barrage (La Hán Quyền), martial arts style. A pair of glowing clenched bronze gauntlet fists striking forward at blinding speed, enveloped in fiery golden impact sparks, motion speed lines, and sacred prayer bead trails. Dark slate background, borderless, no frame. Crisp game UI asset, dynamic action pose --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -85,7 +86,7 @@ A 2D game VFX sprite sheet of rapid phantom fist strikes flurry, top-down arcade
 #### 4. La Hán Trận (`la_han_tran` - Slot 3, Trận pháp buff công / thủ / tốc độ)
 * **Prompt 1 (Icon):**
 ```text
-A 2D MMORPG skill icon of the Sacred Arhat Formation Array (La Hán Trận), Wuxia style. A circular golden Buddhist mandala array with eight glowing Sanskrit dharmachakra wheels and golden lotus petals revolving around a brilliant center. Rich dark background, antique gold square frame with Buddhist vajra corners. High contrast, pristine iconography --ar 1:1 --v 6.0
+A 2D MMORPG skill icon of the Sacred Arhat Formation Array (La Hán Trận), Wuxia style. A circular golden Buddhist mandala array with eight glowing Sanskrit dharmachakra wheels and golden lotus petals revolving around a brilliant center. Rich dark background, borderless, no frame. High contrast, pristine iconography --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -97,7 +98,7 @@ A 2D sprite sheet animation of a circular glowing Buddhist formation ring on the
 #### 5. Kim Cang Bất Hoại (`kim_cang_bat_hoai` - Slot 4, Hộ thể kim chung bất hoại)
 * **Prompt 1 (Icon):**
 ```text
-A 2D skill icon of the Indestructible Vajra Body (Kim Cang Bất Hoại), classic Wuxia style. A translucent golden bell shield (Golden Bell Cocoon) glowing with sacred diamond-like facets, deflecting incoming ethereal blades, radiating divine protective aura. Dark parchment background, heavy square carved golden border. Clear silhouette, mobile game UI ready --ar 1:1 --v 6.0
+A 2D skill icon of the Indestructible Vajra Body (Kim Cang Bất Hoại), classic Wuxia style. A translucent golden bell shield (Golden Bell Cocoon) glowing with sacred diamond-like facets, deflecting incoming ethereal blades, radiating divine protective aura. Dark parchment background, borderless, no frame. Clear silhouette, mobile game UI ready --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -109,7 +110,7 @@ A 2D game VFX sprite sheet of an indestructible golden bell barrier activating, 
 #### 6. Như Lai Thần Chưởng (`nhu_lai_than_chuong` - Slot 5, Tuyệt kỹ chưởng Phật diện rộng)
 * **Prompt 1 (Icon):**
 ```text
-A high-detail 2D game skill icon of the Buddha's Palm ultimate art (Như Lai Thần Chưởng). A colossal radiant golden divine hand palm descending from celestial storm clouds, crackling with golden divine lightning and blinding heavenly light beams. Dark textured stone background, ornate royal gold imperial frame with dragon carvings. Epic scale, masterpiece UI asset, 8k --ar 1:1 --v 6.0 --style raw
+A high-detail 2D game skill icon of the Buddha's Palm ultimate art (Như Lai Thần Chưởng). A colossal radiant golden divine hand palm descending from celestial storm clouds, crackling with golden divine lightning and blinding heavenly light beams. Dark textured stone background, borderless, no frame. Epic scale, masterpiece UI asset, 8k --ar 1:1 --v 6.0 --style raw --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -125,7 +126,7 @@ A 2D game VFX sprite sheet of a colossal divine golden palm crashing onto the ea
 #### 7. Kiếm Khí (`kiem_khi` - Slot 0, Kỹ năng khởi đầu bắn phi kiếm)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of flying sword qi projectile (Kiếm Khí), Wuxia style. A razor-sharp celestial steel sword tip releasing an azure cyan crescent energy blast forward with shimmering light trails. Dark moody slate background, antique bronze square frame with sword-hilt filigree. Clean centered icon, vibrant cyan glow --ar 1:1 --v 6.0
+A 2D game skill icon of flying sword qi projectile (Kiếm Khí), Wuxia style. A razor-sharp celestial steel sword tip releasing an azure cyan crescent energy blast forward with shimmering light trails. Dark moody slate background, borderless, no frame. Clean centered icon, vibrant cyan glow --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -137,7 +138,7 @@ A 2D game VFX sprite sheet of a flying sword-shaped qi shard, horizontal project
 #### 8. Thiếu Dương Kiếm Pháp (`thieu_duong_kiem_phap` - Slot 1, Kiếm pháp sơ nhập Võ Đang)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of the Shao Yang Sword Technique (Thiếu Dương Kiếm Pháp), Taoist Wuxia style. An elegant steel longsword slashing upward with a blazing warm amber and golden solar morning-sun qi aura. Dark parchment background, antique copper square frame with Taoist cloud carvings. Sharp silhouette, readable at 64x64 --ar 1:1 --v 6.0
+A 2D game skill icon of the Shao Yang Sword Technique (Thiếu Dương Kiếm Pháp), Taoist Wuxia style. An elegant steel longsword slashing upward with a blazing warm amber and golden solar morning-sun qi aura. Dark parchment background, borderless, no frame. Sharp silhouette, readable at 64x64 --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -149,7 +150,7 @@ A 2D game VFX sprite sheet of a swift solar sword slash arc, isometric combat vi
 #### 9. Thái Cực Kiếm Pháp (`thai_cuc_kiem_phap` - Slot 2, Nhu hòa chuyển hóa kiếm kình)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Tai Chi Sword Art (Thái Cực Kiếm Pháp), Taoist martial arts style. An elegant Taoist steel sword surrounded by a swirling black and white Yin-Yang Tai Chi sphere, radiating soft white mist and gentle defensive energy rings. Dark stone background, carved jade and silver square frame. Serene mystical balance, clean icon design --ar 1:1 --v 6.0
+A 2D game skill icon of Tai Chi Sword Art (Thái Cực Kiếm Pháp), Taoist martial arts style. An elegant Taoist steel sword surrounded by a swirling black and white Yin-Yang Tai Chi sphere, radiating soft white mist and gentle defensive energy rings. Dark stone background, borderless, no frame. Serene mystical balance, clean icon design --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -161,7 +162,7 @@ A 2D game VFX sprite sheet of an expanding Tai Chi Yin-Yang vortex on the ground
 #### 10. Tam Thanh Kiếm Pháp (`tam_thanh_kiem_phap` - Slot 3, Tam đạo kiếm khí phân thân)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of the Three Purities Sword Art (Tam Thanh Kiếm Pháp), Wuxia fantasy. Three ethereal translucent cyan Taoist flying swords hovering in triangular formation, crackling with electric blue qi sparks. Dark navy background, ornate square silver frame with Taoist Bagua corners. Crisp sharp icon clarity --ar 1:1 --v 6.0
+A 2D game skill icon of the Three Purities Sword Art (Tam Thanh Kiếm Pháp), Wuxia fantasy. Three ethereal translucent cyan Taoist flying swords hovering in triangular formation, crackling with electric blue qi sparks. Dark navy background, borderless, no frame. Crisp sharp icon clarity --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -173,7 +174,7 @@ A 2D game VFX sprite sheet of three flying sword beams converging and piercing, 
 #### 11. Toát Hồng Quân Khuyết (`toat_hong_quan_khuyet` - Slot 4, Buff công kích chân khí)
 * **Prompt 1 (Icon):**
 ```text
-A 2D skill icon of the Cosmic Rainbow Aura (Toát Hồng Quân Khuyết), Taoist Wuxia buff. A celestial longsword pointing upward enveloped in a spiraling vortex of deep violet, crimson and golden rainbow astral qi. Dark parchment background, square antique bronze filigree frame. Mystical power surging, vivid colors --ar 1:1 --v 6.0
+A 2D skill icon of the Cosmic Rainbow Aura (Toát Hồng Quân Khuyết), Taoist Wuxia buff. A celestial longsword pointing upward enveloped in a spiraling vortex of deep violet, crimson and golden rainbow astral qi. Dark parchment background, borderless, no frame. Mystical power surging, vivid colors --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -185,7 +186,7 @@ A 2D game VFX sprite sheet of an ascending pillar of cosmic purple-crimson aura,
 #### 12. Nga My Kiếm Pháp (`nga_my_kiem_phap` - Slot 5, Kiếm pháp Nga My thanh nhã)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of the Emei Sword Technique (Nga My Kiếm Pháp), elegant Wuxia style. A slender silver rapier surrounded by a gentle swirl of pink peach blossom petals and jade-green sword light. Dark indigo background, delicate white jade square frame with lotus carvings. Graceful feminine martial arts iconography --ar 1:1 --v 6.0
+A 2D game skill icon of the Emei Sword Technique (Nga My Kiếm Pháp), elegant Wuxia style. A slender silver rapier surrounded by a gentle swirl of pink peach blossom petals and jade-green sword light. Dark indigo background, borderless, no frame. Graceful feminine martial arts iconography --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -197,7 +198,7 @@ A 2D game VFX sprite sheet of a flowing peach blossom sword slash, isometric vie
 #### 13. Mộng Điệp Thôi Tâm (`mong_diep_thoi_tam` - Slot 6, Ảo ảnh bướm mộng đoạn hồn)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Dream Butterfly Soul Shatter (Mộng Điệp Thôi Tâm), Emei fantasy art. A luminous spiritual butterfly glowing with iridescent violet and soft magenta light resting on the edge of a curved blade, emitting dreamlike sparkling dust. Dark vignette background, ornate silver square frame. Mystical and mesmerizing UI icon --ar 1:1 --v 6.0
+A 2D game skill icon of Dream Butterfly Soul Shatter (Mộng Điệp Thôi Tâm), Emei fantasy art. A luminous spiritual butterfly glowing with iridescent violet and soft magenta light resting on the edge of a curved blade, emitting dreamlike sparkling dust. Dark vignette background, borderless, no frame. Mystical and mesmerizing UI icon --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -209,7 +210,7 @@ A 2D game VFX sprite sheet of a swarm of spectral dream butterflies erupting, to
 #### 14. Từ Hàng Phổ Độ (`tu_hang_pho_do` - Slot 7, Nga My thánh thuật hồi phục)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Merciful Compassion Healing (Từ Hàng Phổ Độ), Buddhist Emei style. A pure blooming white-pink sacred lotus floating on calm water, radiating restorative emerald beams and sparkling dewdrop particles. Dark velvet background, carved pearl and white jade square frame. Soothing divine aura, game UI healing asset --ar 1:1 --v 6.0
+A 2D game skill icon of Merciful Compassion Healing (Từ Hàng Phổ Độ), Buddhist Emei style. A pure blooming white-pink sacred lotus floating on calm water, radiating restorative emerald beams and sparkling dewdrop particles. Dark velvet background, borderless, no frame. Soothing divine aura, game UI healing asset --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -221,7 +222,7 @@ A 2D game VFX sprite sheet of a sacred blooming lotus healing aura, top-down iso
 #### 15. Lưu Thủy Khánh Vân (`luu_thuy_khanh_van` - Slot 8, Buff tốc độ phiêu dật như mây nước)
 * **Prompt 1 (Icon):**
 ```text
-A 2D skill icon of Flowing Water & Auspicious Clouds (Lưu Thủy Khánh Vân), Wuxia speed buff. A graceful white crane feather gliding over spiraling crystal-blue water ripples and auspicious silver clouds. Dark teal background, square carved silver border with flowing wave motifs. Airy, swift and elegant design --ar 1:1 --v 6.0
+A 2D skill icon of Flowing Water & Auspicious Clouds (Lưu Thủy Khánh Vân), Wuxia speed buff. A graceful white crane feather gliding over spiraling crystal-blue water ripples and auspicious silver clouds. Dark teal background, borderless, no frame. Airy, swift and elegant design --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -237,7 +238,7 @@ A 2D game VFX sprite sheet of spiraling water ribbons and wind cloud wisps, top-
 #### 16. Ngũ Độc Đao Pháp (`ngu_doc_tam_phap` - Slot 0, Đao pháp độc tố căn bản)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of the Five Poisons Saber Art (Ngũ Độc Đao Pháp), dark Wuxia style. A heavy curved blackened steel saber dripping with glowing toxic emerald venom, entwined by a venomous green pit viper. Dark moody parchment background, square blackened iron frame with snake scale carvings. Sinister martial aura, sharp icon clarity --ar 1:1 --v 6.0
+A 2D game skill icon of the Five Poisons Saber Art (Ngũ Độc Đao Pháp), dark Wuxia style. A heavy curved blackened steel saber dripping with glowing toxic emerald venom, entwined by a venomous green pit viper. Dark moody parchment background, borderless, no frame. Sinister martial aura, sharp icon clarity --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -249,7 +250,7 @@ A 2D game VFX sprite sheet of a toxic green curved saber slash, isometric combat
 #### 17. Truy Tâm Độc (`truy_tam_doc` - Slot 1, Phi đao / ám khí độc xuyên tâm)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Heart-Piercing Venom (Truy Tâm Độc), Five Poisons assassin art. A wicked jagged poisoned throwing needle flying forward aimed at a dark glowing cursed human heart silhouette, dripping purple scorpion poison. Deep obsidian background, square dark bone and bronze frame. Dark and lethal iconography --ar 1:1 --v 6.0
+A 2D game skill icon of Heart-Piercing Venom (Truy Tâm Độc), Five Poisons assassin art. A wicked jagged poisoned throwing needle flying forward aimed at a dark glowing cursed human heart silhouette, dripping purple scorpion poison. Deep obsidian background, borderless, no frame. Dark and lethal iconography --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -261,7 +262,7 @@ A 2D game VFX sprite sheet of a flying poison needle piercing and bursting, isom
 #### 18. Vạn Độc Triệu Cổ (`van_doc_chieu_hong` - Slot 2, Triệu hồi cổ trùng bộc phát)
 * **Prompt 1 (Icon):**
 ```text
-A 2D game skill icon of Ten Thousand Poisons Gu Summoning (Vạn Độc Triệu Cổ), Wuxia necromancy style. An ancient weathered dark clay Gu pot overflowing with swarming glowing purple centipedes, horned beetles, and toxic green smoke fumes. Pitch black background, square withered wood and iron frame with insect reliefs. Eerie and terrifying asset --ar 1:1 --v 6.0
+A 2D game skill icon of Ten Thousand Poisons Gu Summoning (Vạn Độc Triệu Cổ), Wuxia necromancy style. An ancient weathered dark clay Gu pot overflowing with swarming glowing purple centipedes, horned beetles, and toxic green smoke fumes. Pitch black background, borderless, no frame. Eerie and terrifying asset --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -273,7 +274,7 @@ A 2D game VFX sprite sheet of a swarming poisonous insect explosion on the groun
 #### 19. U Hồn Phiệt Ảnh (`u_hong_phiet_anh` - Slot 3, Buff bạo kích bóng ma quỷ ảnh)
 * **Prompt 1 (Icon):**
 ```text
-A 2D skill icon of the Nether Ghost Phantom Strike (U Hồn Phiệt Ảnh), dark assassin buff. A terrifying ghostly specter with glowing purple hollow eyes looming behind a pair of crossed curved daggers, surrounded by ethereal phantom smoke. Dark abyss background, square wrought-iron frame with thorn filigree. Menacing dark fantasy design --ar 1:1 --v 6.0
+A 2D skill icon of the Nether Ghost Phantom Strike (U Hồn Phiệt Ảnh), dark assassin buff. A terrifying ghostly specter with glowing purple hollow eyes looming behind a pair of crossed curved daggers, surrounded by ethereal phantom smoke. Dark abyss background, borderless, no frame. Menacing dark fantasy design --ar 1:1 --v 6.0 --no border frame
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
@@ -285,7 +286,7 @@ A 2D game VFX sprite sheet of a rising ghostly specter and soul fire burst, top-
 ## 3. Quy Cách Kỹ Thuật & Tích Hợp
 
 ### Thông Số Kỹ Thuật
-- **Icon:** Tỉ lệ `1:1`, kích thước lưu `64×64 px` (PNG 32-bit), đặt tại `public/skills/<skill_id>.png`.
+- **Icon:** Tỉ lệ `1:1`, kích thước lưu `64×64 px` (PNG 32-bit), thiết kế tràn viền không viền khung (`borderless, no frame`), đặt tại `public/skills/<skill_id>.png`.
 - **Sprite Sheet:** Kích thước frame `256×256 px`. Dải 4 frame có kích thước `1024×256 px` (PNG 32-bit trong suốt), đặt tại `public/skills/vfx/<skill_id>/sheet.png`.
 
 ### Cấu Hình `sheet.json` Đi Kèm Cho Mỗi Skill
