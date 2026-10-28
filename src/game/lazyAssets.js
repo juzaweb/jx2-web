@@ -21,6 +21,11 @@ import { normalizeGender } from "./gender.js";
  * cast (see `ensureWeaponVfx`), plus any sheet a remote player asks for mid-fight.
  */
 export const VFX_SPRITES = {
+  "vfx-kiem-khi": {
+    url: "/skills/vfx/kiem_khi/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
   "vfx-la-han-tran": {
     url: "/skills/vfx/la_han_tran/sheet.png",
     frameWidth: 256,

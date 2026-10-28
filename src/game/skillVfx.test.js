@@ -317,94 +317,70 @@ describe("playSkillCastVfx sprite playback", () => {
   });
 });
 
-describe("playSkillCastVfx sword-qi projectile", () => {
+describe("playSkillCastVfx sword-qi sprite sheet", () => {
   const kiemKhi = () => ({
     range: 840,
     splash: { radius: 170, mult: 0.6, maxTargets: 4 },
-    vfx: { projectile: "sword", impact: null, color: 0x9be8ff }
-  });
-
-  it("throws a blade shard from the hero to the aimed point", () => {
-    const { scene, tweenConfigs } = makeScene();
-    const blade = makeSprite();
-    scene.add.polygon = vi.fn(() => blade);
-    scene.add.sprite = vi.fn(() => makeSprite());
-
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
-
-    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
-    expect(flight).toBeTruthy();
-    expect(flight.targets).toContain(blade);
-    expect(flight.x).toBe(toIso(900, 100).x);
-    expect(flight.ease).toBe("Quad.easeIn");
-    expect(flight.duration).toBeGreaterThanOrEqual(160);
-    // The shard is a drawn blade, not a sprite sheet.
-    expect(scene.add.polygon).toHaveBeenCalled();
-    expect(scene.add.sprite).not.toHaveBeenCalled();
-  });
-
-  it("explodes where it lands and cleans every piece up", () => {
-    const { scene, tweenConfigs } = makeScene();
-    const circles = [];
-    const polygons = [];
-    scene.add.polygon = vi.fn(() => {
-      const shape = makeSprite();
-      polygons.push(shape);
-      return shape;
-    });
-    scene.add.circle = vi.fn(() => {
-      const shape = makeSprite();
-      circles.push(shape);
-      return shape;
-    });
-
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
-
-    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
-    const preImpactCircleCount = circles.length;
-    const preImpactPolygonCount = polygons.length;
-
-    flight.onComplete();
-
-    // The flying projectile layers (aura, blade, core) are cleaned up on arrival.
-    for (const piece of polygons.slice(0, preImpactPolygonCount)) {
-      expect(piece.destroy).toHaveBeenCalled();
+    vfx: {
+      sprite: "vfx-kiem-khi",
+      travelFrames: 1,
+      impact: null,
+      rotateToTarget: true,
+      impactScale: 1.8,
+      color: 0x9be8ff,
+      fps: 12
     }
-
-    // Blast pieces include core flash, shockwave rings, sword slashes, and shards.
-    const blastPieces = [
-      ...circles.slice(preImpactCircleCount),
-      ...polygons.slice(preImpactPolygonCount)
-    ];
-    expect(blastPieces.length).toBeGreaterThan(4);
-
-    const blastTweens = tweenConfigs.slice(tweenConfigs.indexOf(flight) + 1);
-    expect(blastTweens).toHaveLength(blastPieces.length);
-
-    // Shards are thrown away from the impact point, so the blast spreads out.
-    const impact = { x: toIso(900, 100).x, y: toIso(900, 100).y - 24 };
-    const thrownShards = blastTweens.filter(
-      (config) => typeof config.x === "number" && (config.x !== impact.x || config.y !== impact.y)
-    );
-    expect(thrownShards.length).toBeGreaterThan(3);
-
-    for (const config of blastTweens) config.onComplete();
-    for (const piece of blastPieces) expect(piece.destroy).toHaveBeenCalled();
-
-    // The ring is drawn at the skill's real splash radius, so the effect ends
-    // exactly where the server stops dealing damage. (Screen px == world px.)
-    const radii = scene.add.circle.mock.calls.map((call) => call[2]);
-    expect(radii).toContain(170);
   });
 
-  it("clamps a throw that aims past the art's reach", () => {
-    const { scene, tweenConfigs } = makeScene();
-    const blade = makeSprite();
-    scene.add.polygon = vi.fn(() => blade);
+  it("loops only the travel frame and keeps the rest for the impact", () => {
+    const { scene, animConfigs } = makeScene({ frameTotal: 5 });
+    scene.add.sprite = () => makeSprite();
 
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 4000, y: 100 });
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
 
-    const flight = tweenConfigs.find((config) => Array.isArray(config.targets));
-    expect(flight.x).toBe(toIso(100 + 840, 100).x);
+    expect(animConfigs).toHaveLength(2);
+    expect(animConfigs[0].frames).toHaveLength(1);
+    expect(animConfigs[0]).toMatchObject({ repeat: -1, yoyo: false, frameRate: 8 });
+    expect(animConfigs[1].frames).toHaveLength(3);
+    expect(animConfigs[1]).toMatchObject({ repeat: 0, frameRate: 12 });
+  });
+
+  it("turns the blade toward its target", () => {
+    const { scene } = makeScene();
+    const sprite = makeSprite();
+    scene.add.sprite = () => sprite;
+
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 100, y: 200 });
+
+    expect(sprite.setRotation).toHaveBeenCalledWith(Math.PI / 2);
+  });
+
+  it("leaves the art untouched when rotateToTarget is off", () => {
+    const { scene } = makeScene();
+    const sprite = makeSprite();
+    scene.add.sprite = () => sprite;
+
+    playSkillCastVfx(scene, makePlayer(), { range: 840, radius: 0, vfx: { sprite: "palm" } }, {
+      x: 100,
+      y: 200
+    });
+
+    expect(sprite.setRotation).not.toHaveBeenCalled();
+  });
+
+  it("blooms the burst to impactScale when it lands, then clears itself", () => {
+    const { scene, tweenConfig } = makeScene();
+    const sprite = makeSprite();
+    scene.add.sprite = () => sprite;
+
+    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
+
+    const baseScale = (90 * 1.8) / 256;
+    tweenConfig.value.onComplete();
+
+    expect(sprite.play).toHaveBeenLastCalledWith("vfx-kiem-khi-impact");
+    expect(sprite.setScale).toHaveBeenLastCalledWith(baseScale * 1.8);
+    sprite.once.mock.calls[0][1]();
+    expect(sprite.destroy).toHaveBeenCalled();
   });
 });

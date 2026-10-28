@@ -36,13 +36,21 @@ const KIEM_KHI_SKILL = defineSkill({
   splash: { radius: 220, mult: 0.6, maxTargets: 6 },
   vfx: {
     /**
-     * A blade-shaped shard of qi flies from the hero to the victim, then bursts.
-     * `projectile` replaces the gesture arc entirely (see `playSkillCastVfx`), so
-     * there is no `cast` kind: `impact: null` leaves the arrival to the shard.
+     * The authored sheet carries the whole sequence: the first frame is the
+     * flying shard (looped as the travel animation), then the vortex, the burst
+     * and a held burst that own the impact — so there is no separate `impact`
+     * primitive. `travelFrames: 1` keeps that single travel pose from looping
+     * into the impact frames, and `rotateToTarget` turns the blade toward the
+     * victim instead of always flying right. The burst blooms past the shard's
+     * size so it reads as the hit.
      */
-    projectile: "sword",
+    sprite: "vfx-kiem-khi",
+    travelFrames: 1,
     impact: null,
-    color: 0x9be8ff
+    rotateToTarget: true,
+    impactScale: 1.8,
+    color: 0x9be8ff,
+    fps: 12
   }
 });
 

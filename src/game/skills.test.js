@@ -55,11 +55,19 @@ describe("skill catalog", () => {
       id: "kiem_khi",
       weapon: "kiem",
       slot: 0,
+      icon: "/skills/kiem_khi.png",
       starter: true,
       unlockLevel: 1,
       range: 1000,
       radius: 0,
-      splash: { radius: 220, mult: 0.6, maxTargets: 6 }
+      splash: { radius: 220, mult: 0.6, maxTargets: 6 },
+      vfx: {
+        sprite: "vfx-kiem-khi",
+        travelFrames: 1,
+        impact: null,
+        rotateToTarget: true,
+        impactScale: 1.8
+      }
     });
 
     const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForWeapon("bao-tay");
@@ -179,7 +187,9 @@ describe("skill catalog", () => {
       "public/skills/vfx/la_han_tran/sheet.png",
       "public/skills/kim_cang_bat_hoai.png",
       "public/skills/nhu_lai_than_chuong.png",
-      "public/skills/vfx/nhu_lai_than_chuong/sheet.png"
+      "public/skills/vfx/nhu_lai_than_chuong/sheet.png",
+      "public/skills/kiem_khi.png",
+      "public/skills/vfx/kiem_khi/sheet.png"
     ]) {
       expect(fs.existsSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)))).toBe(true);
     }
