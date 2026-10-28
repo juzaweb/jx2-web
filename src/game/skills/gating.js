@@ -2,10 +2,12 @@
  * Skill learning and cast gating.
  *
  * A hero only knows the starter skill for free; every other skill is learned
- * from a book (character level 10+), and `requires` lists the skills that must
- * already be learned. Casting a known art is gated by its own `unlockLevel`.
+ * from a book, which needs character level 10+ (`MIN_CHARACTER_LEVEL_TO_LEARN`)
+ * or the art's own `unlockLevel` when that is higher. `requires` lists the skills
+ * that must already be learned. Casting a known art is gated by its own
+ * `unlockLevel`; raising its rank is gated by `characterLevelForSkillLevel`.
  * These helpers are shared by the client (hotbar/tree gates) and the server
- * (authoritative cast and book validation).
+ * (authoritative cast, book and upgrade validation).
  */
 
 import { SKILLS_BY_ID } from "./registry.js";
@@ -182,8 +184,9 @@ export function skillLockReason(skill, level, learned = null) {
   const known = knowsEntry(entry, learnedSet);
 
   // An art the hero does not know yet is gated by its book requirement (the
-  // catalog level, floored at the study minimum); a known art only by its own
-  // unlockLevel, so a legacy save that learned early stays castable.
+  // catalog level, floored at the study minimum); a known art by its own
+  // unlockLevel, which is exactly what `skillUsable` enforces before a cast, so
+  // the tree and the cast gate can never disagree.
   const requiredLevel = learnedSet && !known
     ? characterLevelForSkillLevel(entry, 1)
     : entry.unlockLevel;

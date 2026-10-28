@@ -112,14 +112,14 @@ describe("SkillsModal Component", () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={gated} level={10} />
+        <SkillsModal isOpen={true} skills={gated} level={18} />
       </I18nProvider>
     );
 
     expect(markup).toContain("Cần học Thiếu Lâm Tâm Pháp trước");
     // The tile badge shows the blocking level of the prerequisite.
     expect(markup).toContain(
-      '<span class="skill-node-level" aria-hidden="true">1</span>'
+      '<span class="skill-node-level" aria-hidden="true">10</span>'
     );
   });
 

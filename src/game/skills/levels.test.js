@@ -106,30 +106,33 @@ describe("skill upgrade price", () => {
 });
 
 describe("character level per skill rank", () => {
+  it("pins the tuning constants the design assumes", () => {
+    // Literal guards: a silent change to either number reshapes the whole curve.
+    expect(MIN_CHARACTER_LEVEL_TO_LEARN).toBe(10);
+    expect(SKILL_LEVELS_PER_CHARACTER_LEVEL).toBe(4);
+    expect(MAX_SKILL_LEVEL).toBe(10);
+  });
+
   it("floors every rank at the level-10 study minimum, then adds 4 levels per rank", () => {
     const starter = skillById("kiem_khi");
     expect(starter.unlockLevel).toBe(1);
-    // The book's own level is below the study floor, so the floor wins.
-    expect(characterLevelForSkillLevel(starter, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
-    expect(characterLevelForSkillLevel(starter, 2)).toBe(
-      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL
-    );
-    expect(characterLevelForSkillLevel(starter, MAX_SKILL_LEVEL)).toBe(
-      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL * (MAX_SKILL_LEVEL - 1)
-    );
 
-    // A catalog entry that unlocks later than the floor keeps its own level.
-    expect(characterLevelForSkillLevel({ unlockLevel: 15 }, 1)).toBe(15);
-    expect(characterLevelForSkillLevel({ unlockLevel: 15 }, 2)).toBe(
-      15 + SKILL_LEVELS_PER_CHARACTER_LEVEL
-    );
+    // Literal expectations, not derived from the constants: 10 .. 46 in steps of 4.
+    expect(characterLevelForSkillLevel(starter, 1)).toBe(10);
+    expect(characterLevelForSkillLevel(starter, 2)).toBe(14);
+    expect(characterLevelForSkillLevel(starter, 5)).toBe(26);
+    expect(characterLevelForSkillLevel(starter, MAX_SKILL_LEVEL)).toBe(46);
+
+    // A catalog entry that unlocks later than the floor keeps its own level, and
+    // still gains 4 levels per rank (Như Lai Thần Chưởng: 50 .. 86).
+    expect(characterLevelForSkillLevel({ unlockLevel: 18 }, 1)).toBe(18);
+    expect(characterLevelForSkillLevel({ unlockLevel: 18 }, 2)).toBe(22);
+    expect(characterLevelForSkillLevel({ unlockLevel: 50 }, MAX_SKILL_LEVEL)).toBe(86);
 
     // A bare number is accepted too, and junk clamps to the study floor.
     expect(characterLevelForSkillLevel(20, 1)).toBe(20);
-    expect(characterLevelForSkillLevel(5, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
-    expect(characterLevelForSkillLevel(null, 1)).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
-    expect(characterLevelForSkillLevel({}, 99)).toBe(
-      MIN_CHARACTER_LEVEL_TO_LEARN + SKILL_LEVELS_PER_CHARACTER_LEVEL * (MAX_SKILL_LEVEL - 1)
-    );
+    expect(characterLevelForSkillLevel(5, 1)).toBe(10);
+    expect(characterLevelForSkillLevel(null, 1)).toBe(10);
+    expect(characterLevelForSkillLevel({}, 3)).toBe(18);
   });
 });

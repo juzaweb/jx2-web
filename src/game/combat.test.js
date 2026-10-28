@@ -437,6 +437,8 @@ describe("CombatSystem kill rewards", () => {
   it("casts a hotbar-bound skill by catalog id", () => {
     const { combat, player } = makeCombat();
     player.weaponType = "bao-tay";
+    // la_han_tran is the fourth fist art: it unlocks at character level 26.
+    player.stats.level = 26;
     combat.learnedSkills = new Set(["la_han_tran"]);
     combat.executeSkill = vi.fn();
     const ok = combat.castSkillById("la_han_tran");
@@ -672,7 +674,8 @@ describe("skill targeting", () => {
       pkFlag,
       visual: { scaleX: 1 },
       faceDirection: vi.fn(),
-      stats: { level: 10, mp: 100, maxMp: 100, hp: 100, maxHp: 100, attack: 24, critRate: 0.12, critDamage: 1.5 }
+      // Level 18 so the learned Đại Tu Di Chưởng passes its own level gate.
+      stats: { level: 18, mp: 100, maxMp: 100, hp: 100, maxHp: 100, attack: 24, critRate: 0.12, critDamage: 1.5 }
     };
     const ring = { setStrokeStyle: () => ring, setDepth: () => ring, destroy: vi.fn() };
     const scene = {

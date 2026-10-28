@@ -12,7 +12,8 @@ function makeManager({ enemies, castSkillId, playerWeapon = "bao-tay", skillLeve
   const player = {
     id: "player-1",
     weaponType: playerWeapon,
-    level: 10,
+    // High enough for every fist art used here (la_han_quyen needs 18).
+    level: 40,
     learnedSkills: ["la_han_quyen", "dai_tu_di_chuong"],
     skillLevels,
     mapId: "dong-mon-thanh",

@@ -434,7 +434,9 @@ test("WebSocket server-authority suite", async (t) => {
 
   await t.test("Skill casts are validated (weapon, unlock, passive, MP, damage)", async () => {
     // Give the hero gloves so the bao-tay kit is castable, and learn the skills
-    // the test casts (books are the only way to learn them).
+    // the test casts (books are the only way to learn them). Level 26 lets the
+    // first fist art cast while Như Lai Thần Chưởng (50) stays locked.
+    store.setProgress("char_skill", { level: 26, exp: 0, coins: 0, kills: 0 }, "char_skill");
     store.setInventory("char_skill", { "bao-tay-lang-khach": 1 });
     store.addLearnedSkill("char_skill", "dai_tu_di_chuong");
     store.addLearnedSkill("char_skill", "nhu_lai_than_chuong");
@@ -450,7 +452,7 @@ test("WebSocket server-authority suite", async (t) => {
     const wrongWeapon = await client.waitFor((m) => m.type === "skill_rejected");
     assert.equal(wrongWeapon.payload.reason, "weapon");
 
-    // Locked at level 1.
+    // Locked at level 26: the art needs character level 50.
     client.send({ type: "player_attack", payload: { skill: "nhu_lai_than_chuong" } });
     const locked = await client.waitFor((m) => m.type === "skill_rejected");
     assert.equal(locked.payload.reason, "locked");
@@ -461,9 +463,13 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(passive.payload.reason, "passive");
 
     // A real cast spends its MP, then its follow-up hit is recomputed server-side.
+    // The pool ceiling follows the character level, so measure against the join.
+    const joinMp = await client.waitFor((m) => m.type === "player_mp");
     client.send({ type: "player_attack", payload: { skill: "dai_tu_di_chuong", x: 9500, y: 6700, facingRight: true } });
-    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === 48);
-    assert.equal(mp.payload.maxMp, 60);
+    const spentMp = joinMp.payload.mp - 12;
+    const mp = await client.waitFor((m) => m.type === "player_mp" && m.payload.mp === spentMp);
+    assert.equal(mp.payload.mp, spentMp);
+    assert.equal(mp.payload.maxMp, joinMp.payload.maxMp);
 
     client.send({ type: "enemy_hit", payload: { id: 1, skill: "dai_tu_di_chuong", damage: 9999 } });
     const hit = await client.waitFor((m) => m.type === "enemy_hit" && m.payload.id === 1 && m.payload.damage > 0);
@@ -475,6 +481,7 @@ test("WebSocket server-authority suite", async (t) => {
   await t.test("Test mode casts spend no MP and start no cooldown", async () => {
     process.env.TEST_MODE = "true";
     try {
+      store.setProgress("char_test_mode", { level: 26, exp: 0, coins: 0, kills: 0 }, "char_test_mode");
       store.setInventory("char_test_mode", { "bao-tay-lang-khach": 1 });
       store.addLearnedSkill("char_test_mode", "dai_tu_di_chuong");
 
@@ -488,6 +495,7 @@ test("WebSocket server-authority suite", async (t) => {
       );
 
       const castBy = (m) => m.type === "player_attacked" && m.payload.id === "char_test_mode";
+      const joinMp = await caster.waitFor((m) => m.type === "player_mp");
       caster.send({
         type: "player_attack",
         payload: { skill: "dai_tu_di_chuong", x: 5300, y: 5000, facingRight: true }
@@ -495,7 +503,9 @@ test("WebSocket server-authority suite", async (t) => {
       await observer.waitFor(castBy);
 
       assert.equal(
-        caster.messages.some((m) => m.type === "player_mp" && m.payload.mp !== 60),
+        caster.messages.some(
+          (m) => m.type === "player_mp" && m.payload.mp !== joinMp.payload.mp
+        ),
         false,
         "a test-mode cast never debits the server-owned pool"
       );
@@ -517,7 +527,9 @@ test("WebSocket server-authority suite", async (t) => {
   });
 
   await t.test("Stun is applied by the server and holds the monster still", async () => {
-    // Gloves carry the stun skill; the join hands out a sword.
+    // Gloves carry the stun skill; the join hands out a sword. Đại Tu Di Chưởng
+    // is the second fist art and unlocks at character level 18.
+    store.setProgress("char_stun", { level: 18, exp: 0, coins: 0, kills: 0 }, "char_stun");
     store.setInventory("char_stun", { "bao-tay-lang-khach": 1 });
     store.addLearnedSkill("char_stun", "dai_tu_di_chuong");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);

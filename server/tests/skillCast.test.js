@@ -53,11 +53,11 @@ describe("server skill cast rules", () => {
     assert.deepEqual(studyRejection(skillById("kiem_khi"), 10, []), { reason: "already_learned" });
 
     const gated = skillById("tam_thanh_kiem_phap");
-    assert.equal(studyRejection(gated, 10, [])?.reason, "prereq");
-    assert.equal(studyRejection(gated, 1, ["thai_cuc_quyen"])?.reason, "level");
-    // Studying needs character level 10 at minimum, whatever unlockLevel says.
-    assert.equal(studyRejection(gated, 9, ["thai_cuc_quyen"])?.reason, "level");
-    assert.equal(studyRejection(gated, 10, ["thai_cuc_quyen"]), null);
+    // Own level met, prerequisite missing.
+    assert.equal(studyRejection(gated, 26, [])?.reason, "prereq");
+    // Prerequisite learned, own level still too low (the third sword art needs 26).
+    assert.equal(studyRejection(gated, 25, ["thai_cuc_quyen"])?.reason, "level");
+    assert.equal(studyRejection(gated, 26, ["thai_cuc_quyen"]), null);
   });
 
   it("applies buffs and heals to the caster", () => {
