@@ -1,5 +1,6 @@
 import { RemotePlayer } from "./remotePlayer.js";
 import { skillById } from "./skills.js";
+import { playSkillCastVfx } from "./skills/client/vfx.js";
 
 /**
  * RemotePlayerManager
@@ -157,44 +158,66 @@ export class RemotePlayerManager {
   }
 
   /**
-   * Player performed an attack or skill
+   * Player performed an attack or skill.
+   *
+   * A peer must see the same art the caster sees, so a catalog skill is replayed
+   * through the shared skill-VFX pipeline (sprite sheets, thrown projectiles,
+   * cast gestures). Only a plain swing falls back to the generic melee motion.
    * @param {Object} payload
    */
   handlePlayerAttacked(payload = {}) {
     if (!payload.id) return;
     const player = this.players.get(payload.id);
-    if (player) {
-      if (payload.skill === "la_han_tran") {
-        player.showFormation?.("vfx-la-han-tran", 0.6);
-        if (player.formationTimer) {
-          player.formationTimer.remove?.();
-          player.formationTimer = null;
-        }
-        player.formationTimer = this.scene?.time?.delayedCall?.(180000, () => {
-          player.hideFormation?.();
-          player.formationTimer = null;
-        });
-      } else if (payload.skill === "kim_cang_bat_hoai") {
-        const skill = skillById("kim_cang_bat_hoai");
-        const duration = skill?.effects?.find((effect) => effect.kind === "buff")?.duration ?? 30000;
-        player.showOverhead?.(
-          skill?.vfx?.overhead ?? "buff-phat-an",
-          skill?.vfx?.overheadScale,
-          skill?.vfx?.overheadOffsetY
-        );
-        if (player.overheadTimer) {
-          player.overheadTimer.remove?.();
-          player.overheadTimer = null;
-        }
-        player.overheadTimer = this.scene?.time?.delayedCall?.(duration, () => {
-          player.hideOverhead?.();
-          player.overheadTimer = null;
-        });
-      } else if (payload.skill === "kiem_khi") {
-        player.playSkill();
-      } else {
-        player.playAttack(payload.facingRight !== false);
-      }
+    if (!player) return;
+
+    const skill = payload.skill && payload.skill !== "normal" ? skillById(payload.skill) : null;
+    if (!skill) {
+      player.playAttack(payload.facingRight !== false);
+      return;
+    }
+
+    // The server echoes the impact point it validated, so ranged/AoE art lands
+    // where the caster aimed instead of at the peer's own feet.
+    const aimPoint =
+      Number.isFinite(payload.aimX) && Number.isFinite(payload.aimY)
+        ? { x: payload.aimX, y: payload.aimY }
+        : null;
+
+    this.applyPeerBuffAura(player, skill);
+    playSkillCastVfx(this.scene, player, skill, null, aimPoint);
+  }
+
+  /**
+   * Long-lived self buffs stay on the peer for their whole duration: a ground
+   * formation ring and/or an overhead seal, exactly as the caster renders them.
+   * @param {RemotePlayer} player
+   * @param {Object} skill
+   */
+  applyPeerBuffAura(player, skill) {
+    const vfx = skill?.vfx || {};
+    const duration = Math.max(
+      0,
+      ...(skill?.effects || [])
+        .filter((effect) => effect?.kind === "buff")
+        .map((effect) => Number(effect.duration) || 0)
+    );
+
+    if (vfx.type === "formation" && vfx.sprite) {
+      player.showFormation?.(vfx.sprite, vfx.scale);
+      player.formationTimer?.remove?.();
+      player.formationTimer = this.scene?.time?.delayedCall?.(duration || 180000, () => {
+        player.hideFormation?.();
+        player.formationTimer = null;
+      });
+    }
+
+    if (vfx.type === "overhead" && vfx.overhead) {
+      player.showOverhead?.(vfx.overhead, vfx.overheadScale, vfx.overheadOffsetY);
+      player.overheadTimer?.remove?.();
+      player.overheadTimer = this.scene?.time?.delayedCall?.(duration || 30000, () => {
+        player.hideOverhead?.();
+        player.overheadTimer = null;
+      });
     }
   }
 

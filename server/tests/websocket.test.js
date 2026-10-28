@@ -515,10 +515,20 @@ test("WebSocket server-authority suite", async (t) => {
       await sleep(600);
       caster.send({
         type: "player_attack",
-        payload: { skill: "dai_tu_di_chuong", x: 5200, y: 5000, facingRight: true }
+        payload: {
+          skill: "dai_tu_di_chuong",
+          x: 5200,
+          y: 5000,
+          aimX: 5600,
+          aimY: 5100,
+          facingRight: true
+        }
       });
       const again = await observer.waitFor((m) => castBy(m) && m.payload.x === 5200);
       assert.equal(again.payload.skill, "dai_tu_di_chuong");
+      // Peers land the art on the validated impact point, not the caster's feet.
+      assert.equal(again.payload.aimX, 5600);
+      assert.equal(again.payload.aimY, 5100);
 
       await caster.close();
       await observer.close();

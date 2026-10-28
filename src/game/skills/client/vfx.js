@@ -505,18 +505,26 @@ function playSwordQiProjectileVfx(scene, skill, player, target, aimPoint) {
 
 /**
  * Cast animation played at the hero's feet.
+ *
+ * Works for any caster that exposes `x`, `y` and `facingDirection` — the local
+ * hero and a remote peer alike — so both sides render identical art.
  * @param {Phaser.Scene} scene
- * @param {import("../../player.js").Player} player
+ * @param {{x:number,y:number,facingDirection?:number}} player
  * @param {Object} skill
+ * @param {{x:number,y:number}|null} [target]
+ * @param {{x:number,y:number}|null} [aimPoint]
  */
 export function playSkillCastVfx(scene, player, skill, target = null, aimPoint = null) {
-  if (!scene || !player?.sprite || !skill?.vfx) return;
+  if (!scene || !player || !skill?.vfx) return;
   // Sprite VFX sheets download on first use; a not-yet-ready sheet simply skips
   // its visual for this cast instead of blocking the skill.
   ensureVfxTexture(scene, skill.vfx.sprite);
   const p = baseAt(player.x, player.y);
   const color = skill.vfx.color || 0xffd166;
-  const facingRight = player.visual?.scaleX >= 0;
+  // Facing decides which way an unaimed gesture points. Direction 2 (screen
+  // right) is the default used by every hero rig. Read it from the shared
+  // facing index rather than the rig scale, which never flips.
+  const facingRight = directionVector(player.facingDirection ?? 2).x >= 0;
   const cast = skill.vfx.cast;
   const aimedAt = target || aimPoint;
   const targetPoint = aimedAt ? toIso(aimedAt.x, aimedAt.y) : null;
