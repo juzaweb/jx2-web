@@ -37,6 +37,7 @@ import {
   mapPvpMode
 } from "../../../src/game/maps/mapRegistry.js";
 import {
+  FACTION_IDS,
   factionHomeMap,
   isHostileFaction,
   normalizeFaction
@@ -50,6 +51,8 @@ import {
 import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable } from "../../../src/game/skills.js";
 import { isTestMode } from "../../../src/game/testMode.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
+import { botSnapshot, botLevelForMap } from "../../../src/game/botAi.js";
+import { BotRoster } from "../game/botRoster.js";
 import {
   applyCastSelfEffects,
   castRejection,
@@ -358,6 +361,8 @@ export class GameSocketManager {
     this.enemyRespawnTimers = new Map(); // key: `${mapId}:${enemyId}`, value: timeout
     this.enemyTickMs = clampNum(options.enemyTickMs, 10, 1000, ENEMY_TICK_MS);
 
+    this.botRoster = new BotRoster(this, options);
+
     // Identity is proven by the session token, and the character must belong to
     // that account. Both are injectable so tests can supply their own authority.
     this.verifyToken = options.verifyToken || verifySessionToken;
@@ -379,6 +384,7 @@ export class GameSocketManager {
     this.setupServer();
     this.startHeartbeat();
     this.startEnemyTick();
+    this.botRoster.startTick();
     this.startRegenTick();
   }
 
@@ -815,6 +821,8 @@ export class GameSocketManager {
     this.players.set(ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
 
+    this.ensureBotsForMap(mapId, ws, playerData.faction);
+
     // 1. Send all existing players *on this map* to the joining player
     const existingPlayers = [];
     this.players.forEach((p, clientWs) => {
@@ -822,6 +830,7 @@ export class GameSocketManager {
         existingPlayers.push(this.playerSnapshot(p));
       }
     });
+    this.botsOnMap(mapId).forEach((bot) => existingPlayers.push(botSnapshot(bot)));
 
     this.send(ws, {
       type: "init_world",
@@ -911,6 +920,8 @@ export class GameSocketManager {
     // portal drops the hero back on the map they just left.
     this.persistPosition(player, { force: true });
 
+    this.ensureBotsForMap(target.id, ws, player.faction);
+    this.releaseBotsIfEmpty(fromMapId);
     this.announceMapArrival(player, ws, target);
   }
 
@@ -927,6 +938,7 @@ export class GameSocketManager {
     this.players.forEach((other, clientWs) => {
       if (clientWs !== ws && other.mapId === map.id) peers.push(this.playerSnapshot(other));
     });
+    this.botsOnMap(map.id).forEach((bot) => peers.push(botSnapshot(bot)));
 
     this.send(ws, {
       type: "map_changed",
@@ -1746,7 +1758,8 @@ export class GameSocketManager {
     }
 
     const targetEntry = this.playerById.get(payload.targetId);
-    const target = targetEntry?.data;
+    const botTarget = targetEntry ? null : this.bots.get(payload.targetId);
+    const target = targetEntry?.data || (botTarget && !botTarget.isDead ? botTarget : null);
     if (!target) return this.rejectHit(ws, "target_missing");
     // Two maps can share world coordinates, so distance alone must never let a
     // strike reach a body standing somewhere else.
@@ -1835,8 +1848,9 @@ export class GameSocketManager {
   pvpSplashTargets(attacker, primary, skill) {
     const pvpMode = this.pvpModeFor(attacker);
     const candidates = [];
-    for (const other of this.players.values()) {
+    for (const other of this.combatantsOnMap(attacker.mapId)) {
       if (other.id === attacker.id || other.id === primary.id) continue;
+      if (attacker.isBot && other.isBot) continue;
       if (other.mapId !== primary.mapId || other.hp <= 0) continue;
       const distance = Math.hypot(attacker.x - other.x, attacker.y - other.y);
       if (!canPvpAttack(attacker, other, distance, PVP_ATTACK_RANGE, pvpMode)) continue;
@@ -1952,6 +1966,11 @@ export class GameSocketManager {
     // HP — including the victim, who reads its own pool from here.
     this.broadcastPlayerState(target, hpMessage);
 
+    if (target.isBot) {
+      if (target.hp <= 0) this.defeatBot(target, attacker, source, sourceName);
+      return true;
+    }
+
     // Player hits are map-scoped, but a future cross-map effect must still reach an
     // attacker who is no longer standing on the target's map.
     this.sendToAttackerOffMap(attacker, target.mapId, hpMessage);
@@ -2029,6 +2048,7 @@ export class GameSocketManager {
       this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: victim.id } }, victimWs);
     }
 
+    const vacatedMapId = fromMapId;
     victim.mapId = home.id;
     victim.x = home.spawn.x;
     victim.y = home.spawn.y;
@@ -2044,6 +2064,7 @@ export class GameSocketManager {
     victim.invulnerableUntil = Date.now() + PLAYER_IFRAME_MS;
     this.persistVitals(victim);
     this.broadcastMp(victim);
+    this.releaseBotsIfEmpty(vacatedMapId);
 
     const restoredMessage = {
       type: "player_hp",
@@ -2244,6 +2265,68 @@ export class GameSocketManager {
         break;
       }
 
+      case "spawn_bots": {
+        if (!this.canFightHere(player)) {
+          this.send(ws, {
+            type: "player_chat",
+            payload: {
+              id: `chat-${Date.now()}-bot`,
+              sender: "Hệ Thống",
+              text: "Không thể triệu hồi bot PK trong khu vực an toàn.",
+              channel: "system",
+              time: Date.now()
+            }
+          });
+          break;
+        }
+        const count = clampNum(Number(payload.count), 1, 10, 1);
+        const map = getMap(player.mapId);
+        const mode = mapPvpMode(map);
+        const fallbackFaction =
+          mode === "faction" ? FACTION_IDS.find((id) => id !== player.faction) : undefined;
+        const level = Number.isFinite(Number(payload.level))
+          ? clampNum(Number(payload.level), 1, MAX_LEVEL, this.botRoster.level)
+          : botLevelForMap(map, this.botRoster.level);
+        for (let index = 0; index < count; index += 1) {
+          const angle = (Math.PI * 2 * index) / count;
+          this.spawnBot({
+            mapId: player.mapId,
+            x: player.x + Math.cos(angle) * 320,
+            y: player.y + Math.sin(angle) * 320,
+            level,
+            faction: payload.faction || fallbackFaction,
+            pkFlag: mode !== "none"
+          });
+        }
+        this.send(ws, {
+          type: "player_chat",
+          payload: {
+            id: `chat-${Date.now()}-bot`,
+            sender: "Hệ Thống",
+            text: `Đã triệu hồi ${count} bot PK.`,
+            channel: "system",
+            time: Date.now()
+          }
+        });
+        break;
+      }
+
+      case "clear_bots": {
+        const removed = this.countBotsOnMap(player.mapId);
+        this.despawnBotsOnMap(player.mapId);
+        this.send(ws, {
+          type: "player_chat",
+          payload: {
+            id: `chat-${Date.now()}-bot`,
+            sender: "Hệ Thống",
+            text: `Đã xóa ${removed} bot PK trên bản đồ này.`,
+            channel: "system",
+            time: Date.now()
+          }
+        });
+        break;
+      }
+
       case "teleport": {
         const targetMapId = sanitizeStr(payload.mapId || "", 64);
         if (!isKnownMap(targetMapId)) return;
@@ -2267,10 +2350,13 @@ export class GameSocketManager {
         if (currentMapId !== targetMapId) {
           this.broadcastToMap(currentMapId, { type: "player_left", payload: { id: player.id } }, ws);
           player.mapId = targetMapId;
+          this.ensureBotsForMap(targetMapId, ws, player.faction);
+          this.releaseBotsIfEmpty(currentMapId);
 
           const peers = Array.from(this.players.values())
             .filter((peer) => peer !== player && peer.mapId === targetMapId)
             .map((peer) => this.playerSnapshot(peer));
+          this.botsOnMap(targetMapId).forEach((bot) => peers.push(botSnapshot(bot)));
 
           this.send(ws, {
             type: "map_changed",
@@ -2287,6 +2373,7 @@ export class GameSocketManager {
             ws
           );
         } else {
+          this.ensureBotsForMap(targetMapId, ws, player.faction);
           this.broadcastPlayerState(player, {
             type: "player_moved",
             payload: {
@@ -2349,6 +2436,55 @@ export class GameSocketManager {
    */
   getEnemyState(mapId = DEFAULT_MAP_ID) {
     return Array.from(this.rosterFor(mapId).values()).map((enemy) => this.enemySnapshot(enemy));
+  }
+
+  combatantsOnMap(mapId) {
+    const list = [];
+    this.players.forEach((player) => {
+      if (player.mapId === mapId) list.push(player);
+    });
+    list.push(...this.botsOnMap(mapId));
+    return list;
+  }
+
+  get bots() {
+    return this.botRoster?.bots || new Map();
+  }
+
+  botsOnMap(mapId) {
+    return this.botRoster?.botsOnMap(mapId) || [];
+  }
+
+  spawnBot(options) {
+    return this.botRoster?.spawnBot(options);
+  }
+
+  ensureBotsForMap(mapId, excludeWs = null, playerFaction = null) {
+    return this.botRoster?.ensureBotsForMap(mapId, excludeWs, playerFaction);
+  }
+
+  despawnBot(bot, options) {
+    return this.botRoster?.despawnBot(bot, options);
+  }
+
+  despawnBotsOnMap(mapId) {
+    return this.botRoster?.despawnBotsOnMap(mapId);
+  }
+
+  countBotsOnMap(mapId) {
+    return this.botRoster?.countBotsOnMap(mapId) || 0;
+  }
+
+  releaseBotsIfEmpty(mapId) {
+    return this.botRoster?.releaseBotsIfEmpty(mapId);
+  }
+
+  defeatBot(bot, attacker = null, source = "pvp", sourceName = null) {
+    return this.botRoster?.defeatBot(bot, attacker, source, sourceName);
+  }
+
+  respawnBot(botId) {
+    return this.botRoster?.respawnBot(botId);
   }
 
   /**
@@ -2592,7 +2728,9 @@ export class GameSocketManager {
       if (!roster.size) return;
 
       const map = getMap(mapId);
-      const mapPlayers = players.filter((player) => player.mapId === mapId);
+      const mapPlayers = players
+        .filter((player) => player.mapId === mapId)
+        .concat(this.botsOnMap(mapId));
       const grid = this.gridFor(mapId);
       const moved = [];
       // The market keeps a few legacy spawns outside its square; clamping those to
@@ -2756,7 +2894,8 @@ export class GameSocketManager {
         (other) => other.mapId === mapId
       );
 
-      // When the last player leaves a map, walk its living monsters home.
+      // When the last player leaves a map, walk its living monsters home and
+      // retire the PK bots that were spawned for that population.
       if (!mapStillOccupied) {
         const grid = this.gridFor(mapId);
         this.rosterFor(mapId).forEach((enemy) => {
@@ -2765,6 +2904,7 @@ export class GameSocketManager {
           enemy.y = enemy.homeY;
           grid.update(enemy);
         });
+        this.despawnBotsOnMap(mapId);
       }
 
       // Notify other players standing on the same map
@@ -2788,13 +2928,14 @@ export class GameSocketManager {
       clearInterval(this.heartbeatTimer);
     }
     if (this.enemyTickTimer) {
-
+      clearInterval(this.enemyTickTimer);
+    }
     if (this.regenTimer) {
       clearInterval(this.regenTimer);
-    } clearInterval(this.enemyTickTimer);
     }
     this.enemyRespawnTimers.forEach((timer) => clearTimeout(timer));
     this.enemyRespawnTimers.clear();
+    this.botRoster?.close();
     this.players.clear();
     this.playerById.clear();
     if (this.wss) {

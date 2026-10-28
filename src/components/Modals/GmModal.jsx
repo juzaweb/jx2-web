@@ -365,6 +365,27 @@ export function GmModal({ isOpen, onClose, stats = {} }) {
                   </button>
                 </div>
               </div>
+
+              <div className="gm-section">
+                <span className="gm-section-title">Bot PK</span>
+                <p className="gm-desc" style={{ fontSize: "12px", color: "#d8c29d", margin: "0 0 10px 0", lineHeight: 1.4 }}>
+                  Triệu hồi đối thủ giả lập quanh nhân vật. Bot do máy chủ điều khiển, tuần tra, đánh trả và dùng chiêu.
+                </p>
+                <div className="gm-btn-grid">
+                  <button className="gm-btn primary" onClick={() => emitGmAction("spawn_bots", { count: 1 })}>
+                    🤖 1 Bot
+                  </button>
+                  <button className="gm-btn primary" onClick={() => emitGmAction("spawn_bots", { count: 3 })}>
+                    🤖 3 Bot
+                  </button>
+                  <button className="gm-btn gold" onClick={() => emitGmAction("spawn_bots", { count: 5 })}>
+                    🤖 5 Bot
+                  </button>
+                  <button className="gm-btn" onClick={() => emitGmAction("clear_bots")}>
+                    🧹 Xóa Bot PK
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </div>
