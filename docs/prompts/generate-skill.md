@@ -2,9 +2,9 @@
 
 Tài liệu này cung cấp bộ prompt chuẩn và cụ thể cho **toàn bộ 19 kỹ năng** hiện có trong game **JX2-Web ("Giang Hồ")**.
 
-Mỗi kỹ năng đều được trang bị đầy đủ **2 Prompt Visual Asset riêng biệt**:
-1. **Prompt 1 (Skill Icon):** Tạo ảnh icon 1:1 đại diện trên Hotbar và cây kỹ năng `F5`.
-2. **Prompt 2 (VFX Sprite Sheet):** Tạo dải frame hoạt họa hiệu ứng (dải 4 frame tỉ lệ 4:1 hoặc lưới 16 frame 1:1, nền đen `solid black background`) chuẩn `256×256 px/frame` cho engine Phaser 3.
+Với mỗi kỹ năng trong game, tài nguyên hình ảnh được phân loại như sau:
+- **Chiêu thức Chủ động (Active Skills):** Gồm đầy đủ **2 Prompt** — **Prompt 1 (Skill Icon)** và **Prompt 2 (VFX Sprite Sheet)**.
+- **Chiêu thức Tâm Pháp (Passive / Internal Arts):** **CHỈ CÓ Prompt 1 (Skill Icon)**, hoàn toàn **KHÔNG CÓ Sprite Sheet** vì tâm pháp vận hành nội công ngầm, không thi triển hoạt họa chiêu thức ra ngoài sàn đấu.
 
 ---
 
@@ -36,7 +36,12 @@ Your task is to implement or update a skill into the game according to `docs/wea
 
 ---
 
-## 2. Chi Tiết Từng Skill: Bộ Đôi Prompt (Icon & Sprite Sheet)
+## 2. Chi Tiết Từng Skill: Danh Sách Prompt (Icon & Sprite Sheet)
+
+> [!NOTE]
+> **Quy tắc phân loại Asset cho chiêu thức:**
+> - **Chiêu thức Chủ động (Kiếm pháp, Quyền pháp, Chưởng pháp, Trận pháp, Tuyệt kỹ):** Đầy đủ **2 Prompt** (1 Icon + 1 VFX Sprite Sheet).
+> - **Chiêu thức Tâm Pháp (Nội công / Bị động như *Thiếu Lâm Tâm Pháp*, *Ngũ Độc Tâm Pháp*):** **CHỈ CÓ 1 Prompt (Icon)**, hoàn toàn **KHÔNG CÓ VFX Sprite Sheet** vì là tâm pháp vận hành ngầm trong cơ thể.
 
 ---
 
@@ -44,15 +49,12 @@ Your task is to implement or update a skill into the game according to `docs/wea
 
 ---
 
-#### 1. Thiếu Lâm Tâm Pháp (`thieu_lam_tam_phap` - Slot 0, Bị động hồi máu)
+#### 1. Thiếu Lâm Tâm Pháp (`thieu_lam_tam_phap` - Slot 0, Nội công bị động hồi máu)
 * **Prompt 1 (Icon):**
 ```text
 A 2D game skill icon of ancient Shaolin internal breathing art (Thiếu Lâm Tâm Pháp), Wuxia style. A serene silhouette of a meditating monk in golden lotus posture, surrounded by gentle golden vital energy waves and warm inner light particles. Dark brown parchment background with an antique brass square frame with Buddhist swastika corner filigree. Centered composition, clean UI vector feel, 8k --ar 1:1 --v 6.0
 ```
-* **Prompt 2 (Sprite Sheet):**
-```text
-A 2D game VFX sprite sheet of pulsating internal vitality healing aura, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: soft golden mist gathering around the hero's core; Frame 2: a circular golden lotus energy ring pulsing outward; Frame 3: glowing vital light particles floating upward like fireflies; Frame 4: gentle golden aura settling into a peaceful ambient glow. Pure solid black background, evenly spaced frames, 256x256 per frame, high contrast, clean transparent VFX ready --ar 4:1 --v 6.0 --style raw
-```
+* **Prompt 2 (Sprite Sheet):** *Không có* — Chiêu thức Tâm Pháp (Nội công / Bị động) tự động vận hành trong cơ thể, không có VFX Sprite Sheet thi triển trên sàn đấu.
 
 ---
 
@@ -232,15 +234,12 @@ A 2D game VFX sprite sheet of spiraling water ribbons and wind cloud wisps, top-
 
 ---
 
-#### 16. Ngũ Độc Tâm Pháp (`ngu_doc_tam_phap` - Slot 0, Đao pháp độc tố căn bản)
+#### 16. Ngũ Độc Tâm Pháp (`ngu_doc_tam_phap` - Slot 0, Nội công độc thuật căn bản)
 * **Prompt 1 (Icon):**
 ```text
 A 2D game skill icon of the Five Poisons Heart Art (Ngũ Độc Tâm Pháp), dark Wuxia style. A heavy curved blackened steel saber dripping with glowing toxic emerald venom, entwined by a venomous green pit viper. Dark moody parchment background, square blackened iron frame with snake scale carvings. Sinister martial aura, sharp icon clarity --ar 1:1 --v 6.0
 ```
-* **Prompt 2 (Sprite Sheet):**
-```text
-A 2D game VFX sprite sheet of a toxic green curved saber slash, isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: saber blade igniting with bubbling green acid miasma; Frame 2: wide sweeping crescent slash leaving a vibrant emerald green venom trail; Frame 3: slash trail splashing into acid droplets and small poison bubbles; Frame 4: dispersing green vapor wisps fading away. Solid pure black background, 256x256 frame size, high contrast --ar 4:1 --v 6.0 --style raw
-```
+* **Prompt 2 (Sprite Sheet):** *Không có* — Chiêu thức Tâm Pháp (Nội công độc môn) vận hành ngầm trong cơ thể, không có VFX Sprite Sheet.
 
 ---
 
