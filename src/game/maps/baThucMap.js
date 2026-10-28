@@ -1,5 +1,5 @@
 /**
- * Ba Thục — the eastern hunting ground of Thục Thành, levels 3-29.
+ * Ba Thục — the eastern hunting ground of Thành Đô, levels 3-29.
  *
  * Bamboo lowland behind the Thục east gate: wolves in the near canes, bamboo
  * vipers in the middle, bandits holding the far treeline.
@@ -12,7 +12,7 @@ export const BA_THUC_MAP = defineHuntingGround({
   name: "Ba Thục",
   side: "west",
   cityMapId: "thuc-thanh",
-  cityName: "Thục Thành",
+  cityName: "Thành Đô",
   citySpawn: { x: 6200, y: 4000 },
   palette: {
     rim: 0x26372c,

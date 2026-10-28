@@ -620,7 +620,7 @@ export function App() {
         return;
       }
 
-      // M shows the whole Biện Kinh city map.
+      // M shows the whole city map.
       if (key === "m") {
         if (isLoginOpen || (!activeCharacter && currentUser)) return;
         e.preventDefault();

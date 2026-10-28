@@ -20,13 +20,13 @@
 
 /** @type {Readonly<Record<string, FactionDefinition>>} */
 export const FACTIONS = Object.freeze({
-  han: Object.freeze({
-    id: "han",
-    name: "Hán",
-    glyph: "漢",
+  ngo: Object.freeze({
+    id: "ngo",
+    name: "Ngô",
+    glyph: "吳",
     color: "#d9534f",
     homeMapId: "market",
-    cityName: "Biện Kinh"
+    cityName: "Kiến Nghiệp"
   }),
   thuc: Object.freeze({
     id: "thuc",
@@ -34,7 +34,7 @@ export const FACTIONS = Object.freeze({
     glyph: "蜀",
     color: "#3aa76d",
     homeMapId: "thuc-thanh",
-    cityName: "Thục Thành"
+    cityName: "Thành Đô"
   }),
   nguy: Object.freeze({
     id: "nguy",
@@ -42,7 +42,7 @@ export const FACTIONS = Object.freeze({
     glyph: "魏",
     color: "#4a7bd1",
     homeMapId: "nguy-thanh",
-    cityName: "Ngụy Thành"
+    cityName: "Lạc Dương"
   })
 });
 
@@ -50,14 +50,15 @@ export const FACTIONS = Object.freeze({
 export const FACTION_IDS = Object.keys(FACTIONS);
 
 /** Faction a character falls back to (every pre-faction save). */
-export const DEFAULT_FACTION = "han";
+export const DEFAULT_FACTION = "ngo";
 
 /**
- * Normalise an unknown faction id to a real one.
+ * Normalise an unknown faction id to a real one. Maps legacy "han" to "ngo".
  * @param {*} id
  * @returns {string}
  */
 export function normalizeFaction(id) {
+  if (id === "han") return "ngo";
   return FACTION_IDS.includes(id) ? id : DEFAULT_FACTION;
 }
 
@@ -66,7 +67,7 @@ export function normalizeFaction(id) {
  * @returns {boolean}
  */
 export function isFactionId(id) {
-  return FACTION_IDS.includes(id);
+  return id === "han" || FACTION_IDS.includes(id);
 }
 
 /**
@@ -95,5 +96,6 @@ export function factionHomeMap(id) {
  * @returns {boolean}
  */
 export function isHostileFaction(a, b) {
-  return isFactionId(a) && isFactionId(b) && a !== b;
+  if (!isFactionId(a) || !isFactionId(b)) return false;
+  return normalizeFaction(a) !== normalizeFaction(b);
 }

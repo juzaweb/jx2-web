@@ -1,5 +1,5 @@
 /**
- * Nghiệp Quan — the northern hunting ground of Ngụy Thành, levels 30-44.
+ * Nghiệp Quan — the northern hunting ground of Lạc Dương, levels 30-44.
  *
  * A stone pass behind the Ngụy north gate: armoured riders at the foot, spear
  * guards mid-pass, and a black knight holding the fortress road.
@@ -12,7 +12,7 @@ export const NGHIEP_QUAN_MAP = defineHuntingGround({
   name: "Nghiệp Quan",
   side: "south",
   cityMapId: "nguy-thanh",
-  cityName: "Ngụy Thành",
+  cityName: "Lạc Dương",
   citySpawn: { x: 4000, y: 5200 },
   palette: {
     rim: 0x2d3136,

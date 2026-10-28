@@ -1,5 +1,5 @@
 /**
- * Hứa Điền — the eastern hunting ground of Ngụy Thành, levels 3-29.
+ * Hứa Điền — the eastern hunting ground of Lạc Dương, levels 3-29.
  *
  * Farmland behind the Ngụy east gate: field rats in the near paddies, wild
  * wolves in the middle, road bandits at the far farmsteads.
@@ -12,7 +12,7 @@ export const HUA_DIEN_MAP = defineHuntingGround({
   name: "Hứa Điền",
   side: "west",
   cityMapId: "nguy-thanh",
-  cityName: "Ngụy Thành",
+  cityName: "Lạc Dương",
   citySpawn: { x: 6200, y: 4000 },
   palette: {
     rim: 0x3a3428,

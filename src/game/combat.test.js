@@ -970,7 +970,7 @@ describe("skill targeting", () => {
   });
 
   it("refuses a swing, a cast and a duel inside the city safe zone", () => {
-    const city = { id: "market", name: "Biện Kinh", noCombat: true };
+    const city = { id: "market", name: "Kiến Nghiệp", noCombat: true };
     const flagged = peer("near", 100, 0);
     const nearWolf = wolf("wolf", 30, 0);
     const { combat, ui } = makeCombat({ map: city, peers: [flagged], wolves: [nearWolf] });
@@ -991,7 +991,7 @@ describe("skill targeting", () => {
   });
 
   it("still lets a self buff run inside the city", () => {
-    const city = { id: "market", name: "Biện Kinh", noCombat: true };
+    const city = { id: "market", name: "Kiến Nghiệp", noCombat: true };
     const { combat } = makeCombat({ map: city });
     combat.canCast = () => true;
     combat.executeSkill = vi.fn();

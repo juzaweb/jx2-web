@@ -358,7 +358,7 @@ export class GameSocketManager {
     this.enemyGridByMap.set(DEFAULT_MAP_ID, this.enemyGrid);
 
     if (this.enemiesEnabled) {
-      // Biện Kinh is a safe city: its legacy roster only exists for harnesses that
+      // Kiến Nghiệp is a safe city: its legacy roster only exists for harnesses that
       // explicitly ask for it (`enemySpawns` / `enemyRespawnMs`). Every other map's
       // hunting roster is built on first use by `rosterFor()`, so a world with a
       // dozen maps does not pay for a dozen rosters and spatial grids at boot.
@@ -388,7 +388,7 @@ export class GameSocketManager {
 
     // A city map is a safe zone: no PvE or PvP combat there, whatever the PK
     // flags say. The legacy-roster harness opts out, because it deliberately
-    // fights inside Biện Kinh to exercise the combat paths.
+    // fights inside Kiến Nghiệp to exercise the combat paths.
     this.combatSafeZones = options.combatSafeZones !== false;
 
     this.setupServer();

@@ -125,7 +125,7 @@ describe("Character API Test Suite", () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ name: "Vô Phe", faction: "ngo" })
+      body: JSON.stringify({ name: "Vô Phe", faction: "unknown" })
     });
     assert.equal(res.status, 400);
   });

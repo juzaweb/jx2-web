@@ -48,10 +48,10 @@ describe("botCanAttackPlayer", () => {
 
 describe("botHostileFaction", () => {
   it("picks a camp that is hostile to the given faction", () => {
-    for (const faction of ["han", "thuc", "nguy"]) {
+    for (const faction of ["ngo", "thuc", "nguy"]) {
       const hostile = botHostileFaction(faction);
       expect(hostile).not.toBe(faction);
-      expect(["han", "thuc", "nguy"]).toContain(hostile);
+      expect(["ngo", "thuc", "nguy"]).toContain(hostile);
     }
   });
 });

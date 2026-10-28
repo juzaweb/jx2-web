@@ -1,5 +1,5 @@
 /**
- * Kiếm Các — the northern hunting ground of Thục Thành, levels 30-44.
+ * Kiếm Các — the northern hunting ground of Thành Đô, levels 30-44.
  *
  * A narrow mountain pass behind the Thục north gate: sword disciples at the
  * foot, iron guardians mid-climb, and a poison master at the summit.
@@ -12,7 +12,7 @@ export const KIEM_CAC_MAP = defineHuntingGround({
   name: "Kiếm Các",
   side: "south",
   cityMapId: "thuc-thanh",
-  cityName: "Thục Thành",
+  cityName: "Thành Đô",
   citySpawn: { x: 4000, y: 5200 },
   palette: {
     rim: 0x2b332b,

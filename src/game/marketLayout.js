@@ -1,5 +1,5 @@
 /**
- * Pure layout data for the Biện Kinh market square shown in the reference
+ * Pure layout data for the Kiến Nghiệp market square shown in the reference
  * screenshot. Kept free of Phaser imports so the scene, minimap and tests can
  * share exactly the same coordinates.
  *
@@ -84,7 +84,7 @@ export const MARKET_TREES = [
   [10200, 4700, 0.9, "bush-medium"],
   [9800, 3400, 1.0, "tree-large"],
   [8300, 3150, 0.95, "tree-medium"],
-  [6500, 3050, 1.05, "tree-large"],
+  [5800, 3050, 1.05, "tree-large"],
   [5000, 3200, 0.9, "bush-large"],
   [3200, 3200, 0.9, "tree-medium"]
 ];
@@ -102,7 +102,7 @@ export const MARKET_GRASS = [
   [2380, 7800, 0.95],
   [10600, 7600, 1.0],
   [4700, 9400, 0.9],
-  [6800, 9350, 1.05],
+  [5900, 9350, 1.05],
   [8600, 9400, 0.85],
   [3500, 8000, 0.95],
   [5600, 8600, 1.0],
@@ -110,11 +110,11 @@ export const MARKET_GRASS = [
 ];
 
 /**
- * Paved walkway. It enters the city through the gap between the grocery shop and
- * the pharmacy, then runs east into the middle of the city, paved in a second
- * brick style so the street stands out from the square it crosses.
+ * Paved walkways. The east-west avenue runs from the west gate through the square
+ * to the east gate, while the north-south avenue links the north and south gates.
  */
-export const MARKET_WALKWAY = { x: 2100, y: 4900, w: 7300, d: 1200 };
+export const MARKET_WALKWAY = { x: 2100, y: 4900, w: 8800, d: 1200 };
+export const MARKET_AVENUE_NS = { x: 6200, y: 2600, w: 1200, d: 6900 };
 
 /** Stone emblems / drains painted on the walkway. */
 export const MARKET_MEDALLIONS = [

@@ -95,6 +95,16 @@ describe("WorldManager street rendering", () => {
     expect(ofType(created, "graphics")).toHaveLength(2);
   });
 
+  it("lays a vertical textured street with vertical kerbs", () => {
+    const { manager, created } = managerFor({ x: 0, y: 0, w: 200, d: 800, tileKey: "ground-walkway" });
+
+    manager.drawStreets();
+
+    const [paving] = ofType(created, "tileSprite");
+    expect(paving.key).toBe("ground-walkway");
+    expect(ofType(created, "graphics")).toHaveLength(2);
+  });
+
   it("skips a textured street's kerbs when the map asks for a track", () => {
     const { manager, created } = managerFor({
       x: 0,

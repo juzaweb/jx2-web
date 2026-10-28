@@ -1,5 +1,5 @@
 /**
- * Biện Kinh market square expressed as a MapDefinition.
+ * Kiến Nghiệp market square expressed as a MapDefinition.
  *
  * The layout numbers still live in `marketLayout.js` (kept Phaser-free and shared
  * with the server); this module only packages them into the shape the generic
@@ -14,7 +14,8 @@ import {
   MARKET_NPCS,
   MARKET_SPAWN,
   MARKET_TREES,
-  MARKET_WALKWAY
+  MARKET_WALKWAY,
+  MARKET_AVENUE_NS
 } from "../marketLayout.js";
 
 /**
@@ -37,19 +38,19 @@ const LEGACY_ENEMY_SPAWNS = [
 /** @type {import("./mapRegistry.js").MapDefinition} */
 export const MARKET_MAP = {
   id: "market",
-  name: "Biện Kinh",
+  name: "Kiến Nghiệp",
   /** Peaceful-looking square, but the legacy wolf roster still roams it. */
   safe: false,
   /**
-   * Biện Kinh is the home city, so it is a safe zone: no monster or player can be
+   * Kiến Nghiệp is the home city, so it is a safe zone: no monster or player can be
    * struck there, even with the PK flag raised. The old wolf roster above only
    * exists for harnesses, which opt out of the ban explicitly.
    */
   noCombat: true,
   /** A city is not a battlefield: faction hostility is decided elsewhere. */
   pvpMode: "none",
-  /** Biện Kinh is the Hán faction's capital. */
-  homeFaction: "han",
+  /** Kiến Nghiệp is the Ngô faction's capital. */
+  homeFaction: "ngo",
   /**
    * Three legacy spawn points sit outside `bounds`. Rather than move them (and
    * break the pinned server tests) the registry skips the bounds check for this
@@ -71,6 +72,13 @@ export const MARKET_MAP = {
         ...MARKET_WALKWAY,
         rotation: -0.13,
         kerb: true,
+        tileKey: "ground-walkway",
+        tint: 0xb0a288,
+        tileScale: 0.55
+      },
+      {
+        ...MARKET_AVENUE_NS,
+        kerb: false,
         tileKey: "ground-walkway",
         tint: 0xb0a288,
         tileScale: 0.55

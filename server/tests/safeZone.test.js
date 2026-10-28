@@ -74,7 +74,7 @@ test("the home city is a no-combat safe zone", async (t) => {
   await t.test("every other map keeps fighting, and the harness can opt out", () => {
     const { manager, attacker } = makeManager();
 
-    assert.equal(manager.canFightHere(attacker), false, "Biện Kinh is the safe city");
+    assert.equal(manager.canFightHere(attacker), false, "Kiến Nghiệp is the safe city");
 
     attacker.mapId = "dong-mon-thanh";
     assert.equal(manager.canFightHere(attacker), true, "the hunting ground is a combat map");

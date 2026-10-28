@@ -1,5 +1,5 @@
 /**
- * Quan Trung — the western hunting ground of Ngụy Thành, levels 45-60.
+ * Quan Trung — the western hunting ground of Lạc Dương, levels 45-60.
  *
  * The iron heartland behind the Ngụy west gate: wandering champions, bronze
  * cataphracts, and the self-styled King of Quan Trung.
@@ -12,7 +12,7 @@ export const QUAN_TRUNG_MAP = defineHuntingGround({
   name: "Quan Trung",
   side: "east",
   cityMapId: "nguy-thanh",
-  cityName: "Ngụy Thành",
+  cityName: "Lạc Dương",
   citySpawn: { x: 1800, y: 4000 },
   palette: {
     rim: 0x2b2f38,

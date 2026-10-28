@@ -126,7 +126,7 @@ export class CharacterDatabase {
         name TEXT NOT NULL,
         sect TEXT NOT NULL DEFAULT 'thieu-lam',
         gender TEXT NOT NULL DEFAULT 'male',
-        faction TEXT NOT NULL DEFAULT 'han',
+        faction TEXT NOT NULL DEFAULT 'ngo',
         appearance INTEGER NOT NULL DEFAULT 0,
         level INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
@@ -154,7 +154,7 @@ export class CharacterDatabase {
       this.db.exec("ALTER TABLE characters ADD COLUMN appearance INTEGER NOT NULL DEFAULT 0");
     }
     if (!columns.includes("faction")) {
-      // Every pre-faction save is assigned the Hán capital so nothing is orphaned.
+      // Every pre-faction save is assigned the Ngô capital so nothing is orphaned.
       this.db.exec(
         `ALTER TABLE characters ADD COLUMN faction TEXT NOT NULL DEFAULT '${DEFAULT_FACTION}'`
       );
@@ -373,7 +373,7 @@ export class CharacterDatabase {
    * @param {string} userId
    * @param {string} name
    * @param {"male"|"female"} [gender="male"]
-   * @param {"han"|"thuc"|"nguy"} [faction="han"]
+   * @param {"ngo"|"thuc"|"nguy"} [faction="ngo"]
    * @returns {Object} Sanitized character
    */
   create(userId, name, gender = DEFAULT_GENDER, faction = DEFAULT_FACTION) {

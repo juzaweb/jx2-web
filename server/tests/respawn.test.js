@@ -125,7 +125,7 @@ test("a hero who falls in the home city stays on that map", () => {
   assert.equal(moved.message.payload.id, victim.id);
 });
 
-test("a Thục hero respawns in Thục Thành, not Biện Kinh", () => {
+test("a Thục hero respawns in Thành Đô, not Kiến Nghiệp", () => {
   const { manager, victim, direct } = makeManager("trung-nguyen");
   victim.faction = "thuc";
   const home = getMap("thuc-thanh");

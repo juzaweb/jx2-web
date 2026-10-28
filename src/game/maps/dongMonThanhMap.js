@@ -1,5 +1,5 @@
 /**
- * Đông Môn Thành — 24 000 × 14 000 of forest east of Biện Kinh.
+ * Đông Môn Thành — 24 000 × 14 000 of forest east of Kiến Nghiệp.
  *
  * The hero steps off the realm road into open woodland. Six hunting columns march
  * east, getting deadlier as you walk in: Sơn Cẩu (Lv3) → Dã Lang (8) → Lâm Tặc
@@ -101,7 +101,7 @@ export const DONG_MON_THANH_MAP = {
   },
 
   // A hunting ground, not a market: Đông Môn Thành has no shops, no NPCs and no
-  // roofs at all. Buying and selling stays in Biện Kinh.
+  // roofs at all. Buying and selling stays in Kiến Nghiệp.
   buildings: [],
 
   /** Dense woodland in the outskirts; a handful of shade trees inside the walls. */
@@ -402,7 +402,7 @@ export const DONG_MON_THANH_MAP = {
   portals: [
     {
       id: "west-gate",
-      label: "Biện Kinh",
+      label: "Kiến Nghiệp",
       rect: { x: 120, y: 6650, w: 420, h: 700 },
       targetMapId: "market",
       targetSpawn: { x: 10300, y: 5500 }

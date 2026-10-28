@@ -9,7 +9,7 @@ export default {
     rotateDeviceDesc: "Vui lòng xoay ngang điện thoại để trải nghiệm game tốt nhất.",
     rotateDeviceButton: "Xoay Màn Hình",
     log: {
-      welcome: "Chào mừng hiệp khách đến với Biện Kinh.",
+      welcome: "Chào mừng hiệp khách đến với Kiến Nghiệp.",
       near: "Lãng Khách: Giang hồ hiểm ác, bảo trọng!",
       guide: "Dùng WASD di chuyển, Phím 1/2 uống dược phẩm, Chuột/Space đánh, Q kiếm khí."
     }
@@ -56,10 +56,10 @@ export default {
   },
   minimap: {
     region: "Tàng Long (Máy chủ 1)",
-    subzone: "Biện Kinh",
+    subzone: "Kiến Nghiệp",
     helpTitle: "Cẩm nang tân thủ",
-    questHead: "✦ KHÁM PHÁ BIỆN KINH",
-    questDone: "Đã dạo quanh Biện Kinh",
+    questHead: "✦ KHÁM PHÁ KIẾN NGHIỆP",
+    questDone: "Đã dạo quanh Kiến Nghiệp",
     questTodo: "Thành thị phồn hoa",
     questSafe: "Khu an toàn • Không có quái",
     zoomTitle: "Tab: Phóng to minimap gấp 5 lần",
@@ -69,20 +69,22 @@ export default {
   },
   cityMap: {
     eyebrow: "TOÀN CẢNH THÀNH TRÌ",
-    title: "Bản Đồ Biện Kinh",    titleWithName: "Bản Đồ {name}",    hint: "Nhấn M hoặc Esc để đóng",
+    title: "Bản Đồ Kiến Nghiệp",
+    titleWithName: "Bản Đồ {name}",
+    hint: "Nhấn M hoặc Esc để đóng",
     player: "Nhân vật",
     enemy: "Yêu thú",
     remote: "Hiệp khách",
     pavilion: "Vạn Sự Thông"
   },
   maps: {
-    market: "Biện Kinh",
+    market: "Kiến Nghiệp",
     "dong-mon-thanh": "Đông Môn Thành",
     "bac-linh": "Bắc Lĩnh",
     "tay-son": "Tây Sơn",
     "trung-nguyen": "Trung Nguyên Chiến Trường",
-    "thuc-thanh": "Thục Thành",
-    "nguy-thanh": "Ngụy Thành",
+    "thuc-thanh": "Thành Đô",
+    "nguy-thanh": "Lạc Dương",
     "ba-thuc": "Ba Thục",
     "kiem-cac": "Kiếm Các",
     "nga-mi": "Nga Mi",
@@ -137,7 +139,7 @@ export default {
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
     loot: "Túi đồ & Tiền đồng: Hạ gục Sói Xám để nhận kinh nghiệm, đồng và nhặt túi ngọc phát sáng. 100 đồng = 1 bạc.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
-    map: "Bản đồ: Nhấn Tab để phóng to minimap gấp 5 lần, nhấn M để mở bản đồ toàn thành Biện Kinh.",
+    map: "Bản đồ: Nhấn Tab để phóng to minimap gấp 5 lần, nhấn M để mở bản đồ toàn thành Kiến Nghiệp.",
     pause: "Tạm dừng: Nhấn Esc hoặc mở bảng Hướng Dẫn để tạm dừng game.",
     resume: "ĐÃ THÔNG SUỐT",
     reset: "LÀM LẠI TỪ ĐẦU (RESET TIẾN TRÌNH)"
@@ -188,7 +190,8 @@ export default {
     factionLabel: "Phe phái:",
     factionHint: "Phe quyết định thành nhà và đồng minh trên chiến trường trung tâm.",
     factions: {
-      han: "Hán",
+      ngo: "Ngô",
+      han: "Ngô",
       thuc: "Thục",
       nguy: "Ngụy"
     },
@@ -492,7 +495,7 @@ export default {
     },
     "hoi-thanh-phu": {
       name: "Hồi Thành Phù",
-      desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
+      desc: "Phù chú không gian, đưa hành giả trở về cố hương Kiến Nghiệp."
     },
     "lenh-bai-gm": {
       name: "Lệnh Bài GM",

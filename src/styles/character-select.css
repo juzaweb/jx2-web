@@ -396,10 +396,12 @@
   color: #8aa39d;
 }
 
+.jx2-cs-faction-tile.faction-ngo,
 .jx2-cs-faction-tile.faction-han {
   border-color: #7a3b3b;
 }
 
+.jx2-cs-faction-tile.faction-ngo.selected,
 .jx2-cs-faction-tile.faction-han.selected {
   border-color: #ff7a72;
   background: linear-gradient(180deg, rgba(80, 34, 34, 0.95), rgba(30, 10, 10, 0.95));

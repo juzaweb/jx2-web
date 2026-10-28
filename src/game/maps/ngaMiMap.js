@@ -1,5 +1,5 @@
 /**
- * Nga Mi — the western hunting ground of Thục Thành, levels 45-60.
+ * Nga Mi — the western hunting ground of Thành Đô, levels 45-60.
  *
  * Misty jade ridges behind the Thục west gate: sword maidens, a frost silkworm,
  * and an asura guardian in the cloudline.
@@ -12,7 +12,7 @@ export const NGA_MI_MAP = defineHuntingGround({
   name: "Nga Mi",
   side: "east",
   cityMapId: "thuc-thanh",
-  cityName: "Thục Thành",
+  cityName: "Thành Đô",
   citySpawn: { x: 1800, y: 4000 },
   palette: {
     rim: 0x283a36,

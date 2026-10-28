@@ -2,7 +2,7 @@
  * Map renderer.
  *
  * Everything here is driven by a MapDefinition (see `maps/mapRegistry.js`), so the
- * same class paints Biện Kinh's brick market and Đông Môn Thành's walled town.
+ * same class paints Kiến Nghiệp's brick market and Đông Môn Thành's walled town.
  * The class never imports a layout directly and tracks every object it creates so
  * `destroy()` can hand the scene back clean before another map is loaded.
  */
@@ -288,18 +288,33 @@ export class WorldManager {
     if (W.kerb === false) return;
 
     // Stone kerbs along both long edges so the paving sits above the square.
+    const isVertical = W.orientation === "vertical" || (W.d > W.w && W.orientation !== "horizontal");
     const kerb = this.track(this.scene.add.graphics().setDepth(GROUND_DEPTH + 4));
     kerb.fillStyle(0x5d574b, 0.95);
-    kerb.fillRect(W.x, W.y - KERB, W.w, KERB);
-    kerb.fillRect(W.x, W.y + W.d, W.w, KERB);
-    // End cap where the street finishes.
-    kerb.fillRect(W.x + W.w, W.y - KERB, KERB, W.d + KERB * 2);
-    kerb.fillStyle(0x8b8474, 0.9);
-    kerb.fillRect(W.x, W.y - KERB, W.w, 4);
-    kerb.fillRect(W.x, W.y + W.d + KERB - 4, W.w, 4);
-    kerb.lineStyle(2, 0x3e3a32, 0.35);
-    kerb.lineBetween(W.x, W.y, W.x + W.w, W.y);
-    kerb.lineBetween(W.x, W.y + W.d, W.x + W.w, W.y + W.d);
+
+    if (!isVertical) {
+      kerb.fillRect(W.x, W.y - KERB, W.w, KERB);
+      kerb.fillRect(W.x, W.y + W.d, W.w, KERB);
+      // End cap where the street finishes.
+      kerb.fillRect(W.x + W.w, W.y - KERB, KERB, W.d + KERB * 2);
+      kerb.fillStyle(0x8b8474, 0.9);
+      kerb.fillRect(W.x, W.y - KERB, W.w, 4);
+      kerb.fillRect(W.x, W.y + W.d + KERB - 4, W.w, 4);
+      kerb.lineStyle(2, 0x3e3a32, 0.35);
+      kerb.lineBetween(W.x, W.y, W.x + W.w, W.y);
+      kerb.lineBetween(W.x, W.y + W.d, W.x + W.w, W.y + W.d);
+    } else {
+      kerb.fillRect(W.x - KERB, W.y, KERB, W.d);
+      kerb.fillRect(W.x + W.w, W.y, KERB, W.d);
+      // End cap where the street finishes.
+      kerb.fillRect(W.x - KERB, W.y + W.d, W.w + KERB * 2, KERB);
+      kerb.fillStyle(0x8b8474, 0.9);
+      kerb.fillRect(W.x - KERB, W.y, 4, W.d);
+      kerb.fillRect(W.x + W.w + KERB - 4, W.y, 4, W.d);
+      kerb.lineStyle(2, 0x3e3a32, 0.35);
+      kerb.lineBetween(W.x, W.y, W.x, W.y + W.d);
+      kerb.lineBetween(W.x + W.w, W.y, W.x + W.w, W.y + W.d);
+    }
   }
 
   /** Broad dirt/lichen patches that break up the tiled brick pattern. */

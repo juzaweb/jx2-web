@@ -9,7 +9,7 @@ export default {
     rotateDeviceDesc: "为了获得最佳游戏体验，请将手机旋转至横屏模式。",
     rotateDeviceButton: "旋转屏幕",
     log: {
-      welcome: "欢迎侠客来到汴京。",
+      welcome: "欢迎侠客来到建业。",
       near: "浪客：江湖险恶，请多保重！",
       guide: "使用 WASD 移动，按 1/2 喝药，鼠标/空格攻击，Q 释放剑气。"
     }
@@ -56,10 +56,10 @@ export default {
   },
   minimap: {
     region: "藏龙（服务器 1）",
-    subzone: "汴京",
+    subzone: "建业",
     helpTitle: "新手秘笈",
-    questHead: "✦ 探索汴京",
-    questDone: "已游历汴京",
+    questHead: "✦ 探索建业",
+    questDone: "已游历建业",
     questTodo: "繁华都城",
     questSafe: "安全区 • 无怪物",
     zoomTitle: "Tab：小地图放大 5 倍",
@@ -69,7 +69,7 @@ export default {
   },
   cityMap: {
     eyebrow: "城池全貌",
-    title: "汴京地图",
+    title: "建业地图",
     titleWithName: "{name}地图",
     hint: "按 M 或 Esc 关闭",
     player: "角色",
@@ -78,13 +78,13 @@ export default {
     pavilion: "万事通"
   },
   maps: {
-    market: "汴京",
+    market: "建业",
     "dong-mon-thanh": "东门城",
     "bac-linh": "北岭",
     "tay-son": "西山",
     "trung-nguyen": "中原战场",
-    "thuc-thanh": "蜀城",
-    "nguy-thanh": "魏城",
+    "thuc-thanh": "成都",
+    "nguy-thanh": "洛阳",
     "ba-thuc": "巴蜀",
     "kiem-cac": "剑阁",
     "nga-mi": "峨眉",
@@ -140,7 +140,7 @@ export default {
     potions: "快速药品：\n• 1 键：服用金创药（+35 HP）。\n• 2 键：服用大还丹（+25 MP）。\n• 3 键：服用女儿红（+50 HP & +30 MP）。",
     loot: "行囊与铜钱：击败灰狼可获得经验、铜钱（100 铜钱 = 1 银两），并拾取发光的玉袋。",
     save: "保存进度：系统每 15 秒自动保存。",
-    map: "地图：按 Tab 将小地图放大 5 倍，按 M 打开汴京全城地图。",
+    map: "地图：按 Tab 将小地图放大 5 倍，按 M 打开建业全城地图。",
     pause: "暂停：按 Esc 或打开秘笈面板可暂停游戏。",
     resume: "我已了解",
     reset: "从头开始（重置进度）"
@@ -191,7 +191,8 @@ export default {
     factionLabel: "势力：",
     factionHint: "势力决定你的主城与中央战场上的盟友。",
     factions: {
-      han: "汉",
+      ngo: "吴",
+      han: "吴",
       thuc: "蜀",
       nguy: "魏"
     },
@@ -495,7 +496,7 @@ export default {
     },
     "hoi-thanh-phu": {
       name: "回城符",
-      desc: "空间符咒，可将行者送回故乡汴京。"
+      desc: "空间符咒，可将行者送回故乡建业。"
     },
     "lenh-bai-gm": {
       name: "GM令牌",

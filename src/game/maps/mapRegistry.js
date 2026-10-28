@@ -185,7 +185,8 @@ export function mapWorldConfig(map) {
     buildings: def.buildings,
     trees: def.trees,
     gates: def.gates,
-    portals: def.portals
+    portals: def.portals,
+    streets: def.ground?.streets || []
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * Tây Sơn — the western hunting ground behind Biện Kinh's west gate.
+ * Tây Sơn — the western hunting ground behind Kiến Nghiệp's west gate.
  *
  * Same shape as Bắc Lĩnh but a higher tier: levels 45-60, three camps of fifteen
  * per species (90 spawns). The trail enters from the west edge, so the golden
@@ -120,14 +120,14 @@ export const TAY_SON_MAP = {
       w: 130,
       h: 700,
       orientation: "vertical",
-      label: "Biện Kinh"
+      label: "Kiến Nghiệp"
     }
   ],
 
   portals: [
     {
       id: "west-gate",
-      label: "Biện Kinh",
+      label: "Kiến Nghiệp",
       rect: { x: 120, y: 6650, w: 420, h: 700 },
       targetMapId: "market",
       // Market's west portal rect ends at x 2520, so this lands clear of it.

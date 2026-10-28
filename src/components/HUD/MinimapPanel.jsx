@@ -106,7 +106,7 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
           <div className="minimap-radar-sweep"></div>
         </div>
 
-        {/* Pinned Quest Objective. It describes Biện Kinh only, so a hunting
+        {/* Pinned Quest Objective. It describes Kiến Nghiệp only, so a hunting
             ground must not claim to be a safe city with no monsters. */}
         {mapId === "market" && (
           <div className="quest-tracker" id="quest-tracker">

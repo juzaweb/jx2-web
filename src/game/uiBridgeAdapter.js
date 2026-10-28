@@ -133,7 +133,8 @@ export class UIBridgeAdapter {
       buildings: worldConfig.buildings || [],
       trees: worldConfig.trees || [],
       walls: worldConfig.walls || [],
-      portals: worldConfig.portals || []
+      portals: worldConfig.portals || [],
+      streets: worldConfig.streets || []
     });
 
     // Direct DOM text update for 60fps performance without triggering React re-renders
@@ -171,7 +172,8 @@ export class UIBridgeAdapter {
       buildings: worldConfig.buildings || [],
       trees: worldConfig.trees || [],
       walls: worldConfig.walls || [],
-      portals: worldConfig.portals || []
+      portals: worldConfig.portals || [],
+      streets: worldConfig.streets || []
     });
   }
 
@@ -194,7 +196,8 @@ export class UIBridgeAdapter {
       buildings = [],
       trees = [],
       walls = [],
-      portals = []
+      portals = [],
+      streets = []
     }
   ) {
     const w = canvas.width;
@@ -225,6 +228,17 @@ export class UIBridgeAdapter {
     ctx.lineTo(bx, by + bh);
     ctx.closePath();
     ctx.stroke();
+
+    // Streets and walkways connecting city gates and areas.
+    ctx.fillStyle = "rgba(224, 218, 204, 0.45)";
+    streets.forEach((st) => {
+      ctx.fillRect(
+        mapX(st.x),
+        mapY(st.y),
+        Math.max(2, (st.w || 0) * scaleX),
+        Math.max(2, (st.d || 0) * scaleY)
+      );
+    });
 
     // Town walls first, so buildings and blips draw on top of them.
     ctx.fillStyle = "#565b63";

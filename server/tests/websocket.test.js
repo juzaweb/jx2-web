@@ -131,7 +131,7 @@ test("WebSocket server-authority suite", async (t) => {
           path: "/ws",
           enemyRespawnMs: 800,
           enemyTickMs: 50,
-          // This harness deliberately fights inside Biện Kinh with the legacy
+          // This harness deliberately fights inside Kiến Nghiệp with the legacy
           // roster, so it opts out of the city safe-zone ban.
           combatSafeZones: false,
           // Deterministic rolls: 0.5 never crits and never rolls a dodge.

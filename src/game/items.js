@@ -44,7 +44,7 @@ export const QUICK_ITEMS = [
     useSlot: 4,
     name: "Hồi Thành Phù",
     icon: "icon-scroll",
-    desc: "Phù chú không gian, đưa hành giả trở về cố hương Biện Kinh."
+    desc: "Phù chú không gian, đưa hành giả trở về cố hương Kiến Nghiệp."
   }
 ];
 

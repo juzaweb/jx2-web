@@ -1,8 +1,8 @@
 /**
- * Ngụy Thành — the Ngụy faction's home city.
+ * Lạc Dương — the Ngụy faction's home city.
  *
- * Same minimal phase-1 shape as Thục Thành: a herb shop and four gates, with only
- * the south gate open onto the central battlefield.
+ * A walled square with a herb shop, four gates connecting to hunting grounds and
+ * the central battlefield, and cross-cutting paved avenues.
  *
  * Pure data, no Phaser imports.
  */
@@ -10,7 +10,7 @@
 /** @type {import("./mapRegistry.js").MapDefinition} */
 export const NGUI_THANH_MAP = {
   id: "nguy-thanh",
-  name: "Ngụy Thành",
+  name: "Lạc Dương",
   /** City: no monsters spawn here. */
   safe: true,
   /** City safe zone: neither PvE nor PvP is allowed inside the walls. */
@@ -30,7 +30,28 @@ export const NGUI_THANH_MAP = {
     regions: [
       { x: 1400, y: 1400, w: 5200, h: 5200, fill: 0x948e84, alpha: 0.55 }
     ],
-    streets: []
+    streets: [
+      {
+        x: 0,
+        y: 3400,
+        w: 8000,
+        d: 1200,
+        kerb: false,
+        tileKey: "ground-walkway",
+        tint: 0xb0a288,
+        tileScale: 0.55
+      },
+      {
+        x: 3400,
+        y: 0,
+        w: 1200,
+        d: 8000,
+        kerb: false,
+        tileKey: "ground-walkway",
+        tint: 0xb0a288,
+        tileScale: 0.55
+      }
+    ]
   },
 
   buildings: [
@@ -39,8 +60,8 @@ export const NGUI_THANH_MAP = {
       kind: "shop",
       sign: "DƯỢC ĐIỂM",
       subSign: "藥舖",
-      x: 4000,
-      y: 4300,
+      x: 2300,
+      y: 2800,
       w: 2000,
       d: 900,
       scale: 2.8,
@@ -54,8 +75,8 @@ export const NGUI_THANH_MAP = {
     [2200, 700, 0.95, "bush-medium"],
     [5700, 800, 1.0, "tree-medium"],
     [7100, 1000, 1.05, "tree-large"],
-    [700, 3500, 0.95, "bush-large"],
-    [7300, 3600, 1.0, "tree-medium"],
+    [700, 2700, 0.95, "bush-large"],
+    [7300, 2700, 1.0, "tree-medium"],
     [800, 6900, 1.05, "tree-large"],
     [2300, 7200, 0.95, "bush-medium"],
     [5700, 7200, 1.0, "tree-medium"],
@@ -65,8 +86,8 @@ export const NGUI_THANH_MAP = {
   grass: [
     [1500, 1800, 0.95],
     [6500, 1800, 1.0],
-    [1200, 4300, 0.9],
-    [6800, 4300, 0.95],
+    [1200, 4800, 0.9],
+    [6800, 4800, 0.95],
     [1600, 6500, 1.0],
     [6400, 6500, 0.9]
   ],
@@ -77,8 +98,8 @@ export const NGUI_THANH_MAP = {
       name: "Dược Sư",
       shop: "pharmacy",
       building: "nguy-duoc-diem",
-      x: 4000,
-      y: 4420
+      x: 2300,
+      y: 3300
     }
   ],
 

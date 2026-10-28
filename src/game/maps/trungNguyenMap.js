@@ -7,7 +7,7 @@
  * two players from the same camp never can. There are no monsters here, so the
  * only thing to fight is the other camps.
  *
- * The three staging camps sit on a triangle around the empty middle: Hán to the
+ * The three staging camps sit on a triangle around the empty middle: Ngô to the
  * north, Thục to the west, Ngụy to the east. Each one has a gate back to its city.
  *
  * Pure data, no Phaser imports.
@@ -71,7 +71,7 @@ export const TRUNG_NGUYEN_MAP = {
   ],
 
   gates: [
-    { id: "han-gate", x: 5400, y: 300, w: 1200, h: 130, orientation: "horizontal", label: "Hán" },
+    { id: "ngo-gate", x: 5400, y: 300, w: 1200, h: 130, orientation: "horizontal", label: "Ngô" },
     { id: "thuc-gate", x: 250, y: 5300, w: 130, h: 1200, orientation: "vertical", label: "Thục" },
     { id: "nguy-gate", x: 11620, y: 5300, w: 130, h: 1200, orientation: "vertical", label: "Ngụy" }
   ],
@@ -81,8 +81,8 @@ export const TRUNG_NGUYEN_MAP = {
 
   portals: [
     {
-      id: "han-gate",
-      label: "Biện Kinh",
+      id: "ngo-gate",
+      label: "Kiến Nghiệp",
       rect: { x: 5400, y: 300, w: 1200, h: 500 },
       targetMapId: "market",
       // Market's south portal rect starts at y 9200, so this lands clear of it.
@@ -90,7 +90,7 @@ export const TRUNG_NGUYEN_MAP = {
     },
     {
       id: "thuc-gate",
-      label: "Thục Thành",
+      label: "Thành Đô",
       rect: { x: 300, y: 5300, w: 500, h: 1200 },
       targetMapId: "thuc-thanh",
       // Thục's south portal rect starts at y 7600, so this lands clear of it.
@@ -98,7 +98,7 @@ export const TRUNG_NGUYEN_MAP = {
     },
     {
       id: "nguy-gate",
-      label: "Ngụy Thành",
+      label: "Lạc Dương",
       rect: { x: 11200, y: 5300, w: 500, h: 1200 },
       targetMapId: "nguy-thanh",
       targetSpawn: { x: 4000, y: 7200 }

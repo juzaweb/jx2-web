@@ -401,7 +401,7 @@ export const MONSTERS = {
   },
 
   // ── Thục hunting grounds ─────────────────────────────────────────────────
-  // Parallel tiers to Hán's, so every camp can level from its own capital.
+  // Parallel tiers to Ngô's, so every camp can level from its own capital.
   // Phase 1 pays EXP and coins only: no book or weapon drops.
   "thuc-lang": {
     id: "thuc-lang",
@@ -645,7 +645,7 @@ export const MONSTERS = {
   },
 
   // ── Ngụy hunting grounds ─────────────────────────────────────────────────
-  // Parallel tiers to Hán's; same EXP/coin-only policy as the Thục tiers.
+  // Parallel tiers to Ngô's; same EXP/coin-only policy as the Thục tiers.
   "dien-thu": {
     id: "dien-thu",
     name: "Điền Thử",

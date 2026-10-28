@@ -65,6 +65,41 @@ describe("map registry", () => {
     }
   });
 
+  it("gives every city a complete network of streets connecting its four gates", () => {
+    for (const id of ["market", "thuc-thanh", "nguy-thanh"]) {
+      const map = MAPS[id];
+      const streets = map.ground?.streets || [];
+      expect(streets.length, `${id} must have streets defined`).toBeGreaterThanOrEqual(2);
+
+      // Verify that every gate has a street covering or adjoining its entrance
+      for (const gate of map.gates) {
+        const connects = streets.some((st) => {
+          const stX1 = st.x + (st.w || 0);
+          const stY1 = st.y + (st.d || 0);
+          const gateX1 = gate.x + gate.w;
+          const gateY1 = gate.y + gate.h;
+
+          // Check overlap or touch along the gate axis
+          const xOverlap = Math.max(0, Math.min(stX1, gateX1) - Math.max(st.x, gate.x));
+          const yOverlap = Math.max(0, Math.min(stY1, gateY1) - Math.max(st.y, gate.y));
+
+          if (gate.orientation === "vertical") {
+            // East or west gate: street depth overlaps gate height, and street reaches within tolerance
+            return yOverlap >= 400 && (Math.abs(st.x - gate.x) <= 300 || Math.abs(stX1 - gateX1) <= 300);
+          }
+          // North or south gate: street width overlaps gate width, and street reaches within tolerance
+          return xOverlap >= 400 && (Math.abs(st.y - gate.y) <= 300 || Math.abs(stY1 - gateY1) <= 300);
+        });
+
+        expect(connects, `${id} street network must connect to gate ${gate.id} (${gate.label})`).toBe(true);
+      }
+
+      // Check mapWorldConfig provides streets
+      const config = mapWorldConfig(id);
+      expect(config.streets).toEqual(streets);
+    }
+  });
+
   it("gives each capital one hunting ground behind every non-south gate", () => {
     const expected = {
       market: { "east-gate": "dong-mon-thanh", "north-gate": "bac-linh", "west-gate": "tay-son" },
@@ -305,7 +340,7 @@ describe("map registry", () => {
     expect(findPortal("market", "north-gate")?.targetMapId).toBe("bac-linh");
     expect(findPortal("market", "south-gate")?.targetMapId).toBe("trung-nguyen");
     expect(findPortal("dong-mon-thanh", "west-gate")?.targetMapId).toBe("market");
-    expect(findPortal("trung-nguyen", "han-gate")?.targetMapId).toBe("market");
+    expect(findPortal("trung-nguyen", "ngo-gate")?.targetMapId).toBe("market");
     expect(findPortal("trung-nguyen", "thuc-gate")?.targetMapId).toBe("thuc-thanh");
     expect(findPortal("trung-nguyen", "nguy-gate")?.targetMapId).toBe("nguy-thanh");
     expect(findPortal("thuc-thanh", "south-gate")?.targetMapId).toBe("trung-nguyen");

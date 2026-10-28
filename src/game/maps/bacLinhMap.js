@@ -1,5 +1,5 @@
 /**
- * Bắc Lĩnh — the northern hunting ground behind Biện Kinh's north gate.
+ * Bắc Lĩnh — the northern hunting ground behind Kiến Nghiệp's north gate.
  *
  * Two species columns per tier, levels 30-44, three camps of fifteen per species
  * (90 spawns). The trail enters from the south edge, so the weakest pack sits
@@ -127,14 +127,14 @@ export const BAC_LINH_MAP = {
       w: 1200,
       h: 130,
       orientation: "horizontal",
-      label: "Biện Kinh"
+      label: "Kiến Nghiệp"
     }
   ],
 
   portals: [
     {
       id: "south-gate",
-      label: "Biện Kinh",
+      label: "Kiến Nghiệp",
       rect: { x: 7600, y: 13400, w: 800, h: 500 },
       targetMapId: "market",
       // Market's north portal rect ends at y 3020, so this lands clear of it.

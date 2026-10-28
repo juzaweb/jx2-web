@@ -13,7 +13,7 @@ describe("enemy catalog", () => {
     ];
 
     for (const [min, max] of bands) {
-      // Three camps share each band now (one per faction plus Hán's older tiers);
+      // Three camps share each band now (one per faction plus Ngô's older tiers);
       // the legacy market wolf is scenery, not a hunting species.
       const inBand = monstersBetween(min, max).filter(
         (monster) => monster.id !== "soi-xam"

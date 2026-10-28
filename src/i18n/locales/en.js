@@ -9,7 +9,7 @@ export default {
     rotateDeviceDesc: "Please rotate your phone to landscape mode for the best gaming experience.",
     rotateDeviceButton: "Rotate Screen",
     log: {
-      welcome: "Welcome to Bianjing, honored warrior.",
+      welcome: "Welcome to Jianye, honored warrior.",
       near: "Wanderer: The Jianghu is treacherous. Take care!",
       guide: "Use WASD to move, keys 1/2 to drink potions, Mouse/Space to attack, Q for sword aura."
     }
@@ -56,10 +56,10 @@ export default {
   },
   minimap: {
     region: "Hidden Dragon (Server 1)",
-    subzone: "Bianjing",
+    subzone: "Jianye",
     helpTitle: "Beginner's guide",
-    questHead: "✦ EXPLORE BIANJING",
-    questDone: "You have toured Bianjing",
+    questHead: "✦ EXPLORE JIANYE",
+    questDone: "You have toured Jianye",
     questTodo: "A bustling city",
     questSafe: "Safe zone • No monsters",
     zoomTitle: "Tab: Enlarge the minimap 5x",
@@ -69,7 +69,7 @@ export default {
   },
   cityMap: {
     eyebrow: "CITY OVERVIEW",
-    title: "Bianjing Map",
+    title: "Jianye Map",
     titleWithName: "{name} Map",
     hint: "Press M or Esc to close",
     player: "You",
@@ -78,13 +78,13 @@ export default {
     pavilion: "Pavilion"
   },
   maps: {
-    market: "Bianjing",
+    market: "Jianye",
     "dong-mon-thanh": "Dongmen Town",
     "bac-linh": "Beiling",
     "tay-son": "Xishan",
     "trung-nguyen": "Central Plains Battlefield",
-    "thuc-thanh": "Shu City",
-    "nguy-thanh": "Wei City",
+    "thuc-thanh": "Chengdu",
+    "nguy-thanh": "Luoyang",
     "ba-thuc": "Bashu",
     "kiem-cac": "Jiange",
     "nga-mi": "Emei",
@@ -139,7 +139,7 @@ export default {
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
     loot: "Bag & money: Defeat Grey Wolves to gain experience, copper (100 copper = 1 silver), and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
-    map: "Map: Press Tab to enlarge the minimap 5x, press M to open the full Bianjing city map.",
+    map: "Map: Press Tab to enlarge the minimap 5x, press M to open the full Jianye city map.",
     pause: "Pause: Press Esc or open the Guide to pause the game.",
     resume: "I UNDERSTAND",
     reset: "START OVER (RESET PROGRESS)"
@@ -190,7 +190,8 @@ export default {
     factionLabel: "Faction:",
     factionHint: "Your faction decides your home city and your allies on the central battlefield.",
     factions: {
-      han: "Han",
+      ngo: "Wu",
+      han: "Wu",
       thuc: "Shu",
       nguy: "Wei"
     },
@@ -494,7 +495,7 @@ export default {
     },
     "hoi-thanh-phu": {
       name: "Return City Talisman",
-      desc: "A spatial talisman that returns the traveler to Bianjing."
+      desc: "A spatial talisman that returns the traveler to Jianye."
     },
     "lenh-bai-gm": {
       name: "GM Imperial Token",
