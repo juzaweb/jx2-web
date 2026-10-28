@@ -94,7 +94,17 @@ export const loginUser = async (req, res, next) => {
  */
 export const getProfile = async (req, res, next) => {
   try {
-    const userId = req.query.userId || req.headers["x-user-id"];
+    const requestedUserId = req.query.userId || req.headers["x-user-id"];
+
+    // Verify ownership if a specific userId parameter or header was passed
+    if (requestedUserId && requestedUserId !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        error: "Bạn không có quyền truy cập thông tin của người dùng khác."
+      });
+    }
+
+    const userId = req.userId || requestedUserId;
     if (!userId) {
       return res.status(400).json({
         success: false,
