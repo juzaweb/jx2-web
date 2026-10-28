@@ -9,7 +9,7 @@
  */
 
 import { WorldManager } from "./worldManager.js";
-import { createPharmacyNpc } from "./npc.js";
+import { createNpcSprite } from "./npc.js";
 
 export class MapStage {
   /** @param {import("phaser").Scene} scene */
@@ -60,7 +60,7 @@ export class MapStage {
   spawnNpcs(map) {
     this.destroyNpcs();
     const defs = map?.npcs || [];
-    this.npcs = defs.map((def) => createPharmacyNpc(this.scene, def));
+    this.npcs = defs.map((def) => createNpcSprite(this.scene, def));
     for (const def of defs) {
       this.worldManager?.addBody(def.x, def.y, 46, 34);
     }

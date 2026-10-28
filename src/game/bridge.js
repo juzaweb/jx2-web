@@ -63,7 +63,14 @@ export const EVENTS = {
   STATS_UPDATED: "STATS_UPDATED",
   LOG_ADDED: "LOG_ADDED",
   AUDIO_CHANGED: "AUDIO_CHANGED",
-  QUEST_UPDATED: "QUEST_UPDATED",
+  /** Server-authoritative newbie quest state ({activeId, objectives, completed, level}). */
+  QUESTS_UPDATED: "QUESTS_UPDATED",
+  /** Nearest in-range NPC changed (payload: {npcId, name} | null). */
+  NEARBY_NPC_CHANGED: "NEARBY_NPC_CHANGED",
+  /** An NPC dialog opened in the scene (payload: {npc, lineKey, quest?}). */
+  NPC_DIALOG_OPENED: "NPC_DIALOG_OPENED",
+  NPC_DIALOG_CLOSED: "NPC_DIALOG_CLOSED",
+  QUEST_LOG_TOGGLE: "QUEST_LOG_TOGGLE",
   COORDS_UPDATED: "COORDS_UPDATED",
   INVENTORY_UPDATED: "INVENTORY_UPDATED",
   EQUIPMENT_UPDATED: "EQUIPMENT_UPDATED",
@@ -97,6 +104,16 @@ export const EVENTS = {
   ACTION_CAST_SKILL: "ACTION_CAST_SKILL",
   /** Ask the server to raise a skill by one level (payload: {skillId}). */
   ACTION_UPGRADE_SKILL: "ACTION_UPGRADE_SKILL",
+  /** Newbie quest commands (payload: {questId?, npcId?}). */
+  ACTION_QUEST_ACCEPT: "ACTION_QUEST_ACCEPT",
+  ACTION_QUEST_TALK: "ACTION_QUEST_TALK",
+  ACTION_QUEST_TURN_IN: "ACTION_QUEST_TURN_IN",
+  /** Talk to the nearest in-range NPC (mobile button). */
+  ACTION_INTERACT_NPC: "ACTION_INTERACT_NPC",
+  /** Close the open NPC dialog, releasing the scene. */
+  ACTION_CLOSE_NPC_DIALOG: "ACTION_CLOSE_NPC_DIALOG",
+  /** Open the current NPC's real shop counter (Dược Sư). */
+  ACTION_OPEN_NPC_SHOP: "ACTION_OPEN_NPC_SHOP",
   SET_QUICK_SLOTS: "SET_QUICK_SLOTS",
   ACTION_USE_POTION: "ACTION_USE_POTION",
   ACTION_BUY_ITEM: "ACTION_BUY_ITEM",

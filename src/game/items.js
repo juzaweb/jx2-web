@@ -54,6 +54,31 @@ export const GM_TOKEN_ID = "lenh-bai-gm";
 /** Catalog id of the test-mode command token (granted while test mode is on). */
 export const TEST_TOKEN_ID = "lenh-bai-test";
 
+/** Guide item handed out by Dã Tẩu; using it opens the quest log. */
+export const GUIDE_ITEM_ID = "giang-ho-chi-nam";
+
+/** Letter delivered to Triệu Diên Niên in the final newbie quest. */
+export const NEWBIE_LETTER_ID = "thu-cua-da-tau";
+
+/**
+ * Quest-only items. They live in the bag but have no combat/consumable effect:
+ * the guide opens the quest log client-side, the letter is consumed on turn-in.
+ */
+export const QUEST_ITEMS = [
+  {
+    id: GUIDE_ITEM_ID,
+    name: "Giang Hồ Chỉ Nam",
+    icon: "icon-scroll",
+    desc: "Cẩm nang Dã Tẩu tặng tân thủ. Dùng để mở nhật ký nhiệm vụ."
+  },
+  {
+    id: NEWBIE_LETTER_ID,
+    name: "Thư Của Dã Tẩu",
+    icon: "icon-scroll",
+    desc: "Bức thư Dã Tẩu nhờ giao cho Triệu Diên Niên tại Biện Kinh."
+  }
+];
+
 /**
  * Supreme GM command token for admin control and testing.
  */
@@ -267,6 +292,7 @@ export function getItemById(id) {
     INVENTORY_ITEMS.find((item) => item && item.id === id) ||
     EQUIPMENT_ITEMS.find((item) => item && item.id === id) ||
     BOOK_ITEMS.find((item) => item.id === id) ||
+    QUEST_ITEMS.find((item) => item.id === id) ||
     null
   );
 }
@@ -543,7 +569,7 @@ export function applyQuantities(quantities = defaultQuantities()) {
   const owned = sanitizeQuantities(quantities) || {};
 
   const inventoryItems = [];
-  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS, ...BOOK_ITEMS].filter(Boolean).forEach((item) => {
+  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS, ...BOOK_ITEMS, ...QUEST_ITEMS].filter(Boolean).forEach((item) => {
     const qty = quantityOf(owned, item.id);
     if (qty > 0) inventoryItems.push({ ...item, qty });
   });

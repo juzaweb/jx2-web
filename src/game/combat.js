@@ -878,12 +878,6 @@ export class CombatSystem {
     stats.hp = Math.min(stats.hp, stats.maxHp);
     stats.mp = Math.min(stats.mp, stats.maxMp);
 
-    // The server remembers whether the one-off quest reward was already paid, so
-    // the client can never offer it a second time.
-    if (progress.questRewarded !== undefined) {
-      this.ui.setQuestRewarded?.(Boolean(progress.questRewarded));
-    }
-
     if (stats.level > prevLevel) {
       // The server also heals/refills and streams the new HP/MP; mirror it for a
       // snappy HUD before those packets land.
@@ -898,12 +892,6 @@ export class CombatSystem {
     if (typeof this.onStateChange === "function") {
       this.onStateChange();
     }
-
-    // Quest completion is detected client-side from the kill count, but the
-    // payout is claimed from the server.
-    this.scene.time.delayedCall(650, () => {
-      this.ui.updateQuest(stats, () => this.handleQuestReward());
-    });
   }
 
   /**
@@ -919,16 +907,6 @@ export class CombatSystem {
    */
   isLocalKiller(attackerId) {
     return Boolean(this.localPlayerId) && attackerId === this.localPlayerId;
-  }
-
-  /**
-   * The quest payout is server-owned: ask the server to grant it (idempotent via
-   * the persisted `quest_rewarded` flag). The resulting `player_progress` arrives
-   * through applyServerProgress().
-   */
-  handleQuestReward() {
-    this.scene.networkClient?.sendQuestClaim?.();
-    this.ui.addLog("Nhiệm vụ hoàn thành! Phần thưởng sẽ do máy chủ trao.");
   }
 
   showFloatText(x, y, text, color) {

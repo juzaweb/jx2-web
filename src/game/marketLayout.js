@@ -7,6 +7,8 @@
  * ground units (x right, y down) matching `isoProjection.js`.
  */
 
+import { cityNpc } from "./npcRoster.js";
+
 /** Ground rectangle covered by the stone market square. */
 export const MARKET_PLAZA = { x: 3400, y: 3500, w: 6000, d: 4000 };
 
@@ -19,16 +21,25 @@ export const MARKET_SPAWN = { x: 6400, y: 6050 };
 /**
  * Friendly NPCs. `x`/`y` are the ground contact point; each NPC stands in front
  * of its shop and opens a service when the player interacts with it.
+ *
+ * Identity (name, role, sprite, tint, shop) comes from `npcRoster.js` so the
+ * faction capitals cannot drift from Biện Kinh; only placement lives here.
  */
 export const MARKET_NPCS = [
-  {
-    id: "duoc-su",
-    name: "Dược Sư",
-    shop: "pharmacy",
-    building: "duoc-diem",
-    x: 4300,
-    y: 7020
-  }
+  cityNpc("da-tau", 6400, 5700),
+  cityNpc("chu-tiem-vu-khi", 7000, 4580),
+  cityNpc("chu-tiem-do-nam", 8600, 4580),
+  cityNpc("chu-tiem-do-nu", 7000, 7080),
+  cityNpc("chu-tiem-trang-suc", 8600, 7080),
+  cityNpc("duoc-su", 4300, 7020, { building: "duoc-diem" }),
+  cityNpc("chu-tiem-tap-hoa", 4300, 4580),
+  cityNpc("ve-binh-thanh-mon", 10150, 6000),
+  cityNpc("vo-su", 5600, 4700),
+  cityNpc("thu-kho", 3000, 4700),
+  cityNpc("chu-tuu-lau", 5200, 8220),
+  cityNpc("tieu-su", 9600, 6800),
+  cityNpc("bach-hieu-sinh", 7400, 6000),
+  cityNpc("trieu-dien-nien", 8600, 8100)
 ];
 
 /**
@@ -61,6 +72,71 @@ export const MARKET_BUILDINGS = [
     scale: 2.8,
     signColor: "green",
     palette: "herb"
+  },
+  {
+    id: "vu-khi",
+    kind: "shop",
+    sign: "VŨ KHÍ",
+    subSign: "武器",
+    x: 7000,
+    y: 4400,
+    w: 1600,
+    d: 800,
+    scale: 2.4,
+    signColor: "red",
+    palette: "wood"
+  },
+  {
+    id: "do-nam",
+    kind: "shop",
+    sign: "Y PHỤC NAM",
+    subSign: "男裝",
+    x: 8600,
+    y: 4400,
+    w: 1600,
+    d: 800,
+    scale: 2.4,
+    signColor: "red",
+    palette: "wood"
+  },
+  {
+    id: "do-nu",
+    kind: "shop",
+    sign: "Y PHỤC NỮ",
+    subSign: "女裝",
+    x: 7000,
+    y: 6900,
+    w: 1600,
+    d: 800,
+    scale: 2.4,
+    signColor: "green",
+    palette: "wood"
+  },
+  {
+    id: "trang-suc",
+    kind: "shop",
+    sign: "TRANG SỨC",
+    subSign: "首飾",
+    x: 8600,
+    y: 6900,
+    w: 1600,
+    d: 800,
+    scale: 2.4,
+    signColor: "green",
+    palette: "wood"
+  },
+  {
+    id: "tuu-lau",
+    kind: "shop",
+    sign: "TỬU LẦU",
+    subSign: "酒樓",
+    x: 5200,
+    y: 8100,
+    w: 2200,
+    d: 900,
+    scale: 2.8,
+    signColor: "red",
+    palette: "wood"
   }
 ];
 

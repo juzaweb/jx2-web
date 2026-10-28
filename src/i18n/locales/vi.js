@@ -58,8 +58,12 @@ export default {
     region: "Tàng Long (Máy chủ 1)",
     subzone: "Kiến Nghiệp",
     helpTitle: "Cẩm nang tân thủ",
-    questHead: "✦ KHÁM PHÁ KIẾN NGHIỆP",
-    questDone: "Đã dạo quanh Kiến Nghiệp",
+    questHead: "✦ NHIỆM VỤ TÂN THỦ",
+    questIdle: "Chưa có nhiệm vụ",
+    questReady: "Đã đủ điều kiện trả nhiệm vụ",
+    questHint: "Nhấn J để xem nhật ký",
+    questLogTitle: "Nhật ký nhiệm vụ (J)",
+    questDone: "Đã hoàn thành",
     questTodo: "Thành thị phồn hoa",
     questSafe: "Khu an toàn • Không có quái",
     zoomTitle: "Tab: Phóng to minimap gấp 5 lần",
@@ -468,6 +472,117 @@ export default {
       none: "Không có vật phẩm nào dùng được."
     }
   },
+  quests: {
+    dialog: {
+      eyebrow: "GIAO TIẾP",
+      idle: "Hiệp khách cứ tự nhiên."
+    },
+    ui: {
+      levelReq: "Cần cấp {level}",
+      accept: "Nhận nhiệm vụ",
+      heard: "Đã nghe",
+      turnIn: "Trả nhiệm vụ",
+      openShop: "Mua dược phẩm",
+      talk: "Nói chuyện",
+      talkTo: "Nói chuyện với {name}",
+      exp: "{exp} EXP",
+      bac: "{bac} bạc",
+      letterHint: "Bức thư này phải giao cho Triệu Diên Niên."
+    },
+    status: {
+      done: "Hoàn thành",
+      ready: "Có thể trả",
+      active: "Đang làm",
+      chain: "Cần làm nhiệm vụ trước",
+      level: "Cần cấp {level}",
+      available: "Có thể nhận"
+    },
+    log: {
+      eyebrow: "TÂN THỦ",
+      title: "Nhật Ký Nhiệm Vụ",
+      hint: "Nhấn J hoặc Esc để đóng."
+    },
+    tanThu1: {
+      title: "Thăm hỏi",
+      intro: "Dã Tẩu: Tân thủ sơ nhập giang hồ, hãy đi thăm hỏi các chủ tiệm trong thành để hiểu về trang bị, dược phẩm và tạp hóa.",
+      progress: "Hãy đến thăm đủ sáu chủ tiệm rồi trở về gặp ta.",
+      turnIn: "Tốt lắm, ngươi đã nắm được những điều cơ bản. Nhận lấy chút hành trang.",
+      objective: {
+        shops: "Trò chuyện với các chủ tiệm"
+      },
+      talk: {
+        weapon: "Vũ khí quyết định chiêu thức. Kiếm dùng kiếm pháp, bao tay dùng quyền cước, đao dùng đao pháp.",
+        maleClothes: "Y phục giúp tăng phòng ngự. Hãy mặc đủ áo, nón và quần trước khi ra ngoài thành.",
+        femaleClothes: "Trang phục nữ cũng vậy, nhẹ nhàng mà chắc chắn. Đừng xem thường phòng ngự.",
+        jewelry: "Trang sức quý giá, nhưng tân thủ nên lo giữ mình. Chiếc nón này hợp với ngươi hơn.",
+        pharmacy: "Dược phẩm cứu mạng lúc nguy nan. Kim Sáng Dược hồi sinh lực, Đại Hoàn Đan hồi nội lực.",
+        grocery: "Tạp hóa bán đủ thứ. Hồi Thành Phù sẽ đưa ngươi về thành khi lạc bước."
+      }
+    },
+    tanThu2: {
+      title: "Cách chiến đấu",
+      intro: "Gặp Vệ binh thành môn ở cổng Đông, Võ Sư và Thủ Khố trong thành để học cách chiến đấu và cất giữ vật phẩm.",
+      progress: "Hãy nghe đủ ba vị tiền bối chỉ dạy.",
+      turnIn: "Ngươi đã hiểu cách chiến đấu. Ta truyền cho ngươi chút công lực để tiến xa hơn.",
+      objective: {
+        masters: "Học hỏi Vệ binh, Võ Sư, Thủ Khố"
+      },
+      talk: {
+        guard: "Quái vật phân bố theo vùng. Ngoại thành có Sơn Cẩu, sâu hơn là Dã Lang — đừng vội vào chỗ nguy hiểm.",
+        master: "Ta truyền cho ngươi cách vận công. Đánh đúng lúc, giữ khoảng cách, đừng để bị vây.",
+        keeper: "Hành trang có hạn. Giữ vật phẩm quý, bỏ bớt đồ thừa trước khi lên đường."
+      }
+    },
+    tanThu3: {
+      title: "Giao lưu",
+      intro: "Đến tửu lầu gặp Chủ Tửu Lầu và Tiêu Sư để biết cách trò chuyện, tổ đội và kết giao.",
+      progress: "Hãy gặp Chủ Tửu Lầu và Tiêu Sư.",
+      turnIn: "Giang hồ không chỉ có đao kiếm. Bằng hữu cũng là sức mạnh.",
+      objective: {
+        friends: "Gặp Chủ Tửu Lầu và Tiêu Sư"
+      },
+      talk: {
+        tavern: "Nhấn Enter để trò chuyện. Tổ đội, kết nghĩa và kết hôn sẽ mở khi ngươi đủ duyên.",
+        escort: "Đi đường xa nên có bạn đồng hành. Kết nghĩa kim lan giúp ngươi không cô độc."
+      }
+    },
+    tanThu4: {
+      title: "Kiến thức môn phái",
+      intro: "Màu tên nhân vật thể hiện trạng thái PK. Hãy tìm Bách Hiểu Sinh để hiểu rõ.",
+      progress: "Hãy đến gặp Bách Hiểu Sinh.",
+      turnIn: "Hiểu rồi thì giữ mình. Ta truyền thêm công lực cho ngươi.",
+      objective: {
+        scholar: "Hỏi Bách Hiểu Sinh"
+      },
+      talk: {
+        scholar: "Tên trắng là an phận, tên đỏ là đã bật cờ PK. Cẩn thận khi bước vào chiến trường phe phái."
+      }
+    },
+    tanThu5: {
+      title: "Câu chuyện năm xưa",
+      intro: "Dã Tẩu ấp úng, như có điều muốn nói. Hãy hỏi ông ta.",
+      progress: "Hãy trò chuyện với Dã Tẩu.",
+      turnIn: "Chuyện cũ dài lắm... Ngươi đã đủ bản lĩnh, ta truyền nốt công lực, coi như lời cảm tạ.",
+      objective: {
+        story: "Nghe Dã Tẩu kể chuyện"
+      },
+      talk: {
+        daTau: "Năm xưa ta cũng từng là tân thủ như ngươi. Có những chuyện phải đợi đủ cấp mới kể được..."
+      }
+    },
+    tanThu6: {
+      title: "Đưa thư",
+      intro: "Dã Tẩu nhờ ngươi mang bức thư cho Triệu Diên Niên trong thành.",
+      progress: "Hãy trao thư cho Triệu Diên Niên.",
+      turnIn: "Thư của Dã Tẩu? Cảm ơn ngươi. Đây là chút lòng thành.",
+      objective: {
+        letter: "Trao thư cho Triệu Diên Niên"
+      },
+      talk: {
+        trieuDienNien: "Ngươi mang thư đến cho ta? Đưa đây xem."
+      }
+    }
+  },
   item: {
     "kiem-lang-khach": {
       name: "Kiếm Lãng Khách",
@@ -496,6 +611,14 @@ export default {
     "hoi-thanh-phu": {
       name: "Hồi Thành Phù",
       desc: "Phù chú không gian, đưa hành giả trở về cố hương Kiến Nghiệp."
+    },
+    "giang-ho-chi-nam": {
+      name: "Giang Hồ Chỉ Nam",
+      desc: "Cẩm nang Dã Tẩu tặng tân thủ. Dùng để mở nhật ký nhiệm vụ."
+    },
+    "thu-cua-da-tau": {
+      name: "Thư Của Dã Tẩu",
+      desc: "Bức thư Dã Tẩu nhờ giao cho Triệu Diên Niên."
     },
     "lenh-bai-gm": {
       name: "Lệnh Bài GM",

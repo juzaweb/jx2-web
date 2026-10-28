@@ -16,8 +16,9 @@ Remaining work is listed under _Not done_.
 - [x] Shared battlefield `trung-nguyen` with one return gate per capital.
 - [x] Bắc Lĩnh (30–44) and Tây Sơn (45–60) hunting grounds, 90 spawns each,
       with six new vector-painted species.
-- [x] Thục Thành / Ngụy Thành minimal capitals: herb-shop Dược Sư, four gate
-      arches, south gate open onto the battlefield.
+- [x] Thục Thành / Ngụy Thành capitals: seven shops with their keepers, the
+      full newbie-quest NPC roster, four gate arches, south gate open onto the
+      battlefield.
 - [x] Faction PvP **only** on the battlefield: different camps fight without the
       PK flag, allies never do; every other map keeps the legacy flag rule and
       the three capitals stay no-combat.
@@ -119,14 +120,15 @@ battlefield through its south gate.
 - Character creation now stores `faction` (`characters.faction`, migrated with a
   `han` default). The join snapshot carries `faction`, so nameplates can show
   enemies red on the battlefield.
-- A new character boots into their faction capital; the city's hero shop is the
-  shared Dược Sư.
+- A new character boots into their faction capital; every capital shares the
+  same shop and newbie-quest NPC roster (`src/game/factionCityLayout.js`), so
+  the quest chain runs in Biện Kinh, Thành Đô and Lạc Dương alike.
 - `respawnPlayer` uses `factionHomeMap(victim.faction)`.
 
 ## Verification
 
-1. `npm test` — 82 files / 847 tests.
-2. `npm --prefix server test` — 121 tests.
+1. `npm test` — 94 files / 965 tests.
+2. `npm --prefix server test` — 148 tests.
 3. `npm run build` — clean.
 4. Walkthrough (real WebSocket against the dev server): Thục/ Ngụy characters
    boot in `thuc-thanh`/`nguy-thanh`; every city gate, both battlefield exits

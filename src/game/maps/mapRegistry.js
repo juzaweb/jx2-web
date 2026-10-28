@@ -21,7 +21,7 @@
  * portals       [{id, label, rect:{x,y,w,h}, targetMapId, targetSpawn}]
  * enemySpawns   [{id, monsterId, x, y}] ids are unique per map
  * zones         [{id, minLevel, maxLevel, bounds:{x0,y0,x1,y1}}] level bands
- * npcs          friendly NPC definitions (market only today)
+ * npcs          friendly NPC definitions (the three capitals)
  * ```
  *
  * Keep this module Phaser-free: `server/src/websocket/gameSocket.js` imports it
@@ -103,6 +103,20 @@ export function isKnownMap(id) {
  */
 export function getMap(id) {
   return isKnownMap(id) ? MAPS[id] : MAPS[DEFAULT_MAP_ID];
+}
+
+/**
+ * Find a friendly NPC definition by id on a map. Unknown maps fall back to the
+ * default map, matching {@link getMap}. Used by the server to validate that a
+ * quest interaction happens next to a real NPC.
+ * @param {string} mapId
+ * @param {string} npcId
+ * @returns {object|null}
+ */
+export function findNpc(mapId, npcId) {
+  if (typeof npcId !== "string" || npcId.length === 0) return null;
+  const def = getMap(mapId);
+  return (def.npcs || []).find((npc) => npc && npc.id === npcId) || null;
 }
 
 /**

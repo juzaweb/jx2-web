@@ -3,7 +3,6 @@ import { applyQuantities, getQuantities } from "./items.js";
 
 export class UIBridgeAdapter {
   constructor() {
-    this.questRewarded = false;
     this.minimapCanvas = null;
     this.minimapCtx = null;
     this.cityMapCanvas = null;
@@ -48,10 +47,6 @@ export class UIBridgeAdapter {
     this.cityMapCtx = canvas ? canvas.getContext("2d") : null;
   }
 
-  setQuestRewarded(rewarded) {
-    this.questRewarded = !!rewarded;
-  }
-
   addLog(message, type = "combat") {
     bridge.emit(EVENTS.LOG_ADDED, {
       id: `${Date.now()}-${Math.random()}`,
@@ -83,25 +78,6 @@ export class UIBridgeAdapter {
       quantities || getQuantities()
     );
     bridge.emit(EVENTS.INVENTORY_UPDATED, { quickItems, inventoryItems, capacity });
-  }
-
-  updateQuest(stats, onQuestComplete) {
-    if (!stats) return;
-    const progress = Math.min(stats.kills, 3);
-    const completed = progress >= 3;
-
-    bridge.emit(EVENTS.QUEST_UPDATED, {
-      progress,
-      total: 3,
-      completed
-    });
-
-    if (completed && !this.questRewarded) {
-      this.questRewarded = true;
-      if (typeof onQuestComplete === "function") {
-        onQuestComplete();
-      }
-    }
   }
 
   updateSoundButton(isEnabled) {

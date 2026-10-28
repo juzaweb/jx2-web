@@ -42,10 +42,14 @@ describe("market layout", () => {
     }
   });
 
-  it("keeps the two shops clear of each other", () => {
+  it("keeps every shop footprint clear of the others", () => {
     const shops = MARKET_BUILDINGS.filter((building) => building.kind === "shop");
-    expect(shops).toHaveLength(2);
-    expect(overlaps(footprint(shops[0]), footprint(shops[1]))).toBe(false);
+    expect(shops.length).toBeGreaterThanOrEqual(2);
+    for (let i = 0; i < shops.length; i += 1) {
+      for (let j = i + 1; j < shops.length; j += 1) {
+        expect(overlaps(footprint(shops[i]), footprint(shops[j]))).toBe(false);
+      }
+    }
   });
 
   it("keeps every landmark and NPC inside the playable bounds", () => {
@@ -62,8 +66,9 @@ describe("market layout", () => {
     for (const { x, y } of MARKET_NPCS) expect(inside(x, y)).toBe(true);
   });
 
-  it("places every NPC in front of its shop", () => {
+  it("places every shopkeeper in front of its shop", () => {
     for (const npc of MARKET_NPCS) {
+      if (!npc.building) continue;
       const building = MARKET_BUILDINGS.find((entry) => entry.id === npc.building);
       expect(building).toBeTruthy();
       expect(Math.abs(npc.x - building.x)).toBeLessThan(building.w / 2);

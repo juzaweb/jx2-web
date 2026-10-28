@@ -37,8 +37,9 @@ import { createPortalState, gateAt, portalAt, stepPortalTrigger } from "./maps/p
 import { SHOP_BUILDINGS } from "./marketBuildings.js";
 import { VEGETATION_SPRITES } from "./marketProps.js";
 import { HERO_BODY, HERO_BODY_TEXTURES } from "./heroBody.js";
-import { NPC_DUOC, isInTalkRange, isPointOnNpc, npcApproachPoint } from "./npc.js";
+import { NPC_DUOC, NPC_CITIZEN, isInTalkRange, isPointOnNpc, npcApproachPoint } from "./npc.js";
 import { ShopFlow } from "./shopFlow.js";
+import { QuestFlow } from "./questFlow.js";
 
 /** Ground tiles the gameplay camera shows across the screen width. */
 const CAMERA_TILES = 15;
@@ -129,6 +130,12 @@ export class JiangHuScene extends Phaser.Scene {
       this.load.spritesheet(NPC_DUOC.textureKey, NPC_DUOC.url, {
         frameWidth: NPC_DUOC.frameWidth,
         frameHeight: NPC_DUOC.frameHeight
+      });
+    }
+    if (!this.textures.exists(NPC_CITIZEN.textureKey)) {
+      this.load.spritesheet(NPC_CITIZEN.textureKey, NPC_CITIZEN.url, {
+        frameWidth: NPC_CITIZEN.frameWidth,
+        frameHeight: NPC_CITIZEN.frameHeight
       });
     }
     for (const { key, url } of Object.values(VEGETATION_SPRITES)) {
@@ -253,6 +260,16 @@ export class JiangHuScene extends Phaser.Scene {
       networkClient: this.networkClient,
       saveGame: (showFeedback) => this.saveGame(showFeedback)
     });
+    this.questFlow = new QuestFlow({
+      uiBridge: this.uiBridge,
+      networkClient: this.networkClient,
+      onShop: (npc) => this.shopFlow?.open(npc)
+    });
+    /** Id of the nearest in-range NPC, so the mobile button only re-renders on change. */
+    this.nearbyNpcId = null;
+    this.unsubInteractNpc = bridge.on(EVENTS.ACTION_INTERACT_NPC, () => this.interactWithNearbyNpc());
+    this.unsubCloseNpc = bridge.on(EVENTS.ACTION_CLOSE_NPC_DIALOG, () => this.questFlow?.close());
+    this.unsubOpenNpcShop = bridge.on(EVENTS.ACTION_OPEN_NPC_SHOP, () => this.questFlow?.openShop());
 
     this.networkClient.on("init_world", (payload) => {
       // A completed join proves the session recovered; drop any stale terminal
@@ -268,6 +285,25 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("map_change_rejected", (payload) => {
       this.handleMapChangeRejected(payload);
+    });
+
+    // Authoritative newbie-quest state and refusals.
+    this.networkClient.on("quest_sync", (payload) => {
+      bridge.emit(EVENTS.QUESTS_UPDATED, payload || null);
+    });
+    this.networkClient.on("quest_result", (payload) => {
+      if (!payload || payload.ok) return;
+      const REASONS = {
+        range: "Hãy lại gần NPC để trò chuyện.",
+        level: "Cấp độ chưa đủ để nhận nhiệm vụ này.",
+        chain: "Hãy hoàn thành nhiệm vụ trước đó.",
+        active: "Hãy hoàn thành nhiệm vụ đang làm trước.",
+        incomplete: "Nhiệm vụ chưa hoàn thành.",
+        inactive: "Nhiệm vụ này không còn hiệu lực.",
+        nothing: "Không có gì mới để ghi nhận.",
+        unknown: "Không thể thực hiện nhiệm vụ này."
+      };
+      this.uiBridge.addLog(REASONS[payload.reason] || REASONS.unknown, "system");
     });
 
     this.networkClient.on("player_joined", (payload) => {
@@ -1748,7 +1784,7 @@ export class JiangHuScene extends Phaser.Scene {
     if (candidates.length > 0) {
       this.player.stopMovement();
       this.pendingNpc = null;
-      this.shopFlow.open(candidates[0].npc);
+      this.questFlow?.open(candidates[0].npc);
     } else {
       this.uiBridge.addLog("Không có NPC ở gần để nói chuyện (nhấn [F] khi lại gần NPC).");
     }
@@ -2256,12 +2292,30 @@ export class JiangHuScene extends Phaser.Scene {
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 
-    // Update interaction prompts for nearby NPCs
+    // Update interaction prompts for nearby NPCs and publish which one is closest,
+    // so the mobile control can show a single "Nói chuyện" button.
+    let nearestNpc = null;
+    let nearestDist = Infinity;
     for (const npc of this.stage?.npcs || []) {
       const inRange = isInTalkRange(npc, this.player.x, this.player.y);
       if (npc.promptText) {
         npc.promptText.setVisible(inRange);
       }
+      if (inRange) {
+        const dist = (npc.gx - this.player.x) ** 2 + (npc.gy - this.player.y) ** 2;
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestNpc = npc;
+        }
+      }
+    }
+    const nearestId = nearestNpc?.id || null;
+    if (nearestId !== this.nearbyNpcId) {
+      this.nearbyNpcId = nearestId;
+      bridge.emit(
+        EVENTS.NEARBY_NPC_CHANGED,
+        nearestNpc ? { npcId: nearestNpc.id, name: nearestNpc.name } : null
+      );
     }
 
     // Open a shop once the hero has walked within talking distance.
@@ -2361,6 +2415,17 @@ export class JiangHuScene extends Phaser.Scene {
       this.shopFlow.destroy();
       this.shopFlow = null;
     }
+    if (this.questFlow) {
+      this.questFlow.destroy();
+      this.questFlow = null;
+    }
+    bridge.emit(EVENTS.NEARBY_NPC_CHANGED, null);
+    this.unsubInteractNpc?.();
+    this.unsubInteractNpc = null;
+    this.unsubCloseNpc?.();
+    this.unsubCloseNpc = null;
+    this.unsubOpenNpcShop?.();
+    this.unsubOpenNpcShop = null;
     this.clearCombatTarget?.();
     if (this.autoTargetRing) {
       this.autoTargetRing.destroy();

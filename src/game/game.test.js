@@ -321,9 +321,9 @@ describe("JiangHuScene.useItem", () => {
 });
 
 describe("JiangHuScene.interactWithNearbyNpc", () => {
-  it("opens the shop when an NPC is within range", () => {
+  it("opens the NPC dialog when an NPC is within range", () => {
     const stopMovement = vi.fn();
-    const openShop = vi.fn();
+    const openNpc = vi.fn();
     const addLog = vi.fn();
     const npc = { gx: 100, gy: 100, name: "Chủ Tiệm Dược" };
     const scene = {
@@ -331,14 +331,14 @@ describe("JiangHuScene.interactWithNearbyNpc", () => {
       isPaused: false,
       player: { x: 105, y: 105, stopMovement },
       stage: { npcs: [npc] },
-      shopFlow: { open: openShop },
+      questFlow: { open: openNpc },
       uiBridge: { addLog }
     };
 
     JiangHuScene.prototype.interactWithNearbyNpc.call(scene);
 
     expect(stopMovement).toHaveBeenCalledTimes(1);
-    expect(openShop).toHaveBeenCalledWith(npc);
+    expect(openNpc).toHaveBeenCalledWith(npc);
   });
 
   it("logs a message when no NPC is in range", () => {

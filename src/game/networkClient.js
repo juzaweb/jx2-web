@@ -252,11 +252,27 @@ export class NetworkClient {
   }
 
   /**
-   * Ask the server to pay the one-off quest reward. The server is the payout
-   * authority and ignores repeat claims.
+   * Ask the server to accept a newbie quest at its giver NPC.
+   * @param {{questId:string, npcId:string}} request
    */
-  sendQuestClaim() {
-    this.send("quest_claim", {});
+  sendQuestAccept(request) {
+    this.send("quest_accept", request);
+  }
+
+  /**
+   * Report one conversation for the active quest.
+   * @param {{npcId:string}} request
+   */
+  sendQuestTalk(request) {
+    this.send("quest_talk", request);
+  }
+
+  /**
+   * Ask the server to turn in a ready quest.
+   * @param {{questId:string, npcId:string}} request
+   */
+  sendQuestTurnIn(request) {
+    this.send("quest_turn_in", request);
   }
 
   /**

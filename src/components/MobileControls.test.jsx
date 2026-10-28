@@ -109,4 +109,19 @@ describe("MobileControls logic & props", () => {
     // Potions live outside the fan, in their own column.
     expect((markup.match(/arc-btn-potion/g) || []).length).toBe(2);
   });
+
+  it("hides the talk button while no NPC is in range", () => {
+    const markup = renderControls();
+    expect(markup).not.toContain("mobile-npc-talk");
+  });
+
+  it("shows the talk button for the nearest in-range NPC", () => {
+    const markup = renderControls({
+      nearbyNpc: { npcId: "da-tau", name: "Dã Tẩu" },
+      onInteractNpc: () => {}
+    });
+    expect(markup).toContain('id="mobile-npc-talk"');
+    expect(markup).toContain("Nói chuyện");
+    expect(markup).toContain("Dã Tẩu");
+  });
 });

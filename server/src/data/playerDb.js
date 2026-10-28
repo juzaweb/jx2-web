@@ -4,6 +4,8 @@ import path from "node:path";
 import { config } from "../config.js";
 import { STARTER_ITEMS, GM_STARTER_ITEMS } from "../../../src/game/items.js";
 import { normalizeSkillLevel } from "../../../src/game/skills/levels.js";
+import { FIRST_QUEST_ID } from "../../../src/game/quests/catalog.js";
+import { normalizeQuestState } from "../../../src/game/quests/state.js";
 
 /** Keys that would poison a plain object (and later SQL params) if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -25,8 +27,10 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  *  6 — adds the learned-skill ledger (skills are learned from dropped books).
  *  7 — adds per-skill levels (a learned skill is studied at level 1 and can be
  *      raised to the shared MAX_SKILL_LEVEL).
+ *  8 — adds the newbie-quest state ledger and seeds it from the retired
+ *      `quest_rewarded` flag.
  */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 /**
  * Column definitions of the `saves` table, shared by the initial CREATE and the
@@ -40,6 +44,7 @@ const SAVES_COLUMNS_SQL = `
         coins           INTEGER NOT NULL DEFAULT 0,
         exp             INTEGER NOT NULL DEFAULT 0,
         quest_rewarded  INTEGER NOT NULL DEFAULT 0,
+        quest_state     TEXT NOT NULL DEFAULT '{}',
         inventory       TEXT NOT NULL DEFAULT '{}',
         equipment       TEXT NOT NULL DEFAULT '{}',
         learned_skills  TEXT NOT NULL DEFAULT '[]',
@@ -143,6 +148,7 @@ export class PlayerDatabase {
     addColumn("hp", "INTEGER");
     addColumn("mp", "INTEGER");
     addColumn("state_imported", "INTEGER NOT NULL DEFAULT 0");
+    addColumn("quest_state", "TEXT NOT NULL DEFAULT '{}'");
 
     // Older saves declared hp/mp NOT NULL. A fresh character has unknown vitals
     // until it first joins, and `_writeRow` stores them as NULL, so those rows
@@ -173,8 +179,8 @@ export class PlayerDatabase {
       `UPDATE saves SET player_name = ?, level = ?, kills = ?, coins = ?, exp = ?, updated_at = ?
        WHERE player_id = ?`
     );
-    this.stmtSetQuestRewarded = this.db.prepare(
-      "UPDATE saves SET quest_rewarded = ?, updated_at = ? WHERE player_id = ?"
+    this.stmtUpdateQuestState = this.db.prepare(
+      "UPDATE saves SET quest_state = ?, updated_at = ? WHERE player_id = ?"
     );
     this.stmtUpdateVitals = this.db.prepare(
       "UPDATE saves SET hp = ?, mp = ?, updated_at = ? WHERE player_id = ?"
@@ -309,6 +315,24 @@ export class PlayerDatabase {
               AND (inventory IS NULL OR inventory = '' OR inventory = '{}')`
         )
         .run(JSON.stringify(STARTER_ITEMS), Date.now());
+    }
+
+    if (currentVersion < 8) {
+      // Characters that already claimed the old one-off reward keep that progress:
+      // the first newbie quest is recorded as completed instead of being replayed.
+      const legacy = JSON.stringify({
+        version: 1,
+        activeId: null,
+        objectives: {},
+        completed: [FIRST_QUEST_ID]
+      });
+      this.db
+        .prepare(
+          `UPDATE saves SET quest_state = ?, updated_at = ?
+            WHERE quest_rewarded = 1
+              AND (quest_state IS NULL OR quest_state = '' OR quest_state = '{}')`
+        )
+        .run(legacy, Date.now());
     }
 
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -471,7 +495,7 @@ export class PlayerDatabase {
   /**
    * The character's progression ledger, or null when it has never played.
    * @param {string} playerId
-   * @returns {{level:number, exp:number, coins:number, kills:number, questRewarded:boolean}|null}
+   * @returns {{level:number, exp:number, coins:number, kills:number}|null}
    */
   getProgress(playerId) {
     const row = this.stmtGet.get(playerId);
@@ -480,8 +504,7 @@ export class PlayerDatabase {
       level: row.level,
       exp: row.exp,
       coins: row.coins,
-      kills: row.kills,
-      questRewarded: Boolean(row.quest_rewarded)
+      kills: row.kills
     };
   }
 
@@ -522,13 +545,33 @@ export class PlayerDatabase {
   }
 
   /**
-   * Mark whether the one-off quest reward has been paid, so it can never be
-   * claimed twice.
+   * The persisted newbie-quest state, normalized to the shared shape. A character
+   * that never played gets an empty chain.
    * @param {string} playerId
-   * @param {boolean} rewarded
+   * @returns {ReturnType<typeof normalizeQuestState>}
    */
-  setQuestRewarded(playerId, rewarded) {
-    this.stmtSetQuestRewarded.run(rewarded ? 1 : 0, Date.now(), playerId);
+  getQuestState(playerId) {
+    const row = this.stmtGet.get(playerId);
+    if (!row) return normalizeQuestState(null);
+    try {
+      return normalizeQuestState(JSON.parse(row.quest_state || "{}"));
+    } catch {
+      return normalizeQuestState(null);
+    }
+  }
+
+  /**
+   * Persist the authoritative quest state. The caller passes the normalized shape
+   * produced by the shared state machine.
+   * @param {string} playerId
+   * @param {object} state
+   * @returns {ReturnType<typeof normalizeQuestState>}
+   */
+  setQuestState(playerId, state) {
+    this._ensureRow(playerId);
+    const clean = normalizeQuestState(state);
+    this.stmtUpdateQuestState.run(JSON.stringify(clean), Date.now(), playerId);
+    return clean;
   }
 
   // --- Server-owned vitals ---

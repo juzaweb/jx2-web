@@ -1,0 +1,156 @@
+/* Newbie quest dialog + journal. Reuses the shared modal/overlay chrome. */
+
+.npc-dialog,
+.quest-log {
+  width: min(640px, 92vw);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.npc-dialog-line {
+  margin: 12px 0 16px;
+  line-height: 1.6;
+  color: #e8e0cf;
+}
+
+.npc-dialog-quest {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 215, 107, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 215, 107, 0.08);
+}
+
+.npc-dialog-quest-title {
+  font-weight: 700;
+  color: #ffd76b;
+}
+
+.npc-dialog-quest-meta {
+  font-size: 0.85em;
+  color: #d8c9a5;
+}
+
+.npc-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.wuxia-btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid #a88741;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #2b363d, #141b20);
+  color: #ffd76b;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wuxia-btn-secondary:hover {
+  filter: brightness(1.15);
+}
+
+.quest-log-hint {
+  color: #c9bfa8;
+  margin: 0 0 12px;
+}
+
+.quest-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quest-log-row {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.quest-log-row.status-active,
+.quest-log-row.status-ready {
+  border-color: rgba(255, 215, 107, 0.45);
+}
+
+.quest-log-row.status-done {
+  opacity: 0.75;
+}
+
+.quest-log-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quest-log-index {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 215, 107, 0.18);
+  color: #ffd76b;
+  font-weight: 700;
+  font-size: 0.8em;
+}
+
+.quest-log-title {
+  flex: 1;
+  font-weight: 700;
+  color: #f4e8c8;
+}
+
+.quest-log-chip {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.chip-done {
+  color: #8fd18f;
+}
+
+.chip-ready {
+  color: #ffd76b;
+}
+
+.chip-active {
+  color: #8ec8ff;
+}
+
+.chip-available {
+  color: #d8c9a5;
+}
+
+.chip-locked {
+  color: #a08f7a;
+}
+
+.quest-log-objectives {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.quest-log-objectives li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9em;
+  color: #d7cdbb;
+}
+
+.quest-log-reward {
+  font-size: 0.82em;
+  color: #ffd76b;
+}

@@ -83,6 +83,11 @@ import {
   unequipSlot
 } from "../game/playerBag.js";
 import { syncCommandTokens } from "../game/commandTokens.js";
+import {
+  handleQuestAccept,
+  handleQuestTalk,
+  handleQuestTurnIn
+} from "../game/questRuntime.js";
 
 /**
  * Clean sanitization for player strings
@@ -640,8 +645,16 @@ export class GameSocketManager {
         this.handleMapChange(ws, msg.payload);
         break;
 
-      case "quest_claim":
-        this.handleQuestClaim(ws);
+      case "quest_accept":
+        handleQuestAccept(this, ws, msg.payload);
+        break;
+
+      case "quest_talk":
+        handleQuestTalk(this, ws, msg.payload);
+        break;
+
+      case "quest_turn_in":
+        handleQuestTurnIn(this, ws, msg.payload);
         break;
 
       case "gm_action":
@@ -711,6 +724,7 @@ export class GameSocketManager {
     const saved = store.getProgress(characterId);
     const progress = saved ? normalizeProgress(saved) : { level: 1, exp: 0, coins: 0, kills: 0 };
     store.setProgress(characterId, progress, displayName);
+    const questState = store.getQuestState(characterId);
 
     const stats = deriveCombatStats({ level: progress.level, equipment });
     const storedVitals = store.getVitals(characterId);
@@ -795,7 +809,7 @@ export class GameSocketManager {
       faction: normalizeFaction(character.faction),
       characterId,
       progress,
-      questRewarded: saved?.questRewarded ?? false,
+      questState,
       // Level and both HP/MP ceilings are derived from the server-owned ledger.
       level: progress.level,
       maxHp: stats.maxHp,
@@ -868,9 +882,14 @@ export class GameSocketManager {
     if (progress) {
       this.send(ws, {
         type: "player_progress",
-        payload: { ...progressPayload(progress), questRewarded: playerData.questRewarded }
+        payload: progressPayload(progress)
       });
     }
+
+    this.send(ws, {
+      type: "quest_sync",
+      payload: { ...playerData.questState, level: progress.level }
+    });
 
     // Publish the server-owned state a joining client must render instead of
     // recomputing it: bag, worn gear, derived combat stats and vitals.
@@ -2817,21 +2836,6 @@ export class GameSocketManager {
     });
     this.sendPlayerStats(player);
     return next;
-  }
-
-  /**
-   * One-off quest payout, gated on the persisted `quest_rewarded` flag so a client
-   * cannot claim it twice by replaying the message.
-   * @param {WebSocket} ws
-   */
-  handleQuestClaim(ws) {
-    const player = this.players.get(ws);
-    if (!player || !player.progress || player.questRewarded) return;
-
-    player.questRewarded = true;
-    this.creditReward(ws, player, { exp: 50, coins: 20 });
-    store.setQuestRewarded(player.characterId, true);
-    this.persistProgress(player);
   }
 
   /**

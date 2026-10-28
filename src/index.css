@@ -875,6 +875,39 @@ body {
 .joystick-dir-indicator.dir-left { left: 6px; top: 50%; transform: translateY(-50%); }
 .joystick-dir-indicator.dir-right { right: 6px; top: 50%; transform: translateY(-50%); }
 
+/* --- NPC talk button (only while an NPC is in range) --- */
+.mobile-npc-talk {
+  position: absolute;
+  left: calc(var(--mctrl-edge) + var(--mctrl-safe-l) + var(--mctrl-joy) / 2);
+  bottom: calc(var(--mctrl-edge) + var(--mctrl-safe-b) + var(--mctrl-joy) + 12px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(145deg, #2b363d, #141b20);
+  border: 1.5px solid #ffd43b;
+  border-radius: 999px;
+  color: #ffd43b;
+  font-size: calc(13px * var(--mctrl-scale));
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 10px rgba(255, 212, 59, 0.25);
+  pointer-events: auto;
+  touch-action: manipulation;
+  user-select: none;
+  z-index: 2;
+}
+
+.mobile-npc-talk:active {
+  scale: 0.95;
+  filter: brightness(1.2);
+}
+
+.mobile-npc-talk-icon {
+  font-size: calc(16px * var(--mctrl-scale));
+  line-height: 1;
+}
+
 /* --- Radial Arc Skill Cluster (Bottom Right) --- */
 /* Zero-size anchor parked in the bottom-right corner. Every button is placed
    relative to it, so the cluster never depends on a hard-coded box width. */

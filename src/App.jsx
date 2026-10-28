@@ -16,8 +16,11 @@ import { LoginModal } from "./components/Modals/LoginModal.jsx";
 import { CharacterSelectModal } from "./components/Modals/CharacterSelectModal.jsx";
 import { SkillsModal } from "./components/Modals/SkillsModal.jsx";
 import { ShopModal } from "./components/Modals/ShopModal.jsx";
+import { NpcDialogModal } from "./components/Modals/NpcDialogModal.jsx";
+import { QuestLogModal } from "./components/Modals/QuestLogModal.jsx";
 import { GmModal } from "./components/Modals/GmModal.jsx";
 import { bridge, EVENTS } from "./game/bridge.js";
+import { activeQuestView } from "./game/questView.js";
 import { normalizeGender } from "./game/gender.js";
 import {
   loadMobileSkills,
@@ -39,6 +42,8 @@ import {
   applyQuantities,
   bagQuantity,
   CONSUMABLE_ITEMS,
+  GUIDE_ITEM_ID,
+  NEWBIE_LETTER_ID,
   setQuantities as rememberQuantities
 } from "./game/items.js";
 import { defaultEquipment, equippedWeaponType } from "./game/equipment.js";
@@ -159,6 +164,12 @@ export function App() {
   );
   const [shopNpc, setShopNpc] = useState(null);
   const [shopResult, setShopResult] = useState(null);
+  // Server-authoritative newbie quest chain, the NPC currently being talked to
+  // and the nearest in-range NPC for the mobile talk button.
+  const [questState, setQuestState] = useState(null);
+  const [isQuestLogOpen, setIsQuestLogOpen] = useState(false);
+  const [npcDialog, setNpcDialog] = useState(null);
+  const [nearbyNpc, setNearbyNpc] = useState(null);
   const [stats, setStats] = useState({
     level: 1,
     hp: 100,
@@ -171,11 +182,6 @@ export function App() {
     kills: 0,
     sta: 100,
     maxSta: 100
-  });
-  const [quest, setQuest] = useState({
-    progress: 0,
-    total: 3,
-    completed: false
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
   const [targetVitals, setTargetVitals] = useState(null);
@@ -351,8 +357,22 @@ export function App() {
       setStats((prev) => ({ ...prev, ...newStats }));
     });
 
-    const unsubQuest = bridge.on(EVENTS.QUEST_UPDATED, (newQuest) => {
-      setQuest(newQuest);
+    const unsubQuests = bridge.on(EVENTS.QUESTS_UPDATED, (next) => {
+      setQuestState(next || null);
+    });
+
+    const unsubDialog = bridge.on(EVENTS.NPC_DIALOG_OPENED, (next) => {
+      if (!next?.npc) return;
+      setNpcDialog(next.npc);
+      setIsQuestLogOpen(false);
+    });
+
+    const unsubDialogClosed = bridge.on(EVENTS.NPC_DIALOG_CLOSED, () => {
+      setNpcDialog(null);
+    });
+
+    const unsubNearbyNpc = bridge.on(EVENTS.NEARBY_NPC_CHANGED, (next) => {
+      setNearbyNpc(next || null);
     });
 
     const unsubLog = bridge.on(EVENTS.LOG_ADDED, (newLog) => {
@@ -426,7 +446,10 @@ export function App() {
 
     return () => {
       unsubStats();
-      unsubQuest();
+      unsubQuests();
+      unsubDialog();
+      unsubDialogClosed();
+      unsubNearbyNpc();
       unsubLog();
       unsubAudio();
       unsubPk();
@@ -564,6 +587,15 @@ export function App() {
         return;
       }
 
+      // An open NPC dialog owns the keyboard the same way the shop does.
+      if (npcDialog) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          bridge.emit(EVENTS.ACTION_CLOSE_NPC_DIALOG);
+        }
+        return;
+      }
+
       const key = e.key.toLowerCase();
       const hasOpenModal =
         isHelpOpen ||
@@ -571,6 +603,7 @@ export function App() {
         isCharacterOpen ||
         isSkillsOpen ||
         isCityMapOpen ||
+        isQuestLogOpen ||
         mobileSkillsPicker.isPickerOpen ||
         mobileItemsPicker.isPickerOpen ||
         !!shopNpc ||
@@ -610,6 +643,18 @@ export function App() {
         } else {
           handleOpenSkills();
         }
+        return;
+      }
+
+      // J opens the newbie quest journal (nhật ký nhiệm vụ).
+      if (key === "j") {
+        if (isLoginOpen || (!activeCharacter && currentUser)) return;
+        e.preventDefault();
+        setIsQuestLogOpen((prev) => {
+          const next = !prev;
+          bridge.emit(EVENTS.ACTION_SET_PAUSED, next);
+          return next;
+        });
         return;
       }
 
@@ -665,6 +710,12 @@ export function App() {
         return;
       }
 
+      if (isQuestLogOpen) {
+        setIsQuestLogOpen(false);
+        bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        return;
+      }
+
       if (targetVitalsRef.current) {
         handleClearTarget();
         return;
@@ -689,6 +740,8 @@ export function App() {
     activeCharacter,
     currentUser,
     shopNpc,
+    npcDialog,
+    isQuestLogOpen,
     mobileSkillsPicker.isPickerOpen,
     mobileSkillsPicker.close,
     mobileItemsPicker.isPickerOpen,
@@ -710,8 +763,23 @@ export function App() {
   }, []);
 
   const handleUseItem = useCallback((slot) => {
+    // The guide book opens the quest journal instead of being consumed.
+    if (slot === GUIDE_ITEM_ID) {
+      setIsQuestLogOpen(true);
+      bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+      return;
+    }
+    // The letter is delivered through the quest dialog, never drunk/used.
+    if (slot === NEWBIE_LETTER_ID) {
+      bridge.emit(EVENTS.LOG_ADDED, {
+        id: `${Date.now()}-letter`,
+        text: t("quests.letterHint"),
+        type: "system"
+      });
+      return;
+    }
     bridge.emit(EVENTS.ACTION_USE_POTION, slot);
-  }, []);
+  }, [t]);
 
   const handleEquipItem = useCallback((itemId) => {
     bridge.emit(EVENTS.ACTION_EQUIP_ITEM, itemId);
@@ -910,7 +978,11 @@ export function App() {
 
         <MinimapPanel
           onOpenHelp={handleOpenHelp}
-          quest={quest}
+          onOpenQuestLog={() => {
+            setIsQuestLogOpen(true);
+            bridge.emit(EVENTS.ACTION_SET_PAUSED, true);
+          }}
+          quest={questState ? activeQuestView(questState) : null}
           zoomed={isMinimapZoomed}
           collapsed={!isMinimapOpen}
           onClose={() => setIsMinimapOpen(false)}
@@ -952,6 +1024,8 @@ export function App() {
           onAssignSkill={mobileSkillsPicker.open}
           onUseItem={handleUseItem}
           onAssignItem={mobileItemsPicker.open}
+          onInteractNpc={() => bridge.emit(EVENTS.ACTION_INTERACT_NPC)}
+          nearbyNpc={nearbyNpc}
           playerMp={stats.mp}
           skills={weaponSkills}
           skillSlots={mobileSkillsPicker.bindings}
@@ -998,6 +1072,29 @@ export function App() {
         result={shopResult}
         onBuy={handleBuyShopItem}
         onClose={handleCloseShop}
+      />
+
+      {/* NPC dialog + newbie quest journal */}
+      <NpcDialogModal
+        isOpen={!!npcDialog}
+        npc={npcDialog}
+        state={questState}
+        level={stats.level}
+        onAccept={(questId) => bridge.emit(EVENTS.ACTION_QUEST_ACCEPT, { questId })}
+        onTalk={(npcId) => bridge.emit(EVENTS.ACTION_QUEST_TALK, { npcId })}
+        onTurnIn={(questId) => bridge.emit(EVENTS.ACTION_QUEST_TURN_IN, { questId })}
+        onOpenShop={() => bridge.emit(EVENTS.ACTION_OPEN_NPC_SHOP)}
+        onClose={() => bridge.emit(EVENTS.ACTION_CLOSE_NPC_DIALOG)}
+      />
+
+      <QuestLogModal
+        isOpen={isQuestLogOpen}
+        state={questState}
+        level={stats.level}
+        onClose={() => {
+          setIsQuestLogOpen(false);
+          bridge.emit(EVENTS.ACTION_SET_PAUSED, false);
+        }}
       />
 
       {/* Character Inventory ("Hành trang") */}

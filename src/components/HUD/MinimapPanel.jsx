@@ -3,7 +3,7 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import { LanguageSwitcher } from "../LanguageSwitcher.jsx";
 
-export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = false, onClose, onOpen }) {
+export function MinimapPanel({ onOpenHelp, onOpenQuestLog, quest, zoomed = false, collapsed = false, onClose, onOpen }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const coordsRef = useRef(null);
@@ -54,6 +54,16 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
         >
           🗺
         </button>
+        <button
+          type="button"
+          id="minimap-quest-restore-btn"
+          className="panel-restore-btn"
+          title={t("minimap.questLogTitle")}
+          aria-label={t("minimap.questLogTitle")}
+          onClick={onOpenQuestLog}
+        >
+          📜
+        </button>
       </section>
     );
   }
@@ -84,6 +94,15 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
             >
               ?
             </button>
+            <button
+              id="map-quest-btn"
+              className="mini-btn"
+              title={t("minimap.questLogTitle")}
+              aria-label={t("minimap.questLogTitle")}
+              onClick={onOpenQuestLog}
+            >
+              📜
+            </button>
           </div>
         </div>
 
@@ -106,19 +125,22 @@ export function MinimapPanel({ onOpenHelp, quest, zoomed = false, collapsed = fa
           <div className="minimap-radar-sweep"></div>
         </div>
 
-        {/* Pinned Quest Objective. It describes Kiến Nghiệp only, so a hunting
-            ground must not claim to be a safe city with no monsters. */}
-        {mapId === "market" && (
-          <div className="quest-tracker" id="quest-tracker">
-            <div className="quest-head">{t("minimap.questHead")}</div>
-            <div className="quest-body" id="quest-text">
-              {quest?.completed ? t("minimap.questDone") : t("minimap.questTodo")}
-            </div>
-            <div className="quest-progress" id="quest-progress">
-              {t("minimap.questSafe")}
-            </div>
+        {/* Pinned quest objective. It follows the active newbie quest on every
+            map, so a hunting ground shows the same step the city does. */}
+        <div className="quest-tracker" id="quest-tracker">
+          <div className="quest-head">
+            {quest?.titleKey ? t(quest.titleKey) : t("minimap.questHead")}
           </div>
-        )}
+          <div className="quest-body" id="quest-text">
+            {quest?.labelKey
+              ? `${t(quest.labelKey)} (${quest.done}/${quest.total})`
+              : t("minimap.questIdle")}
+          </div>
+          <div className="quest-progress" id="quest-progress">
+            {quest?.ready ? t("minimap.questReady") : t("minimap.questHint")}
+            {mapId === "market" && ` • ${t("minimap.questSafe")}`}
+          </div>
+        </div>
       </div>
     </section>
   );
