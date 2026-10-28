@@ -484,7 +484,7 @@ export default {
       talkTo: "Talk to {name}",
       exp: "{exp} EXP",
       bac: "{bac} silver",
-      letterHint: "This letter must be delivered to Zhao Yannian in Jianye."
+      letterHint: "This letter must be delivered to Zhao Yannian."
     },
     status: {
       done: "Completed",
@@ -511,7 +511,7 @@ export default {
         femaleClothes: "Ladies' garb is light but sturdy. Never underestimate defense.",
         jewelry: "Jewels are precious, but a newcomer should stay safe. This hat suits you better.",
         pharmacy: "Medicine saves lives. Golden Radiance restores health, Great Return Pill restores inner force.",
-        grocery: "The grocer sells all sorts. A Return City Talisman brings you back to Jianye."
+        grocery: "The grocer sells all sorts. A Return City Talisman brings you back to the city."
       }
     },
     tanThu2: {
@@ -559,7 +559,7 @@ export default {
     },
     tanThu6: {
       title: "Delivering the Letter",
-      intro: "Dã Tẩu asks you to deliver a letter to Zhao Yannian in Jianye.",
+      intro: "Dã Tẩu asks you to deliver a letter to Zhao Yannian in this city.",
       progress: "Deliver the letter to Zhao Yannian.",
       turnIn: "Dã Tẩu's letter? Thank you. Take this token of my gratitude.",
       objective: { letter: "Deliver the letter to Zhao Yannian" },
@@ -603,7 +603,7 @@ export default {
     },
     "thu-cua-da-tau": {
       name: "Dã Tẩu's Letter",
-      desc: "A letter Dã Tẩu asked you to deliver to Zhao Yannian in Jianye."
+      desc: "A letter Dã Tẩu asked you to deliver to Zhao Yannian."
     },
     "lenh-bai-gm": {
       name: "GM Imperial Token",

@@ -487,7 +487,7 @@ export default {
       talkTo: "Nói chuyện với {name}",
       exp: "{exp} EXP",
       bac: "{bac} bạc",
-      letterHint: "Bức thư này phải giao cho Triệu Diên Niên tại Biện Kinh."
+      letterHint: "Bức thư này phải giao cho Triệu Diên Niên."
     },
     status: {
       done: "Hoàn thành",
@@ -516,7 +516,7 @@ export default {
         femaleClothes: "Trang phục nữ cũng vậy, nhẹ nhàng mà chắc chắn. Đừng xem thường phòng ngự.",
         jewelry: "Trang sức quý giá, nhưng tân thủ nên lo giữ mình. Chiếc nón này hợp với ngươi hơn.",
         pharmacy: "Dược phẩm cứu mạng lúc nguy nan. Kim Sáng Dược hồi sinh lực, Đại Hoàn Đan hồi nội lực.",
-        grocery: "Tạp hóa bán đủ thứ. Hồi Thành Phù sẽ đưa ngươi về Biện Kinh khi lạc bước."
+        grocery: "Tạp hóa bán đủ thứ. Hồi Thành Phù sẽ đưa ngươi về thành khi lạc bước."
       }
     },
     tanThu2: {
@@ -572,7 +572,7 @@ export default {
     },
     tanThu6: {
       title: "Đưa thư",
-      intro: "Dã Tẩu nhờ ngươi mang bức thư cho Triệu Diên Niên tại Biện Kinh.",
+      intro: "Dã Tẩu nhờ ngươi mang bức thư cho Triệu Diên Niên trong thành.",
       progress: "Hãy trao thư cho Triệu Diên Niên.",
       turnIn: "Thư của Dã Tẩu? Cảm ơn ngươi. Đây là chút lòng thành.",
       objective: {
@@ -618,7 +618,7 @@ export default {
     },
     "thu-cua-da-tau": {
       name: "Thư Của Dã Tẩu",
-      desc: "Bức thư Dã Tẩu nhờ giao cho Triệu Diên Niên tại Biện Kinh."
+      desc: "Bức thư Dã Tẩu nhờ giao cho Triệu Diên Niên."
     },
     "lenh-bai-gm": {
       name: "Lệnh Bài GM",

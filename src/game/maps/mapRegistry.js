@@ -21,7 +21,7 @@
  * portals       [{id, label, rect:{x,y,w,h}, targetMapId, targetSpawn}]
  * enemySpawns   [{id, monsterId, x, y}] ids are unique per map
  * zones         [{id, minLevel, maxLevel, bounds:{x0,y0,x1,y1}}] level bands
- * npcs          friendly NPC definitions (market only today)
+ * npcs          friendly NPC definitions (the three capitals)
  * ```
  *
  * Keep this module Phaser-free: `server/src/websocket/gameSocket.js` imports it

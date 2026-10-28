@@ -1,11 +1,15 @@
 /**
  * Thành Đô — the Thục faction's home city.
  *
- * A walled square with a herb shop, four gates connecting to hunting grounds and
- * the central battlefield, and cross-cutting paved avenues.
+ * A walled square with the seven city shops and the full newbie-quest NPC
+ * roster, four gates connecting to hunting grounds and the central battlefield,
+ * and cross-cutting paved avenues. The shop/NPC layout is shared with Lạc Dương
+ * through `factionCityLayout.js`.
  *
  * Pure data, no Phaser imports.
  */
+
+import { factionCityBuildings, factionCityNpcs } from "../factionCityLayout.js";
 
 /** @type {import("./mapRegistry.js").MapDefinition} */
 export const THUC_THANH_MAP = {
@@ -55,21 +59,7 @@ export const THUC_THANH_MAP = {
     ]
   },
 
-  buildings: [
-    {
-      id: "thuc-duoc-diem",
-      kind: "shop",
-      sign: "DƯỢC ĐIỂM",
-      subSign: "藥舖",
-      x: 2300,
-      y: 2800,
-      w: 2000,
-      d: 900,
-      scale: 2.8,
-      signColor: "green",
-      palette: "herb"
-    }
-  ],
+  buildings: factionCityBuildings("thuc"),
 
   trees: [
     [900, 900, 1.05, "tree-large"],
@@ -77,7 +67,7 @@ export const THUC_THANH_MAP = {
     [5700, 800, 1.0, "tree-medium"],
     [7100, 1000, 1.05, "tree-large"],
     [700, 2700, 0.95, "bush-large"],
-    [7300, 2700, 1.0, "tree-medium"],
+    [7300, 1900, 1.0, "tree-medium"],
     [800, 6900, 1.05, "tree-large"],
     [2300, 7200, 0.95, "bush-medium"],
     [5700, 7200, 1.0, "tree-medium"],
@@ -89,20 +79,11 @@ export const THUC_THANH_MAP = {
     [6500, 1800, 1.0],
     [1200, 4800, 0.9],
     [6800, 4800, 0.95],
-    [1600, 6500, 1.0],
+    [3100, 6600, 1.0],
     [6400, 6500, 0.9]
   ],
 
-  npcs: [
-    {
-      id: "duoc-su",
-      name: "Dược Sư",
-      shop: "pharmacy",
-      building: "thuc-duoc-diem",
-      x: 2300,
-      y: 3300
-    }
-  ],
+  npcs: factionCityNpcs("thuc"),
 
   /** All four gates open onto hunting grounds and the central battlefield. */
   gates: [

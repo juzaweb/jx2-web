@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MONSTERS } from "../enemyCatalog.js";
+import { QUESTS } from "../quests/catalog.js";
 import {
   DEFAULT_MAP_ID,
   MAPS,
@@ -62,6 +63,23 @@ describe("map registry", () => {
       const south = findPortal(id, "south-gate");
       expect(south, `${id} must wire its south gate`).toBeTruthy();
       expect(south.targetMapId).toBe("trung-nguyen");
+    }
+  });
+  it("gives every capital the full newbie-quest NPC roster", () => {
+    const required = new Set();
+    for (const quest of QUESTS) {
+      required.add(quest.giver);
+      required.add(quest.turnIn);
+      for (const objective of quest.objectives) {
+        for (const target of objective.targets) required.add(target.npcId);
+      }
+    }
+
+    for (const id of ["market", "thuc-thanh", "nguy-thanh"]) {
+      const ids = new Set((MAPS[id].npcs || []).map((npc) => npc.id));
+      for (const npcId of required) {
+        expect(ids.has(npcId), `${id} must place the quest NPC ${npcId}`).toBe(true);
+      }
     }
   });
 
@@ -167,6 +185,34 @@ describe("map registry", () => {
         for (const targetPortal of target.portals || []) {
           expect(
             isInsideRect(targetPortal.rect, portal.targetSpawn.x, portal.targetSpawn.y)
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("points every NPC building reference at a building on the same map", () => {
+    for (const id of MAP_IDS) {
+      const map = MAPS[id];
+      const buildingIds = new Set((map.buildings || []).map((building) => building.id));
+      for (const npc of map.npcs || []) {
+        if (!npc.building) continue;
+        expect(
+          buildingIds.has(npc.building),
+          `${id}/${npc.id} must stand at a building on its own map`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every friendly NPC out of a portal trigger", () => {
+    for (const id of MAP_IDS) {
+      const map = MAPS[id];
+      for (const npc of map.npcs || []) {
+        for (const portal of map.portals || []) {
+          expect(
+            isInsideRect(portal.rect, npc.x, npc.y),
+            `${id}/${npc.id} must not stand inside portal ${portal.id}`
           ).toBe(false);
         }
       }

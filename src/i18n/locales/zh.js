@@ -485,7 +485,7 @@ export default {
       talkTo: "与 {name} 交谈",
       exp: "{exp} 经验",
       bac: "{bac} 银子",
-      letterHint: "这封信要交给建业的赵延年。",
+      letterHint: "这封信要交给赵延年。",
     },
     status: {
       done: "已完成",
@@ -512,7 +512,7 @@ export default {
         femaleClothes: "女装同样轻便而结实，切莫小看防御。",
         jewelry: "首饰珍贵，但新手应先保命。这顶帽子更适合你。",
         pharmacy: "药品能救命。金创药回生命，大还丹回内力。",
-        grocery: "杂货什么都有。回城符能带你回建业。"
+        grocery: "杂货什么都有。回城符能带你回城。"
       }
     },
     tanThu2: {
@@ -560,7 +560,7 @@ export default {
     },
     tanThu6: {
       title: "送信",
-      intro: "野叟托你把信交给建业的赵延年。",
+      intro: "野叟托你把信交给城中的赵延年。",
       progress: "把信交给赵延年。",
       turnIn: "野叟的信？多谢你。这是点心意。",
       objective: { letter: "送信给赵延年" },
@@ -604,7 +604,7 @@ export default {
     },
     "thu-cua-da-tau": {
       name: "野叟之信",
-      desc: "野叟托你交给建业赵延年的信。"
+      desc: "野叟托你交给赵延年的信。"
     },
     "lenh-bai-gm": {
       name: "GM令牌",

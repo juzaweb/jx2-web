@@ -7,6 +7,8 @@
  * ground units (x right, y down) matching `isoProjection.js`.
  */
 
+import { cityNpc } from "./npcRoster.js";
+
 /** Ground rectangle covered by the stone market square. */
 export const MARKET_PLAZA = { x: 3400, y: 3500, w: 6000, d: 4000 };
 
@@ -20,138 +22,24 @@ export const MARKET_SPAWN = { x: 6400, y: 6050 };
  * Friendly NPCs. `x`/`y` are the ground contact point; each NPC stands in front
  * of its shop and opens a service when the player interacts with it.
  *
- * `sprite` picks a sheet (`npc-citizen` is the temporary procedural placeholder)
- * and `tint` differentiates roles on that shared sheet. `role: "quest"` NPCs are
- * pure dialogue; only the Dược Sư keeps a real shop counter.
+ * Identity (name, role, sprite, tint, shop) comes from `npcRoster.js` so the
+ * faction capitals cannot drift from Biện Kinh; only placement lives here.
  */
 export const MARKET_NPCS = [
-  {
-    id: "da-tau",
-    name: "Dã Tẩu",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xc8a878,
-    x: 6400,
-    y: 5700
-  },
-  {
-    id: "chu-tiem-vu-khi",
-    name: "Chủ Tiệm Vũ Khí",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xd8c0a0,
-    x: 7000,
-    y: 4580
-  },
-  {
-    id: "chu-tiem-do-nam",
-    name: "Chủ Tiệm Trang Phục Nam",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xa8c8e8,
-    x: 8600,
-    y: 4580
-  },
-  {
-    id: "chu-tiem-do-nu",
-    name: "Chủ Tiệm Trang Phục Nữ",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xe8b8d0,
-    x: 7000,
-    y: 7080
-  },
-  {
-    id: "chu-tiem-trang-suc",
-    name: "Chủ Tiệm Trang Sức",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xffe08a,
-    x: 8600,
-    y: 7080
-  },
-  {
-    id: "duoc-su",
-    name: "Dược Sư",
-    shop: "pharmacy",
-    role: "service",
-    sprite: "npc-duoc",
-    building: "duoc-diem",
-    x: 4300,
-    y: 7020
-  },
-  {
-    id: "chu-tiem-tap-hoa",
-    name: "Chủ Tạp Hóa",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xc0d8a0,
-    x: 4300,
-    y: 4580
-  },
-  {
-    id: "ve-binh-thanh-mon",
-    name: "Vệ Binh Thành Môn",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xb0b8c8,
-    x: 10150,
-    y: 6000
-  },
-  {
-    id: "vo-su",
-    name: "Võ Sư",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xd0b090,
-    x: 5600,
-    y: 4700
-  },
-  {
-    id: "thu-kho",
-    name: "Thủ Khố",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xc0a880,
-    x: 3000,
-    y: 4700
-  },
-  {
-    id: "chu-tuu-lau",
-    name: "Chủ Tửu Lầu",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xe0b080,
-    x: 5200,
-    y: 8220
-  },
-  {
-    id: "tieu-su",
-    name: "Tiêu Sư",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xb8a8d0,
-    x: 9600,
-    y: 6800
-  },
-  {
-    id: "bach-hieu-sinh",
-    name: "Bách Hiểu Sinh",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xbfa06a,
-    x: 7400,
-    y: 6000
-  },
-  {
-    id: "trieu-dien-nien",
-    name: "Triệu Diên Niên",
-    role: "quest",
-    sprite: "npc-citizen",
-    tint: 0xd8d0b0,
-    x: 8600,
-    y: 8100
-  }
+  cityNpc("da-tau", 6400, 5700),
+  cityNpc("chu-tiem-vu-khi", 7000, 4580),
+  cityNpc("chu-tiem-do-nam", 8600, 4580),
+  cityNpc("chu-tiem-do-nu", 7000, 7080),
+  cityNpc("chu-tiem-trang-suc", 8600, 7080),
+  cityNpc("duoc-su", 4300, 7020, { building: "duoc-diem" }),
+  cityNpc("chu-tiem-tap-hoa", 4300, 4580),
+  cityNpc("ve-binh-thanh-mon", 10150, 6000),
+  cityNpc("vo-su", 5600, 4700),
+  cityNpc("thu-kho", 3000, 4700),
+  cityNpc("chu-tuu-lau", 5200, 8220),
+  cityNpc("tieu-su", 9600, 6800),
+  cityNpc("bach-hieu-sinh", 7400, 6000),
+  cityNpc("trieu-dien-nien", 8600, 8100)
 ];
 
 /**
