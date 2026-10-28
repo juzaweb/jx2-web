@@ -364,10 +364,13 @@ export default {
     closeTitle: "Đóng (F3 / Esc)",
     hint: "Các chỉ số chiến đấu là giá trị thực tế đang dùng khi giao chiến. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
     tabEquip: "Trang bị",
+    tabInventory: "Hành trang",
+    tabStats: "Thuộc tính",
     tabNews: "Tin tức",
     locked: "{label} (chưa mở)",
     notEquipped: "{label} (chưa trang bị)",
     unequipTitle: "{name} (nhấp để tháo)",
+    unequipAction: "Tháo trang bị",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
     slots: {
@@ -383,6 +386,8 @@ export default {
   },
   inventory: {
     title: "Hành trang",
+    tabCharacter: "Nhân vật",
+    itemDetails: "Chi tiết vật phẩm",
     helpTitle: "Trợ giúp túi đồ",
     closeTitle: "Đóng (Esc)",
     hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Kéo vật phẩm xuống thanh 1–9 để gán phím nhanh; kéo ô trên thanh ra ngoài (hoặc chuột phải) để bỏ gán. Kéo trang bị sang bảng Nhân vật (F3) để mặc. Di chuột lên vật phẩm để xem mô tả.",

@@ -4,6 +4,13 @@ export const PANEL_EDGE = 8;
 const DRAG_IGNORE_SELECTOR = "button, a, input, select, textarea, [data-no-drag]";
 
 /**
+ * Check whether the current viewport represents a mobile or compact touch display.
+ */
+export const isMobileViewport = () =>
+  typeof window !== "undefined" &&
+  (window.innerWidth <= 960 || window.innerHeight <= 500);
+
+/**
  * Keep a panel fully inside the viewport. Panels larger than the viewport are
  * pinned to the top-left edge instead of being pushed off-screen.
  */
@@ -29,7 +36,7 @@ export function clampPanelPosition({
  * position until the user grabs the handle. During a drag the element style is
  * updated directly so the heavy panel contents are not re-rendered per frame.
  */
-export function useDraggablePanel(isOpen = true) {
+export function useDraggablePanel(isOpen = true, { disabled = false } = {}) {
   const panelRef = useRef(null);
   const posRef = useRef(null);
   const dragRef = useRef(null);
@@ -50,6 +57,19 @@ export function useDraggablePanel(isOpen = true) {
   }, []);
 
   const applyPosition = useCallback((next, commit) => {
+    if (disabled || isMobileViewport()) {
+      posRef.current = null;
+      const el = panelRef.current;
+      if (el) {
+        el.style.left = "";
+        el.style.top = "";
+        el.style.right = "";
+        el.style.bottom = "";
+      }
+      if (commit) setPos(null);
+      return;
+    }
+
     posRef.current = next;
     const el = panelRef.current;
     if (el) {
@@ -59,29 +79,53 @@ export function useDraggablePanel(isOpen = true) {
       el.style.bottom = "auto";
     }
     if (commit) setPos(next);
-  }, []);
+  }, [disabled]);
 
   // Re-clamp when the panel reopens: the viewport may have shrunk while closed.
   useLayoutEffect(() => {
-    if (!isOpen || !posRef.current) return;
+    if (!isOpen) return;
+    if (disabled || isMobileViewport()) {
+      const el = panelRef.current;
+      if (el) {
+        el.style.left = "";
+        el.style.top = "";
+        el.style.right = "";
+        el.style.bottom = "";
+      }
+      setPos(null);
+      return;
+    }
+    if (!posRef.current) return;
     applyPosition(
       clampToViewport(posRef.current.x, posRef.current.y),
       true
     );
-  }, [isOpen, applyPosition, clampToViewport]);
+  }, [isOpen, disabled, applyPosition, clampToViewport]);
 
   useEffect(() => {
     const handleResize = () => {
+      if (disabled || isMobileViewport()) {
+        const el = panelRef.current;
+        if (el) {
+          el.style.left = "";
+          el.style.top = "";
+          el.style.right = "";
+          el.style.bottom = "";
+        }
+        setPos(null);
+        return;
+      }
       const current = posRef.current;
       if (!current) return;
       applyPosition(clampToViewport(current.x, current.y), true);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [applyPosition, clampToViewport]);
+  }, [disabled, applyPosition, clampToViewport]);
 
   const onPointerDown = useCallback(
     (event) => {
+      if (disabled || isMobileViewport()) return;
       if (event.button !== 0) return;
       if (event.target.closest(DRAG_IGNORE_SELECTOR)) return;
       const el = panelRef.current;
@@ -136,7 +180,7 @@ export function useDraggablePanel(isOpen = true) {
   return {
     panelRef,
     dragging,
-    panelStyle: pos
+    panelStyle: !disabled && !isMobileViewport() && pos
       ? { left: `${pos.x}px`, top: `${pos.y}px`, right: "auto", bottom: "auto" }
       : undefined,
     dragHandlers: {

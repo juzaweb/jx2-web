@@ -306,19 +306,104 @@
   color: #ffd43b;
 }
 
-@media (max-width: 720px) {
-  .char-panel {
-    left: 8px;
-    right: auto;
-    top: 108px;
-    width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
-    max-height: calc(100vh - 216px);
+@media (max-width: 960px), (max-height: 500px), (pointer: coarse) {
+  .char-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    pointer-events: auto;
+    background: rgba(4, 6, 8, 0.72);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    box-sizing: border-box;
   }
+
+  .char-panel {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: auto;
+    width: min(350px, calc(100vw - 12px));
+    max-width: min(350px, calc(100vw - 12px));
+    max-height: min(95vh, 440px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 4px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.95), 0 0 0 1px #8c663a;
+  }
+
+  .char-titlebar {
+    padding: 6px 8px;
+  }
+
+  .char-title {
+    font-size: 15px;
+  }
+
+  .char-icon-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .char-tabs {
+    padding: 5px 8px 0;
+  }
+
+  .char-tab {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+
+  .char-body {
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px;
+    max-height: calc(95vh - 76px);
+    overflow-y: auto;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .char-side {
+    width: 170px;
+    min-width: 145px;
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .stat-row {
+    font-size: 10.5px;
+  }
+
+  .char-equip-grid {
+    grid-template-columns: repeat(2, 44px);
+    column-gap: 8px;
+    row-gap: 4px;
+    padding: 4px;
+  }
+
+  .equip-slot {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 420px) and (orientation: portrait) {
   .char-body {
     flex-direction: column;
+    align-items: stretch;
   }
   .char-side {
     width: auto;
+  }
+  .char-equip-grid {
+    justify-content: center;
   }
 }

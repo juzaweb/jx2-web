@@ -366,10 +366,13 @@ export default {
     closeTitle: "Close (F3 / Esc)",
     hint: "Combat stats are the values the game actually rolls. Drag equipment from the Inventory (F4) onto a slot to wear it, or click/drag a worn slot to take it off.",
     tabEquip: "Equipment",
+    tabInventory: "Inventory",
+    tabStats: "Stats",
     tabNews: "News",
     locked: "{label} (locked)",
     notEquipped: "{label} (not equipped)",
     unequipTitle: "{name} (click to remove)",
+    unequipAction: "Unequip",
     points: "Points:",
     nextLevel: "Next level:",
     slots: {
@@ -385,6 +388,8 @@ export default {
   },
   inventory: {
     title: "Inventory",
+    tabCharacter: "Character",
+    itemDetails: "Item Details",
     helpTitle: "Bag help",
     closeTitle: "Close (Esc)",
     hint: "Click potions or talismans to use them. Drag an item onto the 1–9 bar to bind it to a hotkey; drag a slot off the bar (or right-click it) to unbind. Drag equipment to the Character panel (F3) to wear it. Hover over an item to read its description.",
