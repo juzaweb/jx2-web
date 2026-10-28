@@ -18,6 +18,7 @@ import { computeDamage } from "./damage.js";
 import { Player } from "./player.js";
 import { Wolf } from "./enemy.js";
 import { PVP_ATTACK_RANGE, PVP_CAST_DISTANCE, PVP_HIT_COOLDOWN_MS } from "./pvp.js";
+import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { skillById } from "./skills.js";
 
 describe("computeDamage", () => {
@@ -579,14 +580,14 @@ describe("attack speed coefficient", () => {
   };
 
   it("turns the coefficient into a shorter interval", () => {
-    expect(makeCombat(1).attackIntervalMs()).toBe(400);
-    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(400 / 1.2);
-    expect(makeCombat(1.5).attackIntervalMs()).toBeCloseTo(400 / 1.5);
+    expect(makeCombat(1).attackIntervalMs()).toBe(ATTACK_INTERVAL_MS);
+    expect(makeCombat(1.2).attackIntervalMs()).toBeCloseTo(ATTACK_INTERVAL_MS / 1.2);
+    expect(makeCombat(1.5).attackIntervalMs()).toBeCloseTo(ATTACK_INTERVAL_MS / 1.5);
   });
 
   it("falls back to the base cadence for a missing or invalid coefficient", () => {
-    expect(makeCombat(undefined).attackIntervalMs()).toBe(400);
-    expect(makeCombat(0).attackIntervalMs()).toBe(400);
+    expect(makeCombat(undefined).attackIntervalMs()).toBe(ATTACK_INTERVAL_MS);
+    expect(makeCombat(0).attackIntervalMs()).toBe(ATTACK_INTERVAL_MS);
   });
 
   it("paces PvP strikes to the server's i-frame instead of the melee cadence", () => {

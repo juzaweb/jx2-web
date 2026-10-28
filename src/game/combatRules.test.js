@@ -23,6 +23,7 @@ import {
   splashVictims,
   walkSpeedFor
 } from "./combatRules.js";
+import { ATTACK_INTERVAL_MS } from "./combatConfig.js";
 import { BASE_WALK_SPEED, WORLD_POSITION_SCALE, WORLD_SPEED_SCALE } from "./worldConfig.js";
 
 /** Base walk speed in world px/s, derived from the shared config. */
@@ -30,18 +31,18 @@ const BASE_SPEED = BASE_WALK_SPEED * WORLD_POSITION_SCALE * WORLD_SPEED_SCALE;
 
 describe("attackIntervalFor", () => {
   it("returns the base cadence at speed 1", () => {
-    expect(attackIntervalFor(1)).toBe(400);
+    expect(attackIntervalFor(1)).toBe(ATTACK_INTERVAL_MS);
   });
 
   it("shortens the interval as attack speed grows", () => {
-    expect(attackIntervalFor(2)).toBe(200);
-    expect(attackIntervalFor(1.5)).toBeCloseTo(400 / 1.5);
+    expect(attackIntervalFor(2)).toBe(ATTACK_INTERVAL_MS / 2);
+    expect(attackIntervalFor(1.5)).toBeCloseTo(ATTACK_INTERVAL_MS / 1.5);
   });
 
   it("falls back to the base cadence for invalid speeds", () => {
-    expect(attackIntervalFor(0)).toBe(400);
-    expect(attackIntervalFor(Number.NaN)).toBe(400);
-    expect(attackIntervalFor(undefined)).toBe(400);
+    expect(attackIntervalFor(0)).toBe(ATTACK_INTERVAL_MS);
+    expect(attackIntervalFor(Number.NaN)).toBe(ATTACK_INTERVAL_MS);
+    expect(attackIntervalFor(undefined)).toBe(ATTACK_INTERVAL_MS);
   });
 });
 

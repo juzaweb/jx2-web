@@ -811,7 +811,10 @@ test("WebSocket server-authority suite", async (t) => {
     // A peaceful target cannot be hit: the strike is rejected with a reason.
     const peaceful = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(peaceful, { characterId: "char_peace", x: 5150, y: 5020, extra: { pkFlag: false } });
-    await sleep(400);
+    // Outlast both the i-frame and the melee cadence: a swing fired inside
+    // `nextAttackAt` is dropped before it can authorize the follow-up hit, and
+    // the strike below must be a real one to reach the peaceful-target refusal.
+    await sleep(800);
     attacker.send({ type: "player_attack", payload: { skill: "normal", x: 5000, y: 5000 } });
     attacker.send({ type: "player_hit", payload: { targetId: "char_peace", damage: 30 } });
     const rejected = await attacker.waitFor(
