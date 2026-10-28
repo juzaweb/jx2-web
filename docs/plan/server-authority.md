@@ -106,9 +106,9 @@ portals, quest claim.
    learned and levelled (`skillUsable` + `skill.weapon === player.weaponType`),
    derive attack cadence from attack speed, apply self heal/buff effects on the
    server, record `lastCast` / `lastSwing`.
-2. `handleEnemyHit`: normal attacks recompute with `computeDamage(derived, enemy)`,
-   enforce melee reach and a recent swing, and ignore `payload.damage`; the skill
-   branch uses derived stats.
+2. `handleEnemyHit`: normal attacks recompute with `computeDamage(derived, enemy)`
+   scaled by `NORMAL_ATTACK_MULT`, enforce melee reach and a recent swing, and
+   ignore `payload.damage`; the skill branch uses derived stats.
 3. `handlePlayerHit`: recompute basic or skill damage from server stats and the
    target's derived defense; ignore `payload.damage`; keep flag/range/dodge/iframe.
 4. Track `player.buffs` and tick passive regen server-side with

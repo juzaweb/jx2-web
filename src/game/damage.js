@@ -17,7 +17,7 @@
  * @param {number} [options.defense] - Override defender defense
  * @param {number} [options.critRate] - Override attacker crit rate
  * @param {number} [options.critDamage] - Override attacker crit multiplier
- * @param {number} [options.skillMult=1] - Skill multiplier applied to mitigated damage
+ * @param {number} [options.skillMult=1] - Multiplier applied to the mitigated damage: a skill's `mult`, or `NORMAL_ATTACK_MULT` for a plain swing
  * @param {number} [options.variance=0.1] - Variance fraction (e.g. 0.1 for ±10%, 0 to disable)
  * @param {number} [options.critRoll] - Explicit roll for crit check (< critRate)
  * @param {number} [options.varianceRoll] - Explicit roll for variance ([0, 1])

@@ -55,7 +55,11 @@ the area through `splashVictims` when the hit lands — the same shared path La 
 Quyền uses, so nothing extra is needed client-side beyond the ring that marks it.
 
 The art is cast from the hotbar like any other technique; the plain attack
-(`performAttack`, `MELEE_REACH` = 280 px) is unchanged.
+(`performAttack`, `MELEE_REACH` = 280 px) still reaches the same 280 px, but it
+now lands softer: its damage is scaled by `NORMAL_ATTACK_MULT` (0.65 in
+`src/game/combatConfig.js`) so a free, cooldown-less swing stays filler rather
+than out-damaging every studied skill. Monster bites are untouched — they roll
+their own damage in `tickBites`.
 
 ## 3. Learning from books
 

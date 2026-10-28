@@ -27,6 +27,7 @@ import {
   skillUsable
 } from "../../../src/game/skills.js";
 import { HIT_WINDOW_MS, consumeCastHit, splashMultiplier } from "../../../src/game/combatRules.js";
+import { NORMAL_ATTACK_MULT } from "../../../src/game/combatConfig.js";
 import { computeDamage } from "../../../src/game/damage.js";
 import { computeSkillDamage } from "../../../src/game/skillDamage.js";
 
@@ -192,7 +193,10 @@ export function resolveSkillHit(
   return {
     skill: null,
     attackerStats,
-    damage: computeDamage(attackerStats, { defense: defenderDefense }, random).damage
+    // A free swing lands softer than a studied art (see NORMAL_ATTACK_MULT).
+    damage: computeDamage(attackerStats, { defense: defenderDefense }, random, {
+      skillMult: NORMAL_ATTACK_MULT
+    }).damage
   };
 }
 

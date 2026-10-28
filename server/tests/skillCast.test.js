@@ -11,6 +11,7 @@ import {
   upgradeRejection
 } from "../src/game/skillCast.js";
 import { MAX_SKILL_LEVEL, characterLevelForSkillLevel, skillById } from "../../src/game/skills.js";
+import { NORMAL_ATTACK_MULT } from "../../src/game/combatConfig.js";
 
 /** A server player object with just the fields the cast rules read. */
 const player = (overrides = {}) => ({
@@ -111,6 +112,16 @@ describe("server skill cast rules", () => {
     const stats = { attack: 100 };
     assert.ok(resolveSkillHit(attacker, stats, 10, null, 1100, () => 0.99));
     assert.equal(resolveSkillHit(attacker, stats, 10, null, 1200, Math.random), null);
+  });
+
+  it("lands a plain swing softer than a studied art", () => {
+    const attacker = player({ lastSwing: { at: 1000, used: false } });
+    const stats = { attack: 100 };
+    // 0.5 is above the default crit rate and sits exactly in the middle of the
+    // variance roll, so the cleaned-up hit is (attack - defence) * mult.
+    const hit = resolveSkillHit(attacker, stats, 10, null, 1100, () => 0.5);
+    assert.equal(hit.damage, Math.round((100 - 10) * NORMAL_ATTACK_MULT));
+    assert.ok(hit.damage < 100 - 10, "a free swing no longer deals the full attack-minus-defence");
   });
 
   it("deals a fraction of the primary damage on splash", () => {

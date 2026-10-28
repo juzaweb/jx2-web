@@ -23,3 +23,16 @@ export const BASE_CRIT_DAMAGE = 1.5;
 export const ATTACK_INTERVAL_MS = 600;
 /** Attack-speed multiplier: 1 = base cadence, 1.5 = 50% faster. */
 export const BASE_ATTACK_SPEED = 1;
+/**
+ * Damage multiplier applied to a plain swing (the no-skill branch of
+ * `resolveSkillHit`).
+ *
+ * A swing costs no MP and has no cooldown, so at the full `attack - defence` it
+ * out-damaged every weapon art on sustained hits and none of the studied skills
+ * were worth pressing. Scaling only the swing — never `BASE_ATTACK`, which the
+ * skills share and which would therefore move both sides by the same factor —
+ * keeps the swing as reliable filler while a skill's own `mult` (1.1 to 2.4,
+ * further x1.9 at skill level 10) decides the burst. Monster bites do not use
+ * this: they roll their own damage in `tickBites`.
+ */
+export const NORMAL_ATTACK_MULT = 0.65;
