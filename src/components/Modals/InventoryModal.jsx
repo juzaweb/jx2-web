@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   INVENTORY_GRID_SIZE,
-  splitSilver
+  splitCurrency
 } from "../../game/items.js";
 import {
   EQUIPMENT_SLOTS,
@@ -58,7 +58,7 @@ export function InventoryModal({
     100,
     Math.round((carry.used / carry.total) * 100)
   );
-  const treasury = splitSilver(coins);
+  const treasury = splitCurrency(coins);
 
   const positionTooltip = (clientX, clientY, el) => {
     const width = el?.offsetWidth ?? 210;

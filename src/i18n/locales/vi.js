@@ -129,7 +129,7 @@ export default {
     combat: "Chiến đấu & Tương tác: Nhấn [F] khi lại gần NPC để nói chuyện. Dùng nút Tấn công trên thanh dưới hoặc mobile.",
     skill: "Chiêu thức: Mở bảng Võ Công [F5], kéo chiêu thả vào các ô số 1-9 trên thanh dưới để gán. Nhấn phím số tương ứng để thi triển về phía con trỏ chuột hoặc mục tiêu gần nhất. Chuột phải vào ô để gỡ chiêu.",
     potions: "Dược phẩm cấp tốc:\n• Phím 1: Uống Kim Sáng Dược (+35 HP).\n• Phím 2: Uống Đại Hoàn Đan (+25 MP).\n• Phím 3: Uống Nữ Nhi Hồng (+50 HP & +30 MP).",
-    loot: "Túi đồ & Tiền bạc: Hạ gục Sói Xám để nhận kinh nghiệm, bạc và nhặt túi ngọc phát sáng.",
+    loot: "Túi đồ & Tiền đồng: Hạ gục Sói Xám để nhận kinh nghiệm, đồng và nhặt túi ngọc phát sáng. 100 đồng = 1 bạc.",
     save: "Lưu tiến trình: Hệ thống tự động lưu mỗi 15 giây.",
     map: "Bản đồ: Nhấn Tab để phóng to minimap gấp 5 lần, nhấn M để mở bản đồ toàn thành Biện Kinh.",
     pause: "Tạm dừng: Nhấn Esc hoặc mở bảng Hướng Dẫn để tạm dừng game.",

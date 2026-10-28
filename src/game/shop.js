@@ -1,8 +1,9 @@
 /**
  * Herb-shop stock shared by the Phaser scene, the React shop modal and the
- * server. Prices are expressed in bạc (silver) and are authoritative on the
- * server: the client only uses them to render the stock and disable buttons it
- * clearly cannot afford. Every purchase round-trips through the server.
+ * server. Prices are raw ledger amounts, i.e. đồng (the same base unit kill
+ * payouts use), and are authoritative on the server: the client only uses them
+ * to render the stock and disable buttons it clearly cannot afford. Every
+ * purchase round-trips through the server.
  */
 
 /** Maximum units of one item a single purchase may buy. */

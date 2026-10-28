@@ -7,7 +7,7 @@ import { MONSTER_WEAPON_DROPS } from "../../src/game/enemyCatalog.js";
 test("Kill reward suite", async (t) => {
   const enemy = { id: 2, x: 1110.4, y: 589.6, hp: 0, maxHp: 45, isDead: true };
 
-  await t.test("attributes the kill and pays the shared EXP and bạc range", () => {
+  await t.test("attributes the kill and pays the shared EXP and coin range", () => {
     const reward = rollEnemyReward("usr_hero", enemy, () => 0);
 
     assert.equal(reward.enemyId, 2);
@@ -25,7 +25,7 @@ test("Kill reward suite", async (t) => {
     assert.equal(high.coins, KILL_REWARD.coinsMax);
   });
 
-  await t.test("pays EXP and bạc, plus optional book/weapon loot, inside the documented ranges", () => {
+  await t.test("pays EXP and coins (đồng), plus optional book/weapon loot, inside the documented ranges", () => {
     for (let i = 0; i < 25; i++) {
       const reward = rollEnemyReward("usr_hero", enemy);
 

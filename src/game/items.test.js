@@ -6,7 +6,7 @@ import {
   EQUIPMENT_ITEMS,
   INVENTORY_GRID_SIZE,
   STARTER_ITEMS,
-  splitSilver,
+  splitCurrency,
   defaultQuantities,
   applyQuantities,
   setQuantities,
@@ -75,11 +75,15 @@ describe("item catalog", () => {
     expect(empty).toEqual({ used: 0, total: INVENTORY_GRID_SIZE });
   });
 
-  it("splits a silver balance into gold, silver and copper", () => {
-    expect(splitSilver(0)).toEqual({ gold: 0, silver: 0, copper: 0 });
-    expect(splitSilver(250)).toEqual({ gold: 2, silver: 50, copper: 0 });
-    expect(splitSilver(-5)).toEqual({ gold: 0, silver: 0, copper: 0 });
-    expect(splitSilver(Number.NaN)).toEqual({ gold: 0, silver: 0, copper: 0 });
+  it("splits a đồng balance into vàng, bạc and đồng", () => {
+    expect(splitCurrency(0)).toEqual({ gold: 0, silver: 0, copper: 0 });
+    // Base unit is đồng: 100 đồng = 1 bạc, 100 bạc = 1 vàng.
+    expect(splitCurrency(250)).toEqual({ gold: 0, silver: 2, copper: 50 });
+    expect(splitCurrency(12345)).toEqual({ gold: 1, silver: 23, copper: 45 });
+    expect(splitCurrency(100)).toEqual({ gold: 0, silver: 1, copper: 0 });
+    expect(splitCurrency(10000)).toEqual({ gold: 1, silver: 0, copper: 0 });
+    expect(splitCurrency(-5)).toEqual({ gold: 0, silver: 0, copper: 0 });
+    expect(splitCurrency(Number.NaN)).toEqual({ gold: 0, silver: 0, copper: 0 });
   });
 });
 

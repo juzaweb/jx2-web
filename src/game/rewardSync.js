@@ -39,7 +39,7 @@ export function parseEnemyReward(payload = {}) {
   const coins = toCount(payload.coins);
   if (exp === null || coins === null) return null;
 
-  // Kills pay EXP + bạc only: the reward object stays item-free so a forged loot
+  // Kills pay EXP + đồng only: the reward object stays item-free so a forged loot
   // payload can never be replayed into the bag.
   const reward = {
     enemyId: payload.enemyId,

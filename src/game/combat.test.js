@@ -372,6 +372,20 @@ describe("CombatSystem kill rewards", () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
+  it("announces the kill payout in đồng", () => {
+    const { combat, ui } = makeCombat({ isConnected: true, playerId: "usr_hero" });
+
+    combat.applyServerReward(serverReward({ coins: 7 }));
+
+    expect(ui.addLog).toHaveBeenCalledWith(expect.stringContaining("+7 đồng"));
+    expect(combat.showFloatText).toHaveBeenCalledWith(
+      1110,
+      565,
+      expect.stringContaining("+7 đồng"),
+      "#f3d17f"
+    );
+  });
+
   it("stays silent for a bystander's kill", () => {
     const { combat, player, onStateChange } = makeCombat({ isConnected: true, playerId: "usr_khac" });
 

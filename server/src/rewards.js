@@ -57,8 +57,8 @@ export const rollWeaponDrop = (monsterId, rng = Math.random) => {
 };
 
 /**
- * Roll the reward for a defeated enemy. Kills pay EXP, bạc and, occasionally, a
- * skill book and/or a weapon.
+ * Roll the reward for a defeated enemy. Kills pay EXP, coins (counted in đồng,
+ * the ledger base unit) and, occasionally, a skill book and/or a weapon.
  * @param {string} attackerId - id of the player whose hit landed the killing blow
  * @param {{id:number, mapId?:string, monsterId?:string, x:number, y:number}} enemy
  * @param {Function|number} [rng=Math.random]

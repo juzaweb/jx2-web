@@ -848,8 +848,12 @@ export class CombatSystem {
 
     if (!killedByMe) return;
 
-    this.ui.addLog(`Đánh bại ${reward.name || "quái vật"}! +${reward.exp} EXP`);
-    this.showFloatText(x, y - 25, `+${reward.exp} EXP`, "#f3d17f");
+    // Kill money is counted in đồng (100 đồng = 1 bạc), so the payout reads as a
+    // plain đồng amount instead of a fraction of a bạc.
+    this.ui.addLog(
+      `Đánh bại ${reward.name || "quái vật"}! +${reward.exp} EXP +${reward.coins} đồng`
+    );
+    this.showFloatText(x, y - 25, `+${reward.exp} EXP  +${reward.coins} đồng`, "#f3d17f");
   }
 
   /**

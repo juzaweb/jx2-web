@@ -131,7 +131,7 @@ export default {
     combat: "Combat & Interaction: Press [F] near an NPC to talk. Use the Attack button on the dock or mobile.",
     skill: "Skills: Open the Martial Arts panel [F5] and drag a skill onto hotbar slots 1-9. Press the matching number key to cast towards the cursor or nearest enemy. Right-click a slot to clear it.",
     potions: "Quick potions:\n• Key 1: Golden Radiance Elixir (+35 HP).\n• Key 2: Great Return Pill (+25 MP).\n• Key 3: Daughter's Red Wine (+50 HP & +30 MP).",
-    loot: "Bag & money: Defeat Grey Wolves to gain experience, silver, and glowing jade pouches to pick up.",
+    loot: "Bag & money: Defeat Grey Wolves to gain experience, copper (100 copper = 1 silver), and glowing jade pouches to pick up.",
     save: "Saving: The system auto-saves every 15 seconds.",
     map: "Map: Press Tab to enlarge the minimap 5x, press M to open the full Bianjing city map.",
     pause: "Pause: Press Esc or open the Guide to pause the game.",

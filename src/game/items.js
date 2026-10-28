@@ -205,21 +205,22 @@ export function isSkillBook(itemId) {
 }
 
 /**
- * Split a silver balance into the three display denominations.
- * The server keeps a single silver balance, so copper is always zero until a
- * copper ledger exists.
- * @param {number} silver
- * @returns {{ gold: number, silver: number, copper: number }}
+ * Split a balance into the three display denominations.
+ * The ledger stores a single integer amount counted in `đồng` (the base unit),
+ * so a kill payout of `coins: 3` is three đồng. Conversion is 100 đồng = 1 bạc
+ * and 100 bạc = 1 vàng (10.000 đồng).
+ * @param {number} amount balance in đồng
+ * @returns {{ gold: number, silver: number, copper: number }} `copper` holds đồng
  */
-export function splitSilver(silver) {
-  const amount =
-    typeof silver === "number" && Number.isFinite(silver)
-      ? Math.max(0, Math.floor(silver))
+export function splitCurrency(amount) {
+  const total =
+    typeof amount === "number" && Number.isFinite(amount)
+      ? Math.max(0, Math.floor(amount))
       : 0;
   return {
-    gold: Math.floor(amount / 100),
-    silver: amount % 100,
-    copper: 0
+    gold: Math.floor(total / 10000),
+    silver: Math.floor(total / 100) % 100,
+    copper: total % 100
   };
 }
 
@@ -503,7 +504,7 @@ export function consumeQuantity(id, amount = 1) {
 /**
  * Kill-reward tuning shared with the server, which rolls the reward from its own
  * authoritative enemy health (see server/src/rewards.js). Kills pay EXP and
- * bạc only: no loot table exists, so nothing is ever dropped on the ground.
+ * đồng only: no loot table exists, so nothing is ever dropped on the ground.
  */
 export const KILL_REWARD = {
   exp: 35,
