@@ -115,7 +115,7 @@ export function upgradeRejection(skill, player) {
   if (!skillLearned(skill, player?.learnedSkills)) return { reason: "not_learned" };
 
   const current = skillLevelOf(player?.skillLevels, skill.id);
-  const cost = skillUpgradeCost(current);
+  const cost = skillUpgradeCost(current, skill);
   if (!cost) return { reason: "max_level", level: current };
 
   // Every rank demands a higher character level than the previous one, so the

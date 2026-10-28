@@ -15,6 +15,7 @@
  * both the quoted bạc figure and its đồng equivalent.
  */
 import { toLedgerDong } from "../currency.js";
+import { nextExpForLevel } from "../progression.js";
 
 /** Highest level a skill can reach. */
 export const MAX_SKILL_LEVEL = 10;
@@ -40,6 +41,26 @@ export const SKILL_UPGRADE_COINS_FACTOR = 20;
 
 /** EXP charged for a target level: `factor * targetLevel²` (30/120/…/3.000). */
 export const SKILL_UPGRADE_EXP_FACTOR = 30;
+
+/**
+ * Unlock level that pays list price. Deliberately the same tier as
+ * {@link MIN_CHARACTER_LEVEL_TO_LEARN}: a book cannot be studied below it anyway,
+ * so the cheapest arts priced here are the cheapest arts obtainable.
+ */
+export const SKILL_PRICE_UNLOCK_BASE = MIN_CHARACTER_LEVEL_TO_LEARN;
+
+/** Unlock levels spanned between the base tier and the most expensive art. */
+export const SKILL_PRICE_UNLOCK_SPAN = 40;
+
+/** Surcharge of an art at the far end of the span (250 = ×250 list price). */
+export const SKILL_PRICE_UNLOCK_MAX_FACTOR = 250;
+
+/**
+ * Share of a level's EXP pool one skill step may cost. The remaining tenth is
+ * headroom: a hero who holds a full bar levels up on the next kill, so a price
+ * at 100% of the pool could never actually be paid.
+ */
+export const SKILL_EXP_POOL_SHARE = 0.9;
 
 const toInt = (value) => {
   const n = Number(value);
@@ -171,41 +192,108 @@ export function characterLevelForSkillLevel(skill, skillLevel) {
 }
 
 /**
+ * Price multiplier of one art, driven by the character level its book unlocks at.
+ *
+ * `depth` normalises the unlock level into 0..1 across
+ * {@link SKILL_PRICE_UNLOCK_BASE}..`base + span`, and the multiplier is
+ * `1 + (MAX − 1) · depth³`: the shallow arts pay list price, a rank-1 book at
+ * unlock 18 costs ~3x, at 26 ~17x, at 34 ~55x and the level-50 ultimate 250x (its
+ * rank 2 therefore costs 20.000 bạc = 200 vàng). Cubing keeps the mid tier
+ * affordable while the late arts become genuinely expensive; anything past the
+ * span is capped at the maximum so a future art cannot accidentally price itself
+ * out of reach.
+ * @param {{ unlockLevel?: number }|number|null|undefined} [skill] skill entry, or its unlockLevel
+ * @returns {number} multiplier applied to the quoted bạc price (1 for shallow arts)
+ */
+export function skillUnlockPriceFactor(skill) {
+  const unlock = Number(typeof skill === "object" ? skill?.unlockLevel : skill);
+  const catalogLevel = Number.isFinite(unlock) && unlock > 0 ? Math.floor(unlock) : 1;
+  const aboveBase = Math.max(SKILL_PRICE_UNLOCK_BASE, catalogLevel) - SKILL_PRICE_UNLOCK_BASE;
+  const depth = Math.min(1, aboveBase / SKILL_PRICE_UNLOCK_SPAN);
+  return 1 + (SKILL_PRICE_UNLOCK_MAX_FACTOR - 1) * depth ** 3;
+}
+
+/**
+ * EXP one price step charges, capped by the pool the rank's own character level
+ * allows.
+ *
+ * EXP is progress inside a level: the ledger never holds a full bar (earning the
+ * last point levels the hero up), so a price of the full pool could never be
+ * paid and would dead-lock the rank. The cap therefore keeps
+ * {@link SKILL_EXP_POOL_SHARE} of the pool, which is enough headroom to pay at
+ * the exact character level the rank becomes available — including the level-50
+ * ultimate, whose last ranks would otherwise quote several times that pool.
+ * @param {{ unlockLevel?: number }|number|null|undefined} skill the art being bought
+ * @param {number} skillLevel rank being bought (1 for a freshly studied book)
+ * @param {number} rawExp unlock-scaled EXP quote
+ * @returns {number} EXP to charge, never above the level's payable pool
+ */
+function cappedSkillExp(skill, skillLevel, rawExp) {
+  const pool = nextExpForLevel(characterLevelForSkillLevel(skill, skillLevel));
+  return Math.min(rawExp, Math.floor(pool * SKILL_EXP_POOL_SHARE));
+}
+
+/**
+ * Round a fractional bạc quote up to whole bạc and derive the đồng the ledger
+ * debits. Rounding up first means a surcharge can never round a price *down*, and
+ * it keeps `coinsDong` exactly `coinsBac × 100` for every art.
+ * @param {number} rawBac fractional price quoted in bạc
+ * @returns {{ coinsBac: number, coinsDong: number }}
+ */
+function bacQuote(rawBac) {
+  const coinsBac = Math.ceil(rawBac);
+  return { coinsBac, coinsDong: toLedgerDong(coinsBac) };
+}
+
+/**
  * Price of the next rank, or null when the art is already at
  * {@link MAX_SKILL_LEVEL}.
  *
  * The price grows with the square of the level being bought, so the high ranks
  * cost a multiple of the first ones: 80/120 bạc/EXP for rank 2, 2.000/3.000 for
- * rank 10.
+ * rank 10 — before the art's own {@link skillUnlockPriceFactor} surcharge. A
+ * starter art therefore pays those figures as-is, while the level-50 ultimate
+ * pays 250x for every rank (rank 2 = 20.000 bạc = 200 vàng).
  *
  * Two money fields are returned because the price is *quoted* in bạc while the
  * ledger is held in đồng: `coinsBac` is what the panel shows, `coinsDong` is
  * what the server debits and what {@link skillFundsShortfall} checks.
+ *
+ * Both currencies are rounded up to whole units, so a fractional surcharge can
+ * never round a price down. EXP then goes through {@link cappedSkillExp}, so it
+ * never exceeds what a hero at that rank's required level can actually hold.
  * @param {number} currentLevel
+ * @param {{ unlockLevel?: number }|number|null|undefined} [skill] the art being levelled, or its unlockLevel
  * @returns {{ coinsBac: number, coinsDong: number, exp: number }|null}
  */
-export function skillUpgradeCost(currentLevel) {
+export function skillUpgradeCost(currentLevel, skill) {
   const level = normalizeSkillLevel(currentLevel);
   if (level >= MAX_SKILL_LEVEL) return null;
   const target = level + 1;
-  const coinsBac = SKILL_UPGRADE_COINS_FACTOR * target * target;
+  const factor = skillUnlockPriceFactor(skill);
+  const exp = Math.ceil(SKILL_UPGRADE_EXP_FACTOR * target * target * factor);
   return {
-    coinsBac,
-    coinsDong: toLedgerDong(coinsBac),
-    exp: SKILL_UPGRADE_EXP_FACTOR * target * target
+    ...bacQuote(SKILL_UPGRADE_COINS_FACTOR * target * target * factor),
+    exp: cappedSkillExp(skill, target, exp)
   };
 }
 
 /**
- * Price of studying a book the first time (buying rank 1, the cheapest rank in
- * the curve).
+ * Price of studying a book the first time (buying rank 1).
+ *
+ * Rank 1 sits at the base of the same rank curve, so it carries the art's own
+ * {@link skillUnlockPriceFactor} for both coins and EXP: a starter book costs
+ * 20 bạc / 30 EXP while the level-50 ultimate costs 5.000 bạc (50 vàng) / 7.500
+ * EXP. The EXP is capped by {@link cappedSkillExp} like every other rank.
+ * @param {{ unlockLevel?: number }|number|null|undefined} [skill] the art the book teaches, or its unlockLevel
  * @returns {{ coinsBac: number, coinsDong: number, exp: number }}
  */
-export function skillLearnCost() {
+export function skillLearnCost(skill) {
+  const factor = skillUnlockPriceFactor(skill);
+  const exp = Math.ceil(SKILL_UPGRADE_EXP_FACTOR * factor);
   return {
-    coinsBac: SKILL_UPGRADE_COINS_FACTOR,
-    coinsDong: toLedgerDong(SKILL_UPGRADE_COINS_FACTOR),
-    exp: SKILL_UPGRADE_EXP_FACTOR
+    ...bacQuote(SKILL_UPGRADE_COINS_FACTOR * factor),
+    exp: cappedSkillExp(skill, 1, exp)
   };
 }
 

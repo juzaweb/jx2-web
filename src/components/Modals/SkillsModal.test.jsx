@@ -164,7 +164,41 @@ describe("SkillsModal Component", () => {
     expect(markup).toContain('class="skills-upgrade-btn"');
     expect(markup).not.toContain('class="skills-upgrade-btn" disabled');
     expect(markup).toContain("Nâng cấp — Cấp 6");
-    expect(markup).toContain("720 bạc");
+    // 720 bạc is quoted as 7 vàng 20 bạc once the price reaches a vàng.
+    expect(markup).toContain("7 vàng 20 bạc · 1080 EXP");
+  });
+
+  it("quotes a deep art's upgrade in vàng", () => {
+    const deepSkill = {
+      id: "test_skill_deep",
+      weapon: "bao-tay",
+      slot: 0,
+      glyph: "如",
+      nameKey: "skills.thieuLam.nhuLaiThanChuong.name",
+      descKey: "skills.thieuLam.nhuLaiThanChuong.desc",
+      unlockLevel: 50,
+      mp: 30,
+      cooldown: 20000,
+      target: "enemy",
+      range: 300,
+      mult: 3
+    };
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={[deepSkill]}
+          level={54}
+          learnedSkills={["test_skill_deep"]}
+          skillLevels={{ test_skill_deep: 1 }}
+          coins={2000000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+
+    // Rank 2 of the level-50 art costs 20 * 2² * 250 bạc = 200 vàng and 30.000 EXP.
+    expect(markup).toContain("200 vàng · 30000 EXP");
   });
 
   it("blocks an upgrade the hero's character level does not allow", () => {

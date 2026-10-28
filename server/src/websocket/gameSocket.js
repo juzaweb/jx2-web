@@ -1283,7 +1283,7 @@ export class GameSocketManager {
 
     // Studying costs silver and EXP on top of the book. Funds are checked before
     // the book is consumed, so a refused study never destroys it.
-    const cost = skillLearnCost();
+    const cost = skillLearnCost(skill);
     const shortfall = skillFundsShortfall(cost, player.progress);
     if (shortfall) {
       return reject(shortfall.reason, {
@@ -1347,7 +1347,7 @@ export class GameSocketManager {
     }
 
     const current = skillLevelOf(player.skillLevels, skill.id);
-    const cost = skillUpgradeCost(current);
+    const cost = skillUpgradeCost(current, skill);
     if (!cost) return reject("max_level", { level: current });
 
     // Raise the stored level before debiting, so a crash between the two writes

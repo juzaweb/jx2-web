@@ -51,6 +51,10 @@ export {
   SKILL_LEVELS_PER_CHARACTER_LEVEL,
   SKILL_UPGRADE_COINS_FACTOR,
   SKILL_UPGRADE_EXP_FACTOR,
+  SKILL_PRICE_UNLOCK_BASE,
+  SKILL_PRICE_UNLOCK_SPAN,
+  SKILL_PRICE_UNLOCK_MAX_FACTOR,
+  SKILL_EXP_POOL_SHARE,
   normalizeSkillLevel,
   skillLevelOf,
   skillLevelScale,
@@ -58,6 +62,7 @@ export {
   characterLevelForSkillLevel,
   scaleSkillEffect,
   skillAtLevel,
+  skillUnlockPriceFactor,
   skillUpgradeCost,
   skillLearnCost,
   skillFundsShortfall

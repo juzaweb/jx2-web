@@ -3,6 +3,7 @@ import {
   BAC_PER_VANG,
   DONG_PER_BAC,
   DONG_PER_VANG,
+  splitBac,
   splitCurrency,
   toLedgerDong
 } from "./currency.js";
@@ -37,5 +38,14 @@ describe("currency", () => {
     expect(splitCurrency(10000)).toEqual({ gold: 1, silver: 0, copper: 0 });
     expect(splitCurrency(-5)).toEqual({ gold: 0, silver: 0, copper: 0 });
     expect(splitCurrency(Number.NaN)).toEqual({ gold: 0, silver: 0, copper: 0 });
+  });
+
+  it("splits a bạc-quoted price into vàng plus the bạc remainder", () => {
+    expect(splitBac(0)).toEqual({ gold: 0, silver: 0 });
+    expect(splitBac(99)).toEqual({ gold: 0, silver: 99 });
+    expect(splitBac(100)).toEqual({ gold: 1, silver: 0 });
+    expect(splitBac(4383)).toEqual({ gold: 43, silver: 83 });
+    expect(splitBac(-5)).toEqual({ gold: 0, silver: 0 });
+    expect(splitBac(undefined)).toEqual({ gold: 0, silver: 0 });
   });
 });

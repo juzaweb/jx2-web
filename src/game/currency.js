@@ -50,3 +50,16 @@ export function splitCurrency(amountDong) {
     copper: total % DONG_PER_BAC
   };
 }
+
+/**
+ * Split a *bạc-quoted price* into the coins worth showing: whole vàng first, then
+ * the bạc remainder. A quote is always a whole number of bạc, so there is never
+ * a đồng part; the split reuses {@link splitCurrency} on the đồng equivalent so
+ * the 100 bạc = 1 vàng ratio lives in exactly one place.
+ * @param {number} amountBac price quoted in bạc
+ * @returns {{ gold: number, silver: number }}
+ */
+export function splitBac(amountBac) {
+  const { gold, silver } = splitCurrency(toLedgerDong(amountBac));
+  return { gold, silver };
+}

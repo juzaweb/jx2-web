@@ -12,6 +12,7 @@ import {
 } from "../../game/skills.js";
 import { normalizeWeaponType, WEAPON_LABEL_KEYS } from "../../game/weapons.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
+import { moneyLabel } from "../../game/moneyLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
 import { NORMAL_ATTACK_MULT } from "../../game/combatConfig.js";
 import { regenPerSecond } from "../../game/passiveRegen.js";
@@ -80,7 +81,11 @@ export function SkillsModal({
   /** The entry as it actually behaves at `selectedLevel` (scaled damage/effects). */
   const selectedAtLevel = selectedSkill ? skillAtLevel(selectedSkill, selectedLevel) : null;
   /** Price of the next level, or null when the art is already maxed. */
-  const upgradeCost = selectedUnlocked ? skillUpgradeCost(selectedLevel) : null;
+  const upgradeCost = selectedUnlocked
+    ? skillUpgradeCost(selectedLevel, selectedSkill)
+    : null;
+  /** Price as the player reads it: vàng once it reaches one, bạc below that. */
+  const upgradePrice = upgradeCost ? moneyLabel(upgradeCost.coinsBac, t) : "";
   const upgradeShortfall = upgradeCost
     ? skillFundsShortfall(upgradeCost, { coins, exp })
     : null;
@@ -336,7 +341,7 @@ export function SkillsModal({
                           ? t("skills.levelShort", { level: nextLevelRequired })
                           : upgradeShortfall
                             ? t("skills.upgradeShort", {
-                                coins: upgradeCost.coinsBac,
+                                price: upgradePrice,
                                 exp: upgradeCost.exp
                               })
                             : t("skills.upgradeHint")
@@ -348,7 +353,7 @@ export function SkillsModal({
                       </span>
                       <span className="skills-upgrade-cost">
                         {t("skills.upgradeCost", {
-                          coins: upgradeCost.coinsBac,
+                          price: upgradePrice,
                           exp: upgradeCost.exp
                         })}
                       </span>
