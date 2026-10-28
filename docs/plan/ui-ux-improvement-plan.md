@@ -14,7 +14,7 @@
 As the gameplay expands across weapon-based skill kits, inventory management, NPC shops, and mobile touch controls, several key UI/UX friction points diminish combat responsiveness and player clarity:
 
 1. **Targeting & Enemy Combat Feedback:** Lack of an explicit target selection frame / overhead ring and target health HUD, causing ambiguity during target selection and mob combat.
-2. **Skill Cooldown & Resource Readiness:** Cooldown timers render as plain text numbers without radial conic sweep overlays or distinct visual states when MP/Stamina is insufficient for skill execution.
+2. **Skill Cooldown & Resource Readiness:** Skill cooldown timers in `HotbarDock` render as plain text numbers without radial conic sweep overlays or distinct visual states when MP/Stamina is insufficient for skill execution.
 3. **Mobile & Touch Ergonomics:** Spatial collision between the virtual joystick, chat panel, and hotbar dock on low-resolution mobile viewports (<720px width).
 4. **Shortcut Discoverability:** Essential keyboard hotkeys (`F3`, `F4`, `F5`, `Tab`, `M`) rely on tooltips or help modals rather than persistent shortcut badge overlays on HUD controls.
 5. **Inventory Comparative Tooltips:** Lack of side-by-side equipment comparison tooltips when inspecting inventory items against equipped gear.
@@ -30,7 +30,7 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 1. **Launch & Entry Flow:** `LoginModal` -> `CharacterSelectModal` -> Game World. Managed smoothly in `src/App.jsx` with guest session handling, i18n support (VI/EN), and mobile orientation prompts.
 2. **HUD Overlay:** `PlayerVitals` top-left displays Level, EXP, HP, MP, Stamina, and Martial Aura. `MinimapPanel` top-right shows radar canvas, quest tracker, subzone, and zoom/collapse controls.
 3. **Hotbar Dock:** `HotbarDock` bottom-center houses 9 mixed quick-slots (each holds a consumable item or a weapon skill), plus system tray buttons (`F3` Character, `F4` Inventory, `F5` Skills, Help, PK mode). Techniques are dragged from the `F5` skill tree onto a slot and cast with its number key; consumables are dragged from the bag.
-4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button and four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them). Two consumable buttons (`MobileItemPicker`) sit in their own column outside the fan and are empty until the player binds an item from the bag.
+4. **Mobile Controls:** `MobileControls` displays a virtual joystick on the bottom-left and a radial arc on the bottom-right with an Attack button and four configurable skill buttons (empty by default, shown as `+`; `MobileSkillPicker` assigns them). Two consumable buttons (`MobileItemPicker`) sit in their own column outside the fan.
 5. **Modals & Dialogs:** `CharacterModal`, `InventoryModal`, `SkillsModal`, `CityMapModal`, `ShopModal`, `MobileSkillPicker`, `MobileItemPicker`. Pointer drag support is provided via `useDraggablePanel.js`, `dragItem.js`, and `pointerItemDrag.js` (skills and items share the same drag pipeline).
 
 ---
@@ -76,16 +76,16 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 ---
 
 ### [P1] Mobile Joystick and Chat Panel Collision Prevention & Touch Hitbox Scaling
-- **Status:** Implemented
+- **Status:** Done
 - **Confidence:** High
 - **Type:** Observed issue
 - **Evidence:** `src/components/MobileControls.jsx`, `src/components/HUD/ChatPanel.jsx`, `src/index.css` (`:root` touch tokens, `@media (pointer: coarse), (max-height: 500px)`)
-- **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlaps with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
+- **Player Impact:** On mobile screens or narrow viewports (<768px), the virtual joystick base on the bottom-left overlapped with the expanded chat panel, causing accidental chat opens or stuck movement gestures.
 - **Recommendation:**
   1. Automatically minimize `ChatPanel` into a compact icon tab when touch mobile controls are active.
   2. Increase touch target hitboxes for `MobileControls` arc buttons to a minimum of 48x48px with 8px padding gaps.
   3. Ensure virtual joystick touch capture zone is isolated from hotbar dock boundaries.
-- **What shipped:** all control sizes are now layout tokens (`--mctrl-*` on `:root`, scaled by `--mctrl-scale` on short viewports), the chat panel is lifted above the joystick (`bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2)`), the numbered `1`–`9` bar is hidden on touch so the joystick has no dock to overlap, and the menu tray re-centres as icon-only 48×44 buttons between the two thumbs.
+- **What shipped:** control sizes are now layout tokens (`--mctrl-*` on `:root`, scaled by `--mctrl-scale` on short viewports), chat panel is lifted above the joystick (`bottom: calc(var(--mctrl-joy) + var(--mctrl-edge) * 2)`), the numbered `1`–`9` bar is hidden on touch so the joystick has no dock to overlap, and the menu tray re-centres as icon-only 48×44 buttons between the two thumbs.
 - **Acceptance criteria:**
   - [x] On mobile touch viewports, `ChatPanel` no longer overlaps the joystick.
   - [x] Skill arc buttons maintain minimum 48x48px touch boundaries without touch event overlap (56px skills, 48px potions, 74px attack).
