@@ -1,19 +1,19 @@
 # Game Feature Proposals
 
-- **Date:** 2025-05-18
-- **Project / engine:** React 18, Vite, Phaser 3 (Arcade Physics), Node.js / WebSocket server authority
+- **Date:** 2026-10-28
+- **Project / engine:** React 19, Vite 8, Phaser 3.90 (Arcade Physics), Node.js / WebSocket server authority
 - **Genre / target platform:** Browser-playable isometric 2.5D wuxia RPG (PC desktop & mobile web browser)
-- **Development stage:** Playable Alpha / Content Expansion (2 functional maps, weapon-kit skill architecture, server-authoritative combat)
+- **Development stage:** Playable Alpha / Content Expansion (2 functional maps: Biện Kinh & Đông Môn Thành, weapon-kit skill architecture, server-authoritative combat, persistent player DB)
 - **Audit scope:** `src/game/` (progression, equipment, items, skills, shop, combat, maps, worldManager), `src/components/` (HUD, Modals, MobileControls), `server/src/` (gameSocket, rewards, enemy loop), and `docs/`
-- **Limitations:** Live high-concurrency multiplayer latency (>200ms) was not benchmarked in real network conditions; art assets are constrained to programmatically generated vector graphics and existing sprite sheets.
+- **Limitations:** Live high-concurrency multiplayer latency (>200ms) under real network WAN conditions was not benchmarked; art assets are constrained to programmatically generated vector graphics and existing sprite sheets.
 
 ## Executive summary
 
 Giang Hồ is a React and Phaser 3 browser wuxia RPG inspired by classic Vietnamese martial arts MMORPGs (Võ Lâm Truyền Kỳ 2). The game features a solid technical foundation: 60FPS Arcade physics, server-authoritative movement/combat/rewards, bi-directional React-Phaser bridge, persistent storage, and two playable maps (Biện Kinh market town and Đông Môn Thành 270-monster hunting grounds).
 
 While core combat and navigation are functional, current playability faces four distinct design gaps:
-1. **Economic Sink & Upgrading Void:** Monsters pay silver and occasionally drop a skill book or a weapon, but silver is only spent on basic potions at Dược Sư; there is no gear-enhancement or material sink yet.
-2. **Combat Usability in Dense Camps:** Đông Môn Thành features 18 camps with 15 monsters each (270 total). Target selection lacks a visual lock indicator and range preview ring, leading to ambiguous target selection during dense fights.
+1. **Economic Sink & Upgrading Void:** Monsters pay silver and drop skill books/weapons, but silver is only spent on basic potions at Dược Sư; there is no gear-enhancement or material sink yet.
+2. **Combat Usability in Dense Camps:** Đông Môn Thành features 18 camps with 15 monsters each (270 total). Target selection lacks a dedicated target lock indicator and range preview ring during dense fights.
 3. **Weapon Kit Depth:** The sect system was replaced by weapon kits (sword / gloves / saber) with book-based learning (`docs/weapon-skills.md`), but each weapon has a single item and a small kit — expanding those kits and weapon sources is the current content gap.
 4. **Short-Term Goal Absence:** Aside from grinding monster camps for EXP, players lack structured daily objectives. The HUD minimap has a Quest Tracker stub (`MinimapPanel.jsx`), but no repeatable quest engine exists.
 
@@ -37,9 +37,9 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 | Priority | Feature | Target Player Value | Effort | Confidence |
 | --- | --- | --- | --- | --- |
-| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Converts silver (plus a new upgrade material) into stat growth (+1 to +10 gear), solving silver accumulation. | M | High |
+| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Converts silver and upgrade materials into stat growth (+1 to +10 gear), solving silver accumulation and deepening item chase. | M | High |
 | **P1** | **Target Selection & Visual Lock Indicator (Khóa Mục Tiêu)** | Renders visual target ring & range feedback in 270-monster camps, fixing targeting ambiguity on PC & mobile. | S | High |
-| **P1** | **Weapon Kit Expansion & Weapon Sources** | Deepens the implemented sword/gloves/saber kits and adds more weapon items (drops or a smith) so players can specialize. | M | High |
+| **P1** | **Weapon Kit Expansion & Weapon Sources** | Deepens the implemented sword/gloves/saber kits and adds higher-tier weapon items so players can specialize. | M | High |
 | **P2** | **Daily Bounty Quest System (Nhiệm Vụ Dã Tẩu)** | Reuses Minimap quest tracker UI to offer repeatable monster hunt contracts with silver and material rewards. | M | High |
 | **P2** | **Elite Monster Encounter (Trảm Tướng Đông Môn Thành)** | Adds an elite Boss spawn (Ma Giáo Trưởng Lao) in camp 18 to serve as a high-risk pinnacle test for level 25+ players. | S | Medium |
 
@@ -51,14 +51,14 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Gives silver coins a progression purpose beyond potions. Allows players to continuously upgrade equipped gear (`weapon`, `armor`, `helmet`, `accessory`), giving tangible power progression when facing high-level camps in Đông Môn Thành.
-- **Design summary:** Players visit a Blacksmith NPC or open an Enhancement tab in the equipment sheet. Inserting an equipped item costs silver coins and 1x an upgrade material (e.g. a new Huyễn Kim Thạch item). Enhancing increases item bonus stats (e.g. `attack +2` per rank) up to +10. Success rate starts at 100% (+1 to +3) and scales down to 40% (+10), with failure retaining the item but consuming materials.
-- **Core loop connection:** Monster kill -> Silver & upgrade material -> Blacksmith Enhancement -> Higher stats (`attack`, `defense`, `maxHp`) -> Able to farm higher-level camps.
+- **Player value:** Gives silver coins a progression purpose beyond potions. Allows players to continuously upgrade equipped gear (`weapon`, `armor`, `helmet`, `pants`), giving tangible power progression when facing high-level camps in Đông Môn Thành.
+- **Design summary:** Players visit a Blacksmith NPC or open an Enhancement tab in the equipment sheet. Inserting an equipped item costs silver coins and 1x upgrade material (Huyễn Kim Thạch). Enhancing increases item bonus stats (e.g. `attack +2` per rank for weapons, `defense +2` for armor) up to +10. Success rate starts at 100% (+1 to +3) and scales down to 40% (+10), with failure retaining the item but consuming materials.
+- **Core loop connection:** Monster kill -> Silver & material drop -> Blacksmith Enhancement -> Higher stats (`attack`, `defense`, `maxHp`) -> Able to farm higher-level camps.
 - **MVP scope:**
   - Enhance equipped items up to +6 with deterministic silver + material cost.
   - Server-authoritative enhancement validation (`server/src/websocket/gameSocket.js`).
   - Stat multiplier applied in `deriveEquipmentBonuses()` in `src/game/equipment.js`.
-  - Simple visual enhancement level indicator (`+1` .. `+6` badge) on equipment slots.
+  - Visual enhancement level indicator (`+1` .. `+6` badge) on equipment slots in `CharacterModal.jsx`.
 - **Optional extensions:**
   - Visual glowing aura / particle effect on character rig for +7 and above weapons (`heroRigView.js`).
   - Protection talismans to prevent downgrades on higher tiers (+7 to +10).
@@ -71,8 +71,8 @@ The implemented gameplay loop follows a classic ARPG structure:
   - [ ] Server validates silver and material balance before confirming enhancement.
   - [ ] Failed attempts deduct materials without destroying or corrupting equipped item.
 - **Validation plan:** Unit test enhancement logic in `equipment.test.js`; integration test server websocket handler with mock silver/material quantities.
-- **Evidence:** There is no upgrade material in the item catalog today; the proposal would add one to `src/game/items.js` (and a drop or shop source) before it can be spent.
-- **Assumptions / open questions:** Enhancement values are flat additions to `bonuses` object.
+- **Evidence:** `src/game/items.js` lists equipment items (`EQUIPMENT_ITEMS`) and `src/game/equipment.js` derives bonuses via `deriveEquipmentBonuses()`. Silver is currently only spent at `NPC_DUOC` (`src/game/shop.js`).
+- **Assumptions / open questions:** Enhancement values are flat additions or percentage multipliers to `bonuses` object.
 
 ---
 
@@ -85,7 +85,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Core loop connection:** Improves combat precision and skill responsiveness during intense hunting sessions.
 - **MVP scope:**
   - Active target state stored in Phaser scene (`JiangHuScene.activeTarget`).
-  - Ground ring graphic rendered under active target in `src/game/healthBarView.js` or dedicated target indicator component.
+  - Ground ring graphic rendered under active target in `src/game/healthBarView.js` / target ring rendering.
   - Skill cast targets `activeTarget` if valid and alive; falls back to cursor or auto-proximity when no target is locked.
   - Pressing `Tab` or clicking empty ground selects nearest target or clears selection.
 - **Optional extensions:**
@@ -111,10 +111,10 @@ The implemented gameplay loop follows a classic ARPG structure:
 - **Confidence:** High
 - **Player value:** Lets a hero specialize by weapon (sword / gloves / saber) instead of a removed class, and gives every kit enough depth to keep progressing. Weapons already drop from `hac-y-sat-thu` (gloves) and `ma-giao-de-tu` (saber).
 - **Design summary:** Add more skills per kit and more weapon tiers per type. Keep the rules in `docs/weapon-skills.md`: `skill.weapon` must match the equipped weapon, non-starter skills are learned from books, and the server validates both.
-- **Core loop connection:** Farm monsters → books expand the current kit → better weapons from late camps → harder camps.
+- **Core loop connection:** Farm monsters → books expand the current kit → better weapons from late camps or smith → harder camps.
 - **MVP scope:**
-  - Author additional skills per weapon kit in `src/game/skills.js`, with books in `MONSTER_BOOK_DROPS`.
-  - Add second-tier weapons (and a weapon source beyond drops, e.g. a smith NPC) so loot keeps pace with leveling.
+  - Author additional skills per weapon kit in `src/game/skills/catalog/{baoTay,kiem,dao}.js`, with books in `MONSTER_BOOK_DROPS`.
+  - Add second-tier weapons (e.g. `kiem-huyen-thiet`, `bao-tay-ho-truoc`, `dao-tram-ma`) so loot keeps pace with leveling.
   - Add i18n strings (VI, EN, ZH) and icons for every new skill/weapon.
 - **Optional extensions:**
   - Damage-over-time server tick extension for the dao (Ngũ Độc-flavoured) kit.
@@ -196,7 +196,7 @@ The implemented gameplay loop follows a classic ARPG structure:
 High-value, well-understood features ready for immediate implementation:
 1. **Target Selection & Visual Lock Indicator [P1]:** Low risk, immediate combat clarity improvement.
 2. **Weapon Kit Expansion & Weapon Sources [P1]:** Deepens the implemented weapon/book system, documented in `docs/weapon-skills.md`.
-3. **Equipment Enhancement System [P1]:** Connects existing `huyen-kim-thach` drops and silver to character power progression.
+3. **Equipment Enhancement System [P1]:** Connects upgrade materials and silver to character power progression.
 
 ### Validate first
 Features requiring gameplay balance check or technical spike:
