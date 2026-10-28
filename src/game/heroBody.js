@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "12";
+const BODY_ASSET_VERSION = "13";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -24,7 +24,9 @@ export const HERO_BODY_TEXTURES = {
  * gender. A sheet listed here replaces the gender sheet while that weapon type
  * is worn, and it declares the extra slots it draws so the rig stops stacking
  * its vector weapon on top of the blade (see `bakedSlots`). Both genders ship
- * sword art; any other look keeps the plain sheet plus the vector weapon.
+ * sword art; any other look keeps the plain sheet plus the vector weapon. A
+ * weapon whose art holds no weapon at all ships a strike sheet only - see
+ * WEAPON_ATTACK_TEXTURES below.
  * Built by scripts/build_hero_body.py from docs/example/nv-camkiem.png (male) and
  * docs/example/nv-nu-camkiem.png (female).
  *
@@ -33,7 +35,7 @@ export const HERO_BODY_TEXTURES = {
  * height keeps the hero from shrinking when it draws a weapon. `frameWidth`
  * must match the PNG geometry produced by the build script.
  *
- * `attack` is the matching swing sheet: four frames per direction, the third of
+ * `attack` is the matching strike sheet: four frames per direction, the third of
  * which carries the slash arc. Its frames are wider still because the arc
  * reaches past the body, and it reuses the walk sheet's scale so the hero does
  * not change size mid-swing.
@@ -52,7 +54,9 @@ export const WEAPON_BODY_TEXTURES = {
         frameWidth: 192,
         frameHeight: 160,
         /** Frames per direction in the swing sheet. */
-        frames: 4
+        frames: 4,
+        /** Motions this art covers: a slash on cast, a slash on the normal attack. */
+        kinds: ["basic", "slash"]
       }
     },
     female: {
@@ -66,8 +70,34 @@ export const WEAPON_BODY_TEXTURES = {
         url: `/hero-body-female-sword-attack.png?v=${BODY_ASSET_VERSION}`,
         frameWidth: 192,
         frameHeight: 160,
-        frames: 4
+        frames: 4,
+        kinds: ["basic", "slash"]
       }
+    }
+  }
+};
+
+/**
+ * Strike sheets for weapons whose art ships without a walk counterpart, keyed
+ * by weapon type then gender. The bare-hand art holds no weapon, so the hero
+ * keeps the plain gender sheet (and its vector glove) while walking and only
+ * swaps to these four strike frames for the length of a blow. Its `kinds` list
+ * is therefore narrower than the sword's: the art is a punch/palm sequence, so
+ * it covers the normal attack and palm casts, but not a kick or a buff.
+ *
+ * Built by scripts/build_hero_body.py from docs/example/nv-chuong.png (male).
+ * The female palm art does not exist yet, so a female hero keeps the vector
+ * palm pose.
+ */
+export const WEAPON_ATTACK_TEXTURES = {
+  "bao-tay": {
+    male: {
+      key: "hero-body-male-fist-attack",
+      url: `/hero-body-male-fist-attack.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 128,
+      frameHeight: 160,
+      frames: 4,
+      kinds: ["basic", "shockwave"]
     }
   }
 };
@@ -218,6 +248,10 @@ const ROW_BY_DIRECTION = [0, 2, 2, 2, 3, 1, 1, 1];
  * @property {number} frameWidth
  * @property {number} frameHeight
  * @property {number} frames Frames per direction in the sheet
+ * @property {string[]} kinds Required: the motions the art was drawn for.
+ *   `"basic"` is the normal attack; the rest are skill cast kinds
+ *   (`"slash"`, `"kick"`, `"shockwave"`, `"aura"`). A sheet never plays for a
+ *   motion it does not list.
  */
 
 /**
@@ -245,13 +279,17 @@ export function weaponBodyTextureDef(gender, weaponType = null) {
 }
 
 /**
- * The swing sheet a gender and weapon type share, or null when the art has no
- * swing animation (the rig then keeps its vector arc).
+ * The strike sheet a gender and weapon type share, or null when the art has no
+ * strike animation (the rig then keeps its vector pose). A weapon may ship one
+ * with its walk sheet (the sword) or on its own (bare hands).
  * @param {"male"|"female"|string} gender
  * @param {string|null} [weaponType]
  * @returns {WeaponAttackSheet|null}
  */
 export function weaponAttackTextureDef(gender, weaponType = null) {
+  if (!weaponType) return null;
+  const standalone = WEAPON_ATTACK_TEXTURES[weaponType];
+  if (standalone) return standalone[normalizeGender(gender)] ?? null;
   return weaponBodyTextureDef(gender, weaponType)?.attack ?? null;
 }
 

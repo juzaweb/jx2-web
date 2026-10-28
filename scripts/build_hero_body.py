@@ -106,6 +106,18 @@ SOURCES = {
         "frame_w": 192,
         "scale_from": "hero-body-female-sword.png",
     },
+    "hero-body-male-fist-attack.png": {
+        # Bare-handed palm strike for the male hero (see WEAPON_ATTACK_TEXTURES
+        # in heroBody.js). The art holds no weapon, so the hero keeps the plain
+        # walk sheet with the vector glove and only swaps to this sheet for the
+        # length of a strike. Cell alignment keeps the extended palm from
+        # dragging the body around frame to frame.
+        "path": EXAMPLE / "nv-chuong.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
+        "frame_w": 128,
+    },
 }
 
 # Frame geometry: keep in sync with the runtime copy in src/game/heroBody.js.

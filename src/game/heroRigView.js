@@ -65,8 +65,10 @@ export class HeroRigView {
     /** While an attack pose is playing, the walk cycle must not overwrite it. */
     this.acting = false;
     this.actionTween = null;
-    /** Stepper that plays the baked swing frames, if one is running. */
+    /** Stepper that plays the baked strike frames, if one is running. */
     this.attackTimer = null;
+    /** Vector weapon primitives, hidden while a strike sheet draws the hands. */
+    this.weaponOverlays = [];
     /** Body sheets this view queued on the scene loader and is waiting for. */
     this.pendingSheets = new Set();
     /** Gear of the last `set` call, so a late sheet can redraw the current look. */
@@ -105,6 +107,7 @@ export class HeroRigView {
     this.bodySprite = null;
     this.bodyTextureKey = null;
     this.equipSprites = {};
+    this.weaponOverlays = [];
     this.actionTween?.stop();
     this.actionTween = null;
     this.stopAttackTimer();
@@ -169,7 +172,11 @@ export class HeroRigView {
       const excluded = [...Object.keys(this.equipSprites), ...bakedSlots];
       for (const primitive of buildBodyEquipment({ direction, equipment, excludeSlots: excluded })) {
         const child = createPrimitive(this.scene, primitive);
-        if (child) this.container.add(child);
+        if (!child) continue;
+        this.container.add(child);
+        // The held weapon is a static overlay pinned to the walk pose, so a
+        // strike sheet that animates the hands has to hide it.
+        if (primitive.slot === "weapon") this.weaponOverlays.push(child);
       }
 
       // 3. Headgear sprite (crown & veil layer sits above collar)
@@ -276,23 +283,24 @@ export class HeroRigView {
   /**
    * Play a short melee action pose derived from a skill's VFX type.
    *
-   * A hero holding a weapon that ships a swing sheet plays that sheet instead:
-   * the art already draws the wind-up, the strike and the slash arc, so the rig
-   * only steps the frames.
-   * @param {"slash"|"kick"|"shockwave"|"aura"|string} kind
-   * @returns {boolean} `true` when the baked swing took over (callers may then
+   * A weapon that ships strike art plays that sheet instead: the art already
+   * draws the wind-up, the blow and (for the sword) the slash arc, so the rig
+   * only steps the frames. `basic` is the normal attack, which every melee
+   * sheet covers; skill casts pass their VFX kind.
+   * @param {"basic"|"slash"|"kick"|"shockwave"|"aura"|string} kind
+   * @returns {boolean} `true` when the baked strike took over (callers may then
    *   skip their vector slash arc, which the art already contains)
    */
-  attack(kind = "slash") {
+  attack(kind = "basic") {
     this.actionTween?.stop();
     this.actionTween = null;
     this.stopAttackTimer();
     // A stopped recoil tween leaves the container where it was mid-lurch.
     if (this.container) this.container.x = 0;
 
-    // Only a slash reads as a sword strike; buffs, kicks and slams keep their
-    // own pose instead of swinging the blade.
-    if (kind === "slash" && this.playBakedSwing()) return true;
+    // Each sheet declares the motions it was drawn for, so a punch art never
+    // plays for a buff and the sword never swings for a palm cast.
+    if (this.playBakedAttack(kind)) return true;
 
     const pose = {
       slash: "punch",
@@ -337,28 +345,35 @@ export class HeroRigView {
   }
 
   /**
-   * Step through the worn weapon's swing sheet, then hand the sprite back to the
-   * walk cycle. Only possible when the hero is drawn from a body sheet - the
+   * Step through the worn weapon's strike sheet, then hand the sprite back to
+   * the walk cycle. Only possible when the hero is drawn from a body sheet - the
    * vector rig pivots limbs instead.
-   * @returns {boolean} whether the swing sheet is playing
+   * @param {string} kind motion the caller wants to play
+   * @returns {boolean} whether the strike sheet is playing
    */
-  playBakedSwing() {
+  playBakedAttack(kind) {
     const def = weaponAttackTextureDef(this.gender, this.weaponType);
     if (!def || !this.usingSprite || !this.bodySprite) return false;
-    // The swing art paints the blade too, so it only fits when the walk pose is
-    // the matching weapon sheet; on the plain sheet the vector weapon would
-    // show a second sword for the length of the swing.
+    if (!def.kinds.includes(kind)) return false;
+    // Weapon-holding art (the sword) paints the weapon too, so its strike sheet
+    // only fits when the walk pose is the matching weapon sheet; on the plain
+    // sheet the vector weapon would double for the length of the swing. A
+    // standalone strike sheet has no walk counterpart, so the plain sheet is
+    // exactly what it belongs to.
     const bodySheet = weaponBodyTextureDef(this.gender, this.weaponType);
-    if (this.bodyTextureKey !== bodySheet?.key) return false;
+    if (bodySheet && this.bodyTextureKey !== bodySheet.key) return false;
     if (!this.hasTexture(def.key)) return false;
     if (typeof this.scene?.time?.addEvent !== "function") return false;
 
     const row = bodyRowForDirection(this.direction);
     let frame = 0;
-    // `frames` is both the column count and the swing length in the sheet.
+    // `frames` is both the column count and the strike length in the sheet.
     const show = () => this.bodySprite?.setTexture(def.key, row * def.frames + frame);
 
     this.acting = true;
+    // The art draws the hands in their own pose, so the pinned weapon overlay
+    // would sit on the idle hand for the length of the blow.
+    this.setWeaponOverlaysVisible(false);
     show();
     // Phaser fires `repeat + 1` times, and the last one restores the walk pose.
     this.attackTimer = this.scene.time.addEvent({
@@ -379,10 +394,20 @@ export class HeroRigView {
     return true;
   }
 
-  /** Redraw the walk pose the body sheet was showing before the swing. */
+  /** Redraw the walk pose the body sheet was showing before the blow. */
   restoreWalkFrame() {
     const key = this.bodyTextureKey ?? bodyTextureFor(this.gender);
     this.bodySprite?.setTexture(key, this.frameIndex);
+    this.setWeaponOverlaysVisible(true);
+  }
+
+  /**
+   * Show or hide the vector weapon pinned to the walk pose. Headless scenes
+   * create plain shapes without `setVisible`, so the call is optional.
+   * @param {boolean} visible
+   */
+  setWeaponOverlaysVisible(visible) {
+    for (const obj of this.weaponOverlays) obj?.setVisible?.(visible);
   }
 
   /**
@@ -460,6 +485,7 @@ export class HeroRigView {
     }
     this.bodySprite = null;
     this.equipSprites = {};
+    this.weaponOverlays = [];
     this.usingSprite = false;
     this.pendingSheets.clear();
     this.equipment = {};
