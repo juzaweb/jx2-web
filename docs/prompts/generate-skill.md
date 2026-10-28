@@ -146,7 +146,7 @@ A 2D game VFX sprite sheet of a swift solar sword slash arc, isometric combat vi
 
 ---
 
-#### 9. Thái Cực Kiếm Pháp (`thai_cuc_quyen` - Slot 2, Nhu hòa chuyển hóa kiếm kình)
+#### 9. Thái Cực Kiếm Pháp (`thai_cuc_kiem_phap` - Slot 2, Nhu hòa chuyển hóa kiếm kình)
 * **Prompt 1 (Icon):**
 ```text
 A 2D game skill icon of Tai Chi Sword Art (Thái Cực Kiếm Pháp), Taoist martial arts style. An elegant Taoist steel sword surrounded by a swirling black and white Yin-Yang Tai Chi sphere, radiating soft white mist and gentle defensive energy rings. Dark stone background, carved jade and silver square frame. Serene mystical balance, clean icon design --ar 1:1 --v 6.0
