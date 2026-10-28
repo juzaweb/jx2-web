@@ -649,14 +649,17 @@ describe("HeroRigView bare-hand strike", () => {
     expect(view.weaponOverlays.every((overlay) => overlay.visible)).toBe(true);
   });
 
-  it("keeps the vector palm pose for a female hero without palm art", () => {
-    const scene = makeSpriteScene(["hero-body-female"]);
-    attachTimerStub(scene);
-    scene.tweens = { add: () => ({ stop() {} }) };
+  it("plays the female palm art for a female hero", () => {
+    const scene = makeSpriteScene(["hero-body-female", "hero-body-female-fist-attack"]);
+    const timers = attachTimerStub(scene);
     const view = new HeroRigView(scene);
     view.set(2, wearGloves, "female");
+    expect(view.bodySprite.texture).toBe("hero-body-female");
 
-    expect(view.attack("shockwave")).toBe(false);
+    expect(view.attack("shockwave")).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-female-fist-attack");
+
+    timers[0].tick(4);
     expect(view.bodySprite.texture).toBe("hero-body-female");
   });
 });

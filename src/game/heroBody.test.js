@@ -130,28 +130,30 @@ describe("heroBody", () => {
       expect(weaponAttackTextureDef("male", null)).toBeNull();
     });
 
-    it("resolves the bare-hand strike sheet for the male hero", () => {
-      const def = weaponAttackTextureDef("male", "bao-tay");
-      expect(def.key).toBe("hero-body-male-fist-attack");
-      expect(def.url).toContain("hero-body-male-fist-attack.png");
-      // Same frame size as the plain sheet: the art paints no weapon.
-      expect(def.frameWidth).toBe(HERO_BODY.frameWidth);
-      expect(def.frameHeight).toBe(HERO_BODY.frameHeight);
-      expect(def.frames).toBe(HERO_BODY.columns);
-      // A punch/palm sequence covers the normal attack and a palm cast only.
-      expect(def.kinds).toEqual(["basic", "shockwave"]);
+    it("resolves the bare-hand strike sheet for both genders", () => {
+      for (const gender of ["male", "female"]) {
+        const def = weaponAttackTextureDef(gender, "bao-tay");
+        expect(def.key).toBe(`hero-body-${gender}-fist-attack`);
+        expect(def.url).toContain(`hero-body-${gender}-fist-attack.png`);
+        // The art paints no weapon, so frames keep the plain sheet's height.
+        expect(def.frameHeight).toBe(HERO_BODY.frameHeight);
+        expect(def.frames).toBe(HERO_BODY.columns);
+        // A punch/palm sequence covers the normal attack and a palm cast only.
+        expect(def.kinds).toEqual(["basic", "shockwave"]);
+      }
+      // Her palm reaches a little further, so her frames are slightly wider.
+      expect(weaponAttackTextureDef("male", "bao-tay").frameWidth).toBe(128);
+      expect(weaponAttackTextureDef("female", "bao-tay").frameWidth).toBe(130);
     });
 
     it("keeps the plain walk sheet for bare hands", () => {
       // Only the strike frames come from the fist art, so the walk pose and the
       // vector glove stay exactly as they are for every other unarmed look.
       expect(bodyTextureFor("male", "bao-tay")).toBe("hero-body-male");
+      expect(bodyTextureFor("female", "bao-tay")).toBe("hero-body-female");
       expect(weaponBodyTextureDef("male", "bao-tay")).toBeNull();
+      expect(weaponBodyTextureDef("female", "bao-tay")).toBeNull();
       expect(bakedEquipmentSlots("male", "bao-tay")).toEqual(["pants", "armor", "helmet"]);
-    });
-
-    it("has no bare-hand strike art for the female hero yet", () => {
-      expect(weaponAttackTextureDef("female", "bao-tay")).toBeNull();
     });
 
     it("gives every strike sheet the motions it covers", () => {

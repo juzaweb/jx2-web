@@ -12,7 +12,7 @@ import { HERO_DIRECTIONS } from "./heroDirections.js";
 import { normalizeGender } from "./gender.js";
 
 /** Bump this whenever the sheets are regenerated so browsers drop cached art. */
-const BODY_ASSET_VERSION = "13";
+const BODY_ASSET_VERSION = "14";
 
 export const HERO_BODY_TEXTURES = {
   male: { key: "hero-body-male", url: `/hero-body-male.png?v=${BODY_ASSET_VERSION}` },
@@ -85,9 +85,9 @@ export const WEAPON_BODY_TEXTURES = {
  * is therefore narrower than the sword's: the art is a punch/palm sequence, so
  * it covers the normal attack and palm casts, but not a kick or a buff.
  *
- * Built by scripts/build_hero_body.py from docs/example/nv-chuong.png (male).
- * The female palm art does not exist yet, so a female hero keeps the vector
- * palm pose.
+ * Built by scripts/build_hero_body.py from docs/example/nv-chuong.png (male)
+ * and docs/example/nv-nu-chuong.png (female). The female palm reaches a little
+ * further, so her frames are two pixels wider.
  */
 export const WEAPON_ATTACK_TEXTURES = {
   "bao-tay": {
@@ -95,6 +95,14 @@ export const WEAPON_ATTACK_TEXTURES = {
       key: "hero-body-male-fist-attack",
       url: `/hero-body-male-fist-attack.png?v=${BODY_ASSET_VERSION}`,
       frameWidth: 128,
+      frameHeight: 160,
+      frames: 4,
+      kinds: ["basic", "shockwave"]
+    },
+    female: {
+      key: "hero-body-female-fist-attack",
+      url: `/hero-body-female-fist-attack.png?v=${BODY_ASSET_VERSION}`,
+      frameWidth: 130,
       frameHeight: 160,
       frames: 4,
       kinds: ["basic", "shockwave"]

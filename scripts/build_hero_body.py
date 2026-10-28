@@ -32,9 +32,10 @@ mid-swing. Such a source declares `scale_from`, naming the output whose scale it
 reuses.
 
 Cell sheets are drawn at the plain sheet's body height and declare a `frame_w`
-wide enough to hold the blade, so a hero keeps its size when it draws a weapon.
+wide enough to hold whatever reaches past the body (a blade, an outstretched
+palm), so a hero keeps its size when it draws a weapon.
 `frame_w` is mirrored in src/game/heroBody.js and the script refuses to build a
-sheet whose blade does not fit instead of silently shrinking the character.
+sheet whose pose does not fit instead of silently shrinking the character.
 
 Run: python3 scripts/build_hero_body.py
 """
@@ -117,6 +118,15 @@ SOURCES = {
         "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
         "align": "cell",
         "frame_w": 128,
+    },
+    "hero-body-female-fist-attack.png": {
+        # Female counterpart of hero-body-male-fist-attack.png, same layout. Her
+        # palm reaches a little further, hence the wider frame.
+        "path": EXAMPLE / "nv-nu-chuong.png",
+        # Source row order: front, right-facing, left-facing, back.
+        "row_map": {0: 0, LEFT_ROW: 2, RIGHT_ROW: 1, 3: 3},
+        "align": "cell",
+        "frame_w": 130,
     },
 }
 
@@ -444,7 +454,7 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None, label=None):
     from becoming the ground line.
 
     The body is drawn at the plain sheet's height (CONTENT_H) and `frame_w` is
-    the frame width that must hold the blade beside it. `scale` overrides the
+    the frame width that must hold the pose beside it. `scale` overrides the
     height so a companion sheet (the attack swing) renders the hero at the same
     size as this one.
     """
@@ -510,13 +520,13 @@ def build_cell_sheet(source, row_map, frame_w=FRAME_W, scale=None, label=None):
     widest = max(metric["half_extent"] for metric in metrics)
     if scale is None:
         scale = CONTENT_H / tallest
-    # The frame width is a contract with the runtime (WEAPON_BODY_TEXTURES
-    # loads the sheet with it), so too narrow a frame is an error, not a silent
-    # resize.
+    # The frame width is a contract with the runtime (WEAPON_BODY_TEXTURES /
+    # WEAPON_ATTACK_TEXTURES load the sheet with it), so too narrow a frame is
+    # an error, not a silent resize.
     needed_w = 2 * ceil(widest * scale + FRAME_SAFE_MARGIN)
     if needed_w > frame_w:
         raise SystemExit(
-            f"{label or source.name}: the blade needs a {needed_w}px frame "
+            f"{label or source.name}: the pose needs a {needed_w}px frame "
             f"(declared {frame_w}px); raise `frame_w` in SOURCES and mirror it "
             "in src/game/heroBody.js"
         )
