@@ -88,6 +88,33 @@ export function writeEquipment(playerId, equipment) {
 }
 
 /**
+ * Add multiple stacks to the bag in a single DB read/write operation.
+ * @param {string} playerId
+ * @param {Array<{ itemId: string, amount?: number }>} items
+ * @returns {{ ok: boolean, bag: Record<string, number> }}
+ */
+export function grantItems(playerId, items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { ok: false, bag: readBag(playerId) };
+  }
+
+  const bag = readBag(playerId);
+  let grantedAny = false;
+
+  for (const item of items) {
+    if (!item) continue;
+    const grant = normalizeGrant(item.itemId, item.amount ?? 1);
+    if (!grant) continue;
+
+    bag[grant.itemId] = Math.min(MAX_STACK, (bag[grant.itemId] || 0) + grant.amount);
+    grantedAny = true;
+  }
+
+  if (!grantedAny) return { ok: false, bag };
+  return { ok: true, bag: writeBag(playerId, bag) };
+}
+
+/**
  * Add a stack to the bag. Unknown ids and non-positive amounts are ignored.
  * @param {string} playerId
  * @param {string} itemId
@@ -95,12 +122,7 @@ export function writeEquipment(playerId, equipment) {
  * @returns {{ ok: boolean, bag: Record<string, number> }}
  */
 export function grantItem(playerId, itemId, amount = 1) {
-  const grant = normalizeGrant(itemId, amount);
-  const bag = readBag(playerId);
-  if (!grant) return { ok: false, bag };
-
-  bag[grant.itemId] = Math.min(MAX_STACK, (bag[grant.itemId] || 0) + grant.amount);
-  return { ok: true, bag: writeBag(playerId, bag) };
+  return grantItems(playerId, [{ itemId, amount }]);
 }
 
 /**
