@@ -13,6 +13,7 @@ import {
 import { normalizeWeaponType, WEAPON_LABEL_KEYS } from "../../game/weapons.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
+import { NORMAL_ATTACK_MULT } from "../../game/combatConfig.js";
 import { regenPerSecond } from "../../game/passiveRegen.js";
 import { SkillIcon } from "../SkillIcon.jsx";
 import { useDraggablePanel } from "./useDraggablePanel.js";
@@ -284,7 +285,15 @@ export function SkillsModal({
                 )}
                 {selectedSkill.mult > 0 && (
                   <span className="skills-stat-chip">
-                    {t("skills.dmgTag", { pct: Math.round(selectedAtLevel.mult * 100) })}
+                    {/*
+                     * A skill's `mult` is measured against `attack - defence`, and a
+                     * plain swing now only takes a `NORMAL_ATTACK_MULT` share of that,
+                     * so divide it back out: the chip reads "vs one normal hit", the
+                     * only damage figure the player has to compare against.
+                     */}
+                    {t("skills.dmgTag", {
+                      pct: Math.round((selectedAtLevel.mult / NORMAL_ATTACK_MULT) * 100)
+                    })}
                   </span>
                 )}
                 {selectedRegen > 0 && (

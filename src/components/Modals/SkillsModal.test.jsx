@@ -96,7 +96,7 @@ describe("SkillsModal Component", () => {
     expect(markup).toContain('<span class="skills-detail-name">Đại Tu Di Chưởng</span>');
     expect(markup).toContain("12 MP");
     expect(markup).toContain("Cự ly: 200");
-    expect(markup).toContain("ST: 120%");
+    expect(markup).toContain("ST: 185%");
     expect(markup).toContain('class="skills-drag-hint"');
     expect(markup).toContain('<span class="skill-node-keys">1 4</span>');
   });
@@ -155,8 +155,9 @@ describe("SkillsModal Component", () => {
 
     expect(markup).toContain("Cấp 5/10");
     expect(markup).toContain("+40% hiệu quả");
-    // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68
-    expect(markup).toContain("ST: 168%");
+    // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68, i.e. 168% of
+    // `attack - defence` — shown as a share of a plain swing, so / 0.65.
+    expect(markup).toContain("ST: 258%");
     // Rank 6 costs 20 * 36 silver and demands character level 10 + 4 * 5.
     expect(markup).toContain("Cần cấp 30");
     expect(markup).toContain('class="skills-upgrade-btn"');

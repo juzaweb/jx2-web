@@ -59,7 +59,9 @@ The art is cast from the hotbar like any other technique; the plain attack
 now lands softer: its damage is scaled by `NORMAL_ATTACK_MULT` (0.65 in
 `src/game/combatConfig.js`) so a free, cooldown-less swing stays filler rather
 than out-damaging every studied skill. Monster bites are untouched — they roll
-their own damage in `tickBites`.
+their own damage in `tickBites`. Player duels and server bots share the same
+`resolveSkillHit` path, so their plain swings scale with it too; only a skill's
+own `mult` (and its level scale) decides how hard a studied art lands.
 
 ## 3. Learning from books
 

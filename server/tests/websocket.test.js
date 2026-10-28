@@ -7,6 +7,8 @@ import path from "node:path";
 import { WebSocket } from "ws";
 import { MARKET_NPCS } from "../../src/game/marketLayout.js";
 import { DEFAULT_MAP_ID, MAP_IDS, getMap } from "../../src/game/maps/mapRegistry.js";
+import { PLAYER_IFRAME_MS } from "../../src/game/pvp.js";
+import { ATTACK_INTERVAL_MS } from "../../src/game/combatConfig.js";
 
 // Assigned in the setup subtest, after DB_PATH points at a throwaway file (the
 // server-side modules open their SQLite database at import time).
@@ -814,7 +816,7 @@ test("WebSocket server-authority suite", async (t) => {
     // Outlast both the i-frame and the melee cadence: a swing fired inside
     // `nextAttackAt` is dropped before it can authorize the follow-up hit, and
     // the strike below must be a real one to reach the peaceful-target refusal.
-    await sleep(800);
+    await sleep(Math.max(PLAYER_IFRAME_MS, ATTACK_INTERVAL_MS) + 150);
     attacker.send({ type: "player_attack", payload: { skill: "normal", x: 5000, y: 5000 } });
     attacker.send({ type: "player_hit", payload: { targetId: "char_peace", damage: 30 } });
     const rejected = await attacker.waitFor(
