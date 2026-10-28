@@ -21,7 +21,7 @@ import { findNpc } from "../../../src/game/maps/mapRegistry.js";
 import { isInTalkRange } from "../../../src/game/npcRange.js";
 import { toLedgerDong } from "../../../src/game/currency.js";
 import { store } from "../data/playerDb.js";
-import { consumeItem, grantItem } from "./playerBag.js";
+import { consumeItem, grantItem, grantItems } from "./playerBag.js";
 
 /** Trim a client string to the protocol limit. */
 const clean = (value, maxLen = 64) =>
@@ -57,8 +57,12 @@ export function payoutQuestReward(manager, ws, player, reward) {
     manager.persistProgress(player);
   }
 
-  for (const entry of reward.items || []) {
-    const granted = grantItem(player.characterId, entry.id, entry.qty || 1);
+  if (Array.isArray(reward.items) && reward.items.length > 0) {
+    const itemsToGrant = reward.items.map((entry) => ({
+      itemId: entry.id,
+      amount: entry.qty || 1
+    }));
+    const granted = grantItems(player.characterId, itemsToGrant);
     if (granted.ok) manager.sendInventory(player, granted.bag);
   }
 }

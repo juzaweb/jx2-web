@@ -78,6 +78,7 @@ import {
   consumeItem,
   equipItem,
   grantItem,
+  grantItems,
   readBag,
   readEquipment,
   unequipSlot
@@ -2400,10 +2401,18 @@ export class GameSocketManager {
         if (!player.characterId) return;
         const items = payload.items;
         if (!items || typeof items !== "object") return;
+        const toGrant = [];
         for (const [id, qty] of Object.entries(items)) {
-          if (typeof qty === "number" && qty > 0) grantItem(player.characterId, id, qty);
+          if (typeof qty === "number" && qty > 0) {
+            toGrant.push({ itemId: id, amount: qty });
+          }
         }
-        this.sendInventory(player, readBag(player.characterId));
+        if (toGrant.length > 0) {
+          const granted = grantItems(player.characterId, toGrant);
+          if (granted.ok) this.sendInventory(player, granted.bag);
+        } else {
+          this.sendInventory(player, readBag(player.characterId));
+        }
         break;
       }
 
@@ -2788,10 +2797,9 @@ export class GameSocketManager {
     // A dropped skill book goes straight into the credited killer's bag. The
     // broadcast above only carries it for rendering; the server owns the grant.
     if (player.characterId && Array.isArray(reward.loot) && reward.loot.length > 0) {
-      for (const drop of reward.loot) {
-        const granted = grantItem(player.characterId, drop.itemId, 1);
-        if (granted.ok) this.sendInventory(player, granted.bag);
-      }
+      const itemsToGrant = reward.loot.map((drop) => ({ itemId: drop.itemId, amount: 1 }));
+      const granted = grantItems(player.characterId, itemsToGrant);
+      if (granted.ok) this.sendInventory(player, granted.bag);
     }
 
     // The credited killer's ledger is updated here, on the server. The reward
