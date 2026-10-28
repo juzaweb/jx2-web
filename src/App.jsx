@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { PlayerVitals } from "./components/HUD/PlayerVitals.jsx";
+import { TargetVitals } from "./components/HUD/TargetVitals.jsx";
 import { MinimapPanel } from "./components/HUD/MinimapPanel.jsx";
 import { ChatPanel } from "./components/HUD/ChatPanel.jsx";
 import { HotbarDock } from "./components/HUD/HotbarDock.jsx";
@@ -192,6 +193,9 @@ export function App() {
     completed: false
   });
   const [logs, setLogs] = useState(INITIAL_LOGS);
+  const [targetVitals, setTargetVitals] = useState(null);
+  const targetVitalsRef = useRef(targetVitals);
+  targetVitalsRef.current = targetVitals;
 
   // Inventory stack quantities are persisted per character and mirrored to that
   // character's server bag. Live edits (use / loot) arrive over the bridge, so the
@@ -386,6 +390,10 @@ export function App() {
       if (next?.equipment) setEquipment(next.equipment);
     });
 
+    const unsubTarget = bridge.on(EVENTS.TARGET_UPDATED, (next) => {
+      setTargetVitals(next || null);
+    });
+
     // Server-authoritative learned skills and their levels: replaced wholesale on
     // every sync, on every successful book study and on every upgrade.
     const unsubSkills = bridge.on(EVENTS.SKILLS_UPDATED, (next) => {
@@ -437,6 +445,7 @@ export function App() {
       unsubPk();
       unsubInventory();
       unsubEquipment();
+      unsubTarget();
       unsubSkills();
       unsubStarted();
       unsubShopOpened();
@@ -565,6 +574,11 @@ export function App() {
     bridge.emit(EVENTS.ACTION_BUY_ITEM, { itemId, qty: 1 });
   }, []);
 
+  const handleClearTarget = useCallback(() => {
+    bridge.emit(EVENTS.ACTION_CLEAR_TARGET);
+    setTargetVitals(null);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isTypingTarget(e.target)) return;
@@ -685,6 +699,11 @@ export function App() {
         return;
       }
 
+      if (targetVitalsRef.current) {
+        handleClearTarget();
+        return;
+      }
+
       setIsHelpOpen((prev) => {
         const nextState = !prev;
         bridge.emit(EVENTS.ACTION_SET_PAUSED, nextState);
@@ -701,6 +720,7 @@ export function App() {
     isCityMapOpen,
     isLoginOpen,
     isConnectionGated,
+    handleClearTarget,
     activeCharacter,
     currentUser,
     shopNpc,
@@ -927,6 +947,11 @@ export function App() {
           onLogout={handleLogout}
         />
 
+        <TargetVitals
+          target={targetVitals}
+          onClear={handleClearTarget}
+        />
+
         <MinimapPanel
           onOpenHelp={handleOpenHelp}
           quest={quest}
@@ -960,6 +985,7 @@ export function App() {
           onLogout={handleLogout}
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
+          playerMp={stats.mp}
           skills={weaponSkills}
         />
 
@@ -970,6 +996,7 @@ export function App() {
           onAssignSkill={mobileSkillsPicker.open}
           onUseItem={handleUseItem}
           onAssignItem={mobileItemsPicker.open}
+          playerMp={stats.mp}
           skills={weaponSkills}
           skillSlots={mobileSkillsPicker.bindings}
           items={mobileItemOptions}

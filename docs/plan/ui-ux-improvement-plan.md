@@ -38,19 +38,20 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 ## Prioritized improvements
 
 ### [P1] Target Selection Ring and Target Vitals HUD Frame
-- **Status:** Proposed
+- **Status:** Implemented
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/game/player.js`, `src/game/enemy.js`, `src/components/HUD/PlayerVitals.jsx`, `src/game/bridge.js`
+- **Evidence:** `src/game/player.js`, `src/game/enemy.js`, `src/components/HUD/PlayerVitals.jsx`, `src/components/HUD/TargetVitals.jsx`, `src/game/bridge.js`
 - **Player Impact:** When attacking wolves or NPCs, players cannot easily confirm which entity is currently locked on or evaluate enemy remaining health without watching floating damage numbers.
 - **Recommendation:**
   1. Emit `TARGET_UPDATED` events over `bridge.js` when player selects or switches targets in Phaser.
   2. Draw an overhead selection ring in Phaser around the active target entity.
   3. Render a top-center "Target Vitals" HUD component displaying the target name, level, HP bar percentage, and status effects.
+- **What shipped:** Added `TargetVitals.jsx` HUD frame anchored at top-center displaying target name, level, HP% with smooth bar, boss/duelist badges, and close button. Linked Phaser selection ring (`TargetRing`) in `game.js` for both monsters (gold) and rivals (red), emitting `TARGET_UPDATED` and handling `ACTION_CLEAR_TARGET` / `Esc` key deselect. Target auto-clears on entity death or leaving range (>1600px).
 - **Acceptance criteria:**
-  - [ ] Selecting an enemy displays a golden/red selection ring around the entity sprite in Phaser.
-  - [ ] Target Vitals HUD frame appears top-center with live updating target health percentage.
-  - [ ] Target frame auto-clears when the target dies or moves beyond interaction range.
+  - [x] Selecting an enemy displays a golden/red selection ring around the entity sprite in Phaser.
+  - [x] Target Vitals HUD frame appears top-center with live updating target health percentage.
+  - [x] Target frame auto-clears when the target dies or moves beyond interaction range.
 - **Validation:** Select mobs in Biện Kinh map; verify selection reticle position and real-time HP depletion.
 - **Effort:** M (Requires Phaser selection tracking + React HUD bridge integration)
 - **Dependencies / risks:** Minimal risk; depends on target payload emitted via `bridge.js`.
@@ -58,17 +59,18 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 ---
 
 ### [P1] Conic Radial Cooldown Sweep & Out-of-Resource States for Skill Icons
-- **Status:** Proposed
+- **Status:** Implemented
 - **Confidence:** High
 - **Type:** Observed issue
-- **Evidence:** `src/components/HUD/HotbarDock.jsx`, `src/components/SkillIcon.jsx`, `src/index.css`
+- **Evidence:** `src/components/HUD/HotbarDock.jsx`, `src/components/MobileControls.jsx`, `src/components/SkillIcon.jsx`, `src/index.css`
 - **Player Impact:** Skill cooldowns currently render as plain integer overlays (`<span className="slot-cd">3</span>`). Players cannot intuitively gauge cooldown sweep progress or distinguish between a skill on cooldown vs. a skill unusable due to insufficient MP.
 - **Recommendation:**
   1. Add a CSS conic-gradient dark radial sweep overlay on skill icons during cooldown countdown.
   2. Apply an out-of-resource visual state (`.insufficient-mp` desaturation / blue tint) when current player MP < skill MP cost.
+- **What shipped:** Added CSS `conic-gradient` overlay (`--cd-sweep`) on `.slot-cd` and `.arc-cd` with smooth clock ticking in `useSkillCooldowns`. Implemented `.insufficient-mp` visual state with desaturation, drop shadow, and blue tint overlay when character MP is lower than skill MP cost across both Desktop Hotbar and Mobile Controls.
 - **Acceptance criteria:**
-  - [ ] Skill icons render a smooth clockwise radial dark overlay representing remaining cooldown percentage.
-  - [ ] Skills with MP cost exceeding player MP display a visually distinct out-of-resource state.
+  - [x] Skill icons render a smooth clockwise radial dark overlay representing remaining cooldown percentage.
+  - [x] Skills with MP cost exceeding player MP display a visually distinct out-of-resource state.
 - **Validation:** Trigger skills in rapid succession; confirm radial sweep animation and low-MP visual feedback.
 - **Effort:** S (CSS conic gradient styling + MP check in `HotbarDock.jsx` and `SkillIcon.jsx`)
 - **Dependencies / risks:** None.
@@ -151,13 +153,13 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 
 ## Implementation phases
 
-### Phase 1: High Impact Combat Clarity (Now)
-- Implement Target Selection Ring & Target Vitals HUD Frame (`[P1]`).
-- Implement Conic Radial Cooldown Sweep & Insufficient Resource Styling (`[P1]`).
+### Phase 1: High Impact Combat Clarity (Completed)
+- [x] Implement Target Selection Ring & Target Vitals HUD Frame (`[P1]`).
+- [x] Implement Conic Radial Cooldown Sweep & Insufficient Resource Styling (`[P1]`).
 
 ### Phase 2: Mobile Ergonomics & Discoverability (Next)
-- Resolve Mobile Joystick / Chat Panel Collision and Touch Hitbox Scaling (`[P1]`).
-- Add Hotkey Badges (`F3`, `F4`, `F5`, `Tab`, `M`) to HUD Controls (`[P2]`).
+- [x] Resolve Mobile Joystick / Chat Panel Collision and Touch Hitbox Scaling (`[P1]`).
+- [ ] Add Hotkey Badges (`F3`, `F4`, `F5`, `Tab`, `M`) to HUD Controls (`[P2]`).
 
 ### Phase 3: Inventory Polish & Combat Visuals (Later)
 - Implement Comparative Inventory Tooltips & Item Rarity Borders (`[P2]`).
@@ -169,8 +171,8 @@ Addressing these prioritized improvements will enhance combat clarity, streamlin
 
 - [ ] **Target Resolutions:** Verify HUD layout across 1920x1080 (Desktop Full HD), 1366x768 (Laptop), 1024x768 (Tablet), and 375x812 (Mobile Portrait/Landscape).
 - [ ] **Input Methods:** Test functionality across Keyboard (`W/A/S/D`, `Space`, `1-4`, `F3-F5`, `Tab`, `M`), Mouse (Left/Right click combat & movement), and Touch (Virtual Joystick + Skill Arc).
-- [ ] **Localization:** Confirm all newly added HUD labels and tooltips exist in both Vietnamese (`vi`) and English (`en`) translation dictionaries (`src/i18n/`).
-- [ ] **Performance & Tests:** Verify `npm test` passes cleanly with zero regressions.
+- [x] **Localization:** Confirm all newly added HUD labels and tooltips exist in Vietnamese (`vi`), English (`en`), and Chinese (`zh`) translation dictionaries (`src/i18n/`).
+- [x] **Performance & Tests:** Verify `npm test` passes cleanly with zero regressions (913 tests passing across 88 test suites).
 
 ---
 

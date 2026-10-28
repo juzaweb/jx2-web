@@ -46,7 +46,13 @@ export default {
     hpTitle: "Health (HP)",
     mpTitle: "Inner force (MP)",
     staTitle: "Stamina",
-    buffTitle: "Quanzhen Heart Method: +10% power and agility"
+    buffTitle: "Quanzhen Heart Method: +10% power and agility",
+    targetTitle: "Selected Target",
+    targetMonster: "Monster",
+    targetBoss: "Boss",
+    targetPlayer: "Player",
+    targetDuel: "Duelist",
+    targetDeselect: "Deselect (ESC)"
   },
   minimap: {
     region: "Hidden Dragon (Server 1)",

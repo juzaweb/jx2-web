@@ -85,6 +85,11 @@ export const EVENTS = {
    * another device). Payload: {reason: "auth"|"character"|"superseded"}.
    */
   CONNECTION_ISSUE: "CONNECTION_ISSUE",
+  /**
+   * Target selected or updated in Phaser
+   * (payload: { id, name, level, hp, maxHp, kind, isBoss } | null).
+   */
+  TARGET_UPDATED: "TARGET_UPDATED",
 
   // React -> Phaser
   ACTION_START: "ACTION_START",
@@ -98,6 +103,7 @@ export const EVENTS = {
   ACTION_EQUIP_ITEM: "ACTION_EQUIP_ITEM",
   ACTION_UNEQUIP_SLOT: "ACTION_UNEQUIP_SLOT",
   ACTION_MOVE: "ACTION_MOVE",
+  ACTION_CLEAR_TARGET: "ACTION_CLEAR_TARGET",
   ACTION_SAVE: "ACTION_SAVE",
   ACTION_RESET: "ACTION_RESET",
   ACTION_TOGGLE_AUDIO: "ACTION_TOGGLE_AUDIO",

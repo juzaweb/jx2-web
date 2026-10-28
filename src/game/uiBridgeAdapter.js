@@ -66,6 +66,14 @@ export class UIBridgeAdapter {
   }
 
   /**
+   * Push the current active target vitals to the React HUD.
+   * @param {{ id: number|string, name: string, level?: number, hp: number, maxHp: number, kind?: string, isBoss?: boolean }|null} target
+   */
+  updateTarget(target) {
+    bridge.emit(EVENTS.TARGET_UPDATED, target ? { ...target } : null);
+  }
+
+  /**
    * Push the current bag to the React HUD so hotbar / inventory quantities stay
    * live after a use or a loot pickup (the HUD otherwise holds a mount snapshot).
    * @param {Record<string, number>} [quantities] - Defaults to the shared store

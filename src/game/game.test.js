@@ -594,3 +594,71 @@ describe("JiangHuScene touch auto-targeting", () => {
     expect(touchScene().focusAutoTarget()).toBe(false);
   });
 });
+
+describe("JiangHuScene combat target management", () => {
+  it("sets combat target, shows target ring, and emits target update", () => {
+    const updateTarget = vi.fn();
+    const show = vi.fn();
+    const hide = vi.fn();
+    const enemy = { id: "wolf-1", name: "Dã Lang", level: 2, hp: 80, maxHp: 100, x: 200, y: 150 };
+    const scene = {
+      activeCombatTarget: null,
+      enemyTarget: null,
+      pvpTarget: null,
+      autoTargetRing: { show, hide },
+      uiBridge: { updateTarget },
+      setCombatTarget: JiangHuScene.prototype.setCombatTarget,
+      clearCombatTarget: JiangHuScene.prototype.clearCombatTarget,
+      emitTargetUpdate: JiangHuScene.prototype.emitTargetUpdate
+    };
+
+    scene.setCombatTarget(enemy, "monster");
+
+    expect(scene.activeCombatTarget).toEqual({ target: enemy, kind: "monster" });
+    expect(scene.enemyTarget).toBe(enemy);
+    expect(scene.pvpTarget).toBeNull();
+    expect(show).toHaveBeenCalledWith(200, 150, "monster", 0);
+    expect(updateTarget).toHaveBeenCalledWith({
+      id: "wolf-1",
+      name: "Dã Lang",
+      level: 2,
+      hp: 80,
+      maxHp: 100,
+      kind: "monster",
+      isBoss: false
+    });
+  });
+
+  it("clears combat target, hides target ring, and notifies UI", () => {
+    const updateTarget = vi.fn();
+    const hide = vi.fn();
+    const scene = {
+      activeCombatTarget: { target: { id: "wolf-1" }, kind: "monster" },
+      enemyTarget: { id: "wolf-1" },
+      pvpTarget: null,
+      _lastAutoTargetId: null,
+      autoTargetRing: { hide },
+      uiBridge: { updateTarget },
+      clearCombatTarget: JiangHuScene.prototype.clearCombatTarget
+    };
+
+    scene.clearCombatTarget();
+
+    expect(scene.activeCombatTarget).toBeNull();
+    expect(scene.enemyTarget).toBeNull();
+    expect(hide).toHaveBeenCalled();
+    expect(updateTarget).toHaveBeenCalledWith(null);
+  });
+
+  it("prioritizes active combat target position in castAimPoint on desktop", () => {
+    const enemy = { id: "wolf-1", x: 300, y: 400, isDead: false, active: true };
+    const scene = {
+      autoTargetEnabled: false,
+      activeCombatTarget: { target: enemy, kind: "monster" },
+      input: { activePointer: { worldX: 10, worldY: 10 } },
+      castAimPoint: JiangHuScene.prototype.castAimPoint
+    };
+
+    expect(scene.castAimPoint()).toEqual({ x: 300, y: 400 });
+  });
+});

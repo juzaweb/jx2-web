@@ -9,6 +9,7 @@ import {
   DEFAULT_QUICK_SLOTS,
   skillIdFromBinding
 } from "../../game/quickSlots.js";
+import { effectiveSkillCooldown, effectiveSkillMpCost } from "../../game/skills/cost.js";
 
 export function HotbarDock({
   audioEnabled,
@@ -21,6 +22,7 @@ export function HotbarDock({
   onLogout,
   onTogglePk,
   pkEnabled = false,
+  playerMp,
   skills = [],
   items = [],
   inventoryItems = [],
@@ -103,13 +105,23 @@ export function HotbarDock({
           {quickSlots.map(({ useSlot, item, skill }) => {
             if (skill) {
               const cd = cooldownLeft(skill.id);
+              const totalCd = skill.cooldown || effectiveSkillCooldown(skill.id) || cd;
+              const cdPercent = typeof cooldownLeft.percent === "function"
+                ? cooldownLeft.percent(skill.id, totalCd)
+                : (totalCd > 0 ? (cd / totalCd) * 100 : 0);
+              const mpCost = effectiveSkillMpCost(skill.id) || skill.mp || 0;
+              const insufficientMp = Number.isFinite(playerMp) && playerMp < mpCost;
               const name = t(skill.nameKey, undefined, skill.id);
               return (
                 <div
-                  className="slot-item skill-binding"
+                  className={`slot-item skill-binding${insufficientMp ? " insufficient-mp" : ""}`}
                   id={`slot-${useSlot}`}
                   key={`slot-${useSlot}`}
-                  title={t("hotbar.skillBindingTitle", { key: useSlot, name })}
+                  title={
+                    insufficientMp
+                      ? `${t("hotbar.skillBindingTitle", { key: useSlot, name })} (${t("hud.mpTitle")}: ${playerMp}/${mpCost})`
+                      : t("hotbar.skillBindingTitle", { key: useSlot, name })
+                  }
                   onContextMenu={(e) => handleContextMenu(e, useSlot)}
                   onClick={(event) => handleSlotClick(event, useSlot)}
                   data-hotbar-slot={useSlot}
@@ -117,7 +129,14 @@ export function HotbarDock({
                 >
                   <span className="slot-key">{useSlot}</span>
                   <SkillIcon skill={skill} className="slot-skill-icon" />
-                  {cd > 0 && <span className="slot-cd">{Math.ceil(cd / 1000)}</span>}
+                  {cd > 0 && (
+                    <span
+                      className="slot-cd"
+                      style={{ "--cd-sweep": `${cdPercent.toFixed(1)}%` }}
+                    >
+                      {Math.ceil(cd / 1000)}
+                    </span>
+                  )}
                 </div>
               );
             }

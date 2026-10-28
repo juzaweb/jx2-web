@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { SkillIcon } from "./SkillIcon.jsx";
+import { effectiveSkillCooldown, effectiveSkillMpCost } from "../game/skills/cost.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { MOBILE_SKILL_SLOTS } from "../game/mobileSkills.js";
 import { MOBILE_ITEM_SLOTS } from "../game/mobileItems.js";
@@ -35,6 +36,7 @@ export function MobileControls({
   onAssignSkill,
   onUseItem,
   onAssignItem,
+  playerMp,
   skills = [],
   skillSlots = EMPTY_SKILL_SLOTS,
   items = [],
@@ -247,13 +249,22 @@ export function MobileControls({
             : t("skills.mobilePicker.empty");
           // Seconds of cooldown left, so the arc matches the desktop quick bar.
           const cdLeft = skill ? cooldownLeft(skill.id) : 0;
+          const totalCd = skill ? (skill.cooldown || effectiveSkillCooldown(skill.id) || cdLeft) : 0;
+          const cdPercent = skill && typeof cooldownLeft.percent === "function"
+            ? cooldownLeft.percent(skill.id, totalCd)
+            : (totalCd > 0 ? (cdLeft / totalCd) * 100 : 0);
+          const mpCost = skill ? (effectiveSkillMpCost(skill.id) || skill.mp || 0) : 0;
+          const insufficientMp = skill && Number.isFinite(playerMp) && playerMp < mpCost;
+
           return (
             <button
               key={`mobile-skill-${idx}`}
               id={`mobile-skill-${idx}`}
               className={`arc-btn arc-btn-skill arc-orbit${
                 skill ? "" : " arc-btn-empty"
-              }${holdingKey === `skill:${idx}` ? " is-holding" : ""}`}
+              }${holdingKey === `skill:${idx}` ? " is-holding" : ""}${
+                insufficientMp ? " insufficient-mp" : ""
+              }`}
               style={{ "--i": idx }}
               onPointerDown={
                 skill
@@ -276,7 +287,14 @@ export function MobileControls({
                   +
                 </span>
               )}
-              {cdLeft > 0 && <span className="arc-cd">{Math.ceil(cdLeft / 1000)}</span>}
+              {cdLeft > 0 && (
+                <span
+                  className="arc-cd"
+                  style={{ "--cd-sweep": `${cdPercent.toFixed(1)}%` }}
+                >
+                  {Math.ceil(cdLeft / 1000)}
+                </span>
+              )}
             </button>
           );
         })}

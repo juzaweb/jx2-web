@@ -168,6 +168,11 @@ export class JiangHuScene extends Phaser.Scene {
     this.pvpTarget = null;
     /** Monster locked for combat: walk into range, then strike (see updateEnemyTarget). */
     this.enemyTarget = null;
+    /** Active combat target selected by the player or auto-target: { target, kind: "monster"|"player" } */
+    this.activeCombatTarget = null;
+    this._lastTargetHp = null;
+    this._lastTargetMaxHp = null;
+    this._lastAutoTargetId = null;
     /** Touch layout has no cursor, so a victim is picked and ringed for the player. */
     this.autoTargetEnabled = usesTouchControls();
     /** The ringed victim (see updateAutoTarget). Passive: it never moves the hero. */
@@ -342,6 +347,9 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("player_defeated", (payload) => {
       this.handlePlayerDefeated(payload);
+      if (this.activeCombatTarget?.target?.id === payload.id) {
+        this.clearCombatTarget();
+      }
     });
 
     // The server refused a PvP hit: say why, instead of leaving the client to draw
@@ -352,6 +360,9 @@ export class JiangHuScene extends Phaser.Scene {
 
     this.networkClient.on("player_left", (payload) => {
       this.remotePlayerManager.handlePlayerLeft(payload);
+      if (this.activeCombatTarget?.target?.id === payload.id) {
+        this.clearCombatTarget();
+      }
     });
 
     this.networkClient.on("player_chat", (payload) => {
@@ -367,6 +378,13 @@ export class JiangHuScene extends Phaser.Scene {
         const enemy = this.enemyManager.getById?.(payload.id);
         if (enemy) {
           this.combat.showFloatText(enemy.x, enemy.y - 30, `-${payload.damage}`, "#ffb49a");
+        }
+      }
+      if (this.activeCombatTarget?.target?.id === payload.id) {
+        if (payload.isDead) {
+          this.clearCombatTarget();
+        } else {
+          this.emitTargetUpdate();
         }
       }
     });
@@ -494,7 +512,7 @@ export class JiangHuScene extends Phaser.Scene {
           this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xffdd59);
           return;
         }
-        this.enemyTarget = clickedEnemy;
+        this.setCombatTarget(clickedEnemy, "monster");
         this.isPointerMoving = false;
         this.showClickIndicator(clickedEnemy.x, clickedEnemy.y, 0xff5252);
         this.updateEnemyTarget();
@@ -515,7 +533,7 @@ export class JiangHuScene extends Phaser.Scene {
           return;
         }
         if (mayDuel(this.player, this.pvpMode())) {
-          this.pvpTarget = clickedPlayer;
+          this.setCombatTarget(clickedPlayer, "player");
         } else {
           this.uiBridge.addLog("Mục tiêu đã bật cờ PK — hãy bật cờ PK của bạn để tỷ thí.", "system");
         }
@@ -662,6 +680,9 @@ export class JiangHuScene extends Phaser.Scene {
           this.enemyTarget = null;
           this.player.setTouchDirection(direction);
         }
+      }),
+      bridge.on(EVENTS.ACTION_CLEAR_TARGET, () => {
+        this.clearCombatTarget();
       }),
       bridge.on(EVENTS.ACTION_SAVE, () => this.saveGame(true)),
       bridge.on(EVENTS.ACTION_RESET, () => this.resetGame()),
@@ -1373,6 +1394,13 @@ export class JiangHuScene extends Phaser.Scene {
         const peer = this.remotePlayerManager?.getAll?.().find((entry) => entry.id === payload.id);
         if (peer) this.combat.showFloatText(peer.x, peer.y - 30, `-${payload.damage}`, "#ffb49a");
       }
+      if (this.activeCombatTarget?.target?.id === payload.id) {
+        if (payload.hp <= 0) {
+          this.clearCombatTarget();
+        } else {
+          this.emitTargetUpdate();
+        }
+      }
       return;
     }
 
@@ -1977,6 +2005,149 @@ export class JiangHuScene extends Phaser.Scene {
   clearAutoTarget() {
     this.autoTarget = null;
     this.autoTargetRing?.hide();
+    if (!this.activeCombatTarget) {
+      this.uiBridge?.updateTarget?.(null);
+    }
+  }
+
+  /**
+   * Set the active combat target (monster or duelist peer).
+   * Displays the golden/red selection ring and emits TARGET_UPDATED to React HUD.
+   * @param {Object|null} target
+   * @param {"monster"|"player"} [kind]
+   */
+  setCombatTarget(target, kind = "monster") {
+    if (!target || target.isDead || target.active === false) {
+      this.clearCombatTarget();
+      return;
+    }
+    this.activeCombatTarget = { target, kind };
+    this._lastTargetHp = target.hp;
+    this._lastTargetMaxHp = target.maxHp;
+    if (kind === "monster") {
+      this.enemyTarget = target;
+      this.pvpTarget = null;
+    } else if (kind === "player") {
+      this.pvpTarget = target;
+      this.enemyTarget = null;
+    }
+    const footOffset = kind === "player" ? HERO_FOOT_Y * WORLD_SCALE : 0;
+    this.autoTargetRing?.show(target.x, target.y, kind, footOffset);
+    this.emitTargetUpdate();
+  }
+
+  /**
+   * Deselect active combat target and notify React HUD.
+   */
+  clearCombatTarget() {
+    if (!this.activeCombatTarget && !this.enemyTarget && !this.pvpTarget && this._lastAutoTargetId === null) {
+      return;
+    }
+    this.activeCombatTarget = null;
+    this.enemyTarget = null;
+    this.pvpTarget = null;
+    this._lastTargetHp = null;
+    this._lastTargetMaxHp = null;
+    this._lastAutoTargetId = null;
+    this.autoTargetRing?.hide();
+    this.uiBridge?.updateTarget?.(null);
+  }
+
+  /**
+   * Emit target vitals data to React HUD over the event bridge.
+   */
+  emitTargetUpdate() {
+    const active = this.activeCombatTarget;
+    if (!active?.target || active.target.isDead || active.target.active === false) {
+      this.uiBridge?.updateTarget?.(null);
+      return;
+    }
+    const t = active.target;
+    this.uiBridge?.updateTarget?.({
+      id: t.id,
+      name: t.name || t.displayName || t.username || "Mục tiêu",
+      level: t.level || 1,
+      hp: t.hp ?? 0,
+      maxHp: t.maxHp || 100,
+      kind: active.kind || "monster",
+      isBoss: !!t.isBoss
+    });
+  }
+
+  /**
+   * Synchronise combat target state per frame:
+   * - Tracks entity movement to keep target selection ring pinned.
+   * - Verifies target distance and liveness, auto-clearing if dead or out of range (>1600px).
+   * - On touch, mirrors auto-target candidates onto the Target Vitals frame.
+   */
+  updateCombatTarget() {
+    if (this.activeCombatTarget) {
+      const { target, kind } = this.activeCombatTarget;
+      const isDead = Boolean(
+        target.isDead ||
+        (Number.isFinite(target.hp) && target.hp <= 0) ||
+        target.active === false ||
+        (kind === "player" && target.container?.active === false)
+      );
+
+      if (isDead) {
+        this.clearCombatTarget();
+        return;
+      }
+
+      if (
+        this.player &&
+        Number.isFinite(this.player.x) &&
+        Number.isFinite(this.player.y) &&
+        Number.isFinite(target.x) &&
+        Number.isFinite(target.y)
+      ) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, target.x, target.y);
+        if (dist > 1600) {
+          this.clearCombatTarget();
+          return;
+        }
+      }
+
+      const footOffset = kind === "player" ? HERO_FOOT_Y * WORLD_SCALE : 0;
+      this.autoTargetRing?.show(target.x, target.y, kind, footOffset);
+
+      if (this._lastTargetHp !== target.hp || this._lastTargetMaxHp !== target.maxHp) {
+        this._lastTargetHp = target.hp;
+        this._lastTargetMaxHp = target.maxHp;
+        this.emitTargetUpdate();
+      }
+      return;
+    }
+
+    if (this.autoTargetEnabled) {
+      this.updateAutoTarget();
+      const current = this.autoTarget;
+      if (current?.target) {
+        if (this._lastAutoTargetId !== current.target.id || this._lastTargetHp !== current.target.hp) {
+          this._lastAutoTargetId = current.target.id;
+          this._lastTargetHp = current.target.hp;
+          this._lastTargetMaxHp = current.target.maxHp;
+          const t = current.target;
+          this.uiBridge?.updateTarget?.({
+            id: t.id,
+            name: t.name || t.displayName || t.username || "Mục tiêu",
+            level: t.level || 1,
+            hp: t.hp ?? 0,
+            maxHp: t.maxHp || 100,
+            kind: current.kind || "monster",
+            isBoss: !!t.isBoss
+          });
+        }
+      } else if (this._lastAutoTargetId !== null) {
+        this._lastAutoTargetId = null;
+        this._lastTargetHp = null;
+        this.uiBridge?.updateTarget?.(null);
+      }
+      return;
+    }
+
+    this.autoTargetRing?.hide();
   }
 
   /**
@@ -2025,6 +2196,10 @@ export class JiangHuScene extends Phaser.Scene {
    */
   castAimPoint(skillId = null) {
     if (!this.autoTargetEnabled) {
+      const active = this.activeCombatTarget?.target;
+      if (active && !active.isDead && active.active !== false) {
+        return { x: active.x, y: active.y };
+      }
       const pointer = this.input.activePointer;
       return pointer ? fromIso(pointer.worldX, pointer.worldY) : null;
     }
@@ -2057,8 +2232,8 @@ export class JiangHuScene extends Phaser.Scene {
     this.updatePvpTarget();
     // Close on a targeted enemy and strike once in range.
     this.updateEnemyTarget();
-    // Keep the touch auto-target ring on the best nearby victim.
-    this.updateAutoTarget();
+    // Keep target ring and HUD vitals updated on active victim.
+    this.updateCombatTarget();
     // Walk into a portal and travel to the linked map.
     this.updatePortals(time);
 
@@ -2167,6 +2342,7 @@ export class JiangHuScene extends Phaser.Scene {
       this.shopFlow.destroy();
       this.shopFlow = null;
     }
+    this.clearCombatTarget?.();
     if (this.autoTargetRing) {
       this.autoTargetRing.destroy();
       this.autoTargetRing = null;

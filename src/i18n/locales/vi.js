@@ -46,7 +46,13 @@ export default {
     hpTitle: "Sinh lực (HP)",
     mpTitle: "Nội lực (MP)",
     staTitle: "Thể lực (Stamina)",
-    buffTitle: "Toàn Chân Tâm Pháp: Tăng 10% công lực & thân pháp"
+    buffTitle: "Toàn Chân Tâm Pháp: Tăng 10% công lực & thân pháp",
+    targetTitle: "Mục tiêu đang chọn",
+    targetMonster: "Quái vật",
+    targetBoss: "Thủ Lĩnh",
+    targetPlayer: "Đồng Đạo",
+    targetDuel: "Tỷ Thí",
+    targetDeselect: "Bỏ chọn (ESC)"
   },
   minimap: {
     region: "Tàng Long (Máy chủ 1)",

@@ -60,6 +60,23 @@ describe("HotbarDock logic & props", () => {
     expect(emptyCount).toBe(8);
   });
 
+  it("applies insufficient-mp class when playerMp is lower than skill mp cost", () => {
+    const quickSlotsMapping = { 2: "skill:dai_tu_di_chuong" };
+    const skills = [
+      {
+        id: "dai_tu_di_chuong",
+        glyph: "掌",
+        nameKey: "skills.thieuLam.daiTuDiChuong.name"
+      }
+    ];
+
+    const lowMpMarkup = renderDockMarkup({ quickSlotsMapping, skills, playerMp: 5 });
+    expect(lowMpMarkup).toContain("insufficient-mp");
+
+    const highMpMarkup = renderDockMarkup({ quickSlotsMapping, skills, playerMp: 100 });
+    expect(highMpMarkup).not.toContain("insufficient-mp");
+  });
+
   it("memoizes quick slots calculation and updates when quickSlotsMapping or items change", () => {
     const initialMapping = { 1: "kim-sang-duoc" };
     const items = [{ id: "kim-sang-duoc", name: "Kim Sáng Dược", icon: "icon-hp-pot", qty: 10 }];

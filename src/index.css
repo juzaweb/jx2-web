@@ -74,6 +74,7 @@ body {
 /* Allow clicks inside HUD widgets */
 .metal-card,
 .top-left-panel,
+.top-center-panel,
 .bottom-dock,
 .mobile-controls {
   pointer-events: auto;
@@ -233,6 +234,131 @@ body {
   font-family: monospace;
   color: #aed9ff;
   margin-top: 2px;
+}
+
+/* ====================================================
+   TOP-CENTER: Target Vitals Frame
+==================================================== */
+.top-center-panel {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: auto;
+}
+
+.target-bracket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 5px;
+  background: linear-gradient(90deg, rgba(20, 26, 30, 0.96) 0%, rgba(29, 38, 43, 0.92) 80%, rgba(29, 38, 43, 0.7) 100%);
+  border: 1.5px solid #594731;
+  border-top: 2.5px solid #d4af37;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+  min-width: 260px;
+}
+
+.target-bracket.is-boss {
+  border-top: 2.5px solid #ff4d4d;
+  box-shadow: 0 4px 18px rgba(180, 20, 20, 0.5), inset 0 0 10px rgba(0, 0, 0, 0.7);
+}
+
+.target-bracket.is-pvp {
+  border-top: 2.5px solid #e63946;
+  border-left: 2px solid #e63946;
+}
+
+.target-level-box {
+  width: 34px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle, #252119 0%, #0d1012 100%);
+  border: 1.5px solid #c59e47;
+  color: #ffdd59;
+  font-family: 'Cinzel', monospace, serif;
+  font-size: 16px;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.7), 0 2px 2px #000;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9);
+  flex-shrink: 0;
+}
+
+.target-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.target-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.target-name {
+  color: #ffd166;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.target-bracket.is-boss .target-name {
+  color: #ff6b6b;
+  text-shadow: 0 0 6px rgba(255, 107, 107, 0.6);
+}
+
+.target-kind-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 2px;
+  color: #e0bb6a;
+}
+
+.target-bracket.is-boss .target-kind-badge {
+  color: #ff8787;
+  border-color: rgba(255, 107, 107, 0.6);
+}
+
+.target-bracket.is-pvp .target-kind-badge {
+  color: #ffa8a8;
+  border-color: rgba(230, 57, 70, 0.6);
+}
+
+.target-close-btn {
+  background: transparent;
+  border: none;
+  color: #a89f91;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 3px;
+  margin-left: auto;
+  transition: color 0.15s ease;
+}
+
+.target-close-btn:hover {
+  color: #ff6b6b;
+}
+
+.target-hp-wrap {
+  width: 100%;
+}
+
+.vital-bar.target-hp {
+  height: 14px;
 }
 
 /* ====================================================
@@ -578,10 +704,31 @@ body {
   display: grid;
   place-items: center;
   border-radius: 1px;
-  background: rgba(0, 0, 0, 0.62);
+  background: conic-gradient(rgba(0, 0, 0, 0.75) var(--cd-sweep, 100%), rgba(0, 0, 0, 0.22) var(--cd-sweep, 100%) 100%);
   color: #fff;
   font-size: 13px;
   font-weight: 900;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 4px #000;
+  pointer-events: none;
+}
+
+/* Out-of-resource state (insufficient MP) */
+.slot-item.insufficient-mp .slot-skill-icon,
+.slot-item.insufficient-mp .skill-icon-img,
+.arc-btn-skill.insufficient-mp .arc-skill-img {
+  filter: grayscale(80%) brightness(0.7) drop-shadow(0 0 2px rgba(96, 165, 250, 0.6));
+  opacity: 0.65;
+}
+
+.slot-item.insufficient-mp::before,
+.arc-btn-skill.insufficient-mp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(30, 64, 175, 0.25);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Left/right mouse skill slots */
@@ -835,11 +982,12 @@ body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.62);
+  background: conic-gradient(rgba(0, 0, 0, 0.75) var(--cd-sweep, 100%), rgba(0, 0, 0, 0.22) var(--cd-sweep, 100%) 100%);
   color: #fff;
   font-size: calc(14px * var(--mctrl-scale));
   font-weight: 900;
   pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 4px #000;
 }
 
 .arc-badge {
@@ -1319,6 +1467,12 @@ body {
   .hotbar-slots {
     display: none;
   }
+
+  .top-center-panel {
+    top: 6px;
+    transform: translateX(-50%) scale(0.85);
+    transform-origin: top center;
+  }
 }
 
 /* Portrait phones only: the landscape layout is the playable one, and these
@@ -1580,6 +1734,12 @@ body.is-item-dragging .inv-tooltip {
   left: 10px;
   transform: scale(0.94);
   transform-origin: top left;
+}
+
+.top-center-panel {
+  top: 8px;
+  transform: translateX(-50%) scale(0.94);
+  transform-origin: top center;
 }
 
 .bars-container {

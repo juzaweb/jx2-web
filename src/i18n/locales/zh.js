@@ -46,7 +46,13 @@ export default {
     hpTitle: "生命（HP）",
     mpTitle: "内力（MP）",
     staTitle: "体力（Stamina）",
-    buffTitle: "全真心法：提升 10% 功力与身法"
+    buffTitle: "全真心法：提升 10% 功力与身法",
+    targetTitle: "当前选中目标",
+    targetMonster: "怪物",
+    targetBoss: "首领",
+    targetPlayer: "同道",
+    targetDuel: "比武",
+    targetDeselect: "取消选择（ESC）"
   },
   minimap: {
     region: "藏龙（服务器 1）",
