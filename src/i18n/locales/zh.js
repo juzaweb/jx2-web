@@ -312,8 +312,8 @@ export default {
         desc: "武当基础剑术，轻灵快捷。"
       },
       thaiCucQuyen: {
-        name: "太极拳",
-        desc: "借力打力，造成强劲冲击伤害。"
+        name: "太极剑法",
+        desc: "借力打力的太极剑法，造成强劲冲击伤害。"
       },
       tamThanhKiemPhap: {
         name: "三清剑法",
@@ -344,12 +344,12 @@ export default {
     },
     nguDoc: {
       nguDocTamPhap: {
-        name: "五毒心法",
-        desc: "五毒秘传心法，攻击附带剧毒。"
+        name: "五毒刀法",
+        desc: "五毒秘传刀法，造成剧毒伤害。"
       },
       truyTamDoc: {
         name: "追心毒",
-        desc: "剧毒掌气透骨穿心。"
+        desc: "剧毒刀气透骨穿心。"
       },
       vanDocChieuHong: {
         name: "万毒召蛊",
@@ -367,10 +367,13 @@ export default {
     closeTitle: "关闭（F3 / Esc）",
     hint: "战斗属性为实际交战使用的数值。将行囊（F4）中的装备拖到格子上即可穿戴，或点击/拖动已装备的格子卸下。",
     tabEquip: "装备",
+    tabInventory: "行囊",
+    tabStats: "属性",
     tabNews: "消息",
     locked: "{label}（未开放）",
     notEquipped: "{label}（未装备）",
     unequipTitle: "{name}（点击卸下）",
+    unequipAction: "卸下装备",
     points: "点数：",
     nextLevel: "升级：",
     slots: {
@@ -386,6 +389,8 @@ export default {
   },
   inventory: {
     title: "行囊",
+    tabCharacter: "角色",
+    itemDetails: "物品详情",
     helpTitle: "行囊帮助",
     closeTitle: "关闭（Esc）",
     hint: "点击药品或符咒即可使用。将物品拖到 1–9 快捷栏即可绑定热键；将快捷格拖离快捷栏（或右键）即可清除。将装备拖到人物面板（F3）即可穿戴。将鼠标悬停在物品上可查看描述。",

@@ -526,7 +526,7 @@ describe("JiangHuScene touch auto-targeting", () => {
   });
 
   it("aims a long-range art at the nearest body inside its own reach", () => {
-    // Đại Tu Di Chưởng reaches 6000, so a wolf beyond the ring radius still gets
+    // Đại Tu Di Chưởng reaches 1200, so a wolf beyond the ring radius still gets
     // aimed at instead of the skill flying into empty air.
     const target = wolf({ x: 900 });
     const scene = touchScene({ enemyManager: { getAll: () => [target] } });

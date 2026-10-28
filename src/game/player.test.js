@@ -393,13 +393,14 @@ describe("Player movement controls", () => {
 });
 
 describe("Player attack motion", () => {
-  it("reports the baked swing so the caller skips its vector arc", () => {
+  it("reports the baked strike so the caller skips its vector arc", () => {
     const scene = createMockScene();
     const player = new Player(scene, 100, 100);
     player.rig = { attack: vi.fn(() => true) };
 
     expect(player.playAttackMotion()).toBe(true);
-    expect(player.rig.attack).toHaveBeenCalledWith("slash");
+    // The normal attack is weapon-agnostic: each strike sheet opts into "basic".
+    expect(player.rig.attack).toHaveBeenCalledWith("basic");
     expect(scene.tweens.add).toHaveBeenCalled();
   });
 

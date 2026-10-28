@@ -51,4 +51,18 @@ describe("CharacterModal stats sheet", () => {
     expect(markup).toContain('data-equip-slot="armor"');
     expect(markup).not.toContain('data-equip-slot="undefined"');
   });
+
+  it("renders quick switch tab to inventory when onSwitchToInventory is provided", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <CharacterModal
+          isOpen
+          onClose={() => {}}
+          onSwitchToInventory={() => {}}
+          stats={{ level: 1 }}
+        />
+      </I18nProvider>
+    );
+    expect(markup).toContain("Hành trang");
+  });
 });

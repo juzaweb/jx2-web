@@ -89,7 +89,7 @@ describe("skill catalog", () => {
       unlockLevel: 18,
       mp: 12,
       cooldown: 6000,
-      range: 6000,
+      range: 1200,
       radius: 0
     });
     expect(laHanQuyen).toMatchObject({
@@ -155,7 +155,7 @@ describe("skill catalog", () => {
       mp: 35,
       cooldown: 30000,
       target: "enemy",
-      range: 6000,
+      range: 1200,
       radius: 900,
       mult: 2.4,
       effects: [{ kind: "stun", duration: 1200 }],

@@ -12,6 +12,7 @@ import {
   HERO_BODY,
   HERO_BODY_TEXTURES,
   HERO_EQUIPMENT_TEXTURES,
+  WEAPON_ATTACK_TEXTURES,
   WEAPON_BODY_TEXTURES,
   weaponAttackTextureDef,
   weaponBodyTextureDef
@@ -129,6 +130,50 @@ describe("heroBody", () => {
       expect(weaponAttackTextureDef("male", null)).toBeNull();
     });
 
+    it("resolves the bare-hand strike sheet for both genders", () => {
+      for (const gender of ["male", "female"]) {
+        const def = weaponAttackTextureDef(gender, "bao-tay");
+        expect(def.key).toBe(`hero-body-${gender}-fist-attack`);
+        expect(def.url).toContain(`hero-body-${gender}-fist-attack.png`);
+        // The art paints no weapon, so frames keep the plain sheet's height.
+        expect(def.frameHeight).toBe(HERO_BODY.frameHeight);
+        expect(def.frames).toBe(HERO_BODY.columns);
+        // A punch/palm sequence covers the normal attack and a palm cast only.
+        expect(def.kinds).toEqual(["basic", "shockwave"]);
+      }
+      // Her palm reaches a little further, so her frames are slightly wider.
+      expect(weaponAttackTextureDef("male", "bao-tay").frameWidth).toBe(128);
+      expect(weaponAttackTextureDef("female", "bao-tay").frameWidth).toBe(130);
+    });
+
+    it("keeps the plain walk sheet for bare hands", () => {
+      // Only the strike frames come from the fist art, so the walk pose and the
+      // vector glove stay exactly as they are for every other unarmed look.
+      expect(bodyTextureFor("male", "bao-tay")).toBe("hero-body-male");
+      expect(bodyTextureFor("female", "bao-tay")).toBe("hero-body-female");
+      expect(weaponBodyTextureDef("male", "bao-tay")).toBeNull();
+      expect(weaponBodyTextureDef("female", "bao-tay")).toBeNull();
+      expect(bakedEquipmentSlots("male", "bao-tay")).toEqual(["pants", "armor", "helmet"]);
+    });
+
+    it("gives every strike sheet the motions it covers", () => {
+      const sheets = [
+        ...Object.values(WEAPON_BODY_TEXTURES).flatMap((byGender) =>
+          Object.values(byGender).map((def) => def.attack)
+        ),
+        ...Object.values(WEAPON_ATTACK_TEXTURES).flatMap((byGender) =>
+          Object.values(byGender)
+        )
+      ].filter(Boolean);
+
+      expect(sheets.length).toBeGreaterThan(0);
+      for (const def of sheets) {
+        // Every melee look covers the normal attack; a missing list would make
+        // the rig silently fall back to its vector pose.
+        expect(def.kinds, def.key).toContain("basic");
+      }
+    });
+
     it("declares frame geometry that matches the shipped PNGs", () => {
       const expected = (def) => ({
         width: HERO_BODY.columns * def.frameWidth,
@@ -140,6 +185,13 @@ describe("heroBody", () => {
         expect(pngSize(def.attack.url), `${gender} swing sheet`).toEqual(
           expected(def.attack)
         );
+      }
+      for (const [weapon, byGender] of Object.entries(WEAPON_ATTACK_TEXTURES)) {
+        for (const [gender, def] of Object.entries(byGender)) {
+          expect(pngSize(def.url), `${gender} ${weapon} strike sheet`).toEqual(
+            expected(def)
+          );
+        }
       }
       for (const [gender, def] of Object.entries(HERO_BODY_TEXTURES)) {
         expect(pngSize(def.url), `${gender} plain sheet`).toEqual(

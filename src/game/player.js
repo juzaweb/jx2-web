@@ -275,12 +275,12 @@ export class Player {
 
   /**
    * Play the normal-attack motion.
-   * @returns {boolean} `true` when the baked swing sheet played (the art already
-   *   contains the slash arc, so the caller must not draw one)
+   * @returns {boolean} `true` when the weapon's baked strike sheet played (the
+   *   art already contains the slash arc, so the caller must not draw one)
    */
   playAttackMotion() {
     if (!this.body) return false;
-    const bakedSwing = this.rig?.attack?.("slash") === true;
+    const bakedStrike = this.rig?.attack?.("basic") === true;
     this.scene.tweens.add({
       targets: this.body,
       x: 7,
@@ -293,12 +293,12 @@ export class Player {
         if (this.body) this.body.x = 0;
       }
     });
-    return bakedSwing;
+    return bakedStrike;
   }
 
   /**
    * Play the limb animation for a skill cast.
-   * @param {"slash"|"kick"|"shockwave"|"aura"|string} [kind]
+   * @param {"basic"|"slash"|"kick"|"shockwave"|"aura"|string} [kind]
    */
   playSkillMotion(kind = "slash") {
     if (!this.body) return;

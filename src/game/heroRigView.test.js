@@ -62,6 +62,7 @@ function makeSpriteScene(availableTextures = ["hero-body-male", "hero-body-femal
   const shape = () => ({
     x: 0,
     y: 0,
+    visible: true,
     setOrigin() {
       return this;
     },
@@ -69,6 +70,10 @@ function makeSpriteScene(availableTextures = ["hero-body-male", "hero-body-femal
       return this;
     },
     setLineWidth() {
+      return this;
+    },
+    setVisible(next) {
+      this.visible = next;
       return this;
     }
   });
@@ -418,6 +423,17 @@ describe("HeroRigView sword swing", () => {
     expect(view.acting).toBe(false);
   });
 
+  it("plays the swing sheet for the normal attack too", () => {
+    const scene = swordScene();
+    attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, { weapon: "kiem-lang-khach" }, "male");
+
+    // The strike sheet opts into "basic", so the everyday swing uses it as well.
+    expect(view.attack("basic")).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-male-sword-attack");
+  });
+
   it("walks the whole cycle without leaving the walk cycle suppressed", () => {
     const scene = swordScene();
     const timers = attachTimerStub(scene);
@@ -483,9 +499,10 @@ describe("HeroRigView sword swing", () => {
     const view = new HeroRigView(scene);
     view.set(2, { weapon: "kiem-lang-khach" }, "male");
 
-    // A buff or a kick must not become a sword swing.
+    // A buff, a kick or a palm cast must not become a sword swing.
     expect(view.attack("aura")).toBe(false);
     expect(view.attack("kick")).toBe(false);
+    expect(view.attack("shockwave")).toBe(false);
     expect(view.bodySprite.texture).toBe("hero-body-male-sword");
   });
 
@@ -537,6 +554,113 @@ describe("HeroRigView sword swing", () => {
 
     timers[0].tick(4);
     expect(view.bodySprite.texture).toBe("hero-body-female-sword");
+  });
+});
+
+describe("HeroRigView bare-hand strike", () => {
+  // The palm art holds no weapon, so the walk sheet stays the plain one and
+  // only the strike frames come from the fist sheet.
+  const fistScene = () =>
+    makeSpriteScene(["hero-body-male", "hero-body-male-fist-attack"]);
+  const wearGloves = { weapon: "bao-tay-lang-khach" };
+
+  it("plays the palm sheet for the normal attack and a palm cast", () => {
+    for (const kind of ["basic", "shockwave"]) {
+      const scene = fistScene();
+      const timers = attachTimerStub(scene);
+      const view = new HeroRigView(scene);
+      view.set(2, wearGloves, "male"); // faces right (row 2)
+      expect(view.bodySprite.texture).toBe("hero-body-male");
+
+      expect(view.attack(kind)).toBe(true);
+      expect(view.bodySprite.texture).toBe("hero-body-male-fist-attack");
+      expect(view.bodySprite.frame).toBe(8); // row 2 * 4 columns + frame 0
+
+      timers[0].tick(4);
+      expect(view.bodySprite.texture).toBe("hero-body-male");
+      expect(view.bodySprite.frame).toBe(8);
+    }
+  });
+
+  it("keeps the vector pose for motions the art was not drawn for", () => {
+    const scene = fistScene();
+    attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "male");
+
+    // A kick, a buff and a slash-flavoured fist skill are not a palm strike.
+    for (const kind of ["kick", "aura", "slash"]) {
+      expect(view.attack(kind)).toBe(false);
+    }
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+  });
+
+  it("treats a bare call as the normal attack", () => {
+    const scene = fistScene();
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "male");
+
+    expect(view.attack()).toBe(true);
+    timers[0].tick(4);
+    expect(view.bodySprite.texture).toBe("hero-body-male");
+  });
+
+  it("keeps the glove on when the strike art has not loaded yet", () => {
+    // An unloaded sheet must degrade to the vector pose, not to a gloveless
+    // hero frozen on a strike frame.
+    const scene = makeSpriteScene(["hero-body-male"]);
+    attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "male");
+
+    expect(view.attack("basic")).toBe(false);
+    expect(view.weaponOverlays.every((overlay) => overlay.visible)).toBe(true);
+  });
+
+  it("hides the vector glove while the art draws the hands", () => {
+    const scene = fistScene();
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "male");
+
+    expect(view.weaponOverlays.length).toBeGreaterThan(0);
+    expect(view.weaponOverlays.every((overlay) => overlay.visible)).toBe(true);
+
+    view.attack("basic");
+    expect(view.weaponOverlays.every((overlay) => overlay.visible === false)).toBe(true);
+
+    timers[0].tick(4);
+    expect(view.weaponOverlays.every((overlay) => overlay.visible === true)).toBe(true);
+  });
+
+  it("shows the glove again when the strike is cancelled", () => {
+    const scene = fistScene();
+    const timers = attachTimerStub(scene);
+    scene.tweens = { add: () => ({ stop() {} }) };
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "male");
+
+    view.attack("basic");
+    view.attack("kick"); // a cancelled strike must not leave the glove hidden
+    expect(timers[0].removed).toBe(true);
+    expect(view.weaponOverlays.every((overlay) => overlay.visible)).toBe(true);
+  });
+
+  it("plays the female palm art for a female hero", () => {
+    const scene = makeSpriteScene(["hero-body-female", "hero-body-female-fist-attack"]);
+    const timers = attachTimerStub(scene);
+    const view = new HeroRigView(scene);
+    view.set(2, wearGloves, "female");
+    expect(view.bodySprite.texture).toBe("hero-body-female");
+
+    expect(view.attack("shockwave")).toBe(true);
+    expect(view.bodySprite.texture).toBe("hero-body-female-fist-attack");
+
+    timers[0].tick(4);
+    expect(view.bodySprite.texture).toBe("hero-body-female");
   });
 });
 

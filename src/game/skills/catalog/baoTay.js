@@ -43,7 +43,7 @@ export const BAO_TAY_SKILLS = [
     mp: 12,
     cooldown: 6000,
     target: "enemy",
-    range: 6000,
+    range: 1200,
     radius: 0,
     mult: 1.3,
     effects: [{ kind: "stun", duration: 800 }],
@@ -80,7 +80,7 @@ export const BAO_TAY_SKILLS = [
     splash: { radius: 160, mult: 0.6, maxTargets: 4 },
     effects: [{ kind: "stun", duration: 600, chance: 0.1 }],
     vfx: {
-      preset: "slash",
+      preset: "palm",
       color: 0xffc94d
     }
   }),
@@ -161,7 +161,7 @@ export const BAO_TAY_SKILLS = [
     mp: 35,
     cooldown: 30000,
     target: "enemy",
-    range: 6000,
+    range: 1200,
     radius: 900,
     mult: 2.4,
     effects: [{ kind: "stun", duration: 1200 }],
