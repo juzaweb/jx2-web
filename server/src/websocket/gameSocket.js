@@ -1802,6 +1802,9 @@ export class GameSocketManager {
           skill: skillId,
           x,
           y,
+          // The impact point the server validated, so peers land the art where
+          // the caster aimed instead of at the caster's feet.
+          ...(aim ? { aimX: aim.x, aimY: aim.y } : {}),
           facingRight
         }
       },

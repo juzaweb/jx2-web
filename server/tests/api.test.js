@@ -142,6 +142,28 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(json.success, false);
   });
 
+  test("Users: Register a new user successfully", async () => {
+    const res = await fetch(`${baseUrl}/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "hiepkhat99",
+        password: "secretpassword123",
+        displayName: "Hiệp Khách Vô Danh"
+      })
+    });
+    assert.equal(res.status, 201);
+    const json = await res.json();
+    assert.equal(json.success, true);
+    assert.equal(json.data.user.username, "hiepkhat99");
+    assert.equal(json.data.user.displayName, "Hiệp Khách Vô Danh");
+    assert.ok(json.data.user.id);
+    assert.ok(json.data.token);
+    // Ensure password_hash and salt are not exposed in response
+    assert.equal(json.data.user.password_hash, undefined);
+    assert.equal(json.data.user.salt, undefined);
+  });
+
   test("Users: Profile access requires authentication and ownership", async () => {
     // 1. Unauthenticated request must return 401
     const unauthRes = await fetch(`${baseUrl}/users/me`);
@@ -198,26 +220,22 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(({}).admin, undefined, "Prototype pollution must be neutralized");
   });
 
-  test("Users: Register a new user successfully", async () => {
+  test("Users: Public registration with admin_ prefix does not grant admin status", async () => {
+    const { userDb } = await import("../src/data/userDb.js");
     const res = await fetch(`${baseUrl}/users/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: "hiepkhat99",
+        username: "admin_imposter",
         password: "secretpassword123",
-        displayName: "Hiệp Khách Vô Danh"
+        displayName: "Fake Admin"
       })
     });
     assert.equal(res.status, 201);
     const json = await res.json();
     assert.equal(json.success, true);
-    assert.equal(json.data.user.username, "hiepkhat99");
-    assert.equal(json.data.user.displayName, "Hiệp Khách Vô Danh");
-    assert.ok(json.data.user.id);
-    assert.ok(json.data.token);
-    // Ensure password_hash and salt are not exposed in response
-    assert.equal(json.data.user.password_hash, undefined);
-    assert.equal(json.data.user.salt, undefined);
+    assert.equal(json.data.user.role, "player");
+    assert.equal(userDb.isAdmin(json.data.user.id), false);
   });
 
   test("Users: Register rejects duplicate username", async () => {

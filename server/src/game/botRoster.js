@@ -383,6 +383,8 @@ export class BotRoster {
         skill: skillId || "normal",
         x: target.x,
         y: target.y,
+        // Same contract as a real player's cast: the aim point peers draw at.
+        ...(skillId ? { aimX: target.x, aimY: target.y } : {}),
         facingRight: bot.direction === "right"
       }
     });

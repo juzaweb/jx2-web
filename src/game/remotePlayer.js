@@ -229,25 +229,6 @@ export class RemotePlayer {
   }
 
   /**
-   * Play visual Kiếm Khí skill ring
-   */
-  playSkill() {
-    const base = toIso(this.x, this.y);
-    const ring = this.scene.add
-      .circle(base.x, base.y, 24, 0x80d7e9, 0.2)
-      .setStrokeStyle(4, 0xb8e9f0, 0.9)
-      .setDepth(isoDepth(this.x, this.y) + 5);
-
-    this.scene.tweens.add({
-      targets: ring,
-      scale: 4,
-      alpha: 0,
-      duration: 380,
-      onComplete: () => ring.destroy()
-    });
-  }
-
-  /**
    * Frame update with smooth interpolation
    * @param {number} time
    * @param {number} delta

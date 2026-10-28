@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./remotePlayer.js", () => {
   return {
@@ -18,6 +18,15 @@ vi.mock("./remotePlayer.js", () => {
       update(time, delta) {
         this.lastUpdate = { time, delta };
       }
+      playAttack(facingRight = true) {
+        this.playedAttack = facingRight;
+      }
+      showFormation(...args) {
+        this.shownFormation = args;
+      }
+      hideFormation() {
+        this.hiddenFormation = true;
+      }
       showOverhead(...args) {
         this.shownOverhead = args;
       }
@@ -28,9 +37,16 @@ vi.mock("./remotePlayer.js", () => {
   };
 });
 
+vi.mock("./skills/client/vfx.js", () => ({ playSkillCastVfx: vi.fn() }));
+
 import { RemotePlayerManager } from "./remotePlayerManager.js";
+import { playSkillCastVfx } from "./skills/client/vfx.js";
 
 describe("RemotePlayerManager", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("handles player join without emitting noisy system chat logs", () => {
     const uiBridge = { addLog: vi.fn() };
     const scene = {};
@@ -78,6 +94,73 @@ describe("RemotePlayerManager", () => {
     expect(manager.players.has("my-id")).toBe(false);
     expect(manager.players.has("peer-1")).toBe(true);
     expect(manager.players.has("peer-2")).toBe(true);
+  });
+
+  it("replays a peer's skill art at the aim point the server validated", () => {
+    const manager = new RemotePlayerManager({}, null);
+    manager.handlePlayerJoined({ player: { id: "remote-caster" } });
+    const peer = manager.players.get("remote-caster");
+
+    manager.handlePlayerAttacked({
+      id: "remote-caster",
+      skill: "dai_tu_di_chuong",
+      x: 500,
+      y: 500,
+      aimX: 900,
+      aimY: 520,
+      facingRight: true
+    });
+
+    expect(playSkillCastVfx).toHaveBeenCalledWith(
+      expect.anything(),
+      peer,
+      expect.objectContaining({ id: "dai_tu_di_chuong" }),
+      null,
+      { x: 900, y: 520 }
+    );
+  });
+
+  it("falls back to the melee motion for a plain swing", () => {
+    const manager = new RemotePlayerManager({}, null);
+    manager.handlePlayerJoined({ player: { id: "remote-swing" } });
+    const peer = manager.players.get("remote-swing");
+
+    manager.handlePlayerAttacked({ id: "remote-swing", skill: "normal", facingRight: false });
+
+    expect(peer.playedAttack).toBe(false);
+    expect(playSkillCastVfx).not.toHaveBeenCalled();
+  });
+
+  it("keeps a peer's formation ring for the buff's whole duration", () => {
+    const timers = [];
+    const scene = {
+      time: {
+        delayedCall: vi.fn((delay, callback) => {
+          const timer = { delay, callback, remove: vi.fn() };
+          timers.push(timer);
+          return timer;
+        })
+      }
+    };
+    const manager = new RemotePlayerManager(scene, null);
+    manager.handlePlayerJoined({ player: { id: "remote-formation" } });
+    const peer = manager.players.get("remote-formation");
+
+    manager.handlePlayerAttacked({ id: "remote-formation", skill: "la_han_tran" });
+
+    expect(peer.shownFormation).toEqual(["vfx-la-han-tran", 0.6]);
+    expect(timers[0].delay).toBe(180000);
+    // A self-buff carries no aim, so the art falls back to the peer's facing.
+    expect(playSkillCastVfx).toHaveBeenCalledWith(
+      expect.anything(),
+      peer,
+      expect.objectContaining({ id: "la_han_tran" }),
+      null,
+      null
+    );
+
+    timers[0].callback();
+    expect(peer.hiddenFormation).toBe(true);
   });
 
   it("shows the overhead seal when a peer casts Kim Cang Bất Hoại", () => {
