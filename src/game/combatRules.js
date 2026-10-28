@@ -180,16 +180,33 @@ export function splashVictims(primary, enemies, skill) {
   const radius = splashRadius(skill);
   if (!primary || radius <= 0 || !Array.isArray(enemies)) return [];
 
-  return enemies
-    .filter((enemy) => enemy && enemy !== primary && !enemy.isDead)
-    .map((enemy) => ({
-      enemy,
-      distance: Math.hypot(enemy.x - primary.x, enemy.y - primary.y)
-    }))
-    .filter(({ distance }) => distance <= radius)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, splashMaxTargets(skill))
-    .map(({ enemy }) => enemy);
+  // BOLT OPTIMIZATION: Avoid multi-pass array allocation (.filter().map().filter().sort().slice().map())
+  // and expensive Math.hypot square roots in high-frequency splash calculations.
+  // Single-pass distance squared filtering reduces allocations and eliminates square root operations.
+  const radiusSq = radius * radius;
+  const maxTargets = splashMaxTargets(skill);
+  const candidates = [];
+
+  for (let i = 0; i < enemies.length; i += 1) {
+    const enemy = enemies[i];
+    if (enemy && enemy !== primary && !enemy.isDead) {
+      const dx = enemy.x - primary.x;
+      const dy = enemy.y - primary.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= radiusSq) {
+        candidates.push({ enemy, distSq });
+      }
+    }
+  }
+
+  if (candidates.length > 1) {
+    candidates.sort((a, b) => a.distSq - b.distSq);
+  }
+  if (candidates.length > maxTargets) {
+    candidates.length = maxTargets;
+  }
+
+  return candidates.map((c) => c.enemy);
 }
 
 /** Position tolerance multiplier on top of the walk speed. */
