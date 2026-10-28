@@ -38,5 +38,30 @@ describe("GmModal Component", () => {
     expect(markup).toContain('type="number"');
     expect(markup).toContain("Đặt Cấp");
   });
+
+  it("renders weapons and skill books options in equipment tab", () => {
+    const markup = renderModal({ initialTab: "equipment" });
+    // Costumes
+    expect(markup).toContain("Bộ Y Phục Lãng Khách");
+    expect(markup).toContain("Nón Lãng Khách");
+    expect(markup).toContain("Áo Lãng Khách");
+    expect(markup).toContain("Quần Lãng Khách");
+    expect(markup).toContain("Nhận Trọn Bộ Y Phục");
+
+    // Weapons
+    expect(markup).toContain("Vũ Khí Lãng Khách");
+    expect(markup).toContain("Kiếm Lãng Khách");
+    expect(markup).toContain("Đao Lãng Khách");
+    expect(markup).toContain("Bao Tay Lãng Khách");
+    expect(markup).toContain("Nhận Trọn Bộ Vũ Khí");
+
+    // Skill Books
+    expect(markup).toContain("Bí Kíp Võ Học (Sách Kỹ Năng)");
+    expect(markup).toContain("Nhận Toàn Bộ Bí Kíp (18 Cuốn)");
+    expect(markup).toContain("Bí Kíp Thiếu Lâm (6)");
+    expect(markup).toContain("Bí Kíp Võ Đang (4)");
+    expect(markup).toContain("Bí Kíp Nga My (4)");
+    expect(markup).toContain("Bí Kíp Ngũ Độc (4)");
+  });
 });
 

@@ -556,7 +556,21 @@ export default {
       getPants: "Quần Lãng Khách",
       quickActions: "Thao Tác Nhanh",
       receiveFullSet: "Nhận Trọn Bộ Y Phục",
-      equipFullSet: "Mặc Trọn Bộ Ngay"
+      equipFullSet: "Mặc Trọn Bộ Ngay",
+      weaponsTitle: "Vũ Khí Lãng Khách",
+      getSword: "Kiếm Lãng Khách",
+      getGlove: "Bao Tay Lãng Khách",
+      getSaber: "Đao Lãng Khách",
+      receiveAllWeapons: "Nhận Trọn Bộ Vũ Khí",
+      booksTitle: "Bí Kíp Võ Học (Sách Kỹ Năng)",
+      booksDesc: "Nhận bí kíp các môn phái vào hành trang để học kỹ năng.",
+      receiveAllBooks: "Nhận Toàn Bộ Bí Kíp (18 Cuốn)",
+      receiveThieuLamBooks: "Bí Kíp Thiếu Lâm (6)",
+      receiveVoDangBooks: "Bí Kíp Võ Đang (4)",
+      receiveNgaMyBooks: "Bí Kíp Nga My (4)",
+      receiveNguDocBooks: "Bí Kíp Ngũ Độc (4)",
+      allBooksReceivedText: "Đã nhận toàn bộ bí kíp kỹ năng!",
+      allBooksReceivedLog: "Đã nhận toàn bộ 18 cuốn bí kíp kỹ năng vào túi đồ."
     },
     teleport: {
       receiveScroll: "Nhận 99x Hồi Thành Phù"

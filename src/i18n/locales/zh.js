@@ -557,7 +557,21 @@ export default {
       getPants: "浪客劲装裤",
       quickActions: "快捷操作",
       receiveFullSet: "获取完整套装",
-      equipFullSet: "一键穿戴全套"
+      equipFullSet: "一键穿戴全套",
+      weaponsTitle: "浪客武器",
+      getSword: "浪客长剑",
+      getGlove: "浪客拳套",
+      getSaber: "浪客长刀",
+      receiveAllWeapons: "获取全套武器",
+      booksTitle: "武功秘籍（技能书）",
+      booksDesc: "获取各派武学秘籍至背包以研习技能。",
+      receiveAllBooks: "获取全部秘籍 (18本)",
+      receiveThieuLamBooks: "少林秘籍 (6)",
+      receiveVoDangBooks: "武当秘籍 (4)",
+      receiveNgaMyBooks: "峨眉秘籍 (4)",
+      receiveNguDocBooks: "五毒秘籍 (4)",
+      allBooksReceivedText: "已获取全部武学秘籍！",
+      allBooksReceivedLog: "已将全部18本武学秘籍放入背包。"
     },
     teleport: {
       receiveScroll: "获取 99x 回城符"

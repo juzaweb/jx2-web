@@ -556,7 +556,21 @@ export default {
       getPants: "Wanderer Trousers",
       quickActions: "Quick Actions",
       receiveFullSet: "Receive Full Set",
-      equipFullSet: "Equip Full Set Now"
+      equipFullSet: "Equip Full Set Now",
+      weaponsTitle: "Wanderer Weapons",
+      getSword: "Wanderer Sword",
+      getGlove: "Wanderer Gloves",
+      getSaber: "Wanderer Saber",
+      receiveAllWeapons: "Receive All Weapons",
+      booksTitle: "Martial Arts Skill Books",
+      booksDesc: "Receive sect skill books to inventory to study skills.",
+      receiveAllBooks: "Receive All Skill Books (18)",
+      receiveThieuLamBooks: "Shaolin Books (6)",
+      receiveVoDangBooks: "Wudang Books (4)",
+      receiveNgaMyBooks: "Emei Books (4)",
+      receiveNguDocBooks: "Five Poisons Books (4)",
+      allBooksReceivedText: "Received all martial skill books!",
+      allBooksReceivedLog: "Received all 18 skill books to inventory."
     },
     teleport: {
       receiveScroll: "Receive 99x Return City Talisman"
