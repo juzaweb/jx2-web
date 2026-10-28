@@ -67,7 +67,7 @@ const KIEM_VO_DANG_SKILLS = [
     id: "thai_cuc_quyen",
     weapon: "kiem",
     slot: 1,
-    book: { viName: "Thái Cực Quyền", dropTiers: ["da-lang", "lam-tac"] },
+    book: { viName: "Thái Cực Kiếm Pháp", dropTiers: ["da-lang", "lam-tac"] },
     glyph: "太",
     requires: [{ id: "thieu_duong_kiem_phap", level: 1 }],
     nameKey: "skills.voDang.thaiCucQuyen.name",

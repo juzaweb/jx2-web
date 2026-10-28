@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { deriveCharacterSheet } from "../../game/characterStats.js";
 import { getItemById } from "../../game/items.js";
+import { bonusRows } from "../../game/equipment.js";
 import "../../styles/character.css";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
-import { localizeItem } from "../../i18n/localize.js";
+import { localizeItem, localizeBonusRows } from "../../i18n/localize.js";
 import { setDragPayload } from "./dragItem.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 
@@ -107,15 +108,40 @@ export function CharacterModal({
   playerName = "",
   equipment = {},
   gender = "male",
-  onUnequipSlot
+  onUnequipSlot,
+  onSwitchToInventory
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
+  const [selectedEquip, setSelectedEquip] = useState(null);
   const { panelRef, dragging, panelStyle, dragHandlers } = useDraggablePanel(isOpen);
 
   if (!isOpen) return null;
 
   const sheet = deriveCharacterSheet(stats);
+
+  const handleSlotClick = (slot, item) => {
+    if (!item) return;
+
+    const isTouch = typeof window !== "undefined" && (
+      window.innerWidth <= 960 ||
+      window.innerHeight <= 500 ||
+      ("ontouchstart" in window) ||
+      (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+    );
+
+    if (isTouch) {
+      setSelectedEquip({
+        item,
+        slotKey: slot.key,
+        source: slot.source,
+        label: t(slot.labelKey)
+      });
+      return;
+    }
+
+    onUnequipSlot?.(slot.source);
+  };
 
   const renderSlot = (slot) => {
     const wornId = slot.source ? equipment?.[slot.source] : null;
@@ -131,7 +157,7 @@ export function CharacterModal({
           data-equip-slot={slot.source}
           draggable
           onDragStart={(event) => setDragPayload(event, { kind: "equipment", slot: slot.source })}
-          onClick={() => onUnequipSlot?.(slot.source)}
+          onClick={() => handleSlotClick(slot, item)}
         >
           <span className={`inv-icon ${item.icon}`} />
         </button>
@@ -152,8 +178,18 @@ export function CharacterModal({
     );
   };
 
+  const handleOverlayClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose?.();
+    }
+  };
+
+  const selectedBonusRows = selectedEquip?.item
+    ? localizeBonusRows(bonusRows(selectedEquip.item), t)
+    : [];
+
   return (
-    <div className="char-modal-overlay" id="character-modal">
+    <div className="char-modal-overlay" id="character-modal" onClick={handleOverlayClick}>
       <div
         className={`char-panel${dragging ? " is-dragging" : ""}`}
         ref={panelRef}
@@ -166,6 +202,7 @@ export function CharacterModal({
           <span className="char-title">{t("character.title")}</span>
           <div className="char-titlebar-actions">
             <button
+              type="button"
               className="char-icon-btn"
               title={t("character.helpTitle")}
               onClick={() => setShowHint((v) => !v)}
@@ -173,6 +210,7 @@ export function CharacterModal({
               ?
             </button>
             <button
+              type="button"
               className="char-icon-btn close"
               title={t("character.closeTitle")}
               onClick={onClose}
@@ -202,6 +240,18 @@ export function CharacterModal({
               {t(tab.labelKey)}
             </button>
           ))}
+          {onSwitchToInventory && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              className="char-tab"
+              onClick={onSwitchToInventory}
+              title={t("character.tabInventory")}
+            >
+              {t("character.tabInventory")}
+            </button>
+          )}
         </div>
 
         <div className="char-body">
@@ -244,7 +294,67 @@ export function CharacterModal({
           </div>
         </div>
 
+        {selectedEquip && (
+          <div className="item-detail-overlay" onClick={() => setSelectedEquip(null)}>
+            <div
+              className="item-detail-card"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-label={selectedEquip.item.name}
+            >
+              <div className="item-detail-head">
+                <span className={`item-detail-icon inv-icon ${selectedEquip.item.icon}`} />
+                <div className="item-detail-title-group">
+                  <div className="item-detail-name">{selectedEquip.item.name}</div>
+                  <div className="item-detail-slot">{selectedEquip.label}</div>
+                </div>
+                <button
+                  type="button"
+                  className="item-detail-close-btn"
+                  onClick={() => setSelectedEquip(null)}
+                  title={t("common.close")}
+                >
+                  ×
+                </button>
+              </div>
 
+              {selectedEquip.item.desc && (
+                <div className="item-detail-desc">{selectedEquip.item.desc}</div>
+              )}
+
+              {selectedBonusRows.length > 0 && (
+                <div className="item-detail-bonuses">
+                  {selectedBonusRows.map((row) => (
+                    <div key={row.stat} className="item-detail-bonus-row">
+                      <span>{row.label}</span>
+                      <span className="item-detail-bonus-val">+{row.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="item-detail-actions">
+                <button
+                  type="button"
+                  className="item-detail-action-btn equip"
+                  onClick={() => {
+                    onUnequipSlot?.(selectedEquip.source);
+                    setSelectedEquip(null);
+                  }}
+                >
+                  {t("character.unequipAction")}
+                </button>
+                <button
+                  type="button"
+                  className="item-detail-action-btn cancel"
+                  onClick={() => setSelectedEquip(null)}
+                >
+                  {t("common.close")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

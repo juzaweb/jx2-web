@@ -196,12 +196,12 @@ export class RemotePlayer {
   }
 
   /**
-   * Play visual sword attack arc
+   * Play the peer's normal-attack motion.
    * @param {boolean} facingRight
    */
   playAttack(facingRight = true) {
-    // A peer holding a weapon with swing art plays that instead.
-    if (this.rig?.attack?.("slash") === true) return;
+    // A peer holding a weapon with strike art plays that instead.
+    if (this.rig?.attack?.("basic") === true) return;
 
     const slashOffsetX = facingRight ? 16 : -16;
     const base = toIso(this.x, this.y);

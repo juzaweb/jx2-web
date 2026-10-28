@@ -29,6 +29,7 @@ export function InventoryModal({
   onEquipItem,
   onUnequipSlot,
   onAssignQuickSlot,
+  onSwitchToCharacter,
   equipment = {},
   coins = 0,
   inventoryItems = EMPTY_GRID,
@@ -36,6 +37,7 @@ export function InventoryModal({
 }) {
   const { t } = useI18n();
   const [hovered, setHovered] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [showHint, setShowHint] = useState(false);
   const tooltipRef = useRef(null);
@@ -43,7 +45,11 @@ export function InventoryModal({
 
   // Closing the bag mid-drag must not leave a ghost icon or window listeners behind.
   useEffect(() => {
-    if (!isOpen) cancelItemDrag();
+    if (!isOpen) {
+      cancelItemDrag();
+      setSelectedItem(null);
+      setHovered(null);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -86,6 +92,19 @@ export function InventoryModal({
     if (!item) return;
     // The pointer drag ends with a click on the item it moved; do not also use it.
     if (didItemDragJustEnd(event.currentTarget)) return;
+
+    const isTouch = typeof window !== "undefined" && (
+      window.innerWidth <= 960 ||
+      window.innerHeight <= 500 ||
+      ("ontouchstart" in window) ||
+      (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+    );
+
+    if (isTouch) {
+      setSelectedItem(localizeItem(item, t));
+      return;
+    }
+
     if (item.slot) {
       onEquipItem?.(item.id);
       return;
@@ -135,9 +154,16 @@ export function InventoryModal({
   );
 
   const hoveredBonusRows = hovered ? localizeBonusRows(bonusRows(hovered), t) : [];
+  const selectedBonusRows = selectedItem ? localizeBonusRows(bonusRows(selectedItem), t) : [];
+
+  const handleDockClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose?.();
+    }
+  };
 
   return (
-    <div id="inventory-modal" className="inventory-dock">
+    <div id="inventory-modal" className="inventory-dock" onClick={handleDockClick}>
       <div
         className={`wuxia-modal inventory-panel metal-card${dragging ? " is-dragging" : ""}`}
         ref={panelRef}
@@ -154,6 +180,7 @@ export function InventoryModal({
           <span className="inv-title">{t("inventory.title")}</span>
           <div className="inv-titlebar-actions">
             <button
+              type="button"
               className="inv-icon-btn"
               title={t("inventory.helpTitle")}
               onClick={() => setShowHint((v) => !v)}
@@ -161,6 +188,7 @@ export function InventoryModal({
               ?
             </button>
             <button
+              type="button"
               className="inv-icon-btn close"
               title={t("inventory.closeTitle")}
               onClick={onClose}
@@ -168,6 +196,28 @@ export function InventoryModal({
               ×
             </button>
           </div>
+        </div>
+
+        <div className="inv-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected="true"
+            className="inv-tab active"
+          >
+            {t("inventory.title")}
+          </button>
+          {onSwitchToCharacter && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              className="inv-tab"
+              onClick={onSwitchToCharacter}
+            >
+              {t("inventory.tabCharacter")}
+            </button>
+          )}
         </div>
 
         {showHint && (
@@ -285,6 +335,97 @@ export function InventoryModal({
           {(hovered.useSlot != null || hovered.skillId) && (
             <div className="inv-tooltip-use">{t("inventory.useHint")}</div>
           )}
+        </div>
+      )}
+
+      {selectedItem && (
+        <div className="item-detail-overlay" onClick={() => setSelectedItem(null)}>
+          <div
+            className="item-detail-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label={selectedItem.name}
+          >
+            <div className="item-detail-head">
+              <span className={`item-detail-icon inv-icon ${selectedItem.icon}`} />
+              <div className="item-detail-title-group">
+                <div className="item-detail-name">{selectedItem.name}</div>
+                {typeof selectedItem.qty === "number" && (
+                  <div className="item-detail-qty">
+                    {t("inventory.quantity", { qty: selectedItem.qty })}
+                  </div>
+                )}
+                {selectedItem.slot && (
+                  <div className="item-detail-slot">
+                    {t("inventory.equipHint", {
+                      slot: t(
+                        `slots.${selectedItem.slot}`,
+                        undefined,
+                        EQUIPMENT_SLOTS.find((s) => s.key === selectedItem.slot)?.label || selectedItem.slot
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="item-detail-close-btn"
+                onClick={() => setSelectedItem(null)}
+                title={t("common.close")}
+              >
+                ×
+              </button>
+            </div>
+
+            {selectedItem.desc && (
+              <div className="item-detail-desc">{selectedItem.desc}</div>
+            )}
+
+            {selectedBonusRows.length > 0 && (
+              <div className="item-detail-bonuses">
+                {selectedBonusRows.map((row) => (
+                  <div key={row.stat} className="item-detail-bonus-row">
+                    <span>{row.label}</span>
+                    <span className="item-detail-bonus-val">+{row.amount}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="item-detail-actions">
+              {selectedItem.slot && (
+                <button
+                  type="button"
+                  className="item-detail-action-btn equip"
+                  onClick={() => {
+                    onEquipItem?.(selectedItem.id);
+                    setSelectedItem(null);
+                  }}
+                >
+                  {t("inventory.equip")}
+                </button>
+              )}
+              {(selectedItem.useSlot != null || selectedItem.skillId) && (
+                <button
+                  type="button"
+                  className="item-detail-action-btn use"
+                  onClick={() => {
+                    onUseItem?.(selectedItem.id);
+                    setSelectedItem(null);
+                  }}
+                >
+                  {t("inventory.use")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="item-detail-action-btn cancel"
+                onClick={() => setSelectedItem(null)}
+              >
+                {t("common.close")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

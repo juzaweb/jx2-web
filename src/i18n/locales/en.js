@@ -311,8 +311,8 @@ export default {
         desc: "Basic Wudang sword technique, agile and precise."
       },
       thaiCucQuyen: {
-        name: "Tai Chi Fist",
-        desc: "Defensive fist art redirecting force to deliver crushing impact."
+        name: "Tai Chi Sword Art",
+        desc: "Tai Chi sword technique borrowing force to redirect momentum, dealing concussive damage."
       },
       tamThanhKiemPhap: {
         name: "Three Pure Ones Sword",
@@ -343,12 +343,12 @@ export default {
     },
     nguDoc: {
       nguDocTamPhap: {
-        name: "Five Poisons Mind Method",
-        desc: "Heritage secret technique infusing attacks with deadly venom."
+        name: "Five Poisons Saber Art",
+        desc: "Traditional Five Poisons saber technique, dealing poison damage."
       },
       truyTamDoc: {
         name: "Heart-Piercing Venom",
-        desc: "Toxic palm blast penetrating deep into the foe's core."
+        desc: "Poisonous saber qi penetrating deep into the foe's core."
       },
       vanDocChieuHong: {
         name: "Ten Thousand Poison Gu",
@@ -366,10 +366,13 @@ export default {
     closeTitle: "Close (F3 / Esc)",
     hint: "Combat stats are the values the game actually rolls. Drag equipment from the Inventory (F4) onto a slot to wear it, or click/drag a worn slot to take it off.",
     tabEquip: "Equipment",
+    tabInventory: "Inventory",
+    tabStats: "Stats",
     tabNews: "News",
     locked: "{label} (locked)",
     notEquipped: "{label} (not equipped)",
     unequipTitle: "{name} (click to remove)",
+    unequipAction: "Unequip",
     points: "Points:",
     nextLevel: "Next level:",
     slots: {
@@ -385,6 +388,8 @@ export default {
   },
   inventory: {
     title: "Inventory",
+    tabCharacter: "Character",
+    itemDetails: "Item Details",
     helpTitle: "Bag help",
     closeTitle: "Close (Esc)",
     hint: "Click potions or talismans to use them. Drag an item onto the 1–9 bar to bind it to a hotkey; drag a slot off the bar (or right-click it) to unbind. Drag equipment to the Character panel (F3) to wear it. Hover over an item to read its description.",

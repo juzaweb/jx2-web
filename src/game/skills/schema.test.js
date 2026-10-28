@@ -45,9 +45,9 @@ describe("skill catalog schema", () => {
   });
 
   it("expands vfx presets into concrete fields at authoring time", () => {
-    const slash = skillById("la_han_quyen")?.vfx;
-    expect(slash).toMatchObject({ cast: "slash", impact: "spark", color: 0xffc94d });
-    expect(slash.preset).toBeUndefined();
+    const palm = skillById("la_han_quyen")?.vfx;
+    expect(palm).toMatchObject({ cast: "shockwave", color: 0xffc94d });
+    expect(palm.preset).toBeUndefined();
 
     const aura = skillById("kim_cang_bat_hoai")?.vfx;
     expect(aura).toMatchObject({

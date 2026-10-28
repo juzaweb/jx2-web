@@ -191,10 +191,11 @@ export function ensureWeaponBodyTexture(scene, gender, weaponType = null) {
 }
 
 /**
- * Queue the swing sheet that belongs to a weapon's body sheet (see
- * WEAPON_BODY_TEXTURES.attack). It has its own frame size, so it is queued at
- * the same time as the body sheet: a hero may swing before the walk sheet has
- * even been drawn.
+ * Queue the strike sheet of a weapon: either the one that belongs to its body
+ * sheet (see WEAPON_BODY_TEXTURES.attack) or a standalone one (see
+ * WEAPON_ATTACK_TEXTURES). It has its own frame size, so it is queued at the
+ * same time as the walk sheet: a hero may strike before the walk sheet has even
+ * been drawn.
  * @param {import("phaser").Scene} scene
  * @param {"male"|"female"|string} gender
  * @param {string|null} [weaponType]

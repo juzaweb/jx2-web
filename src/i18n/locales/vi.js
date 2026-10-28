@@ -309,8 +309,8 @@ export default {
         desc: "Kiếm pháp cơ bản Võ Đang, linh hoạt nhanh nhẹn."
       },
       thaiCucQuyen: {
-        name: "Thái Cực Quyền",
-        desc: "Quyền pháp mượn lực đả lực, gây sát thương chấn động."
+        name: "Thái Cực Kiếm Pháp",
+        desc: "Kiếm pháp mượn lực đả lực, gây sát thương chấn động."
       },
       tamThanhKiemPhap: {
         name: "Tam Thanh Kiếm Pháp",
@@ -341,12 +341,12 @@ export default {
     },
     nguDoc: {
       nguDocTamPhap: {
-        name: "Ngũ Độc Tâm Pháp",
-        desc: "Tâm pháp truyền đời Ngũ Độc, gây sát thương độc tố."
+        name: "Ngũ Độc Đao Pháp",
+        desc: "Đao pháp truyền đời Ngũ Độc, gây sát thương độc tố."
       },
       truyTamDoc: {
         name: "Truy Tâm Độc",
-        desc: "Chưởng khí mang kịch độc xuyên thấu tâm can kẻ địch."
+        desc: "Đao khí mang kịch độc xuyên thấu tâm can kẻ địch."
       },
       vanDocChieuHong: {
         name: "Vạn Độc Triệu Cổ",
@@ -364,10 +364,13 @@ export default {
     closeTitle: "Đóng (F3 / Esc)",
     hint: "Các chỉ số chiến đấu là giá trị thực tế đang dùng khi giao chiến. Kéo trang bị từ Hành trang (F4) vào ô để mặc, hoặc nhấp/kéo ô đang mặc để tháo ra.",
     tabEquip: "Trang bị",
+    tabInventory: "Hành trang",
+    tabStats: "Thuộc tính",
     tabNews: "Tin tức",
     locked: "{label} (chưa mở)",
     notEquipped: "{label} (chưa trang bị)",
     unequipTitle: "{name} (nhấp để tháo)",
+    unequipAction: "Tháo trang bị",
     points: "Điểm:",
     nextLevel: "Tăng cấp:",
     slots: {
@@ -383,6 +386,8 @@ export default {
   },
   inventory: {
     title: "Hành trang",
+    tabCharacter: "Nhân vật",
+    itemDetails: "Chi tiết vật phẩm",
     helpTitle: "Trợ giúp túi đồ",
     closeTitle: "Đóng (Esc)",
     hint: "Nhấp vào dược phẩm hoặc phù chú để sử dụng. Kéo vật phẩm xuống thanh 1–9 để gán phím nhanh; kéo ô trên thanh ra ngoài (hoặc chuột phải) để bỏ gán. Kéo trang bị sang bảng Nhân vật (F3) để mặc. Di chuột lên vật phẩm để xem mô tả.",
