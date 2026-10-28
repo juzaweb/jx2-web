@@ -197,8 +197,8 @@ describe("SkillsModal Component", () => {
       </I18nProvider>
     );
 
-    // Rank 2 of the level-50 art costs 20 * 2² * 250 bạc = 200 vàng and 30.000 EXP.
-    expect(markup).toContain("200 vàng · 30000 EXP");
+    // Rank 2 of the level-50 art costs 20 * 2² * 125 bạc = 100 vàng and 15.000 EXP.
+    expect(markup).toContain("100 vàng · 15000 EXP");
   });
 
   it("blocks an upgrade the hero's character level does not allow", () => {

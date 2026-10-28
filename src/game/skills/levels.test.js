@@ -132,51 +132,48 @@ describe("skill upgrade price", () => {
 });
 
 describe("skill price by unlock level", () => {
-  it("charges list price for the shallow arts and 250x for the level-50 ultimate", () => {
+  it("charges list price for the shallow arts and 125x for the level-50 ultimate", () => {
     // The base tier is the study floor, so the two cannot drift apart.
     expect(SKILL_PRICE_UNLOCK_BASE).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
     // unlock 1 (starter) and unlock 10 both sit at the base tier.
     expect(skillUnlockPriceFactor(skillById("kiem_khi"))).toBe(1);
     expect(skillUnlockPriceFactor(skillById("thieu_lam_tam_phap"))).toBe(1);
-    expect(skillUnlockPriceFactor({ unlockLevel: 18 })).toBeCloseTo(2.992);
-    expect(skillUnlockPriceFactor({ unlockLevel: 26 })).toBeCloseTo(16.936);
-    expect(skillUnlockPriceFactor({ unlockLevel: 34 })).toBeCloseTo(54.784);
-    expect(skillUnlockPriceFactor({ unlockLevel: 50 })).toBe(250);
+    expect(skillUnlockPriceFactor({ unlockLevel: 18 })).toBeCloseTo(1.992);
+    expect(skillUnlockPriceFactor({ unlockLevel: 26 })).toBeCloseTo(8.936);
+    expect(skillUnlockPriceFactor({ unlockLevel: 34 })).toBeCloseTo(27.784);
+    expect(skillUnlockPriceFactor({ unlockLevel: 50 })).toBe(125);
   });
 
   it("caps the surcharge and falls back to list price for an unknown art", () => {
-    expect(skillUnlockPriceFactor({ unlockLevel: 80 })).toBe(250);
+    expect(skillUnlockPriceFactor({ unlockLevel: 80 })).toBe(125);
     expect(skillUnlockPriceFactor(undefined)).toBe(1);
     expect(skillUnlockPriceFactor(null)).toBe(1);
     expect(skillUnlockPriceFactor("nope")).toBe(1);
   });
 
-  it("prices the ultimate's rank 2 at exactly 200 vàng", () => {
+  it("prices the ultimate's rank 2 at exactly 100 vàng", () => {
     const ultimate = skillById("nhu_lai_than_chuong");
     expect(ultimate.unlockLevel).toBe(50);
-    // 20 * 2² * 250 bạc = 20.000 bạc = 2.000.000 đồng; EXP is 30 * 2² * 250.
+    // 20 * 2² * 125 bạc = 10.000 bạc = 1.000.000 đồng; EXP is 30 * 2² * 125.
     expect(skillUpgradeCost(1, ultimate)).toEqual({
-      coinsBac: 20000,
-      coinsDong: 2000000,
-      exp: 30000
+      coinsBac: 10000,
+      coinsDong: 1000000,
+      exp: 15000
     });
-    // Rank 10 is still 25x rank 2 on the same quadratic curve, but its EXP is
-    // capped at 90% of what a level-86 hero (50 + 4 * 9) can hold.
+    // Rank 10 is still 25x rank 2 on the same quadratic curve.
     expect(skillUpgradeCost(9, ultimate)).toEqual({
-      coinsBac: 500000,
-      coinsDong: 50000000,
-      exp: 610447
+      coinsBac: 250000,
+      coinsDong: 25000000,
+      exp: 375000
     });
   });
 
-  it("never quotes more EXP than the rank's required level can pay", () => {
-    // Under the cap: rank 8 quotes 30 * 8² * 250 EXP, less than a level-78 pool.
-    expect(skillUpgradeCost(7, { unlockLevel: 50 }).exp).toBe(480000);
-    // Over the cap: rank 9 would quote 607.500, so it stops at 90% of the
-    // level-82 pool (602.640), leaving a tenth of the bar as headroom.
-    expect(skillUpgradeCost(8, { unlockLevel: 50 }).exp).toBe(542376);
-    // Rank 10 clips to 90% of the level-86 pool (678.275).
-    expect(skillUpgradeCost(9, { unlockLevel: 50 }).exp).toBe(610447);
+  it("keeps the ultimate's EXP on the plain curve", () => {
+    // 30 * target² * 125 stays below the 90% pool of every required level, so the
+    // cap never bites at the shipped tuning.
+    expect(skillUpgradeCost(7, { unlockLevel: 50 }).exp).toBe(240000);
+    expect(skillUpgradeCost(8, { unlockLevel: 50 }).exp).toBe(303750);
+    expect(skillUpgradeCost(9, { unlockLevel: 50 }).exp).toBe(375000);
   });
 
   it("keeps every rank of every art inside the EXP its required level can pay", () => {
@@ -194,11 +191,11 @@ describe("skill price by unlock level", () => {
   });
 
   it("rounds the surcharged quote up to a whole coin of each currency", () => {
-    // 20 * 2² * 2.992 = 239.36 bạc -> 240 bạc; EXP 30 * 2² * 2.992 = 359.04 -> 360.
+    // 20 * 2² * 1.992 = 159.36 bạc -> 160 bạc; EXP 30 * 2² * 1.992 = 239.04 -> 240.
     expect(skillUpgradeCost(1, { unlockLevel: 18 })).toEqual({
-      coinsBac: 240,
-      coinsDong: 24000,
-      exp: 360
+      coinsBac: 160,
+      coinsDong: 16000,
+      exp: 240
     });
   });
 
@@ -210,15 +207,15 @@ describe("skill price by unlock level", () => {
       exp: 30
     });
     expect(skillLearnCost({ unlockLevel: 18 })).toEqual({
-      coinsBac: 60,
-      coinsDong: 6000,
-      exp: 90
+      coinsBac: 40,
+      coinsDong: 4000,
+      exp: 60
     });
-    // The level-50 ultimate costs 50 vàng and 7.500 EXP to study.
+    // The level-50 ultimate costs 25 vàng and 3.750 EXP to study.
     expect(skillLearnCost(skillById("nhu_lai_than_chuong"))).toEqual({
-      coinsBac: 5000,
-      coinsDong: 500000,
-      exp: 7500
+      coinsBac: 2500,
+      coinsDong: 250000,
+      exp: 3750
     });
   });
 
