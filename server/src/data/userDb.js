@@ -88,9 +88,10 @@ export class UserDatabase {
    * @param {string} username
    * @param {string} password
    * @param {string} [displayName]
+   * @param {string} [role="player"]
    * @returns {Object} Sanitized user profile
    */
-  register(username, password, displayName = "") {
+  register(username, password, displayName = "", role = "player") {
     if (!username || typeof username !== "string" || !USERNAME_REGEX.test(username.trim())) {
       const err = new Error("Tên tài khoản phải gồm 3-30 ký tự chữ cái, số hoặc dấu gạch dưới.");
       err.code = "INVALID_USERNAME";
@@ -125,15 +126,17 @@ export class UserDatabase {
     const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const createdAt = Date.now();
-    const role = cleanUsername === "admin" || cleanUsername.startsWith("admin_") ? "admin" : "player";
 
-    this.stmtInsertUser.run(id, cleanUsername, passwordHash, salt, cleanDisplayName, role, createdAt, null);
+    // Security: Only assign "admin" role if explicitly passed or if username is "admin"
+    const assignedRole = role === "admin" || cleanUsername === "admin" ? "admin" : "player";
+
+    this.stmtInsertUser.run(id, cleanUsername, passwordHash, salt, cleanDisplayName, assignedRole, createdAt, null);
 
     return {
       id,
       username: cleanUsername,
       displayName: cleanDisplayName,
-      role,
+      role: assignedRole,
       createdAt,
       lastLogin: null
     };
@@ -218,7 +221,7 @@ export class UserDatabase {
     if (!id || typeof id !== "string") return false;
     const user = this.getUserById(id);
     const uname = user?.username?.toLowerCase() || "";
-    return Boolean(user?.role === "admin" || uname === "admin" || uname.startsWith("admin_"));
+    return Boolean(user?.role === "admin" || uname === "admin");
   }
 
   /**
