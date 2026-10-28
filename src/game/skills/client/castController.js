@@ -644,17 +644,33 @@ export class SkillCastController {
     if (!mayDuel(this.combat.player, mode)) return [];
 
     const peers = this.combat.scene.remotePlayerManager?.getAll?.() || [];
+    if (!peers.length) return [];
+
     const origin = center || { x: this.combat.player.x, y: this.combat.player.y };
-    const distanceToCenter = (peer) =>
-      Phaser.Math.Distance.Between(origin.x, origin.y, peer.x, peer.y);
+    const radiusSq = skill.radius * skill.radius;
     const legal = (peer) =>
       this.combat.isDuelTarget?.(peer) ?? peer?.pkFlag === true;
-    return peers
-      .filter(
-        (peer) => isPeerTarget(peer) && legal(peer) && peer.container?.active !== false
-      )
-      .filter((peer) => distanceToCenter(peer) <= skill.radius)
-      .sort((a, b) => distanceToCenter(a) - distanceToCenter(b));
+
+    // BOLT OPTIMIZATION: Avoid multi-pass filtering and repeated Phaser.Math.Distance.Between square roots.
+    // Single-pass squared distance filtering reduces allocations and eliminates square root operations in sort.
+    const candidates = [];
+    for (let i = 0; i < peers.length; i += 1) {
+      const peer = peers[i];
+      if (isPeerTarget(peer) && legal(peer) && peer.container?.active !== false) {
+        const dx = peer.x - origin.x;
+        const dy = peer.y - origin.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= radiusSq) {
+          candidates.push({ peer, distSq });
+        }
+      }
+    }
+
+    if (candidates.length > 1) {
+      candidates.sort((a, b) => a.distSq - b.distSq);
+    }
+
+    return candidates.map((c) => c.peer);
   }
 
   /**
