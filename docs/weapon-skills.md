@@ -41,12 +41,18 @@ and knows **Kiếm Khí** (`kiem_khi`, `starter: true`):
 
 ### Kiếm Khí
 
-`kiem_khi` reaches **1000 px** and its VFX is a vector projectile: `vfx.projectile:
-"sword"` makes `playSkillCastVfx` draw a blade-shaped shard that flies from the hero
-to the aimed point (clamped to `skill.range`) and explodes there — a core flash, a
-ring spreading out to the splash radius and a fan of qi shards thrown outwards
-(`playSwordQiBlast`). Because the art owns its own impact, `vfx.impact` is `null` —
-no separate spark is spawned at the victim.
+`kiem_khi` reaches **1000 px** and its VFX is an authored spritesheet
+(`/skills/vfx/kiem_khi/sheet.png`, 4 frames of 256², `sheet.json` at 12 fps). The
+first frame is the flying qi shard: it loops as the travel animation
+(`vfx.travelFrames: 1`), is turned toward the victim (`vfx.rotateToTarget`) and
+flies from the hero to the aimed point (clamped to `skill.range`). Frames 2-4 are
+the one-shot impact — vortex, burst and a held burst — played where it lands,
+blooming to `vfx.impactScale` (1.8×) so the hit reads bigger than the shard.
+Because the art owns its own impact, `vfx.impact` is `null` — no separate spark is
+spawned at the victim.
+
+The shard and icon are generated from `docs/example/kiem-khi.png` and
+`docs/example/kiem-khi-icon.png` by `python3 scripts/build_skill_kiem_khi.py`.
 
 The explosion is real damage: `splash: { radius: 220, mult: 0.6, maxTargets: 6 }`
 makes every monster inside 220 px of the impact take 60% of the primary hit, capped at
