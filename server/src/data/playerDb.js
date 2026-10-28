@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 import { STARTER_ITEMS, GM_STARTER_ITEMS } from "../../../src/game/items.js";
+import { normalizeSkillLevel } from "../../../src/game/skills/levels.js";
 
 /** Keys that would poison a plain object (and later SQL params) if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -22,8 +23,10 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  *  4 — adds server-owned equipment, persisted HP/MP and the one-time state-import flag.
  *  5 — adds the persisted map/position, so a relog resumes where the hero stood.
  *  6 — adds the learned-skill ledger (skills are learned from dropped books).
+ *  7 — adds per-skill levels (a learned skill is studied at level 1 and can be
+ *      raised to the shared MAX_SKILL_LEVEL).
  */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 /**
  * Column definitions of the `saves` table, shared by the initial CREATE and the
@@ -40,6 +43,7 @@ const SAVES_COLUMNS_SQL = `
         inventory       TEXT NOT NULL DEFAULT '{}',
         equipment       TEXT NOT NULL DEFAULT '{}',
         learned_skills  TEXT NOT NULL DEFAULT '[]',
+        skill_levels    TEXT NOT NULL DEFAULT '{}',
         hp              INTEGER,
         map_id          TEXT,
         pos_x           REAL,
@@ -135,6 +139,7 @@ export class PlayerDatabase {
     addColumn("starter_granted", "INTEGER NOT NULL DEFAULT 0");
     addColumn("equipment", "TEXT NOT NULL DEFAULT '{}'");
     addColumn("learned_skills", "TEXT NOT NULL DEFAULT '[]'");
+    addColumn("skill_levels", "TEXT NOT NULL DEFAULT '{}'");
     addColumn("hp", "INTEGER");
     addColumn("mp", "INTEGER");
     addColumn("state_imported", "INTEGER NOT NULL DEFAULT 0");
@@ -183,6 +188,9 @@ export class PlayerDatabase {
     this.stmtUpdateLearned = this.db.prepare(
       "UPDATE saves SET learned_skills = ?, updated_at = ? WHERE player_id = ?"
     );
+    this.stmtUpdateSkillLevels = this.db.prepare(
+      "UPDATE saves SET skill_levels = ?, updated_at = ? WHERE player_id = ?"
+    );
     this.stmtMarkStateImported = this.db.prepare(
       "UPDATE saves SET state_imported = 1, updated_at = ? WHERE player_id = ?"
     );
@@ -200,8 +208,8 @@ export class PlayerDatabase {
     this.stmtUpsert = this.db.prepare(`
       INSERT INTO saves (
         player_id, player_name, level, kills, coins, exp, quest_rewarded, inventory,
-        equipment, learned_skills, hp, mp, state_imported, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        equipment, learned_skills, skill_levels, hp, mp, state_imported, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(player_id) DO UPDATE SET
         player_name = excluded.player_name,
         level = excluded.level,
@@ -212,6 +220,7 @@ export class PlayerDatabase {
         inventory = excluded.inventory,
         equipment = excluded.equipment,
         learned_skills = excluded.learned_skills,
+        skill_levels = excluded.skill_levels,
         hp = excluded.hp,
         mp = excluded.mp,
         state_imported = excluded.state_imported,
@@ -275,6 +284,9 @@ export class PlayerDatabase {
    *
    * Version 6 adds the learned-skill ledger column, also created by the
    * ALTER TABLE guard above.
+   *
+   * Version 7 adds the per-skill level column, also created by the ALTER TABLE
+   * guard above.
    *
    * Running once is enforced by the version check, so real items acquired later
    * are never touched again.
@@ -378,6 +390,29 @@ export class PlayerDatabase {
   }
 
   /**
+   * Parse the stored `skillId -> level` map, dropping malformed entries and
+   * clamping every level into the shared 1..MAX_SKILL_LEVEL range.
+   * @param {string} raw
+   * @returns {Record<string, number>}
+   */
+  _parseSkillLevels(raw) {
+    try {
+      const parsed = JSON.parse(raw || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      const levels = {};
+      for (const [id, level] of Object.entries(parsed)) {
+        if (DANGEROUS_KEYS.has(id) || typeof id !== "string" || id.length === 0) continue;
+        const value = Number(level);
+        if (!Number.isFinite(value)) continue;
+        levels[id] = normalizeSkillLevel(value);
+      }
+      return levels;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * Read the ledger row, creating it when the character has never played so a
    * later vitals/equipment write always has a row to target.
    * @param {string} playerId
@@ -395,6 +430,7 @@ export class PlayerDatabase {
       inventory: {},
       equipment: {},
       learnedSkills: [],
+      skillLevels: {},
       hp: null,
       mp: null,
       stateImported: 0,
@@ -407,6 +443,7 @@ export class PlayerDatabase {
    * Insert or replace a whole row from already-normalized column values.
    * @param {{playerId:string, playerName:string, level:number, kills:number, coins:number,
    *   exp:number, questRewarded:number, inventory:Object, equipment?:Object,
+   *   learnedSkills?:string[], skillLevels?:Record<string, number>,
    *   hp?:number|null, mp?:number|null, stateImported?:number, updatedAt:number}} row
    */
   _writeRow(row) {
@@ -421,6 +458,7 @@ export class PlayerDatabase {
       JSON.stringify(row.inventory || {}),
       JSON.stringify(row.equipment || {}),
       JSON.stringify(row.learnedSkills || []),
+      JSON.stringify(row.skillLevels || {}),
       row.hp ?? null,
       row.mp ?? null,
       row.stateImported ?? 0,
@@ -626,6 +664,52 @@ export class PlayerDatabase {
     const learned = this.getLearnedSkills(playerId);
     if (learned.includes(skillId)) return learned;
     return this.setLearnedSkills(playerId, [...learned, skillId]);
+  }
+
+  // --- Skill levels ---
+
+  /**
+   * Per-skill levels as a `skillId -> level` map. Skills absent from the map are
+   * still level 1, which is what every freshly studied art starts at.
+   * @param {string} playerId
+   * @returns {Record<string, number>}
+   */
+  getSkillLevels(playerId) {
+    const row = this.stmtGet.get(playerId);
+    return row ? this._parseSkillLevels(row.skill_levels) : {};
+  }
+
+  /**
+   * Replace the stored skill-level map, keeping only sane entries.
+   * @param {string} playerId
+   * @param {Record<string, number>} levels
+   * @returns {Record<string, number>}
+   */
+  setSkillLevels(playerId, levels = {}) {
+    this._ensureRow(playerId);
+    const clean = {};
+    const source = levels && typeof levels === "object" ? levels : {};
+    for (const [id, level] of Object.entries(source)) {
+      if (DANGEROUS_KEYS.has(id) || typeof id !== "string" || id.length === 0) continue;
+      const value = Number(level);
+      if (!Number.isFinite(value)) continue;
+      clean[id] = normalizeSkillLevel(value);
+    }
+    this.stmtUpdateSkillLevels.run(JSON.stringify(clean), Date.now(), playerId);
+    return clean;
+  }
+
+  /**
+   * Write one skill's level and return the merged map.
+   * @param {string} playerId
+   * @param {string} skillId
+   * @param {number} level
+   * @returns {Record<string, number>}
+   */
+  setSkillLevel(playerId, skillId, level) {
+    if (typeof skillId !== "string" || !skillId) return this.getSkillLevels(playerId);
+    const levels = this.getSkillLevels(playerId);
+    return this.setSkillLevels(playerId, { ...levels, [skillId]: level });
   }
 
   /**

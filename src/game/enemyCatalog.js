@@ -902,7 +902,15 @@ export const MONSTER_BOOK_CHANCES = Object.freeze({
   "lam-tac": 0.05,
   "hac-y-sat-thu": 0.06,
   "thiet-giap-binh": 0.08,
-  "ma-giao-de-tu": 0.1
+  "ma-giao-de-tu": 0.1,
+  // Late-game hunting grounds drop the rank-4 and ultimate books, so a hero can
+  // only farm the art it is actually high enough level to study.
+  "tuyet-lang": 0.08,
+  "son-tac-dau-linh": 0.09,
+  "kim-giap-binh": 0.08,
+  "huyet-ma": 0.1,
+  "nga-mi-kiem-nu": 0.08,
+  "bang-tam-yeu": 0.1
 });
 
 /**

@@ -6,15 +6,16 @@
  * framework-free so the game loop only has to feed it elapsed time.
  */
 
-import { skillsForWeapon, skillPassiveRegen, skillUsable } from "./skills.js";
+import { skillAtLevel, skillsForWeapon, skillLevelOf, skillPassiveRegen, skillUsable } from "./skills.js";
 
 /**
- * HP per second restored by one skill's `regen` effects.
+ * HP per second restored by one skill's `regen` effects, at its current level.
  * @param {Object} skill
+ * @param {number} [skillLevel=1]
  * @returns {number}
  */
-export function regenPerSecond(skill) {
-  return skillPassiveRegen(skill);
+export function regenPerSecond(skill, skillLevel = 1) {
+  return skillPassiveRegen(skillAtLevel(skill, skillLevel));
 }
 
 /**
@@ -23,14 +24,15 @@ export function regenPerSecond(skill) {
  * @param {string} weapon
  * @param {number} [level=1]
  * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids
+ * @param {Record<string, number>|null} [skillLevels=null] `skillId -> level` map
  * @returns {number}
  */
-export function passiveRegenRate(weapon, level = 1, learned = null) {
+export function passiveRegenRate(weapon, level = 1, learned = null, skillLevels = null) {
   let rate = 0;
   for (const skill of skillsForWeapon(weapon)) {
     if (skill?.passive !== true) continue;
     if (!skillUsable(skill, level, learned)) continue;
-    rate += regenPerSecond(skill);
+    rate += regenPerSecond(skill, skillLevelOf(skillLevels, skill.id));
   }
   return rate;
 }

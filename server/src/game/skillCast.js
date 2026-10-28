@@ -1,11 +1,12 @@
 /**
- * Pure server-side skill cast rules.
+ * Pure server-side skill action rules: casting, book study, levelling and the
+ * authorization of a follow-up hit.
  *
  * Extracted from the WebSocket server so cast validation, self-effect
- * application and damage authorization can be unit-tested without a socket,
- * a live world, or a database. Every function here takes plain objects and
- * mutates only the state it is handed (the cast's hit budget, the player's
- * buffs/HP), never transport or storage.
+ * application, study/upgrade gates and damage authorization can be unit-tested
+ * without a socket, a live world, or a database. Every function here takes plain
+ * objects and mutates only the state it is handed (the cast's hit budget, the
+ * player's buffs/HP), never transport or storage.
  *
  * The client shares the same catalog and maths through `src/game/skills.js`, so
  * both sides cannot drift apart.
@@ -13,10 +14,16 @@
 
 import {
   applySelfEffects,
+  characterLevelForSkillLevel,
   isInsideCastArea,
+  skillAtLevel,
   skillById,
+  skillFundsShortfall,
   skillLearnable,
+  skillLearned,
+  skillLevelOf,
   skillLockReason,
+  skillUpgradeCost,
   skillUsable
 } from "../../../src/game/skills.js";
 import { HIT_WINDOW_MS, consumeCastHit, splashMultiplier } from "../../../src/game/combatRules.js";
@@ -73,15 +80,68 @@ export function studyRejection(skill, level, learned = []) {
 
 /**
  * Apply a cast's self-targeted effects (buff, heal) to a server player object.
- * Broadcasting and persistence stay with the caller.
+ * Magnitudes follow the caster's level in that skill. Broadcasting and
+ * persistence stay with the caller.
  *
- * @param {{ hp: number, maxHp: number, buffs?: Object[] }} player
+ * @param {{ hp: number, maxHp: number, buffs?: Object[], skillLevels?: Record<string, number> }} player
  * @param {Object} skill
  * @param {number} now
  * @returns {{ statsChanged: boolean, healed: number }}
  */
 export function applyCastSelfEffects(player, skill, now) {
-  return applySelfEffects(skill, player, now);
+  const leveled = skillAtLevel(skill, skillLevelOf(player?.skillLevels, skill?.id));
+  return applySelfEffects(leveled, player, now);
+}
+
+/**
+ * Why a skill cannot be levelled up right now, or null when it can.
+ *
+ * A skill must already be learned (starter skills count), below the maximum
+ * rank, the character must be high enough level for the rank being bought, and
+ * the ledger must hold the silver and EXP it costs. The server calls this before
+ * debiting anything.
+ *
+ * @param {Object|null|undefined} skill resolved catalog entry
+ * @param {{ level?: number, learnedSkills?: string[], skillLevels?: Record<string, number>,
+ *   progress?: { coins?: number, exp?: number }|null }} player
+ * @returns {{ reason: "not_usable"|"not_learned"|"max_level"|"level"|"coins"|"exp",
+ *   level?: number, skillLevel?: number, current?: number,
+ *   coins?: number, exp?: number,
+ *   required?: { coins: number, exp: number } }|null}
+ */
+export function upgradeRejection(skill, player) {
+  if (!skill) return { reason: "not_usable" };
+  if (!skillLearned(skill, player?.learnedSkills)) return { reason: "not_learned" };
+
+  const current = skillLevelOf(player?.skillLevels, skill.id);
+  const cost = skillUpgradeCost(current);
+  if (!cost) return { reason: "max_level", level: current };
+
+  // Every rank demands a higher character level than the previous one, so the
+  // hero's level gates the rank independently of what the ledger can pay.
+  const characterLevel = Math.floor(Number(player?.level) || 1);
+  const requiredLevel = characterLevelForSkillLevel(skill, current + 1);
+  if (characterLevel < requiredLevel) {
+    return {
+      reason: "level",
+      level: requiredLevel,
+      skillLevel: current + 1,
+      current: characterLevel
+    };
+  }
+
+  const funds = skillFundsShortfall(cost, player?.progress);
+  if (funds) {
+    return {
+      reason: funds.reason,
+      level: current,
+      coins: funds.coins,
+      exp: funds.exp,
+      required: cost
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -115,10 +175,14 @@ export function resolveSkillHit(
     if (skill.weapon !== attacker.weaponType) return null;
     if (!skillUsable(skill, attacker.level, attacker.learnedSkills)) return null;
     if (!consumeCastHit(attacker.lastCast, skill, now)) return null;
+    // Damage and any control magnitudes follow the caster's level in the skill;
+    // the returned entry is the leveled one so hit application reads the same
+    // numbers the damage was rolled from.
+    const leveled = skillAtLevel(skill, skillLevelOf(attacker.skillLevels, skill.id));
     return {
-      skill,
+      skill: leveled,
       attackerStats,
-      damage: computeSkillDamage(skill, attackerStats, { defense: defenderDefense }, random).damage
+      damage: computeSkillDamage(leveled, attackerStats, { defense: defenderDefense }, random).damage
     };
   }
 
@@ -134,17 +198,18 @@ export function resolveSkillHit(
 
 /**
  * Roll one splash strike: a fixed fraction of the skill's multiplier, using the
- * same RNG as a direct hit.
+ * same RNG as a direct hit and the caster's level in that skill.
  *
  * @param {Object} skill
  * @param {Object} attackerStats
  * @param {number} defenderDefense
  * @param {Function|number} [random]
+ * @param {number} [level=1] caster's level in this skill
  * @returns {number}
  */
-export function splashDamage(skill, attackerStats, defenderDefense, random = Math.random) {
+export function splashDamage(skill, attackerStats, defenderDefense, random = Math.random, level = 1) {
   return computeSkillDamage(
-    skill,
+    skillAtLevel(skill, level),
     attackerStats,
     { defense: defenderDefense },
     random,

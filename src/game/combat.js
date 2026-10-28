@@ -85,6 +85,8 @@ export class CombatSystem {
     this.lastChaseAt = 0;
     /** Skill ids learned from books; starter skills are implicitly known. */
     this.learnedSkills = new Set();
+    /** skill id -> level (1..MAX_SKILL_LEVEL), mirrored from `skills_sync`. */
+    this.skillLevels = {};
     /** Player id this client joined with, used to match server kill attribution. */
     this.localPlayerId = null;
 

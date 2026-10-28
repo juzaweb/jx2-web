@@ -1,6 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
-import { skillLockReason } from "../../game/skills.js";
+import {
+  MAX_SKILL_LEVEL,
+  characterLevelForSkillLevel,
+  skillAtLevel,
+  skillFundsShortfall,
+  skillLevelBonus,
+  skillLevelOf,
+  skillLockReason,
+  skillUpgradeCost
+} from "../../game/skills.js";
 import { normalizeWeaponType, WEAPON_LABEL_KEYS } from "../../game/weapons.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
@@ -27,9 +36,13 @@ export function SkillsModal({
   skills = [],
   weapon = "kiem",
   learnedSkills = [],
+  skillLevels = {},
   level = 1,
+  coins = 0,
+  exp = 0,
   quickSlotsMapping = {},
-  onAssignSkill
+  onAssignSkill,
+  onUpgradeSkill
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
@@ -61,8 +74,22 @@ export function SkillsModal({
     : null;
   const selectedUnlocked = selectedSkill ? selectedLockReason === null : false;
   const selectedLockLabel = formatSkillLock(selectedLockReason, t);
-  /** HP/s an always-on art restores; 0 for every cast skill. */
-  const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill) : 0;
+  /** Level this hero has in the selected art (1 for a freshly studied skill). */
+  const selectedLevel = selectedSkill ? skillLevelOf(skillLevels, selectedSkill.id) : 1;
+  /** The entry as it actually behaves at `selectedLevel` (scaled damage/effects). */
+  const selectedAtLevel = selectedSkill ? skillAtLevel(selectedSkill, selectedLevel) : null;
+  /** Price of the next level, or null when the art is already maxed. */
+  const upgradeCost = selectedUnlocked ? skillUpgradeCost(selectedLevel) : null;
+  const upgradeShortfall = upgradeCost
+    ? skillFundsShortfall(upgradeCost, { coins, exp })
+    : null;
+  /** Character level the next rank demands, or null when the art is maxed. */
+  const nextLevelRequired = upgradeCost
+    ? characterLevelForSkillLevel(selectedSkill, selectedLevel + 1)
+    : null;
+  const levelTooLow = nextLevelRequired !== null && level < nextLevelRequired;
+  /** HP/s an always-on art restores at its current level; 0 for every cast skill. */
+  const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill, selectedLevel) : 0;
 
   return (
     <div className="skills-modal-overlay" id="skills-modal">
@@ -257,7 +284,7 @@ export function SkillsModal({
                 )}
                 {selectedSkill.mult > 0 && (
                   <span className="skills-stat-chip">
-                    {t("skills.dmgTag", { pct: Math.round(selectedSkill.mult * 100) })}
+                    {t("skills.dmgTag", { pct: Math.round(selectedAtLevel.mult * 100) })}
                   </span>
                 )}
                 {selectedRegen > 0 && (
@@ -265,7 +292,65 @@ export function SkillsModal({
                     {t("skills.regenTag", { hp: selectedRegen })}
                   </span>
                 )}
+                {selectedUnlocked && (
+                  <span className="skills-stat-chip skills-level-chip">
+                    {t("skills.levelTag", { level: selectedLevel, max: MAX_SKILL_LEVEL })}
+                  </span>
+                )}
+                {selectedUnlocked && selectedLevel > 1 && (
+                  <span className="skills-stat-chip skills-level-bonus">
+                    {t("skills.levelBonus", {
+                      pct: Math.round(skillLevelBonus(selectedLevel) * 100)
+                    })}
+                  </span>
+                )}
+                {nextLevelRequired !== null && (
+                  <span
+                    className={`skills-stat-chip skills-req-chip${levelTooLow ? " unmet" : ""}`}
+                  >
+                    {t("skills.reqLevelTag", { level: nextLevelRequired })}
+                  </span>
+                )}
               </div>
+
+              {/* Levelling: the server owns the price and the debit; the panel
+                  only shows what the next rank costs and whether it is affordable. */}
+              {selectedUnlocked && (
+                <div className="skills-upgrade">
+                  {upgradeCost ? (
+                    <button
+                      type="button"
+                      className="skills-upgrade-btn"
+                      disabled={Boolean(upgradeShortfall) || levelTooLow}
+                      title={
+                        levelTooLow
+                          ? t("skills.levelShort", { level: nextLevelRequired })
+                          : upgradeShortfall
+                            ? t("skills.upgradeShort", {
+                                coins: upgradeCost.coins,
+                                exp: upgradeCost.exp
+                              })
+                            : t("skills.upgradeHint")
+                      }
+                      onClick={() => onUpgradeSkill?.(selectedSkill.id)}
+                    >
+                      <span className="skills-upgrade-label">
+                        {t("skills.upgrade", { level: selectedLevel + 1 })}
+                      </span>
+                      <span className="skills-upgrade-cost">
+                        {t("skills.upgradeCost", {
+                          coins: upgradeCost.coins,
+                          exp: upgradeCost.exp
+                        })}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="skills-upgrade-maxed">
+                      {t("skills.maxLevel", { max: MAX_SKILL_LEVEL })}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* An always-on passive art has nothing to bind: it runs without
                   being cast, so the drag hint is hidden for it. */}

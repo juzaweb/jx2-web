@@ -313,12 +313,16 @@ export class JiangHuScene extends Phaser.Scene {
       this.handleEquipmentSync(payload);
     });
 
-    // Skills studied from books. The server is authoritative: a learned id is
-    // only usable after it lands here.
+    // Skills studied from books and their levels. The server is authoritative: a
+    // learned id is only usable after it lands here.
     this.networkClient.on("skills_sync", (payload) => {
       const learned = Array.isArray(payload?.skills) ? payload.skills : [];
-      if (this.combat) this.combat.learnedSkills = new Set(learned);
-      bridge.emit(EVENTS.SKILLS_UPDATED, { skills: learned });
+      const levels = payload?.levels && typeof payload.levels === "object" ? payload.levels : {};
+      if (this.combat) {
+        this.combat.learnedSkills = new Set(learned);
+        this.combat.skillLevels = { ...levels };
+      }
+      bridge.emit(EVENTS.SKILLS_UPDATED, { skills: learned, levels });
     });
 
     // Result of a server-side use/equip/unequip action.
@@ -628,6 +632,10 @@ export class JiangHuScene extends Phaser.Scene {
         // Same aim the number keys use: the projectile follows the pointer
         // (desktop) or the ringed auto-target (touch), never the last footstep.
         this.combat.castSkillById(skillId, this.castAimPoint(skillId));
+      }),
+      bridge.on(EVENTS.ACTION_UPGRADE_SKILL, ({ skillId } = {}) => {
+        if (!skillId || !this.networkClient?.isConnected) return;
+        this.networkClient.sendSkillUpgrade({ skillId });
       }),
       bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
         if (this.started && quickSlots) {
@@ -1463,8 +1471,12 @@ export class JiangHuScene extends Phaser.Scene {
       empty_slot: "Ô trang bị đang trống.",
       unknown_item: "Vật phẩm không tồn tại.",
       already_learned: "Bạn đã học chiêu thức này rồi.",
-      level: "Cấp độ chưa đủ để học chiêu thức này.",
-      prereq: "Cần học chiêu thức trước đó trước khi học sách này."
+      level: "Cấp độ nhân vật chưa đủ cho chiêu thức này.",
+      prereq: "Cần học chiêu thức trước đó trước khi học sách này.",
+      not_learned: "Bạn chưa học chiêu thức này.",
+      max_level: "Chiêu thức đã đạt cấp tối đa.",
+      coins: "Không đủ bạc cho chiêu thức này.",
+      exp: "Không đủ kinh nghiệm cho chiêu thức này."
     };
 
     if (payload.ok === false) {
@@ -1487,6 +1499,14 @@ export class JiangHuScene extends Phaser.Scene {
       const name = skill ? translate(skill.nameKey, undefined, skill.id) : "chiêu thức mới";
       this.uiBridge.addLog(`Đã học ${name}!`, "system");
       playTone(880, 0.2, "triangle", 0.05);
+      return;
+    }
+
+    if (payload.action === "skill_upgrade") {
+      const skill = payload.skillId ? skillById(payload.skillId) : null;
+      const name = skill ? translate(skill.nameKey, undefined, skill.id) : "chiêu thức";
+      this.uiBridge.addLog(`${name} đã lên cấp ${payload.level}!`, "system");
+      playTone(980, 0.2, "triangle", 0.05);
       return;
     }
 

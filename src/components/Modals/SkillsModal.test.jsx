@@ -71,7 +71,7 @@ describe("SkillsModal Component", () => {
   it("distinguishes unlocked and locked tiles", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={mockSkills} level={5} learnedSkills={["test_skill_1"]} />
+        <SkillsModal isOpen={true} skills={mockSkills} level={12} learnedSkills={["test_skill_1"]} />
       </I18nProvider>
     );
 
@@ -112,14 +112,14 @@ describe("SkillsModal Component", () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={gated} level={1} />
+        <SkillsModal isOpen={true} skills={gated} level={18} />
       </I18nProvider>
     );
 
     expect(markup).toContain("Cần học Thiếu Lâm Tâm Pháp trước");
     // The tile badge shows the blocking level of the prerequisite.
     expect(markup).toContain(
-      '<span class="skill-node-level" aria-hidden="true">1</span>'
+      '<span class="skill-node-level" aria-hidden="true">10</span>'
     );
   });
 
@@ -136,5 +136,84 @@ describe("SkillsModal Component", () => {
       );
       expect(markup).toContain(`<span class="skills-weapon-badge">${expectedLabel}</span>`);
     }
+  });
+
+  it("shows the skill level, its scaled damage and an affordable upgrade", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={30}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 5 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+
+    expect(markup).toContain("Cấp 5/10");
+    expect(markup).toContain("+40% hiệu quả");
+    // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68
+    expect(markup).toContain("ST: 168%");
+    // Rank 6 costs 20 * 36 silver and demands character level 10 + 4 * 5.
+    expect(markup).toContain("Cần cấp 30");
+    expect(markup).toContain('class="skills-upgrade-btn"');
+    expect(markup).not.toContain('class="skills-upgrade-btn" disabled');
+    expect(markup).toContain("Nâng cấp — Cấp 6");
+    expect(markup).toContain("720 bạc");
+  });
+
+  it("blocks an upgrade the hero's character level does not allow", () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={29}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 5 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+
+    expect(markup).toContain("Cần cấp 30");
+    expect(markup).toContain("skills-req-chip unmet");
+    expect(markup).toContain('class="skills-upgrade-btn" disabled');
+  });
+
+  it("disables an unaffordable upgrade and marks a maxed skill", () => {
+    const broke = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={5}
+          learnedSkills={["test_skill_1"]}
+          coins={0}
+          exp={0}
+        />
+      </I18nProvider>
+    );
+    expect(broke).toContain('class="skills-upgrade-btn" disabled');
+
+    const maxed = renderToStaticMarkup(
+      <I18nProvider>
+        <SkillsModal
+          isOpen={true}
+          skills={mockSkills}
+          level={5}
+          learnedSkills={["test_skill_1"]}
+          skillLevels={{ test_skill_1: 10 }}
+          coins={10000}
+          exp={10000}
+        />
+      </I18nProvider>
+    );
+    expect(maxed).toContain("Đã đạt cấp tối đa (10)");
+    expect(maxed).not.toContain('class="skills-upgrade-btn"');
   });
 });

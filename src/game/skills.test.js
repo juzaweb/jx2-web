@@ -69,7 +69,7 @@ describe("skill catalog", () => {
       slot: 0,
       icon: "/skills/thieu_lam_tam_phap.png",
       glyph: "心",
-      unlockLevel: 1,
+      unlockLevel: 10,
       mp: 0,
       cooldown: 0,
       target: "self",
@@ -83,7 +83,7 @@ describe("skill catalog", () => {
       id: "dai_tu_di_chuong",
       weapon: "bao-tay",
       slot: 1,
-      unlockLevel: 1,
+      unlockLevel: 18,
       mp: 12,
       cooldown: 6000,
       range: 6000,
@@ -95,7 +95,7 @@ describe("skill catalog", () => {
       slot: 2,
       icon: "/skills/la_han_quyen.png",
       glyph: "拳",
-      unlockLevel: 1,
+      unlockLevel: 10,
       mp: 20,
       cooldown: 8000,
       target: "enemy",
@@ -110,7 +110,7 @@ describe("skill catalog", () => {
       id: "la_han_tran",
       weapon: "bao-tay",
       slot: 3,
-      unlockLevel: 1,
+      unlockLevel: 26,
       mp: 18,
       cooldown: 9000,
       target: "self",
@@ -129,7 +129,7 @@ describe("skill catalog", () => {
       slot: 4,
       icon: "/skills/kim_cang_bat_hoai.png",
       glyph: "卍",
-      unlockLevel: 1,
+      unlockLevel: 34,
       mp: 20,
       cooldown: 18000,
       target: "self",
@@ -148,7 +148,7 @@ describe("skill catalog", () => {
       id: "nhu_lai_than_chuong",
       weapon: "bao-tay",
       slot: 5,
-      unlockLevel: 10,
+      unlockLevel: 50,
       mp: 35,
       cooldown: 30000,
       target: "enemy",
@@ -254,16 +254,17 @@ describe("skill catalog", () => {
   });
 
   it("gates skills by level", () => {
-    expect(skillUnlocked("dai_tu_di_chuong", 1)).toBe(true);
-    expect(skillUnlocked("dai_tu_di_chuong", 0)).toBe(false);
-    expect(skillUnlocked("la_han_quyen", 1)).toBe(true);
-    expect(skillUnlocked("la_han_quyen", 0)).toBe(false);
-    expect(skillUnlocked("la_han_tran", 1)).toBe(true);
-    expect(skillUnlocked("la_han_tran", 0)).toBe(false);
-    expect(skillUnlocked("kim_cang_bat_hoai", 1)).toBe(true);
-    expect(skillUnlocked("kim_cang_bat_hoai", 0)).toBe(false);
-    expect(skillUnlocked("nhu_lai_than_chuong", 10)).toBe(true);
-    expect(skillUnlocked("nhu_lai_than_chuong", 9)).toBe(false);
+    // Each art of a school needs more character level than the one before it.
+    expect(skillUnlocked("la_han_quyen", 10)).toBe(true);
+    expect(skillUnlocked("la_han_quyen", 9)).toBe(false);
+    expect(skillUnlocked("dai_tu_di_chuong", 18)).toBe(true);
+    expect(skillUnlocked("dai_tu_di_chuong", 17)).toBe(false);
+    expect(skillUnlocked("la_han_tran", 26)).toBe(true);
+    expect(skillUnlocked("la_han_tran", 25)).toBe(false);
+    expect(skillUnlocked("kim_cang_bat_hoai", 34)).toBe(true);
+    expect(skillUnlocked("kim_cang_bat_hoai", 33)).toBe(false);
+    expect(skillUnlocked("nhu_lai_than_chuong", 50)).toBe(true);
+    expect(skillUnlocked("nhu_lai_than_chuong", 49)).toBe(false);
     expect(skillUnlocked("bogus", 99)).toBe(false);
   });
 
@@ -294,41 +295,72 @@ describe("skill catalog", () => {
 
     // Without the prerequisite learned, a book cannot be studied.
     expect(skillLearnable("dai_tu_di_chuong", 1, [])).toBe(false);
-    expect(skillLearnable("dai_tu_di_chuong", 1, ["thieu_lam_tam_phap"])).toBe(true);
+    // Đại Tu Di Chưởng is the second fist art: level 18, once the internal art is known.
+    expect(skillLearnable("dai_tu_di_chuong", 17, ["thieu_lam_tam_phap"])).toBe(false);
+    expect(skillLearnable("dai_tu_di_chuong", 18, ["thieu_lam_tam_phap"])).toBe(true);
+    // La Hán Quyền opens at the level-10 floor and needs no prerequisite.
+    expect(skillLearnable("la_han_quyen", 9, [])).toBe(false);
+    expect(skillLearnable("la_han_quyen", 10, [])).toBe(true);
+    // Như Lai Thần Chưởng keeps its own, much higher requirement.
     expect(skillLearnable("nhu_lai_than_chuong", 9, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
       false
     );
+    expect(skillLearnable("nhu_lai_than_chuong", 49, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
+      false
+    );
+    expect(skillLearnable("nhu_lai_than_chuong", 50, ["dai_tu_di_chuong", "la_han_tran"])).toBe(
+      true
+    );
 
-    // Casting requires the skill to be learned (starter skills are free).
+    // Casting requires the skill to be learned (starter skills are free) and the
+    // character to be at the art's own unlock level.
     expect(skillUsable("kiem_khi", 1, [])).toBe(true);
     expect(skillUsable("dai_tu_di_chuong", 1, [])).toBe(false);
-    expect(skillUsable("dai_tu_di_chuong", 1, ["dai_tu_di_chuong"])).toBe(true);
+    expect(skillUsable("dai_tu_di_chuong", 10, ["dai_tu_di_chuong"])).toBe(false);
+    expect(skillUsable("dai_tu_di_chuong", 18, ["dai_tu_di_chuong"])).toBe(true);
+    expect(skillUsable("la_han_tran", 25, ["la_han_tran"])).toBe(false);
+    expect(skillUsable("la_han_tran", 26, ["la_han_tran"])).toBe(true);
   });
 
   it("resolves prerequisites when unlocking a skill", () => {
-    // tam_thanh_kiem_phap needs level 2 and also its prerequisite thai_cuc_quyen.
-    expect(skillUnlocked("tam_thanh_kiem_phap", 1)).toBe(false);
-    expect(skillUnlocked("tam_thanh_kiem_phap", 2)).toBe(true);
+    // tam_thanh_kiem_phap is the third sword art and also needs thai_cuc_quyen.
+    expect(skillUnlocked("tam_thanh_kiem_phap", 25)).toBe(false);
+    expect(skillUnlocked("tam_thanh_kiem_phap", 26)).toBe(true);
 
-    const gated = { id: "synthetic", unlockLevel: 1, requires: [{ id: "dai_tu_di_chuong", level: 5 }] };
-    expect(skillUnlocked(gated, 4)).toBe(false);
-    expect(skillUnlocked(gated, 5)).toBe(true);
+    const gated = { id: "synthetic", unlockLevel: 10, requires: [{ id: "dai_tu_di_chuong", level: 18 }] };
+    expect(skillUnlocked(gated, 17)).toBe(false);
+    expect(skillUnlocked(gated, 18)).toBe(true);
 
-    const missing = { id: "synthetic", unlockLevel: 1, requires: [{ id: "nope", level: 1 }] };
+    const missing = { id: "synthetic", unlockLevel: 10, requires: [{ id: "nope", level: 1 }] };
     expect(skillUnlocked(missing, 10)).toBe(false);
   });
 
   it("explains why a skill is still locked", () => {
-    expect(skillLockReason("thieu_lam_tam_phap", 1)).toBeNull();
-    expect(skillLockReason("tam_thanh_kiem_phap", 1)).toEqual({ kind: "level", level: 2 });
+    expect(skillLockReason("thieu_lam_tam_phap", 10)).toBeNull();
+    expect(skillLockReason("thieu_lam_tam_phap", 9)).toEqual({ kind: "level", level: 10 });
+    expect(skillLockReason("tam_thanh_kiem_phap", 1)).toEqual({ kind: "level", level: 26 });
 
-    const gated = { id: "synthetic", unlockLevel: 1, requires: [{ id: "dai_tu_di_chuong", level: 5 }] };
-    expect(skillLockReason(gated, 4)).toMatchObject({
+    // Its own level is met, but the prerequisite needs a higher character level,
+    // which is what the level-only gate reports.
+    const gated = { id: "synthetic", unlockLevel: 10, requires: [{ id: "dai_tu_di_chuong", level: 34 }] };
+    expect(skillLockReason(gated, 9)).toMatchObject({ kind: "level", level: 10 });
+    expect(skillLockReason(gated, 12)).toMatchObject({
       kind: "prereq",
       id: "dai_tu_di_chuong",
-      level: 5
+      level: 34
     });
-    expect(skillLockReason(gated, 5)).toBeNull();
+    // Once every prerequisite is reachable at that level, nothing is locked.
+    expect(skillLockReason(gated, 34)).toBeNull();
+  });
+
+  it("applies the level-10 study floor even when an entry unlocks earlier", () => {
+    // No authored skill sits below the floor today, so pin the rule with a
+    // synthetic entry: a book must never be studied before character level 10.
+    const early = { id: "synthetic_early", unlockLevel: 1, requires: [] };
+    expect(skillLearnable(early, 9, [])).toBe(false);
+    expect(skillLearnable(early, 10, [])).toBe(true);
+    expect(skillLockReason(early, 9, [])).toEqual({ kind: "level", level: 10 });
+    expect(skillLockReason(early, 10, [])).toEqual({ kind: "book" });
   });
 
   it("has valid name and description in all locales for every skill", () => {

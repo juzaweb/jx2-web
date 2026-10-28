@@ -32,15 +32,17 @@ describe("regenPerSecond", () => {
 
 describe("passiveRegenRate", () => {
   it("sums the learned passive arts of a weapon kit", () => {
-    expect(passiveRegenRate("bao-tay", 1, ["thieu_lam_tam_phap"])).toBe(2);
-    expect(passiveRegenRate("kiem", 1, ["thieu_lam_tam_phap"])).toBe(0);
+    // The fist internal art unlocks at character level 10.
+    expect(passiveRegenRate("bao-tay", 10, ["thieu_lam_tam_phap"])).toBe(2);
+    expect(passiveRegenRate("kiem", 10, ["thieu_lam_tam_phap"])).toBe(0);
     // An unlearned passive contributes nothing.
-    expect(passiveRegenRate("bao-tay", 1, [])).toBe(0);
+    expect(passiveRegenRate("bao-tay", 10, [])).toBe(0);
     // Unknown weapons normalise to the sword kit, which has no passive.
-    expect(passiveRegenRate("bogus", 1, ["thieu_lam_tam_phap"])).toBe(0);
+    expect(passiveRegenRate("bogus", 10, ["thieu_lam_tam_phap"])).toBe(0);
   });
 
   it("ignores a passive the hero has not unlocked yet", () => {
+    expect(passiveRegenRate("bao-tay", 9, ["thieu_lam_tam_phap"])).toBe(0);
     expect(passiveRegenRate("bao-tay", 0, ["thieu_lam_tam_phap"])).toBe(0);
   });
 

@@ -71,7 +71,10 @@ export const EVENTS = {
   GAME_PAUSED: "GAME_PAUSED",
   PK_CHANGED: "PK_CHANGED",
   SKILL_CAST: "SKILL_CAST",
-  /** Server-authoritative learned skill ids (payload: {skills: string[]}). */
+  /**
+   * Server-authoritative learned skills
+   * (payload: { skills: string[], levels: Record<string, number> }).
+   */
   SKILLS_UPDATED: "SKILLS_UPDATED",
   SHOP_OPENED: "SHOP_OPENED",
   SHOP_RESULT: "SHOP_RESULT",
@@ -87,6 +90,8 @@ export const EVENTS = {
   ACTION_START: "ACTION_START",
   ACTION_ATTACK: "ACTION_ATTACK",
   ACTION_CAST_SKILL: "ACTION_CAST_SKILL",
+  /** Ask the server to raise a skill by one level (payload: {skillId}). */
+  ACTION_UPGRADE_SKILL: "ACTION_UPGRADE_SKILL",
   SET_QUICK_SLOTS: "SET_QUICK_SLOTS",
   ACTION_USE_POTION: "ACTION_USE_POTION",
   ACTION_BUY_ITEM: "ACTION_BUY_ITEM",

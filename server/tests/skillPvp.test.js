@@ -12,7 +12,8 @@ function makeManager(skillId, { others = [] } = {}) {
   const attacker = {
     id: "attacker-1",
     weaponType: "bao-tay",
-    level: 10,
+    // High enough for Như Lai Thần Chưởng (unlockLevel 50) to be castable.
+    level: 60,
     learnedSkills: ["la_han_quyen", "dai_tu_di_chuong", "nhu_lai_than_chuong"],
     mapId: "dong-mon-thanh",
     x: 0,

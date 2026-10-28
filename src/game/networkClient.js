@@ -243,6 +243,15 @@ export class NetworkClient {
   }
 
   /**
+   * Ask the server to raise one learned skill by a level. The price is
+   * server-owned and the reply carries the authoritative level and progress.
+   * @param {{skillId:string}} upgrade
+   */
+  sendSkillUpgrade(upgrade) {
+    this.send("skill_upgrade", upgrade);
+  }
+
+  /**
    * Ask the server to pay the one-off quest reward. The server is the payout
    * authority and ignores repeat claims.
    */

@@ -216,6 +216,8 @@ export function App() {
   // Learned skill ids, mirrored from the server (`skills_sync`). Starter skills
   // (Kiếm Khí) are always known and are not listed here.
   const [learnedSkills, setLearnedSkills] = useState([]);
+  // skill id -> level (1..MAX_SKILL_LEVEL), mirrored from `skills_sync`.
+  const [skillLevels, setSkillLevels] = useState({});
 
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
@@ -273,6 +275,13 @@ export function App() {
     },
     [handleAssignQuickSlot]
   );
+
+  // Levelling is server-owned: the panel only names the skill and shows the
+  // price, the server validates and debits silver + EXP.
+  const handleUpgradeSkill = useCallback((skillId) => {
+    if (!skillId) return;
+    bridge.emit(EVENTS.ACTION_UPGRADE_SKILL, { skillId });
+  }, []);
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
   // rename in the users table reaches the HUD, the game scene and the network join.
@@ -377,10 +386,11 @@ export function App() {
       if (next?.equipment) setEquipment(next.equipment);
     });
 
-    // Server-authoritative learned skills: replaced wholesale on every sync and
-    // on every successful book study.
+    // Server-authoritative learned skills and their levels: replaced wholesale on
+    // every sync, on every successful book study and on every upgrade.
     const unsubSkills = bridge.on(EVENTS.SKILLS_UPDATED, (next) => {
       setLearnedSkills(Array.isArray(next?.skills) ? next.skills : []);
+      setSkillLevels(next?.levels && typeof next.levels === "object" ? next.levels : {});
     });
 
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
@@ -727,6 +737,7 @@ export function App() {
     setActiveCharacter(null);
     setConnectionIssue(null);
     setLearnedSkills([]);
+    setSkillLevels({});
     StorageManager.setUserId(session.user.id);
     StorageManager.setCharacterId(null);
     setEquipment(defaultEquipment());
@@ -751,6 +762,7 @@ export function App() {
 
     setActiveCharacter(character);
     setLearnedSkills([]);
+    setSkillLevels({});
     // Switch the shared bag store to this character's own inventory before the
     // scene enters the world, so the server fallback can never leak another
     // character's items.
@@ -802,6 +814,7 @@ export function App() {
     setIsConnectionGated(false);
     setConnectionIssue(null);
     setLearnedSkills([]);
+    setSkillLevels({});
     StorageManager.setUserId(null);
     StorageManager.setCharacterId(null);
     setEquipment(defaultEquipment());
@@ -994,9 +1007,13 @@ export function App() {
         skills={weaponSkills}
         weapon={weaponType}
         learnedSkills={learnedSkills}
+        skillLevels={skillLevels}
         level={stats.level}
+        coins={stats.coins}
+        exp={stats.exp}
         quickSlotsMapping={quickSlots}
         onAssignSkill={handleAssignSkill}
+        onUpgradeSkill={handleUpgradeSkill}
       />
 
       {/* Mobile arc skill picker (tap "+" on a mobile skill button) */}

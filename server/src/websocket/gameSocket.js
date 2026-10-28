@@ -48,7 +48,16 @@ import {
   normalizeProgress,
   progressPayload
 } from "../../../src/game/progression.js";
-import { skillById, effectiveSkillMpCost, effectiveSkillCooldown, skillUsable } from "../../../src/game/skills.js";
+import {
+  skillById,
+  effectiveSkillMpCost,
+  effectiveSkillCooldown,
+  skillFundsShortfall,
+  skillLearnCost,
+  skillLevelOf,
+  skillUpgradeCost,
+  skillUsable
+} from "../../../src/game/skills.js";
 import { isTestMode } from "../../../src/game/testMode.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
 import { botSnapshot, botLevelForMap } from "../../../src/game/botAi.js";
@@ -59,7 +68,8 @@ import {
   isInsideCastArea as isTargetInsideCastArea,
   resolveSkillHit,
   splashDamage,
-  studyRejection
+  studyRejection,
+  upgradeRejection
 } from "../game/skillCast.js";
 import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
 import { equippedWeaponType } from "../../../src/game/equipment.js";
@@ -590,6 +600,10 @@ export class GameSocketManager {
         this.handleUseItem(ws, msg.payload);
         break;
 
+      case "skill_upgrade":
+        this.handleSkillUpgrade(ws, msg.payload);
+        break;
+
       case "equip_item":
         this.handleEquipItem(ws, msg.payload);
         break;
@@ -800,6 +814,8 @@ export class GameSocketManager {
       weaponType: equippedWeaponType(equipment),
       /** Skill ids studied from books (starter skills are always known). */
       learnedSkills,
+      /** skill id -> level (1..MAX_SKILL_LEVEL); absent entries are level 1. */
+      skillLevels: store.getSkillLevels(characterId),
       pkFlag: payload.pkFlag === true,
       invulnerableUntil: 0,
       nextBiteAt: 0,
@@ -860,7 +876,10 @@ export class GameSocketManager {
     // recomputing it: bag, worn gear, derived combat stats and vitals.
     this.send(ws, { type: "inventory_sync", payload: { inventory: bag } });
     this.send(ws, { type: "equipment_sync", payload: { equipment } });
-    this.send(ws, { type: "skills_sync", payload: { skills: learnedSkills } });
+    this.send(ws, {
+      type: "skills_sync",
+      payload: { skills: learnedSkills, levels: playerData.skillLevels }
+    });
     this.send(ws, {
       type: "player_stats",
       payload: { id: playerId, ...stats }
@@ -1204,9 +1223,39 @@ export class GameSocketManager {
   }
 
   /**
-   * Study a skill book: validate the level/prerequisites, consume one copy and
-   * record the skill on the character. The client is told whether the study
-   * succeeded so it can update the skill panel and the bag.
+   * Charge a validated skill price to the character's ledger and publish the new
+   * balance. Funds must already have been checked by the caller.
+   * @param {WebSocket} ws
+   * @param {Object} player
+   * @param {{coins:number, exp:number}} cost
+   */
+  chargeSkillCost(ws, player, cost) {
+    if (!player?.progress) return;
+    player.progress = {
+      ...player.progress,
+      coins: player.progress.coins - cost.coins,
+      exp: player.progress.exp - cost.exp
+    };
+    this.persistProgress(player);
+    this.send(ws, { type: "player_progress", payload: progressPayload(player.progress) });
+  }
+
+  /**
+   * Publish the player's learned skills together with their levels.
+   * @param {WebSocket} ws
+   * @param {Object} player
+   */
+  publishSkills(ws, player) {
+    this.send(ws, {
+      type: "skills_sync",
+      payload: { skills: player.learnedSkills, levels: player.skillLevels }
+    });
+  }
+
+  /**
+   * Study a skill book: validate the level/prerequisites and the silver/EXP
+   * price, consume one copy, then record the skill at level 1. The client is told
+   * whether the study succeeded so it can update the skill panel and the bag.
    * @param {WebSocket} ws
    * @param {Object} player
    * @param {string} itemId
@@ -1231,18 +1280,91 @@ export class GameSocketManager {
       return reject(reason, extra);
     }
 
+    // Studying costs silver and EXP on top of the book. Funds are checked before
+    // the book is consumed, so a refused study never destroys it.
+    const cost = skillLearnCost();
+    const shortfall = skillFundsShortfall(cost, player.progress);
+    if (shortfall) {
+      return reject(shortfall.reason, {
+        coins: shortfall.coins,
+        exp: shortfall.exp,
+        required: cost
+      });
+    }
+
     const consumed = consumeItem(player.characterId, itemId, 1);
     if (!consumed.ok) {
       this.sendInventory(player, consumed.bag);
       return reject(consumed.reason || "missing_item");
     }
 
+    // Grant the skill before the debit: a crash between the two writes must never
+    // leave the player charged for an art they did not receive.
     player.learnedSkills = store.addLearnedSkill(player.characterId, skill.id);
+    player.skillLevels = store.setSkillLevel(player.characterId, skill.id, 1);
+    this.chargeSkillCost(ws, player, cost);
     this.sendInventory(player, consumed.bag);
-    this.send(ws, { type: "skills_sync", payload: { skills: player.learnedSkills } });
+    this.publishSkills(ws, player);
     this.send(ws, {
       type: "item_result",
-      payload: { ok: true, action: "learn", itemId, skillId: skill.id }
+      payload: {
+        ok: true,
+        action: "learn",
+        itemId,
+        skillId: skill.id,
+        level: 1,
+        coins: player.progress?.coins,
+        exp: player.progress?.exp
+      }
+    });
+  }
+
+  /**
+   * Raise one learned skill by a level. The server owns the price and the ledger:
+   * it validates the skill level and the character's silver/EXP, debits both and
+   * pushes the new level plus the authoritative progress back to the player.
+   * @param {WebSocket} ws
+   * @param {{skillId?:string}} payload
+   */
+  handleSkillUpgrade(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player || !player.characterId) return;
+
+    const skill = skillById(sanitizeStr(payload.skillId, 64));
+    const skillId = skill?.id || null;
+    const reject = (reason, extra = {}) => {
+      this.send(ws, {
+        type: "item_result",
+        payload: { ok: false, action: "skill_upgrade", skillId, reason, ...extra }
+      });
+    };
+
+    const rejection = upgradeRejection(skill, player);
+    if (rejection) {
+      const { reason, ...extra } = rejection;
+      return reject(reason, extra);
+    }
+
+    const current = skillLevelOf(player.skillLevels, skill.id);
+    const cost = skillUpgradeCost(current);
+    if (!cost) return reject("max_level", { level: current });
+
+    // Raise the stored level before debiting, so a crash between the two writes
+    // can never charge the player for a level they did not receive.
+    player.skillLevels = store.setSkillLevel(player.characterId, skill.id, current + 1);
+    this.chargeSkillCost(ws, player, cost);
+    this.publishSkills(ws, player);
+    this.send(ws, {
+      type: "item_result",
+      payload: {
+        ok: true,
+        action: "skill_upgrade",
+        skillId: skill.id,
+        level: current + 1,
+        coins: player.progress.coins,
+        exp: player.progress.exp,
+        required: cost
+      }
     });
   }
 
@@ -1552,7 +1674,12 @@ export class GameSocketManager {
   tickRegen() {
     const now = Date.now();
     this.players.forEach((player) => {
-      const rate = passiveRegenRate(player.weaponType, player.level, player.learnedSkills);
+      const rate = passiveRegenRate(
+        player.weaponType,
+        player.level,
+        player.learnedSkills,
+        player.skillLevels
+      );
       const previous = player.regenAt;
       player.regenAt = now;
 
@@ -1876,6 +2003,7 @@ export class GameSocketManager {
     if (!skill || victims.length === 0) return;
 
     const stats = attackerStats || this.effectiveStats(attacker, now);
+    const level = skillLevelOf(attacker.skillLevels, skill.id);
 
     for (const victim of victims) {
       const distance = Math.hypot(attacker.x - victim.x, attacker.y - victim.y);
@@ -1892,7 +2020,7 @@ export class GameSocketManager {
       }
 
       const victimStats = this.effectiveStats(victim, now);
-      const damage = this.computeSplashDamage(skill, stats, victimStats.defense);
+      const damage = this.computeSplashDamage(skill, stats, victimStats.defense, level);
       if (damage <= 0) continue;
 
       // A splash tick is part of the same channelled strikes, so it follows the
@@ -1907,10 +2035,11 @@ export class GameSocketManager {
    * @param {Object} skill
    * @param {Object} attackerStats
    * @param {number} defenderDefense
+   * @param {number} [level=1] attacker's level in this skill
    * @returns {number}
    */
-  computeSplashDamage(skill, attackerStats, defenderDefense) {
-    return splashDamage(skill, attackerStats, defenderDefense, this.random);
+  computeSplashDamage(skill, attackerStats, defenderDefense, level = 1) {
+    return splashDamage(skill, attackerStats, defenderDefense, this.random, level);
   }
 
   /**
@@ -2550,19 +2679,32 @@ export class GameSocketManager {
       return;
     }
 
+    // Effects follow the caster's level in the skill: `hit.skill` is the leveled
+    // entry the damage was rolled from, so splash and control read the same values.
+    const effectiveSkill = hit.skill || skill;
+    const skillLevel = effectiveSkill ? skillLevelOf(player.skillLevels, effectiveSkill.id) : 1;
+
     // Splash victims are chosen before the primary can die, so a killing blow
     // still carries the strike's radius to the monsters standing around it.
-    const splashTargets = skill && hasSplash(skill)
-      ? splashVictims(enemy, Array.from(this.rosterFor(enemy.mapId).values()), skill)
+    const splashTargets = effectiveSkill && hasSplash(effectiveSkill)
+      ? splashVictims(enemy, Array.from(this.rosterFor(enemy.mapId).values()), effectiveSkill)
       : [];
 
-    if (this.applyEnemyDamage(player, enemy, damage, skill, now)) {
+    if (this.applyEnemyDamage(player, enemy, damage, effectiveSkill, now)) {
       this.rewardKill(ws, player, enemy);
     }
 
     for (const victim of splashTargets) {
-      const splashDamage = this.computeSplashDamage(skill, attackerStats, victim.defense);
-      if (this.applyEnemyDamage(player, victim, splashDamage, skill, now)) {
+      // Splash rolls its own multiplier from the raw entry plus the level:
+      // `effectiveSkill` is already scaled, passing it with a level would
+      // scale the strike twice.
+      const splashDamage = this.computeSplashDamage(
+        skill,
+        attackerStats,
+        victim.defense,
+        skillLevel
+      );
+      if (this.applyEnemyDamage(player, victim, splashDamage, effectiveSkill, now)) {
         this.rewardKill(ws, player, victim);
       }
     }

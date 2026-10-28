@@ -48,8 +48,9 @@ describe("MobileSkillPicker", () => {
     expect(markup).toContain("Chọn chiêu cho nút 2");
     expect(markup).toContain("Đại Tu Di Chưởng");
     expect(markup).toContain("12 MP");
-    // The level-5 art stays visible but disabled with its lock hint.
-    expect(markup).toContain("Cần cấp 5");
+    // The level-5 art stays visible but disabled with its lock hint. Studying
+    // any book now needs at least character level 10, so that floor wins.
+    expect(markup).toContain("Cần cấp 10");
     expect(markup).toContain("mobile-picker-row locked");
   });
 
