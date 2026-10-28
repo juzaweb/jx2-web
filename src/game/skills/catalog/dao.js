@@ -10,7 +10,7 @@ export const DAO_SKILLS = [
     id: "ngu_doc_tam_phap",
     weapon: "dao",
     slot: 0,
-    book: { viName: "Ngũ Độc Tâm Pháp", dropTiers: ["da-lang"] },
+    book: { viName: "Ngũ Độc Đao Pháp", dropTiers: ["da-lang"] },
     glyph: "毒",
     nameKey: "skills.nguDoc.nguDocTamPhap.name",
     descKey: "skills.nguDoc.nguDocTamPhap.desc",

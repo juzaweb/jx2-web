@@ -312,8 +312,8 @@ export default {
         desc: "武当基础剑术，轻灵快捷。"
       },
       thaiCucQuyen: {
-        name: "太极拳",
-        desc: "借力打力，造成强劲冲击伤害。"
+        name: "太极剑法",
+        desc: "借力打力的太极剑法，造成强劲冲击伤害。"
       },
       tamThanhKiemPhap: {
         name: "三清剑法",
@@ -344,12 +344,12 @@ export default {
     },
     nguDoc: {
       nguDocTamPhap: {
-        name: "五毒心法",
-        desc: "五毒秘传心法，攻击附带剧毒。"
+        name: "五毒刀法",
+        desc: "五毒秘传刀法，造成剧毒伤害。"
       },
       truyTamDoc: {
         name: "追心毒",
-        desc: "剧毒掌气透骨穿心。"
+        desc: "剧毒刀气透骨穿心。"
       },
       vanDocChieuHong: {
         name: "万毒召蛊",

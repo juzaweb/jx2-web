@@ -311,8 +311,8 @@ export default {
         desc: "Basic Wudang sword technique, agile and precise."
       },
       thaiCucQuyen: {
-        name: "Tai Chi Fist",
-        desc: "Defensive fist art redirecting force to deliver crushing impact."
+        name: "Tai Chi Sword Art",
+        desc: "Tai Chi sword technique borrowing force to redirect momentum, dealing concussive damage."
       },
       tamThanhKiemPhap: {
         name: "Three Pure Ones Sword",
@@ -343,12 +343,12 @@ export default {
     },
     nguDoc: {
       nguDocTamPhap: {
-        name: "Five Poisons Mind Method",
-        desc: "Heritage secret technique infusing attacks with deadly venom."
+        name: "Five Poisons Saber Art",
+        desc: "Traditional Five Poisons saber technique, dealing poison damage."
       },
       truyTamDoc: {
         name: "Heart-Piercing Venom",
-        desc: "Toxic palm blast penetrating deep into the foe's core."
+        desc: "Poisonous saber qi penetrating deep into the foe's core."
       },
       vanDocChieuHong: {
         name: "Ten Thousand Poison Gu",

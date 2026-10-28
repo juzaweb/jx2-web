@@ -2017,7 +2017,7 @@ export class JiangHuScene extends Phaser.Scene {
    * auto-target is the aim; with nothing to hit the skill follows the hero's
    * facing (a null aim) instead of a stale finger position on the HUD.
    *
-   * A long-range art (Đại Tu Di Chưởng and Như Lai Thần Chưởng reach 6000) may
+   * A long-range art (Đại Tu Di Chưởng and Như Lai Thần Chưởng reach 1200) may
    * hit a body the ringed auto-target radius never reaches, so `skillId` widens
    * the search to that skill's own reach before giving up on aiming.
    * @param {string|null} [skillId]
