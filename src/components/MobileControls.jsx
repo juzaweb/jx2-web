@@ -36,6 +36,8 @@ export function MobileControls({
   onAssignSkill,
   onUseItem,
   onAssignItem,
+  onInteractNpc,
+  nearbyNpc = null,
   playerMp,
   skills = [],
   skillSlots = EMPTY_SKILL_SLOTS,
@@ -227,6 +229,21 @@ export function MobileControls({
         <div className="joystick-dir-indicator dir-right">▶</div>
         <div className="joystick-dir-indicator dir-down">▼</div>
       </div>
+
+      {/* Talk button: appears only while an NPC is within interaction range. */}
+      {nearbyNpc && (
+        <button
+          type="button"
+          id="mobile-npc-talk"
+          className="mobile-npc-talk"
+          onClick={() => onInteractNpc?.()}
+          title={t("quests.ui.talkTo", { name: nearbyNpc.name })}
+          aria-label={t("quests.ui.talkTo", { name: nearbyNpc.name })}
+        >
+          <span className="mobile-npc-talk-icon" aria-hidden="true">💬</span>
+          <span className="mobile-npc-talk-label">{t("quests.ui.talk")}</span>
+        </button>
+      )}
 
       {/* Radial Arc Skill Cluster (Bottom Right) */}
       <div className="mobile-skill-arc">

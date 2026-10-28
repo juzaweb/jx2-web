@@ -106,6 +106,20 @@ export function getMap(id) {
 }
 
 /**
+ * Find a friendly NPC definition by id on a map. Unknown maps fall back to the
+ * default map, matching {@link getMap}. Used by the server to validate that a
+ * quest interaction happens next to a real NPC.
+ * @param {string} mapId
+ * @param {string} npcId
+ * @returns {object|null}
+ */
+export function findNpc(mapId, npcId) {
+  if (typeof npcId !== "string" || npcId.length === 0) return null;
+  const def = getMap(mapId);
+  return (def.npcs || []).find((npc) => npc && npc.id === npcId) || null;
+}
+
+/**
  * Walkable size of a map.
  * @param {import("./mapRegistry.js").MapDefinition|string} [map]
  * @returns {{width:number, height:number}}

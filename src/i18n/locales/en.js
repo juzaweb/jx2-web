@@ -58,8 +58,12 @@ export default {
     region: "Hidden Dragon (Server 1)",
     subzone: "Jianye",
     helpTitle: "Beginner's guide",
-    questHead: "✦ EXPLORE JIANYE",
-    questDone: "You have toured Jianye",
+    questHead: "✦ NEWBIE QUESTS",
+    questIdle: "No quest yet",
+    questReady: "Ready to turn in",
+    questHint: "Press J for the journal",
+    questLogTitle: "Quest journal (J)",
+    questDone: "Completed",
     questTodo: "A bustling city",
     questSafe: "Safe zone • No monsters",
     zoomTitle: "Tab: Enlarge the minimap 5x",
@@ -468,6 +472,102 @@ export default {
       none: "No usable items available."
     }
   },
+  quests: {
+    dialog: { eyebrow: "CONVERSATION", idle: "Speak freely, traveler." },
+    ui: {
+      levelReq: "Requires level {level}",
+      accept: "Accept quest",
+      heard: "I understand",
+      turnIn: "Turn in quest",
+      openShop: "Buy medicine",
+      talk: "Talk",
+      talkTo: "Talk to {name}",
+      exp: "{exp} EXP",
+      bac: "{bac} silver",
+      letterHint: "This letter must be delivered to Zhao Yannian in Jianye."
+    },
+    status: {
+      done: "Completed",
+      ready: "Ready",
+      active: "In progress",
+      chain: "Finish the previous quest",
+      level: "Requires level {level}",
+      available: "Available"
+    },
+    log: {
+      eyebrow: "NEWBIE",
+      title: "Quest Journal",
+      hint: "Press J or Esc to close."
+    },
+    tanThu1: {
+      title: "A Round of Visits",
+      intro: "Dã Tẩu: A newcomer should visit the shopkeepers to learn about gear, medicine and supplies.",
+      progress: "Visit all six shopkeepers, then return to me.",
+      turnIn: "Well done, you know the basics now. Take this travel pack.",
+      objective: { shops: "Talk to the shopkeepers" },
+      talk: {
+        weapon: "Your weapon decides your arts: swords for swordplay, gloves for fists, sabers for blade work.",
+        maleClothes: "Armour raises your defense. Wear robe, hat and trousers before leaving the city.",
+        femaleClothes: "Ladies' garb is light but sturdy. Never underestimate defense.",
+        jewelry: "Jewels are precious, but a newcomer should stay safe. This hat suits you better.",
+        pharmacy: "Medicine saves lives. Golden Radiance restores health, Great Return Pill restores inner force.",
+        grocery: "The grocer sells all sorts. A Return City Talisman brings you back to Jianye."
+      }
+    },
+    tanThu2: {
+      title: "The Way of Battle",
+      intro: "Find the gate guard at the east gate, then the martial master and quartermaster in the city to learn combat and inventory.",
+      progress: "Hear all three elders out.",
+      turnIn: "You understand combat now. Let me pass you some inner power to go further.",
+      objective: { masters: "Learn from guard, master and quartermaster" },
+      talk: {
+        guard: "Monsters live in bands. Mountain hounds near the edge, grey wolves deeper in — do not rush.",
+        master: "I will teach you to focus your qi. Strike at the right moment, keep your distance, never get surrounded.",
+        keeper: "Your bag is limited. Keep valuables and drop spare goods before you set out."
+      }
+    },
+    tanThu3: {
+      title: "Making Friends",
+      intro: "Visit the tavern keeper and the escort chief to learn about chat, parties and bonds.",
+      progress: "Meet the tavern keeper and the escort chief.",
+      turnIn: "The jianghu is not only blades. Friends are strength too.",
+      objective: { friends: "Meet the tavern keeper and escort chief" },
+      talk: {
+        tavern: "Press Enter to chat. Parties, sworn bonds and marriage open when fate allows.",
+        escort: "Long roads need companions. A sworn bond keeps you from walking alone."
+      }
+    },
+    tanThu4: {
+      title: "Sect Knowledge",
+      intro: "Your name colour shows your PK state. Ask Scholar Bai to explain.",
+      progress: "Go to Scholar Bai.",
+      turnIn: "Knowing this, stay safe. Let me pass you more inner power.",
+      objective: { scholar: "Ask Scholar Bai" },
+      talk: {
+        scholar: "A white name is peaceful; a red name means the PK flag is up. Be careful on faction battlefields."
+      }
+    },
+    tanThu5: {
+      title: "The Old Story",
+      intro: "Dã Tẩu hesitates, as if hiding something. Ask him.",
+      progress: "Talk to Dã Tẩu.",
+      turnIn: "The old tale is long... You have proven yourself, so take the rest of my power as thanks.",
+      objective: { story: "Hear Dã Tẩu's story" },
+      talk: {
+        daTau: "Long ago I was a newcomer too. Some things can only be told once you are ready..."
+      }
+    },
+    tanThu6: {
+      title: "Delivering the Letter",
+      intro: "Dã Tẩu asks you to deliver a letter to Zhao Yannian in Jianye.",
+      progress: "Deliver the letter to Zhao Yannian.",
+      turnIn: "Dã Tẩu's letter? Thank you. Take this token of my gratitude.",
+      objective: { letter: "Deliver the letter to Zhao Yannian" },
+      talk: {
+        trieuDienNien: "You bring a letter for me? Let me see."
+      }
+    }
+  },
   item: {
     "kiem-lang-khach": {
       name: "Wanderer's Sword",
@@ -496,6 +596,14 @@ export default {
     "hoi-thanh-phu": {
       name: "Return City Talisman",
       desc: "A spatial talisman that returns the traveler to Jianye."
+    },
+    "giang-ho-chi-nam": {
+      name: "Jianghu Guide",
+      desc: "Dã Tẩu's guide for newcomers. Use it to open the quest journal."
+    },
+    "thu-cua-da-tau": {
+      name: "Dã Tẩu's Letter",
+      desc: "A letter Dã Tẩu asked you to deliver to Zhao Yannian in Jianye."
     },
     "lenh-bai-gm": {
       name: "GM Imperial Token",

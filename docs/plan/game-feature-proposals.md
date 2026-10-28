@@ -264,3 +264,13 @@ Longer-term expansions and future content iterations:
 
 1. Should Equipment Enhancement have visual glowing weapon aura effects at +7 and above in the current Phaser rig renderer?
 2. Should the dao kit's poison mechanics be shipped as v1 (flat debuff/slow) first or wait for the full server-authoritative DoT tick engine (v2)?
+
+---
+
+## Implementation note — Newbie quest chain (2026-10-28)
+
+The Dã Tẩu newbie chain (`src/game/quests/catalog.js`) is now live: six talk-only quests
+(levels 1/4/6/8/9/10), server-authoritative state persisted in `saves.quest_state`, NPC dialogs,
+a `J` quest journal, and a HUD tracker. EXP payouts are sized to reach each next quest's level, so
+the chain never requires grinding and has no monster-count objectives. Life-skill quests are out of
+scope. This supersedes the old one-off `quest_claim` / `quest_rewarded` stub.

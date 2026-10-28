@@ -58,8 +58,12 @@ export default {
     region: "藏龙（服务器 1）",
     subzone: "建业",
     helpTitle: "新手秘笈",
-    questHead: "✦ 探索建业",
-    questDone: "已游历建业",
+    questHead: "✦ 新手任务",
+    questIdle: "暂无任务",
+    questReady: "可以交任务",
+    questHint: "按 J 查看任务日志",
+    questLogTitle: "任务日志（J）",
+    questDone: "已完成",
     questTodo: "繁华都城",
     questSafe: "安全区 • 无怪物",
     zoomTitle: "Tab：小地图放大 5 倍",
@@ -469,6 +473,102 @@ export default {
       none: "没有可用的物品。"
     }
   },
+  quests: {
+    dialog: { eyebrow: "交谈", idle: "少侠请随意。" },
+    ui: {
+      levelReq: "需要 {level} 级",
+      accept: "接受任务",
+      heard: "已听明",
+      turnIn: "交任务",
+      openShop: "购买药品",
+      talk: "交谈",
+      talkTo: "与 {name} 交谈",
+      exp: "{exp} 经验",
+      bac: "{bac} 银子",
+      letterHint: "这封信要交给建业的赵延年。",
+    },
+    status: {
+      done: "已完成",
+      ready: "可交付",
+      active: "进行中",
+      chain: "请先完成前置任务",
+      level: "需要 {level} 级",
+      available: "可接受"
+    },
+    log: {
+      eyebrow: "新手",
+      title: "任务日志",
+      hint: "按 J 或 Esc 关闭。"
+    },
+    tanThu1: {
+      title: "拜访",
+      intro: "野叟：初入江湖，去拜访城中各位店主，了解装备、药品与杂货。",
+      progress: "拜访六位店主后回来找我。",
+      turnIn: "很好，你已懂得基本常识。收下这点行装吧。",
+      objective: { shops: "与各位店主交谈" },
+      talk: {
+        weapon: "兵器决定招式。剑用剑法，拳套用拳脚，刀用刀法。",
+        maleClothes: "衣甲能提升防御。出城前记得穿齐衣、帽、裤。",
+        femaleClothes: "女装同样轻便而结实，切莫小看防御。",
+        jewelry: "首饰珍贵，但新手应先保命。这顶帽子更适合你。",
+        pharmacy: "药品能救命。金创药回生命，大还丹回内力。",
+        grocery: "杂货什么都有。回城符能带你回建业。"
+      }
+    },
+    tanThu2: {
+      title: "战斗之道",
+      intro: "在东门寻找城门卫兵，并在城中拜访武师与仓库管理员，学习战斗与整理物品。",
+      progress: "听齐三位前辈的指点。",
+      turnIn: "你已明白如何战斗。我传你些功力，助你走得更远。",
+      objective: { masters: "向卫兵、武师、仓库管理员学习" },
+      talk: {
+        guard: "怪物分区域出没。外城有山狗，深处有野狼——别急着冒险。",
+        master: "我教你运功之法。看准时机，保持距离，别被围住。",
+        keeper: "行囊有限。留值钱之物，出发前清掉杂物。"
+      }
+    },
+    tanThu3: {
+      title: "交流",
+      intro: "去酒楼找掌柜与镖师，了解聊天、组队与结义。",
+      progress: "去见酒楼掌柜与镖师。",
+      turnIn: "江湖不只有刀剑，朋友也是力量。",
+      objective: { friends: "见酒楼掌柜与镖师" },
+      talk: {
+        tavern: "按 Enter 聊天。组队、结义、结婚待到有缘时自会开放。",
+        escort: "远行需有同伴。结义金兰能让你不孤单。"
+      }
+    },
+    tanThu4: {
+      title: "门派知识",
+      intro: "名字颜色代表 PK 状态。去找百晓生问个明白。",
+      progress: "去找百晓生。",
+      turnIn: "明白了就要自保。我再传你些功力。",
+      objective: { scholar: "询问百晓生" },
+      talk: {
+        scholar: "白名是安分，红名是开了 PK。踏入阵营战场时要小心。"
+      }
+    },
+    tanThu5: {
+      title: "往事",
+      intro: "野叟吞吞吐吐，似有隐情。去问他。",
+      progress: "与野叟交谈。",
+      turnIn: "往事很长……你已有本事，剩下的功力就传给你，算是谢礼。",
+      objective: { story: "听野叟讲往事" },
+      talk: {
+        daTau: "当年我也曾是新手的你。有些事，要等你够强才能说……"
+      }
+    },
+    tanThu6: {
+      title: "送信",
+      intro: "野叟托你把信交给建业的赵延年。",
+      progress: "把信交给赵延年。",
+      turnIn: "野叟的信？多谢你。这是点心意。",
+      objective: { letter: "送信给赵延年" },
+      talk: {
+        trieuDienNien: "你带信给我？拿来我看看。"
+      }
+    }
+  },
   item: {
     "kiem-lang-khach": {
       name: "浪客之剑",
@@ -497,6 +597,14 @@ export default {
     "hoi-thanh-phu": {
       name: "回城符",
       desc: "空间符咒，可将行者送回故乡建业。"
+    },
+    "giang-ho-chi-nam": {
+      name: "江湖指南",
+      desc: "野叟赠予新手的指南。使用可打开任务日志。"
+    },
+    "thu-cua-da-tau": {
+      name: "野叟之信",
+      desc: "野叟托你交给建业赵延年的信。"
     },
     "lenh-bai-gm": {
       name: "GM令牌",
