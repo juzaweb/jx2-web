@@ -33,7 +33,7 @@ describe("parseEnemyReward", () => {
     expect(Object.keys(reward)).not.toContain("drop");
   });
 
-  it("rejects payloads without a usable EXP or bạc amount", () => {
+  it("rejects payloads without a usable EXP or đồng amount", () => {
     expect(parseEnemyReward({ coins: 5 })).toBeNull();
     expect(parseEnemyReward({ exp: 35 })).toBeNull();
     expect(parseEnemyReward({ exp: -35, coins: 5 })).toBeNull();

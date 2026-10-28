@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PHARMACY_STOCK, getShopItem } from "../../game/shop.js";
 import { getItemById } from "../../game/items.js";
+import { splitCurrency, toLedgerDong } from "../../game/currency.js";
 import { localizeItem } from "../../i18n/localize.js";
 import { useI18n } from "../../i18n/I18nProvider.jsx";
 import "./shop.css";
@@ -38,6 +39,9 @@ export function ShopModal({ isOpen, npcName, coins = 0, result = null, onBuy, on
 
   if (!isOpen) return null;
 
+  /** Prices are quoted in bạc, so each row is only affordable at 100x in đồng. */
+  const treasury = splitCurrency(coins);
+
   const rows = PHARMACY_STOCK.map((entry) => {
     const item = localizeItem(getItemById(entry.id), t);
     return { ...entry, item };
@@ -64,13 +68,17 @@ export function ShopModal({ isOpen, npcName, coins = 0, result = null, onBuy, on
 
         <div className="shop-balance">
           <span>{t("shop.balance")}</span>
-          <b>{coins}</b>
+          <b>{treasury.gold}</b>
+          <span>{t("inventory.gold")}</span>
+          <b>{treasury.silver}</b>
           <span>{t("inventory.silver")}</span>
+          <b>{treasury.copper}</b>
+          <span>{t("inventory.copper")}</span>
         </div>
 
         <div className="shop-list">
-          {rows.map(({ id, price, item }) => {
-            const affordable = coins >= price;
+          {rows.map(({ id, priceBac, item }) => {
+            const affordable = coins >= toLedgerDong(priceBac);
             const pending = pendingId === id;
             return (
               <div key={id} className="shop-row">
@@ -81,7 +89,7 @@ export function ShopModal({ isOpen, npcName, coins = 0, result = null, onBuy, on
                 </div>
                 <div className="shop-action">
                   <span className={`shop-price ${affordable ? "" : "insufficient"}`}>
-                    {price} {t("inventory.silver")}
+                    {priceBac} {t("inventory.silver")}
                   </span>
                   <button
                     type="button"

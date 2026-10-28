@@ -1,29 +1,31 @@
 /**
  * Herb-shop stock shared by the Phaser scene, the React shop modal and the
- * server. Prices are raw ledger amounts, i.e. đồng (the same base unit kill
- * payouts use), and are authoritative on the server: the client only uses them
- * to render the stock and disable buttons it clearly cannot afford. Every
- * purchase round-trips through the server.
+ * server. Prices are quoted in bạc (the coin the player recognises), while the
+ * ledger is counted in đồng, so `shopPurchase` returns both the quoted total and
+ * the đồng amount to debit. Prices are authoritative on the server: the client
+ * only uses them to render the stock and disable buttons it cannot afford.
+ * Every purchase round-trips through the server.
  */
+import { toLedgerDong } from "./currency.js";
 
 /** Maximum units of one item a single purchase may buy. */
 export const MAX_SHOP_QTY = 99;
 
 /**
  * Fixed stock of the Dược Điểm shop.
- * @type {Array<{id:string, price:number}>}
+ * @type {Array<{id:string, priceBac:number}>}
  */
 export const PHARMACY_STOCK = [
-  { id: "kim-sang-duoc", price: 8 },
-  { id: "dai-hoan-dan", price: 8 },
-  { id: "nu-nhi-hong", price: 20 }
+  { id: "kim-sang-duoc", priceBac: 8 },
+  { id: "dai-hoan-dan", priceBac: 8 },
+  { id: "nu-nhi-hong", priceBac: 20 }
 ];
 
 /**
  * Look up a stocked item. Unknown ids return null so a forged shop_buy packet
  * cannot sell arbitrary catalog entries.
  * @param {string} id
- * @returns {{id:string, price:number}|null}
+ * @returns {{id:string, priceBac:number}|null}
  */
 export function getShopItem(id) {
   if (typeof id !== "string" || id.length === 0) return null;
@@ -43,15 +45,18 @@ export function normalizeShopQty(qty) {
 }
 
 /**
- * Total silver cost of buying `qty` units of `id`, or null when the item is not
- * stocked.
+ * What buying `qty` units of `id` quotes and costs, or null when the item is not
+ * stocked. `totalBac` is what the shop shows; `chargeDong` is what the server
+ * debits from the đồng ledger.
  * @param {string} id
  * @param {number} [qty=1]
- * @returns {{item:{id:string, price:number}, qty:number, total:number}|null}
+ * @returns {{item:{id:string, priceBac:number}, qty:number, totalBac:number,
+ *   chargeDong:number}|null}
  */
 export function shopPurchase(id, qty = 1) {
   const item = getShopItem(id);
   if (!item) return null;
   const amount = normalizeShopQty(qty);
-  return { item, qty: amount, total: item.price * amount };
+  const totalBac = item.priceBac * amount;
+  return { item, qty: amount, totalBac, chargeDong: toLedgerDong(totalBac) };
 }

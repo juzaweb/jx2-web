@@ -9,8 +9,8 @@ import {
 
 describe("pharmacy shop", () => {
   it("stocks the HP and MP potions", () => {
-    expect(getShopItem("kim-sang-duoc")).toEqual({ id: "kim-sang-duoc", price: 8 });
-    expect(getShopItem("dai-hoan-dan")).toEqual({ id: "dai-hoan-dan", price: 8 });
+    expect(getShopItem("kim-sang-duoc")).toEqual({ id: "kim-sang-duoc", priceBac: 8 });
+    expect(getShopItem("dai-hoan-dan")).toEqual({ id: "dai-hoan-dan", priceBac: 8 });
   });
 
   it("rejects unknown or malformed ids", () => {
@@ -28,9 +28,22 @@ describe("pharmacy shop", () => {
     expect(normalizeShopQty("nope")).toBe(1);
   });
 
-  it("computes the total from the catalog price", () => {
+  it("computes the quoted bạc total and the đồng ledger charge", () => {
     const purchase = shopPurchase("nu-nhi-hong", 2.9);
-    expect(purchase).toEqual({ item: PHARMACY_STOCK[2], qty: 2, total: 40 });
+    expect(purchase).toEqual({
+      item: PHARMACY_STOCK[2],
+      qty: 2,
+      totalBac: 40,
+      chargeDong: 4000
+    });
     expect(shopPurchase("not-stocked")).toBeNull();
+  });
+
+  it("always charges 100 đồng per quoted bạc", () => {
+    // Guards the 1 bạc = 100 đồng ratio at the one place money leaves the player.
+    for (const entry of PHARMACY_STOCK) {
+      const purchase = shopPurchase(entry.id, 3);
+      expect(purchase.chargeDong).toBe(purchase.totalBac * 100);
+    }
   });
 });

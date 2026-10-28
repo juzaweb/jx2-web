@@ -555,10 +555,10 @@ export default {
       receiveScroll: "Receive 99x Return City Talisman"
     },
     utility: {
-      title: "Silver & Utility",
-      addCoins1k: "Receive 1,000 Silver",
-      addCoins10k: "Receive 10,000 Silver (100 Gold)",
-      addCoins100k: "Receive 100,000 Silver",
+      title: "Copper & Utility",
+      addCoins1k: "Receive 1,000 Copper (10 Silver)",
+      addCoins10k: "Receive 10,000 Copper (1 Gold)",
+      addCoins100k: "Receive 100,000 Copper (10 Gold)",
       godMode: "God Mode (Invulnerable)",
       godModeOn: "God Mode: [ACTIVE]",
       godModeOff: "Enable God Mode",

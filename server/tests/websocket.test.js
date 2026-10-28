@@ -685,24 +685,27 @@ test("WebSocket server-authority suite", async (t) => {
   });
 
   await t.test("Shop purchases debit the server ledger", async () => {
-    store.setProgress("char_shop", { level: 1, exp: 0, coins: 100, kills: 0 }, "char_shop");
+    // Prices are quoted in bạc while the ledger holds đồng, so 1,000 đồng is
+    // 10 bạc: enough for the 8-bạc potion and nothing else.
+    store.setProgress("char_shop", { level: 1, exp: 0, coins: 1000, kills: 0 }, "char_shop");
     const npc = MARKET_NPCS.find((entry) => entry.shop === "pharmacy");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_shop", x: npc.x, y: npc.y + 80 });
 
     const before = await client.waitFor((m) => m.type === "player_progress");
-    assert.equal(before.payload.coins, 100);
+    assert.equal(before.payload.coins, 1000);
 
     client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
     const bought = await client.waitFor((m) => m.type === "shop_result");
     assert.equal(bought.payload.ok, true);
-    assert.equal(bought.payload.total, 8);
-    assert.equal(bought.payload.coins, 92);
+    assert.equal(bought.payload.total, 8, "quoted in bạc");
+    assert.equal(bought.payload.charged, 800, "debited in đồng");
+    assert.equal(bought.payload.coins, 200);
 
     const progress = await client.waitFor(
-      (m) => m.type === "player_progress" && m.payload.coins === 92
+      (m) => m.type === "player_progress" && m.payload.coins === 200
     );
-    assert.equal(progress.payload.coins, 92);
+    assert.equal(progress.payload.coins, 200);
     const bag = await client.waitFor(
       (m) => m.type === "inventory_sync" && m.payload.inventory["kim-sang-duoc"] === 1
     );
@@ -711,8 +714,29 @@ test("WebSocket server-authority suite", async (t) => {
     await client.close();
   });
 
+  await t.test("A shop purchase priced in bạc is refused when only bạc-worth of đồng remains", async () => {
+    // 8 bạc costs 800 đồng: a 500-đồng wallet must be refused, not charged 8.
+    store.setProgress("char_shop_poor", { level: 1, exp: 0, coins: 500, kills: 0 }, "char_shop_poor");
+    const npc = MARKET_NPCS.find((entry) => entry.shop === "pharmacy");
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_shop_poor", x: npc.x, y: npc.y + 80 });
+
+    await client.waitFor((m) => m.type === "player_progress");
+
+    client.send({ type: "shop_buy", payload: { itemId: "kim-sang-duoc", qty: 1 } });
+    const refused = await client.waitFor((m) => m.type === "shop_result");
+    assert.equal(refused.payload.ok, false);
+    assert.equal(refused.payload.reason, "coins");
+    assert.equal(refused.payload.total, 8, "still quoted in bạc");
+
+    // Nothing was debited and nothing entered the bag.
+    assert.equal(store.getProgress("char_shop_poor").coins, 500);
+
+    await client.close();
+  });
+
   await t.test("Skill upgrades debit the ledger and persist the level", async () => {
-    store.setProgress("char_skill", { level: 20, exp: 500, coins: 500, kills: 0 }, "char_skill");
+    store.setProgress("char_skill", { level: 20, exp: 500, coins: 10000, kills: 0 }, "char_skill");
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_skill", x: 5000, y: 5000 });
 
@@ -730,9 +754,9 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(upgraded.payload.ok, true);
     assert.equal(upgraded.payload.level, 2);
 
-    // Level 2 costs 80 silver and 120 EXP (40/60 per target level).
+    // Level 2 costs 80 bạc and 120 EXP, and bạc is debited as 100 đồng each.
     const progress = await client.waitFor(
-      (m) => m.type === "player_progress" && m.payload.coins === 420
+      (m) => m.type === "player_progress" && m.payload.coins === 2000
     );
     assert.equal(progress.payload.exp, 380);
 

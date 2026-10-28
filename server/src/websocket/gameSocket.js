@@ -1224,16 +1224,17 @@ export class GameSocketManager {
 
   /**
    * Charge a validated skill price to the character's ledger and publish the new
-   * balance. Funds must already have been checked by the caller.
+   * balance. Funds must already have been checked by the caller. The price is
+   * quoted in bạc while the ledger holds đồng, so `coinsDong` is what is debited.
    * @param {WebSocket} ws
    * @param {Object} player
-   * @param {{coins:number, exp:number}} cost
+   * @param {{coinsBac:number, coinsDong:number, exp:number}} cost
    */
   chargeSkillCost(ws, player, cost) {
     if (!player?.progress) return;
     player.progress = {
       ...player.progress,
-      coins: player.progress.coins - cost.coins,
+      coins: player.progress.coins - cost.coinsDong,
       exp: player.progress.exp - cost.exp
     };
     this.persistProgress(player);
@@ -1476,7 +1477,7 @@ export class GameSocketManager {
           ok: false,
           itemId: purchase.item.id,
           qty: purchase.qty,
-          total: purchase.total,
+          total: purchase.totalBac,
           coins: player.progress.coins,
           reason: "range"
         }
@@ -1484,14 +1485,14 @@ export class GameSocketManager {
       return;
     }
 
-    if (player.progress.coins < purchase.total) {
+    if (player.progress.coins < purchase.chargeDong) {
       this.send(ws, {
         type: "shop_result",
         payload: {
           ok: false,
           itemId: purchase.item.id,
           qty: purchase.qty,
-          total: purchase.total,
+          total: purchase.totalBac,
           coins: player.progress.coins,
           reason: "coins"
         }
@@ -1513,7 +1514,7 @@ export class GameSocketManager {
           ok: false,
           itemId: purchase.item.id,
           qty: purchase.qty,
-          total: purchase.total,
+          total: purchase.totalBac,
           coins: player.progress.coins,
           reason: "error"
         }
@@ -1521,7 +1522,7 @@ export class GameSocketManager {
       return;
     }
 
-    player.progress = { ...player.progress, coins: player.progress.coins - purchase.total };
+    player.progress = { ...player.progress, coins: player.progress.coins - purchase.chargeDong };
     this.persistProgress(player);
     this.sendInventory(player, readBag(player.characterId));
 
@@ -1535,7 +1536,8 @@ export class GameSocketManager {
         ok: true,
         itemId: purchase.item.id,
         qty: purchase.qty,
-        total: purchase.total,
+        total: purchase.totalBac,
+        charged: purchase.chargeDong,
         coins: player.progress.coins
       }
     });

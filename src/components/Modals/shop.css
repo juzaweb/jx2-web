@@ -29,6 +29,7 @@
 
 .shop-balance {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
   padding: 7px 10px;

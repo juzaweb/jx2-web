@@ -204,26 +204,6 @@ export function isSkillBook(itemId) {
   return skillIdForBook(itemId) !== null;
 }
 
-/**
- * Split a balance into the three display denominations.
- * The ledger stores a single integer amount counted in `đồng` (the base unit),
- * so a kill payout of `coins: 3` is three đồng. Conversion is 100 đồng = 1 bạc
- * and 100 bạc = 1 vàng (10.000 đồng).
- * @param {number} amount balance in đồng
- * @returns {{ gold: number, silver: number, copper: number }} `copper` holds đồng
- */
-export function splitCurrency(amount) {
-  const total =
-    typeof amount === "number" && Number.isFinite(amount)
-      ? Math.max(0, Math.floor(amount))
-      : 0;
-  return {
-    gold: Math.floor(total / 10000),
-    silver: Math.floor(total / 100) % 100,
-    copper: total % 100
-  };
-}
-
 /** Quick-slot consumables reused inside the inventory grid, destructured by their fixed order. */
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 

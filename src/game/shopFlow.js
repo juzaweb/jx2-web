@@ -97,7 +97,7 @@ export class ShopFlow {
 
     const item = getItemById(purchase.item.id);
     this.uiBridge.addLog(
-      `Đã mua ${purchase.qty} ${item?.name || purchase.item.id} (−${payload.total ?? purchase.total} bạc).`,
+      `Đã mua ${purchase.qty} ${item?.name || purchase.item.id} (−${payload.total ?? purchase.totalBac} bạc).`,
       "system"
     );
     bridge.emit(EVENTS.SHOP_RESULT, {

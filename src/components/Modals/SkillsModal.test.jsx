@@ -147,7 +147,8 @@ describe("SkillsModal Component", () => {
           level={30}
           learnedSkills={["test_skill_1"]}
           skillLevels={{ test_skill_1: 5 }}
-          coins={10000}
+          // 720 bạc is 72.000 đồng, which the ledger holds in đồng.
+          coins={200000}
           exp={10000}
         />
       </I18nProvider>
@@ -158,7 +159,7 @@ describe("SkillsModal Component", () => {
     // 1.2 multiplier at level 5 (1 + 0.1 * 4) = 1.68, i.e. 168% of
     // `attack - defence` — shown as a share of a plain swing, so / 0.65.
     expect(markup).toContain("ST: 258%");
-    // Rank 6 costs 20 * 36 silver and demands character level 10 + 4 * 5.
+    // Rank 6 costs 20 * 36 bạc and demands character level 10 + 4 * 5.
     expect(markup).toContain("Cần cấp 30");
     expect(markup).toContain('class="skills-upgrade-btn"');
     expect(markup).not.toContain('class="skills-upgrade-btn" disabled');

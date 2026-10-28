@@ -77,31 +77,47 @@ describe("skill level scaling", () => {
 
 describe("skill upgrade price", () => {
   it("grows with the square of the level being bought and stops at the cap", () => {
-    // Rank 2 costs 20 * 2² / 30 * 2², rank 10 costs 20 * 10² / 30 * 10².
-    expect(skillUpgradeCost(1)).toEqual({ coins: 80, exp: 120 });
-    expect(skillUpgradeCost(2)).toEqual({ coins: 180, exp: 270 });
-    expect(skillUpgradeCost(9)).toEqual({ coins: 2000, exp: 3000 });
+    // Rank 2 costs 20 * 2² bạc / 30 * 2² EXP, rank 10 costs 20 * 10² / 30 * 10².
+    expect(skillUpgradeCost(1)).toEqual({ coinsBac: 80, coinsDong: 8000, exp: 120 });
+    expect(skillUpgradeCost(2)).toEqual({ coinsBac: 180, coinsDong: 18000, exp: 270 });
+    expect(skillUpgradeCost(9)).toEqual({ coinsBac: 2000, coinsDong: 200000, exp: 3000 });
     expect(skillUpgradeCost(MAX_SKILL_LEVEL)).toBeNull();
 
     const first = skillUpgradeCost(1);
     const last = skillUpgradeCost(9);
     // Quadratic, not linear: the last rank costs 25x the first one.
-    expect(last.coins / first.coins).toBeCloseTo(25);
+    expect(last.coinsBac / first.coinsBac).toBeCloseTo(25);
 
     // Studying a book buys rank 1, the cheapest step in the same curve.
     expect(skillLearnCost()).toEqual({
-      coins: SKILL_UPGRADE_COINS_FACTOR,
+      coinsBac: SKILL_UPGRADE_COINS_FACTOR,
+      coinsDong: SKILL_UPGRADE_COINS_FACTOR * 100,
       exp: SKILL_UPGRADE_EXP_FACTOR
     });
   });
 
+  it("debits 100 đồng for every quoted bạc", () => {
+    for (let level = 1; level < MAX_SKILL_LEVEL; level++) {
+      const cost = skillUpgradeCost(level);
+      expect(cost.coinsDong).toBe(cost.coinsBac * 100);
+    }
+  });
+
   it("reports which resource is short before anything is spent", () => {
-    const cost = { coins: 80, exp: 120 };
-    expect(skillFundsShortfall(cost, { coins: 80, exp: 120 })).toBeNull();
+    const cost = skillUpgradeCost(1);
+    expect(skillFundsShortfall(cost, { coins: cost.coinsDong, exp: cost.exp })).toBeNull();
     expect(skillFundsShortfall(cost, null)?.reason).toBe("coins");
-    expect(skillFundsShortfall(cost, { coins: 79, exp: 500 })?.reason).toBe("coins");
-    expect(skillFundsShortfall(cost, { coins: 500, exp: 119 })?.reason).toBe("exp");
+    expect(skillFundsShortfall(cost, { coins: cost.coinsDong - 1, exp: 500 })?.reason).toBe(
+      "coins"
+    );
+    expect(skillFundsShortfall(cost, { coins: 1e6, exp: cost.exp - 1 })?.reason).toBe("exp");
     expect(skillFundsShortfall(null, { coins: 0, exp: 0 })).toBeNull();
+  });
+
+  it("treats a cost without a đồng figure as unaffordable", () => {
+    // Fail closed: a malformed cost must never buy a rank for free.
+    const broken = { coinsBac: 80, exp: 0 };
+    expect(skillFundsShortfall(broken, { coins: 1e9, exp: 1e9 })?.reason).toBe("coins");
   });
 });
 

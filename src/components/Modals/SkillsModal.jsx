@@ -336,7 +336,7 @@ export function SkillsModal({
                           ? t("skills.levelShort", { level: nextLevelRequired })
                           : upgradeShortfall
                             ? t("skills.upgradeShort", {
-                                coins: upgradeCost.coins,
+                                coins: upgradeCost.coinsBac,
                                 exp: upgradeCost.exp
                               })
                             : t("skills.upgradeHint")
@@ -348,7 +348,7 @@ export function SkillsModal({
                       </span>
                       <span className="skills-upgrade-cost">
                         {t("skills.upgradeCost", {
-                          coins: upgradeCost.coins,
+                          coins: upgradeCost.coinsBac,
                           exp: upgradeCost.exp
                         })}
                       </span>

@@ -10,7 +10,11 @@
  * Kept pure and Phaser/DOM-free: the client renders these numbers and the server
  * bills and authorizes them through the very same functions, so the two sides can
  * never disagree about what a level is worth.
+ *
+ * Prices are quoted in bạc but the ledger is held in đồng, so every cost carries
+ * both the quoted bạc figure and its đồng equivalent.
  */
+import { toLedgerDong } from "../currency.js";
 
 /** Highest level a skill can reach. */
 export const MAX_SKILL_LEVEL = 10;
@@ -31,7 +35,7 @@ export const MIN_CHARACTER_LEVEL_TO_LEARN = 10;
  */
 export const SKILL_LEVELS_PER_CHARACTER_LEVEL = 4;
 
-/** Silver charged for a target level: `factor * targetLevel²` (20/80/…/2.000). */
+/** Bạc quoted for a target level: `factor * targetLevel²` (20/80/…/2.000). */
 export const SKILL_UPGRADE_COINS_FACTOR = 20;
 
 /** EXP charged for a target level: `factor * targetLevel²` (30/120/…/3.000). */
@@ -167,33 +171,40 @@ export function characterLevelForSkillLevel(skill, skillLevel) {
 }
 
 /**
- * Silver and EXP needed to raise a skill from `currentLevel` to the next level,
- * or null when it is already at {@link MAX_SKILL_LEVEL}.
+ * Price of the next rank, or null when the art is already at
+ * {@link MAX_SKILL_LEVEL}.
  *
  * The price grows with the square of the level being bought, so the high ranks
- * cost a multiple of the first ones: 80/120 silver/EXP for rank 2, 2.000/3.000
- * for rank 10.
+ * cost a multiple of the first ones: 80/120 bạc/EXP for rank 2, 2.000/3.000 for
+ * rank 10.
+ *
+ * Two money fields are returned because the price is *quoted* in bạc while the
+ * ledger is held in đồng: `coinsBac` is what the panel shows, `coinsDong` is
+ * what the server debits and what {@link skillFundsShortfall} checks.
  * @param {number} currentLevel
- * @returns {{ coins: number, exp: number }|null}
+ * @returns {{ coinsBac: number, coinsDong: number, exp: number }|null}
  */
 export function skillUpgradeCost(currentLevel) {
   const level = normalizeSkillLevel(currentLevel);
   if (level >= MAX_SKILL_LEVEL) return null;
   const target = level + 1;
+  const coinsBac = SKILL_UPGRADE_COINS_FACTOR * target * target;
   return {
-    coins: SKILL_UPGRADE_COINS_FACTOR * target * target,
+    coinsBac,
+    coinsDong: toLedgerDong(coinsBac),
     exp: SKILL_UPGRADE_EXP_FACTOR * target * target
   };
 }
 
 /**
- * Silver and EXP needed to study a book the first time (buying rank 1, the
- * cheapest rank in the curve).
- * @returns {{ coins: number, exp: number }}
+ * Price of studying a book the first time (buying rank 1, the cheapest rank in
+ * the curve).
+ * @returns {{ coinsBac: number, coinsDong: number, exp: number }}
  */
 export function skillLearnCost() {
   return {
-    coins: SKILL_UPGRADE_COINS_FACTOR,
+    coinsBac: SKILL_UPGRADE_COINS_FACTOR,
+    coinsDong: toLedgerDong(SKILL_UPGRADE_COINS_FACTOR),
     exp: SKILL_UPGRADE_EXP_FACTOR
   };
 }
@@ -201,18 +212,24 @@ export function skillLearnCost() {
 /**
  * Why the character cannot pay `cost`, or null when it can. Checked server-side
  * before a book is consumed, so a refused study never destroys the book.
- * @param {{coins:number, exp:number}|null} cost
+ *
+ * The ledger holds đồng, so the comparison uses `coinsDong`. A cost missing its
+ * `coinsDong` or `exp` is treated as unaffordable rather than free: failing
+ * closed can only refuse an upgrade, never grant one for nothing.
+ * @param {{coinsDong:number, exp:number}|null} cost
  * @param {{coins?:number, exp?:number}|null|undefined} progress character ledger
  * @returns {{ reason: "coins"|"exp", coins: number, exp: number,
- *   required: {coins:number, exp:number} }|null}
+ *   required: {coinsDong:number, exp:number} }|null}
  */
 export function skillFundsShortfall(cost, progress) {
   if (!cost) return null;
   const coins = Math.max(0, Number(progress?.coins) || 0);
   const exp = Math.max(0, Number(progress?.exp) || 0);
-  if (coins < cost.coins || exp < cost.exp) {
+  const requiredCoins = Number.isFinite(cost.coinsDong) ? cost.coinsDong : Infinity;
+  const requiredExp = Number.isFinite(cost.exp) ? cost.exp : Infinity;
+  if (coins < requiredCoins || exp < requiredExp) {
     return {
-      reason: coins < cost.coins ? "coins" : "exp",
+      reason: coins < requiredCoins ? "coins" : "exp",
       coins,
       exp,
       required: cost

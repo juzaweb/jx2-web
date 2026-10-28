@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  INVENTORY_GRID_SIZE,
-  splitCurrency
+  INVENTORY_GRID_SIZE
 } from "../../game/items.js";
+import { splitCurrency } from "../../game/currency.js";
 import {
   EQUIPMENT_SLOTS,
   bonusRows

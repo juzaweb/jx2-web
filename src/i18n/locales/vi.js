@@ -553,10 +553,10 @@ export default {
       receiveScroll: "Nhận 99x Hồi Thành Phù"
     },
     utility: {
-      title: "Ngân Lượng & Tiện Ích",
-      addCoins1k: "Nhận 1.000 Bạc",
-      addCoins10k: "Nhận 10.000 Bạc (100 Vàng)",
-      addCoins100k: "Nhận 100.000 Bạc",
+      title: "Đồng & Tiện Ích",
+      addCoins1k: "Nhận 1.000 Đồng (10 Bạc)",
+      addCoins10k: "Nhận 10.000 Đồng (1 Vàng)",
+      addCoins100k: "Nhận 100.000 Đồng (10 Vàng)",
       godMode: "Chế Độ Bất Tử",
       godModeOn: "Bất Tử: [ĐANG BẬT]",
       godModeOff: "Bật Bất Tử (God Mode)",

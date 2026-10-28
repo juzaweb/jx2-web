@@ -556,10 +556,10 @@ export default {
       receiveScroll: "获取 99x 回城符"
     },
     utility: {
-      title: "银两与辅助功能",
-      addCoins1k: "获取 1,000 银两",
-      addCoins10k: "获取 10,000 银两",
-      addCoins100k: "获取 100,000 银两",
+      title: "铜钱与辅助功能",
+      addCoins1k: "获取 1,000 铜钱（10 银两）",
+      addCoins10k: "获取 10,000 铜钱（1 黄金）",
+      addCoins100k: "获取 100,000 铜钱（10 黄金）",
       godMode: "无敌模式 (God Mode)",
       godModeOn: "无敌模式：[已开启]",
       godModeOff: "开启无敌模式",
