@@ -1578,15 +1578,52 @@ export class GameSocketManager {
    * @returns {ReturnType<typeof deriveCombatStats>}
    */
   effectiveStats(player, now = Date.now()) {
-    if (Array.isArray(player.buffs)) {
-      player.buffs = player.buffs.filter((buff) => !(buff?.until <= now));
+    const buffs = Array.isArray(player.buffs) ? player.buffs : null;
+    const buffsLength = buffs ? buffs.length : 0;
+    const nextExpiry = player._nextBuffExpiry ?? Infinity;
+
+    if (
+      !player._statsDirty &&
+      player._cachedStats &&
+      player._cachedLevel === player.level &&
+      player._cachedEquipment === player.equipment &&
+      player._cachedBuffs === buffs &&
+      player._cachedBuffsLength === buffsLength &&
+      now < nextExpiry
+    ) {
+      return player._cachedStats;
     }
-    return deriveCombatStats({
+
+    if (buffs && buffsLength > 0) {
+      player.buffs = buffs.filter((buff) => !(buff?.until <= now));
+    }
+
+    const currentBuffs = Array.isArray(player.buffs) ? player.buffs : [];
+    let minExpiry = Infinity;
+    for (let i = 0; i < currentBuffs.length; i++) {
+      const until = currentBuffs[i]?.until;
+      if (typeof until === "number" && until < minExpiry) {
+        minExpiry = until;
+      }
+    }
+    player._nextBuffExpiry = minExpiry;
+
+    const stats = deriveCombatStats({
       level: player.level,
       equipment: player.equipment,
-      buffs: player.buffs,
+      buffs: currentBuffs,
       now
     });
+
+    const finalBuffs = Array.isArray(player.buffs) ? player.buffs : null;
+    player._cachedStats = stats;
+    player._cachedLevel = player.level;
+    player._cachedEquipment = player.equipment;
+    player._cachedBuffs = finalBuffs;
+    player._cachedBuffsLength = finalBuffs ? finalBuffs.length : 0;
+    player._statsDirty = false;
+
+    return stats;
   }
 
   /**
