@@ -484,7 +484,10 @@ function playSwordQiProjectileVfx(scene, skill, player, target, aimPoint) {
     .setDepth(depth);
 
   const worldDistance = Math.hypot(aim.x - player.x, aim.y - player.y);
-  const travelDuration = Math.max(160, Math.min(520, worldDistance / 1.8));
+  // 1.8 px/ms keeps every throw readable; the cap only bounds absurd reaches, so
+  // it sits just above the longest shoot (Kiếm Khí's 1000 px ≈ 556 ms) instead
+  // of compressing a long-range shard into a snap across the screen.
+  const travelDuration = Math.max(160, Math.min(620, worldDistance / 1.8));
   const flying = [blade, aura, coreSpine, glow, coreGlow];
 
   scene.tweens.add({

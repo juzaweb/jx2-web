@@ -56,7 +56,10 @@ describe("skill catalog", () => {
       weapon: "kiem",
       slot: 0,
       starter: true,
-      unlockLevel: 1
+      unlockLevel: 1,
+      range: 1000,
+      radius: 0,
+      splash: { radius: 220, mult: 0.6, maxTargets: 6 }
     });
 
     const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForWeapon("bao-tay");

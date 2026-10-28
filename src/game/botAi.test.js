@@ -94,8 +94,17 @@ describe("botSpawnPoints", () => {
 describe("stepBot", () => {
   it("chases a flagged player until skill range", () => {
     const bot = makeBot({ mp: 60 });
-    const player = { id: "p1", pkFlag: true, mapId: bot.mapId, x: 2000, y: 1000, hp: 100 };
     const range = botAttackRange(bot);
+    // Derive the spot from the bot's own reach so a range tweak cannot leave the
+    // starter already in casting distance (the aggro cap still covers it).
+    const player = {
+      id: "p1",
+      pkFlag: true,
+      mapId: bot.mapId,
+      x: bot.x + range + 300,
+      y: bot.y,
+      hp: 100
+    };
     expect(range).toBeGreaterThan(100);
 
     const result = stepBot(bot, [player], "flag", 100, 0, () => 0.5, BOT_TUNING);
@@ -103,7 +112,7 @@ describe("stepBot", () => {
     expect(result.target?.id).toBe("p1");
     expect(result.moved).toBe(true);
     expect(result.x).toBeGreaterThan(bot.x);
-    expect(result.x).toBeLessThan(2000);
+    expect(result.x).toBeLessThan(player.x);
     expect(result.vx).toBeGreaterThan(0);
   });
 

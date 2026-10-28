@@ -41,16 +41,16 @@ and knows **Kiếm Khí** (`kiem_khi`, `starter: true`):
 
 ### Kiếm Khí
 
-`kiem_khi` reaches **840 px** and its VFX is a vector projectile: `vfx.projectile:
+`kiem_khi` reaches **1000 px** and its VFX is a vector projectile: `vfx.projectile:
 "sword"` makes `playSkillCastVfx` draw a blade-shaped shard that flies from the hero
 to the aimed point (clamped to `skill.range`) and explodes there — a core flash, a
 ring spreading out to the splash radius and a fan of qi shards thrown outwards
 (`playSwordQiBlast`). Because the art owns its own impact, `vfx.impact` is `null` —
 no separate spark is spawned at the victim.
 
-The explosion is real damage: `splash: { radius: 170, mult: 0.6, maxTargets: 4 }`
-makes every monster inside 170 px of the impact take 60% of the primary hit, capped at
-four extras. The cast itself stays single-target (`radius: 0`); the server resolves
+The explosion is real damage: `splash: { radius: 220, mult: 0.6, maxTargets: 6 }`
+makes every monster inside 220 px of the impact take 60% of the primary hit, capped at
+six extras. The cast itself stays single-target (`radius: 0`); the server resolves
 the area through `splashVictims` when the hit lands — the same shared path La Hán
 Quyền uses, so nothing extra is needed client-side beyond the ring that marks it.
 

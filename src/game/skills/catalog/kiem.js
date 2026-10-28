@@ -24,7 +24,7 @@ const KIEM_KHI_SKILL = defineSkill({
   mp: 5,
   cooldown: 2000,
   target: "enemy",
-  range: 840,
+  range: 1000,
   radius: 0,
   mult: 1.1,
   /**
@@ -33,7 +33,7 @@ const KIEM_KHI_SKILL = defineSkill({
    * itself is still aimed at one target — the server resolves the area from
    * `splashVictims` when the hit lands.
    */
-  splash: { radius: 170, mult: 0.6, maxTargets: 4 },
+  splash: { radius: 220, mult: 0.6, maxTargets: 6 },
   vfx: {
     /**
      * A blade-shaped shard of qi flies from the hero to the victim, then bursts.
