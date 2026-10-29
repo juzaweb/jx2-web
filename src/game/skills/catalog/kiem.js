@@ -12,6 +12,7 @@ export const VO_DANG_SKILLS = [
     id: "thieu_duong_kiem_phap",
     weapon: "kiem",
     slot: 0,
+    icon: "/skills/thieu_duong_kiem_phap.png",
     glyph: "剑",
     nameKey: "skills.voDang.thieuDuongKiemPhap.name",
     descKey: "skills.voDang.thieuDuongKiemPhap.desc",
@@ -22,7 +23,14 @@ export const VO_DANG_SKILLS = [
     target: "enemy",
     range: 200,
     radius: 0,
-    mult: 1.2
+    mult: 1.2,
+    vfx: {
+      sprite: "vfx-thieu-duong-kiem-phap",
+      travelFrames: 1,
+      impact: null,
+      color: 0xffa726,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "thai_cuc_quyen",

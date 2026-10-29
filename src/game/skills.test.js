@@ -63,7 +63,15 @@ describe("skill catalog", () => {
       starter: true,
       unlockLevel: 1,
       range: 200,
-      radius: 0
+      radius: 0,
+      icon: "/skills/thieu_duong_kiem_phap.png",
+      vfx: {
+        sprite: "vfx-thieu-duong-kiem-phap",
+        travelFrames: 1,
+        impact: null,
+        color: 0xffa726,
+        fps: 12
+      }
     });
     expect(skillsForSect("nga-my")[0]).toMatchObject({
       id: "nga_my_kiem_phap",
@@ -190,7 +198,9 @@ describe("skill catalog", () => {
       "public/skills/vfx/la_han_tran/sheet.png",
       "public/skills/kim_cang_bat_hoai.png",
       "public/skills/nhu_lai_than_chuong.png",
-      "public/skills/vfx/nhu_lai_than_chuong/sheet.png"
+      "public/skills/vfx/nhu_lai_than_chuong/sheet.png",
+      "public/skills/thieu_duong_kiem_phap.png",
+      "public/skills/vfx/thieu_duong_kiem_phap/sheet.png"
     ]) {
       expect(fs.existsSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)))).toBe(true);
     }

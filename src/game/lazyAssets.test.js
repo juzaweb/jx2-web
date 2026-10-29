@@ -120,13 +120,15 @@ describe("ensureWeaponVfx", () => {
       { id: "no-vfx" },
       { id: "palm", vfx: { sprite: "vfx-dai-tu-di-chuong" } },
       { id: "ring", vfx: { sprite: "vfx-la-han-tran" } },
-      { id: "ultimate", vfx: { sprite: "vfx-nhu-lai-than-chuong" } }
+      { id: "ultimate", vfx: { sprite: "vfx-nhu-lai-than-chuong" } },
+      { id: "sword", vfx: { sprite: "vfx-thieu-duong-kiem-phap" } }
     ]);
 
     expect(scene.calls.filter(([name]) => name === "spritesheet").map((call) => call[1])).toEqual([
       "vfx-dai-tu-di-chuong",
       "vfx-la-han-tran",
-      "vfx-nhu-lai-than-chuong"
+      "vfx-nhu-lai-than-chuong",
+      "vfx-thieu-duong-kiem-phap"
     ]);
     expect(scene.calls.filter(([name]) => name === "start")).toHaveLength(1);
   });
