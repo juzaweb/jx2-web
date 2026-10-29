@@ -6,4 +6,4 @@ description:
 
 # Local Assets and AI
 
-- API documentation: http://192.168.1.13:8090/docs. Use key `LOCAL_API_KEY` from `.env` file to access the API.
+Use API documentation: http://192.168.1.14:8090/docs and key `LOCAL_API_KEY` from `.env` file to access the API generate assets.
