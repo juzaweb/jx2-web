@@ -44,6 +44,7 @@ Your task is to implement or update a skill into the game according to `docs/sec
 > - **Chiêu thức Chủ động (Kiếm pháp, Đao pháp, Quyền pháp, Chưởng pháp, Trận pháp, Tuyệt kỹ):** Đầy đủ **2 Prompt** (1 Icon + 1 VFX Sprite Sheet).
 > - **Chiêu thức Tâm Pháp Bị động (*Thiếu Lâm Tâm Pháp*):** **CHỈ CÓ 1 Prompt (Icon)**, hoàn toàn **KHÔNG CÓ VFX Sprite Sheet** vì là nội công bị động tự vận hành ngầm trong cơ thể.
 > - **Quy chuẩn Icon:** Thiết kế **không viền (borderless, no frame)** tràn viền (full bleed) để khung hiển thị UI trong game (`HotbarDock` / slot chiêu thức) tự quản lý viền và bo góc, tránh bị trùng lặp 2 lớp viền.
+> - **Quy chuẩn Sprite Sheet:** Sử dụng **nền trắng thuần (`Solid pure white background`)** cho toàn bộ hiệu ứng chiêu thức để tối ưu tách nền AI và chuyển đổi sang PNG trong suốt (Alpha channel).
 
 ---
 
@@ -67,7 +68,7 @@ A high-detail 2D game skill icon of the Great Sumeru Palm (Đại Tu Di Chưởn
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a flying golden palm energy projectile and impact shockwave, isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: a compressed golden hand palm shape shooting forward leaving an energy tail; Frame 2: the golden palm colliding with air pressure distortion; Frame 3: violent shockwave burst with concentric golden blast rings and flying rock fragments; Frame 4: residual golden dust and dispersing smoke ripples. Solid pure black background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a flying golden palm energy projectile and impact shockwave, isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: a compressed golden hand palm shape shooting forward leaving an energy tail; Frame 2: the golden palm colliding with air pressure distortion; Frame 3: violent shockwave burst with concentric golden blast rings and flying rock fragments; Frame 4: residual golden dust and dispersing smoke ripples. Solid pure white background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -79,7 +80,7 @@ A 2D game skill icon of Arhat Fist barrage (La Hán Quyền), martial arts style
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of rapid phantom fist strikes flurry, top-down arcade combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: three phantom golden fist silhouettes thrusting forward; Frame 2: crisscrossing golden fist barrage with rapid impact flashes; Frame 3: heavy dual-fist cross slam creating a radial spark burst; Frame 4: fading golden motion blurs and dissolving energy ripples. Pure solid black background, centered in each frame, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of rapid phantom fist strikes flurry, top-down arcade combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: three phantom golden fist silhouettes thrusting forward; Frame 2: crisscrossing golden fist barrage with rapid impact flashes; Frame 3: heavy dual-fist cross slam creating a radial spark burst; Frame 4: fading golden motion blurs and dissolving energy ripples. Solid pure white background, centered in each frame, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -91,7 +92,7 @@ A 2D MMORPG skill icon of the Sacred Arhat Formation Array (La Hán Trận), Wux
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D sprite sheet animation of a circular glowing Buddhist formation ring on the ground, top-down view. A 4x4 grid of 16 sequential animation frames showing a seamless rotating formation: glowing golden Sanskrit runes and spinning lotus mandala ring rotating steadily, emitting rising divine golden light dust and pulsing outer perimeter. Solid black background, uniform cell spacing, 256x256 per cell, seamless looping effect --ar 1:1 --v 6.0 --style raw
+A 2D sprite sheet animation of a circular glowing Buddhist formation ring on the ground, top-down view. A 4x4 grid of 16 sequential animation frames showing a seamless rotating formation: glowing golden Sanskrit runes and spinning lotus mandala ring rotating steadily, emitting rising divine golden light dust and pulsing outer perimeter. Solid pure white background, uniform cell spacing, 256x256 per cell, seamless looping effect --ar 1:1 --v 6.0 --style raw
 ```
 
 ---
@@ -103,7 +104,7 @@ A 2D skill icon of the Indestructible Vajra Body (Kim Cang Bất Hoại), classi
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of an indestructible golden bell barrier activating, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: radiant golden light pillars descending and curving inwards; Frame 2: a massive glowing translucent golden bell slamming onto the ground around the hero; Frame 3: bell barrier vibrating violently, emitting blinding hexagonal diamond light facets; Frame 4: steady pulsing golden shield dome with floating Sanskrit warding runes. Pure black background, 256x256 frame size, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of an indestructible golden bell barrier activating, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: radiant golden light pillars descending and curving inwards; Frame 2: a massive glowing translucent golden bell slamming onto the ground around the hero; Frame 3: bell barrier vibrating violently, emitting blinding hexagonal diamond light facets; Frame 4: steady pulsing golden shield dome with floating Sanskrit warding runes. Solid pure white background, 256x256 frame size, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -115,7 +116,7 @@ A high-detail 2D game skill icon of the Buddha's Palm ultimate art (Như Lai Th�
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a colossal divine golden palm crashing onto the earth, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: a giant glowing golden hand palm silhouette dropping vertically from the sky; Frame 2: catastrophic impact crater flash with golden holy rays blasting outward; Frame 3: massive seismic ground fissure ring expanding with erupting golden flames and molten rock fragments; Frame 4: fading residual sacred steam, dissipating gold sparks and burning palm print. Solid black background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a colossal divine golden palm crashing onto the earth, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: a giant glowing golden hand palm silhouette dropping vertically from the sky; Frame 2: catastrophic impact crater flash with golden holy rays blasting outward; Frame 3: massive seismic ground fissure ring expanding with erupting golden flames and molten rock fragments; Frame 4: fading residual sacred steam, dissipating gold sparks and burning palm print. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -131,7 +132,7 @@ A 2D game skill icon of the Shao Yang Sword Technique (Thiếu Dương Kiếm Ph
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a swift solar sword slash arc, isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: blade tip igniting with warm amber solar energy; Frame 2: a clean curving golden slash trail sweeping across a 120-degree arc; Frame 3: solar slash trail bursting into warm ember sparkles; Frame 4: thin dissipation of lingering golden light ribbon. Pure black background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a swift solar sword slash arc, isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: blade tip igniting with warm amber solar energy; Frame 2: a clean curving golden slash trail sweeping across a 120-degree arc; Frame 3: solar slash trail bursting into warm ember sparkles; Frame 4: thin dissipation of lingering golden light ribbon. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -143,7 +144,7 @@ A 2D game skill icon of Tai Chi Sword Art (Thái Cực Kiếm Pháp), Taoist mar
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of an expanding Tai Chi Yin-Yang vortex on the ground, top-down view. Single horizontal row of 4 animation frames from left to right: Frame 1: two fluid streams of black and white qi spiraling inward; Frame 2: full formation of a glowing Yin-Yang diagram rotating smoothly on the floor; Frame 3: radial burst of misty energy rings releasing outward from the center; Frame 4: gentle swirling Taoist mist fading outward. Solid black background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of an expanding Tai Chi Yin-Yang vortex on the ground, top-down view. Single horizontal row of 4 animation frames from left to right: Frame 1: two fluid streams of black and white qi spiraling inward; Frame 2: full formation of a glowing Yin-Yang diagram rotating smoothly on the floor; Frame 3: radial burst of misty energy rings releasing outward from the center; Frame 4: gentle swirling Taoist mist fading outward. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -155,7 +156,7 @@ A 2D game skill icon of the Three Purities Sword Art (Tam Thanh Kiếm Pháp), W
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of three flying sword beams converging and piercing, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: three distinct glowing cyan sword trails diving from three angles; Frame 2: three blades piercing a central point simultaneously with electric sparks; Frame 3: triple sword explosion creating a three-pointed starburst wave; Frame 4: fading cyan sword phantoms dissolving into light trails. Solid black background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of three flying sword beams converging and piercing, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: three distinct glowing cyan sword trails diving from three angles; Frame 2: three blades piercing a central point simultaneously with electric sparks; Frame 3: triple sword explosion creating a three-pointed starburst wave; Frame 4: fading cyan sword phantoms dissolving into light trails. Solid pure white background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -167,7 +168,7 @@ A 2D skill icon of the Cosmic Rainbow Aura (Toát Hồng Quân Khuyết), Taoist
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of an ascending pillar of cosmic purple-crimson aura, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: purple and crimson energy ribbons coiling around the hero's feet; Frame 2: massive pillar of violet astral light shooting straight up; Frame 3: swirling ring of glowing Taoist talisman symbols orbiting the character; Frame 4: residual shimmering violet particles settling into an active attack buff aura. Pure black background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of an ascending pillar of cosmic purple-crimson aura, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: purple and crimson energy ribbons coiling around the hero's feet; Frame 2: massive pillar of violet astral light shooting straight up; Frame 3: swirling ring of glowing Taoist talisman symbols orbiting the character; Frame 4: residual shimmering violet particles settling into an active attack buff aura. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -179,7 +180,7 @@ A 2D game skill icon of the Emei Sword Technique (Nga My Kiếm Pháp), elegant 
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a flowing peach blossom sword slash, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: tip of the slender blade trailing glowing pink petal wisps; Frame 2: a smooth sweeping crescent slash with fluttering blossom petals; Frame 3: crescent slash dividing into a shower of cutting jade petal blades; Frame 4: gentle scattering of pink petals fading in the wind. Solid black background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a flowing peach blossom sword slash, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: tip of the slender blade trailing glowing pink petal wisps; Frame 2: a smooth sweeping crescent slash with fluttering blossom petals; Frame 3: crescent slash dividing into a shower of cutting jade petal blades; Frame 4: gentle scattering of pink petals fading in the wind. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -191,7 +192,7 @@ A 2D game skill icon of Dream Butterfly Soul Shatter (Mộng Điệp Thôi Tâm)
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a swarm of spectral dream butterflies erupting, top-down combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: a cluster of glowing violet spirit butterflies forming at the sword tip; Frame 2: butterflies surging forward in an undulating spiral vortex; Frame 3: butterfly swarm bursting into a shimmering cloud of purple stardust on impact; Frame 4: fading violet sparkles and faint glowing moth wings dissolving. Solid pure black background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a swarm of spectral dream butterflies erupting, top-down combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: a cluster of glowing violet spirit butterflies forming at the sword tip; Frame 2: butterflies surging forward in an undulating spiral vortex; Frame 3: butterfly swarm bursting into a shimmering cloud of purple stardust on impact; Frame 4: fading violet sparkles and faint glowing moth wings dissolving. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -203,7 +204,7 @@ A 2D game skill icon of Merciful Compassion Healing (Từ Hàng Phổ Độ), Bu
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a sacred blooming lotus healing aura, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: glowing jade lotus bud opening at the hero's feet; Frame 2: lotus in full bloom radiating upward emerald light beams; Frame 3: shower of divine sparkling water drops and glowing jade petals raining down; Frame 4: soft residual green healing mist fading peacefully. Pure solid black background, 256x256 cell size, clean transparent VFX ready --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a sacred blooming lotus healing aura, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: glowing jade lotus bud opening at the hero's feet; Frame 2: lotus in full bloom radiating upward emerald light beams; Frame 3: shower of divine sparkling water drops and glowing jade petals raining down; Frame 4: soft residual green healing mist fading peacefully. Solid pure white background, 256x256 cell size, clean transparent VFX ready --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -215,7 +216,7 @@ A 2D skill icon of Flowing Water & Auspicious Clouds (Lưu Thủy Khánh Vân), 
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of spiraling water ribbons and wind cloud wisps, top-down perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: swirling rings of crystal blue water and white wind gathering at the feet; Frame 2: wind and water spirals surging upward around the body; Frame 3: outward burst of gentle water droplets and floating auspicious cloud puffs; Frame 4: trailing faint wind ribbons dissipating into the sprint path. Pure black background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of spiraling water ribbons and wind cloud wisps, top-down perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: swirling rings of crystal blue water and white wind gathering at the feet; Frame 2: wind and water spirals surging upward around the body; Frame 3: outward burst of gentle water droplets and floating auspicious cloud puffs; Frame 4: trailing faint wind ribbons dissipating into the sprint path. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -231,7 +232,7 @@ A 2D game skill icon of the Five Poisons Saber Art (Ngũ Độc Đao Pháp), dar
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a toxic green curved saber slash, isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: saber blade igniting with bubbling green acid miasma; Frame 2: wide sweeping crescent slash leaving a vibrant emerald green venom trail; Frame 3: slash trail splashing into acid droplets and small poison bubbles; Frame 4: dispersing green vapor wisps fading away. Solid pure black background, 256x256 frame size, high contrast --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a toxic green curved saber slash, isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: saber blade igniting with bubbling green acid miasma; Frame 2: wide sweeping crescent slash leaving a vibrant emerald green venom trail; Frame 3: slash trail splashing into acid droplets and small poison bubbles; Frame 4: dispersing green vapor wisps fading away. Solid pure white background, 256x256 frame size, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -243,7 +244,7 @@ A 2D game skill icon of Heart-Piercing Venom (Truy Tâm Độc), Five Poisons as
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a flying poison needle piercing and bursting, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: a sharp purple poison needle streaking forward with a toxic smoke tail; Frame 2: needle striking the target point with an acidic purple flash; Frame 3: explosive burst of toxic purple needles and acid blood droplets flying outward; Frame 4: fading dark purple poison smoke dissolving. Pure black background, 256x256 cell size --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a flying poison needle piercing and bursting, isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: a sharp purple poison needle streaking forward with a toxic smoke tail; Frame 2: needle striking the target point with an acidic purple flash; Frame 3: explosive burst of toxic purple needles and acid blood droplets flying outward; Frame 4: fading dark purple poison smoke dissolving. Solid pure white background, 256x256 cell size --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -255,7 +256,7 @@ A 2D game skill icon of Ten Thousand Poisons Gu Summoning (Vạn Độc Triệu 
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a swarming poisonous insect explosion on the ground, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: bubbling pool of green acid forming with glowing insect eyes; Frame 2: violent eruption of toxic purple miasma and swarming spectral centipedes bursting upward; Frame 3: expanding shockwave cloud of stinging venomous insects and green acid splashes; Frame 4: cloud dissipating into lingering toxic ground sludge and fading fumes. Solid black background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a swarming poisonous insect explosion on the ground, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: bubbling pool of green acid forming with glowing insect eyes; Frame 2: violent eruption of toxic purple miasma and swarming spectral centipedes bursting upward; Frame 3: expanding shockwave cloud of stinging venomous insects and green acid splashes; Frame 4: cloud dissipating into lingering toxic ground sludge and fading fumes. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -267,7 +268,7 @@ A 2D skill icon of the Nether Ghost Phantom Strike (U Hồn Phiệt Ảnh), dark
 ```
 * **Prompt 2 (Sprite Sheet):**
 ```text
-A 2D game VFX sprite sheet of a rising ghostly specter and soul fire burst, top-down isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: dark purple shadowy smoke rising from the hero's silhouette; Frame 2: a demonic specter phantom shrieking upward with glowing purple eyes; Frame 3: specter bursting into radial phantom soul flames and skull-shaped smoke wisps; Frame 4: soul flames settling into a sinister dark purple critical-strike aura around the body. Pure solid black background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+A 2D game VFX sprite sheet of a rising ghostly specter and soul fire burst, top-down isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: dark purple shadowy smoke rising from the hero's silhouette; Frame 2: a demonic specter phantom shrieking upward with glowing purple eyes; Frame 3: specter bursting into radial phantom soul flames and skull-shaped smoke wisps; Frame 4: soul flames settling into a sinister dark purple critical-strike aura around the body. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
@@ -276,7 +277,7 @@ A 2D game VFX sprite sheet of a rising ghostly specter and soul fire burst, top-
 
 ### Thông Số Kỹ Thuật
 - **Icon:** Tỉ lệ `1:1`, kích thước lưu `64×64 px` (PNG 32-bit), thiết kế tràn viền không viền khung (`borderless, no frame`), đặt tại `public/skills/<skill_id>.png`.
-- **Sprite Sheet:** Kích thước frame `256×256 px`. Dải 4 frame có kích thước `1024×256 px` (PNG 32-bit trong suốt), đặt tại `public/skills/vfx/<skill_id>/sheet.png`.
+- **Sprite Sheet:** Kích thước frame `256×256 px`. Dải 4 frame có kích thước `1024×256 px` (PNG 32-bit trong suốt), ảnh gốc AI tạo với nền trắng thuần (`Solid pure white background`) phục vụ tách nền sạch sẽ, đặt tại `public/skills/vfx/<skill_id>/sheet.png`.
 
 ### Cấu Hình `sheet.json` Đi Kèm Cho Mỗi Skill
 Tại `public/skills/vfx/<skill_id>/sheet.json`:
