@@ -110,6 +110,7 @@ export const NGA_MY_SKILLS = [
     id: "nga_my_kiem_phap",
     weapon: "kiem",
     slot: 0,
+    icon: "/skills/nga_my_kiem_phap.png",
     glyph: "剑",
     nameKey: "skills.ngaMy.ngaMyKiemPhap.name",
     descKey: "skills.ngaMy.ngaMyKiemPhap.desc",
@@ -120,12 +121,20 @@ export const NGA_MY_SKILLS = [
     target: "enemy",
     range: 200,
     radius: 0,
-    mult: 1.15
+    mult: 1.15,
+    vfx: {
+      sprite: "vfx-nga-my-kiem-phap",
+      travelFrames: 1,
+      impact: null,
+      color: 0xf472b6,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "mong_diep_thoi_tam",
     weapon: "kiem",
     slot: 1,
+    icon: "/skills/mong_diep_thoi_tam.png",
     glyph: "蝶",
     requires: [{ id: "nga_my_kiem_phap", level: 1 }],
     nameKey: "skills.ngaMy.mongDiepThoiTam.name",
@@ -136,12 +145,20 @@ export const NGA_MY_SKILLS = [
     target: "enemy",
     range: 350,
     radius: 0,
-    mult: 1.3
+    mult: 1.3,
+    vfx: {
+      sprite: "vfx-mong-diep-thoi-tam",
+      travelFrames: 1,
+      impact: null,
+      color: 0xa855f7,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "tu_hang_pho_do",
     weapon: "kiem",
     slot: 2,
+    icon: "/skills/tu_hang_pho_do.png",
     glyph: "医",
     requires: [{ id: "mong_diep_thoi_tam", level: 1 }],
     nameKey: "skills.ngaMy.tuHangPhoDo.name",
@@ -153,12 +170,18 @@ export const NGA_MY_SKILLS = [
     range: 0,
     radius: 0,
     mult: 0,
-    effects: [{ kind: "heal", amount: 50 }]
+    effects: [{ kind: "heal", amount: 50 }],
+    vfx: {
+      sprite: "vfx-tu-hang-pho-do",
+      color: 0x34d399,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "luu_thuy_khanh_van",
     weapon: "kiem",
     slot: 3,
+    icon: "/skills/luu_thuy_khanh_van.png",
     glyph: "云",
     requires: [{ id: "tu_hang_pho_do", level: 2 }],
     nameKey: "skills.ngaMy.luuThuyKhanhVan.name",
@@ -170,6 +193,11 @@ export const NGA_MY_SKILLS = [
     range: 0,
     radius: 0,
     mult: 0,
-    effects: [{ kind: "buff", stat: "speedPct", amount: 0.25, duration: 120000 }]
+    effects: [{ kind: "buff", stat: "speedPct", amount: 0.25, duration: 120000 }],
+    vfx: {
+      sprite: "vfx-luu-thuy-khanh-van",
+      color: 0x38bdf8,
+      fps: 12
+    }
   })
 ];

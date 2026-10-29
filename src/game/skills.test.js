@@ -129,7 +129,17 @@ describe("skill catalog", () => {
       id: "nga_my_kiem_phap",
       weapon: "kiem",
       slot: 0,
-      starter: true
+      starter: true,
+      icon: "/skills/nga_my_kiem_phap.png",
+      vfx: { sprite: "vfx-nga-my-kiem-phap" }
+    });
+    expect(skillsForSect("ngu-doc")[0]).toMatchObject({
+      id: "ngu_doc_tam_phap",
+      weapon: "dao",
+      slot: 0,
+      starter: true,
+      icon: "/skills/ngu_doc_tam_phap.png",
+      vfx: { sprite: "vfx-ngu-doc-tam-phap" }
     });
 
     const [tamPhap, daiTuDiChuong, laHanQuyen] = skillsForSect("thieu-lam");
@@ -258,7 +268,23 @@ describe("skill catalog", () => {
       "public/skills/tam_thanh_kiem_phap.png",
       "public/skills/vfx/tam_thanh_kiem_phap/sheet.png",
       "public/skills/toat_hong_quan_khuyet.png",
-      "public/skills/vfx/toat_hong_quan_khuyet/sheet.png"
+      "public/skills/vfx/toat_hong_quan_khuyet/sheet.png",
+      "public/skills/nga_my_kiem_phap.png",
+      "public/skills/vfx/nga_my_kiem_phap/sheet.png",
+      "public/skills/mong_diep_thoi_tam.png",
+      "public/skills/vfx/mong_diep_thoi_tam/sheet.png",
+      "public/skills/tu_hang_pho_do.png",
+      "public/skills/vfx/tu_hang_pho_do/sheet.png",
+      "public/skills/luu_thuy_khanh_van.png",
+      "public/skills/vfx/luu_thuy_khanh_van/sheet.png",
+      "public/skills/ngu_doc_tam_phap.png",
+      "public/skills/vfx/ngu_doc_tam_phap/sheet.png",
+      "public/skills/truy_tam_doc.png",
+      "public/skills/vfx/truy_tam_doc/sheet.png",
+      "public/skills/van_doc_chieu_hong.png",
+      "public/skills/vfx/van_doc_chieu_hong/sheet.png",
+      "public/skills/u_hong_phiet_anh.png",
+      "public/skills/vfx/u_hong_phiet_anh/sheet.png"
     ]) {
       expect(fs.existsSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)))).toBe(true);
     }

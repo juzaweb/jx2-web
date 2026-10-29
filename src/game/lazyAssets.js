@@ -55,6 +55,46 @@ export const VFX_SPRITES = {
     url: "/skills/vfx/toat_hong_quan_khuyet/sheet.png",
     frameWidth: 256,
     frameHeight: 256
+  },
+  "vfx-nga-my-kiem-phap": {
+    url: "/skills/vfx/nga_my_kiem_phap/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-mong-diep-thoi-tam": {
+    url: "/skills/vfx/mong_diep_thoi_tam/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-tu-hang-pho-do": {
+    url: "/skills/vfx/tu_hang_pho_do/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-luu-thuy-khanh-van": {
+    url: "/skills/vfx/luu_thuy_khanh_van/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-ngu-doc-tam-phap": {
+    url: "/skills/vfx/ngu_doc_tam_phap/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-truy-tam-doc": {
+    url: "/skills/vfx/truy_tam_doc/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-van-doc-chieu-hong": {
+    url: "/skills/vfx/van_doc_chieu_hong/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
+  },
+  "vfx-u-hong-phiet-anh": {
+    url: "/skills/vfx/u_hong_phiet_anh/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
   }
 };
 
