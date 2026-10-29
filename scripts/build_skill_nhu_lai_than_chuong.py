@@ -15,6 +15,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_PATH = ROOT / "docs" / "example" / "nhu-lai-than-chuong.png"
+ICON_SOURCE_PATH = ROOT / "docs" / "example" / "nhu-lai-than-chuong-icon.png"
 VFX_DIR = ROOT / "public" / "skills" / "vfx" / "nhu_lai_than_chuong"
 ICON_PATH = ROOT / "public" / "skills" / "nhu_lai_than_chuong.png"
 
@@ -22,7 +23,7 @@ PANEL_BOUNDS = [(0, 432), (432, 890), (890, 1259), (1259, 1640)]
 FRAME_SIZE = 256
 CONTENT_SIZE = 240
 ALPHA_THRESHOLD = 8
-ICON_SIZE = 64
+ICON_SIZE = 128
 ICON_FRAME = 0
 
 # Panels 2-4 (indexes 1-3) were illustrated with a flat cream backdrop that is cropped into a
@@ -132,19 +133,29 @@ def build():
         "}\n"
     )
 
-    icon_frame = frames[ICON_FRAME]
-    icon_box = icon_frame.getbbox()
-    if not icon_box:
-        raise ValueError("Icon frame has no visible pixels")
-    icon = icon_frame.crop(icon_box)
-    side = max(icon.width, icon.height)
-    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    square.paste(
-        icon,
-        ((side - icon.width) // 2, (side - icon.height) // 2),
-        icon,
-    )
-    square.resize((ICON_SIZE, ICON_SIZE), Image.Resampling.LANCZOS).save(ICON_PATH)
+    if ICON_SOURCE_PATH.exists():
+        with Image.open(ICON_SOURCE_PATH) as art:
+            square = art.convert("RGBA")
+            side = min(square.size)
+            left = (square.width - side) // 2
+            top = (square.height - side) // 2
+            square = square.crop((left, top, left + side, top + side))
+            icon = square.resize((ICON_SIZE, ICON_SIZE), Image.Resampling.LANCZOS)
+        icon.save(ICON_PATH, "PNG", optimize=True)
+    else:
+        icon_frame = frames[ICON_FRAME]
+        icon_box = icon_frame.getbbox()
+        if not icon_box:
+            raise ValueError("Icon frame has no visible pixels")
+        icon = icon_frame.crop(icon_box)
+        side = max(icon.width, icon.height)
+        square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        square.paste(
+            icon,
+            ((side - icon.width) // 2, (side - icon.height) // 2),
+            icon,
+        )
+        square.resize((ICON_SIZE, ICON_SIZE), Image.Resampling.LANCZOS).save(ICON_PATH)
 
     print(f"Generated {VFX_DIR / 'sheet.png'}")
     print(f"Generated {ICON_PATH}")

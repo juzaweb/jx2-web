@@ -9,8 +9,10 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_PATH = Path("/var/folders/zz/38wct_p13gz3pb0f2jmy1h140000gn/T/orca-paste-1792575332575-fe827c2e-aadf-43ec-890a-0a8a4cc87122.png")
+ICON_SOURCE_PATH = ROOT / "docs" / "example" / "la-han-tran-icon.png"
 VFX_DIR = ROOT / "public" / "skills" / "vfx" / "la_han_tran"
 ICON_PATH = ROOT / "public" / "skills" / "la_han_tran.png"
+ICON_SIZE = 128
 
 COL_BOUNDS = [(0, 189), (189, 380), (380, 572), (572, 765)]
 
@@ -50,7 +52,28 @@ def de_fringe(alpha, rgb):
         alpha[solid & edge & near_grey] = 0
 
 
+def build_icon():
+    if not ICON_SOURCE_PATH.exists():
+        raise SystemExit(f"Icon source art not found: {ICON_SOURCE_PATH}")
+    with Image.open(ICON_SOURCE_PATH) as art:
+        square = art.convert("RGBA")
+        side = min(square.size)
+        left = (square.width - side) // 2
+        top = (square.height - side) // 2
+        square = square.crop((left, top, left + side, top + side))
+        icon = square.resize((ICON_SIZE, ICON_SIZE), Image.Resampling.LANCZOS)
+    ICON_PATH.parent.mkdir(parents=True, exist_ok=True)
+    icon.save(ICON_PATH, "PNG", optimize=True)
+    print(f"wrote {ICON_PATH.relative_to(ROOT)} ({ICON_SIZE}x{ICON_SIZE})")
+
+
 def build():
+    build_icon()
+
+    if not SOURCE_PATH.exists():
+        print(f"VFX source not found ({SOURCE_PATH}); skipped VFX spritesheet build.")
+        return
+
     VFX_DIR.mkdir(parents=True, exist_ok=True)
     ICON_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -94,20 +117,7 @@ def build():
     (VFX_DIR / "sheet.json").write_text(
         '{\n  "frameWidth": 256,\n  "frameHeight": 256,\n  "frameCount": 16,\n  "fps": 12,\n  "source": "New formation sheet (16 rotation frames centered at 128,128)"\n}\n'
     )
-
-    # Build 64x64 icon from Frame 1
-    f1 = frames[0]
-    bbox = f1.getbbox()
-    crop1 = f1.crop(bbox)
-    w, h = crop1.size
-    dim = max(w, h)
-    sq = Image.new("RGBA", (dim, dim), (0, 0, 0, 0))
-    sq.paste(crop1, ((dim - w) // 2, (dim - h) // 2))
-    icon = sq.resize((64, 64), Image.Resampling.LANCZOS)
-    icon.save(ICON_PATH)
-
     print(f"Generated {VFX_DIR / 'sheet.png'}")
-    print(f"Generated {ICON_PATH}")
 
 
 if __name__ == "__main__":

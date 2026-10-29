@@ -13,15 +13,17 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "docs" / "example" / "la-han-icon.png"
+ALT_SOURCE = ROOT / "docs" / "example" / "vi-da-quyen-icon.png"
 OUTPUT = ROOT / "public" / "skills" / "la_han_quyen.png"
 SIZE = 128
 
 
 def main() -> None:
-    if not SOURCE.exists():
+    src = SOURCE if SOURCE.exists() else ALT_SOURCE
+    if not src.exists():
         raise SystemExit(f"Source art not found: {SOURCE}")
 
-    with Image.open(SOURCE) as art:
+    with Image.open(src) as art:
         square = art.convert("RGBA")
         side = min(square.size)
         left = (square.width - side) // 2
