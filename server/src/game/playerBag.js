@@ -88,24 +88,39 @@ export function writeEquipment(playerId, equipment) {
 }
 
 /**
+/**
  * Add multiple stacks to the bag in a single DB read/write operation.
+ * Accepts either an array of `{ itemId, amount }` entries or a map of
+ * `itemId -> amount`. Unknown ids and non-positive amounts are ignored.
  * @param {string} playerId
- * @param {Array<{ itemId: string, amount?: number }>} items
+ * @param {Array<{ itemId: string, amount?: number }>|Record<string, number>} items
  * @returns {{ ok: boolean, bag: Record<string, number> }}
  */
-export function grantItems(playerId, items = []) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return { ok: false, bag: readBag(playerId) };
+export function grantItems(playerId, items) {
+  const bag = readBag(playerId);
+
+  const entries = [];
+  if (Array.isArray(items)) {
+    for (const item of items) {
+      if (!item) continue;
+      entries.push([item.itemId, item.amount ?? 1]);
+    }
+  } else if (items && typeof items === "object") {
+    for (const [id, qty] of Object.entries(items)) {
+      entries.push([id, qty]);
+    }
+  } else {
+    return { ok: false, bag };
   }
 
-  const bag = readBag(playerId);
+  if (entries.length === 0) {
+    return { ok: false, bag };
+  }
+
   let grantedAny = false;
-
-  for (const item of items) {
-    if (!item) continue;
-    const grant = normalizeGrant(item.itemId, item.amount ?? 1);
+  for (const [itemId, rawAmount] of entries) {
+    const grant = normalizeGrant(itemId, rawAmount);
     if (!grant) continue;
-
     bag[grant.itemId] = Math.min(MAX_STACK, (bag[grant.itemId] || 0) + grant.amount);
     grantedAny = true;
   }
@@ -122,7 +137,7 @@ export function grantItems(playerId, items = []) {
  * @returns {{ ok: boolean, bag: Record<string, number> }}
  */
 export function grantItem(playerId, itemId, amount = 1) {
-  return grantItems(playerId, [{ itemId, amount }]);
+  return grantItems(playerId, { [itemId]: amount });
 }
 
 /**
