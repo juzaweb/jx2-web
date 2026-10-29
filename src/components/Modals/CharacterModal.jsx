@@ -108,8 +108,7 @@ export function CharacterModal({
   playerName = "",
   equipment = {},
   gender = "male",
-  onUnequipSlot,
-  onSwitchToInventory
+  onUnequipSlot
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
@@ -240,18 +239,6 @@ export function CharacterModal({
               {t(tab.labelKey)}
             </button>
           ))}
-          {onSwitchToInventory && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected="false"
-              className="char-tab"
-              onClick={onSwitchToInventory}
-              title={t("character.tabInventory")}
-            >
-              {t("character.tabInventory")}
-            </button>
-          )}
         </div>
 
         <div className="char-body">

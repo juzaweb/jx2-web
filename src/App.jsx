@@ -503,23 +503,12 @@ export function App() {
 
   const handleOpenCharacter = useCallback(() => {
     dismissHelp();
-    if (usesTouchControls()) {
-      setIsInventoryOpen(false);
-      setIsSkillsOpen(false);
-    }
     setIsCharacterOpen(true);
   }, [dismissHelp]);
 
   const handleToggleCharacter = useCallback(() => {
     dismissHelp();
-    setIsCharacterOpen((prev) => {
-      const next = !prev;
-      if (next && usesTouchControls()) {
-        setIsInventoryOpen(false);
-        setIsSkillsOpen(false);
-      }
-      return next;
-    });
+    setIsCharacterOpen((prev) => !prev);
   }, [dismissHelp]);
 
   const handleCloseCharacter = useCallback(() => {
@@ -528,37 +517,16 @@ export function App() {
 
   const handleOpenInventory = useCallback(() => {
     dismissHelp();
-    if (usesTouchControls()) {
-      setIsCharacterOpen(false);
-      setIsSkillsOpen(false);
-    }
     setIsInventoryOpen(true);
   }, [dismissHelp]);
 
   const handleToggleInventory = useCallback(() => {
     dismissHelp();
-    setIsInventoryOpen((prev) => {
-      const next = !prev;
-      if (next && usesTouchControls()) {
-        setIsCharacterOpen(false);
-        setIsSkillsOpen(false);
-      }
-      return next;
-    });
+    setIsInventoryOpen((prev) => !prev);
   }, [dismissHelp]);
 
   const handleCloseInventory = useCallback(() => {
     setIsInventoryOpen(false);
-  }, []);
-
-  const handleSwitchToCharacter = useCallback(() => {
-    setIsInventoryOpen(false);
-    setIsCharacterOpen(true);
-  }, []);
-
-  const handleSwitchToInventory = useCallback(() => {
-    setIsCharacterOpen(false);
-    setIsInventoryOpen(true);
   }, []);
 
   const handleOpenSkills = useCallback(() => {
@@ -1122,7 +1090,6 @@ export function App() {
         onEquipItem={handleEquipItem}
         onUnequipSlot={handleUnequipSlot}
         onAssignQuickSlot={handleAssignQuickSlot}
-        onSwitchToCharacter={handleSwitchToCharacter}
         equipment={equipment}
         coins={stats.coins}
         inventoryItems={inventory.inventoryItems}
@@ -1138,7 +1105,6 @@ export function App() {
         equipment={equipment}
         gender={normalizeGender(activeCharacter?.gender)}
         onUnequipSlot={handleUnequipSlot}
-        onSwitchToInventory={handleSwitchToInventory}
       />
 
       {/* Skills Panel Modal (F5) */}

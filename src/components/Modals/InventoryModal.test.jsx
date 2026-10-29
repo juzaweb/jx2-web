@@ -42,17 +42,16 @@ describe("InventoryModal", () => {
     expect(markup).toContain("x5");
   });
 
-  it("renders tab switch to character when onSwitchToCharacter is provided", () => {
+  it("does not render tab switch bar when open", () => {
     const markup = renderToStaticMarkup(
       <I18nProvider>
         <InventoryModal
           isOpen
           onClose={() => {}}
-          onSwitchToCharacter={() => {}}
         />
       </I18nProvider>
     );
-    expect(markup).toContain("Nhân vật");
+    expect(markup).not.toContain("inv-tabs");
   });
 });
 

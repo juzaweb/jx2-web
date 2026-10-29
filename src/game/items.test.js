@@ -122,6 +122,15 @@ describe("inventory quantities", () => {
     expect(css).toContain(`.${testToken.icon} {`);
   });
 
+  it("defines CSS artwork classes for all known items", () => {
+    const css = fs.readFileSync(new URL("../styles/item-icons.css", import.meta.url), "utf8");
+    for (const item of INVENTORY_ITEMS) {
+      if (item?.icon) {
+        expect(css).toContain(`.${item.icon} {`);
+      }
+    }
+  });
+
   it("keeps command tokens out of the mobile consumable picker", () => {
     const ids = CONSUMABLE_ITEMS.map((item) => item.id);
     expect(ids).not.toContain(GM_TOKEN_ID);

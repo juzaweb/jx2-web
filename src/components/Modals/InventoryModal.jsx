@@ -29,7 +29,6 @@ export function InventoryModal({
   onEquipItem,
   onUnequipSlot,
   onAssignQuickSlot,
-  onSwitchToCharacter,
   equipment = {},
   coins = 0,
   inventoryItems = EMPTY_GRID,
@@ -196,28 +195,6 @@ export function InventoryModal({
               ×
             </button>
           </div>
-        </div>
-
-        <div className="inv-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected="true"
-            className="inv-tab active"
-          >
-            {t("inventory.title")}
-          </button>
-          {onSwitchToCharacter && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected="false"
-              className="inv-tab"
-              onClick={onSwitchToCharacter}
-            >
-              {t("inventory.tabCharacter")}
-            </button>
-          )}
         </div>
 
         {showHint && (

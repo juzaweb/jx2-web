@@ -65,4 +65,24 @@
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="6" y="4" width="20" height="24" rx="2" fill="%23f4ecd8" stroke="%23a07b38" stroke-width="1.5"/><rect x="6" y="4" width="4" height="24" fill="%238b2e2e"/><line x1="13" y1="10" x2="23" y2="10" stroke="%23b83838" stroke-width="1.4"/><line x1="13" y1="14" x2="23" y2="14" stroke="%234a4233" stroke-width="1.1"/><line x1="13" y1="18" x2="21" y2="18" stroke="%234a4233" stroke-width="1.1"/><circle cx="18" cy="23" r="2.4" fill="none" stroke="%23b83838" stroke-width="1.2"/></svg>');
 }
 
+/* Wanderer's Robe (Lam Y Lãng Khách) */
+.icon-armor-lang-khach {
+  background-image: url('/icon-armor-lang-khach.png');
+}
+
+/* Wanderer's Conical Hat (Nón Trúc Lãng Khách) */
+.icon-hat-non-truc {
+  background-image: url('/icon-hat-non-truc.png');
+}
+
+/* Female Veiled Conical Hat (Nón Mạng Lãng Khách) */
+.icon-hat-non-mang {
+  background-image: url('/icon-hat-non-mang.png');
+}
+
+/* Wanderer's Trousers (Quần Lãng Khách) */
+.icon-pants-lang-khach {
+  background-image: url('/icon-pants-lang-khach.png');
+}
+
 
