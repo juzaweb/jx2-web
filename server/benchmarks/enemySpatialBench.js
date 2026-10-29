@@ -46,19 +46,22 @@ function linearTickBites(players, enemies, biteRangeSq) {
 // Spatial grid tickBites implementation
 function spatialTickBites(players, spatialGrid, biteRange) {
   let bitCount = 0;
+  const biteRangeSq = biteRange * biteRange;
   players.forEach((player) => {
-    const candidates = spatialGrid.getNear(player.x, player.y, biteRange).filter((e) => !e.isDead);
+    const candidates = spatialGrid.getNear(player.x, player.y, biteRange);
     let nearest = null;
-    let nearestDistance = Infinity;
-    candidates.forEach((wolf) => {
+    let nearestDistanceSq = biteRangeSq;
+    for (let i = 0; i < candidates.length; i++) {
+      const wolf = candidates[i];
+      if (wolf.isDead) continue;
       const dx = wolf.x - player.x;
       const dy = wolf.y - player.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < nearestDistance) {
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistanceSq) {
         nearest = wolf;
-        nearestDistance = dist;
+        nearestDistanceSq = distSq;
       }
-    });
+    }
     if (nearest) bitCount++;
   });
   return bitCount;

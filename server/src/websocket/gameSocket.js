@@ -2972,27 +2972,37 @@ export class GameSocketManager {
   /**
    * Apply wolf bites to nearby players on the server tick. One bite per player per
    * cooldown (whichever wolf is closest), respecting the shared immunity window.
+   *
+   * BOLT OPTIMIZATION: Single-pass linear scan using squared distance comparison
+   * (`dx * dx + dy * dy < nearestDistanceSq`). Avoids intermediate `.filter()`
+   * array allocations and expensive `Math.hypot` square roots on every server tick.
    * @param {Array<Object>} players
    */
   tickBites(players, mapId = DEFAULT_MAP_ID) {
     const now = Date.now();
     const grid = this.gridFor(mapId);
+    const biteRangeSq = BITE_TUNING.range * BITE_TUNING.range;
 
     players.forEach((player) => {
       if (now < player.nextBiteAt || now < player.invulnerableUntil) return;
 
-      const candidates = grid
-        .getNear(player.x, player.y, BITE_TUNING.range)
-        .filter((enemy) => !enemy.isDead && !isEnemyStunned(enemy, now));
+      const candidates = grid.getNear(player.x, player.y, BITE_TUNING.range);
       let nearest = null;
-      let nearestDistance = Infinity;
-      candidates.forEach((enemy) => {
-        const distance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-        if (distance < nearestDistance) {
+      let nearestDistanceSq = biteRangeSq;
+
+      for (let i = 0; i < candidates.length; i++) {
+        const enemy = candidates[i];
+        if (enemy.isDead || isEnemyStunned(enemy, now)) continue;
+
+        const dx = enemy.x - player.x;
+        const dy = enemy.y - player.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < nearestDistanceSq) {
           nearest = enemy;
-          nearestDistance = distance;
+          nearestDistanceSq = distSq;
         }
-      });
+      }
+
       if (!nearest) return;
 
       player.nextBiteAt = now + BITE_TUNING.cooldownMs;
