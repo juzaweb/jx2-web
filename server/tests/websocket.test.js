@@ -949,12 +949,14 @@ test("WebSocket server-authority suite", async (t) => {
     client.send({ type: "player_hit", payload: { targetId: "char_any", damage: 40 } });
     client.send({ type: "player_move", payload: { x: 100, y: 100 } });
     client.send({ type: "use_item", payload: { itemId: "kim-sang-duoc" } });
+    client.send({ type: "player_chat", payload: { sender: "Hacker", text: "Spoofed Chat" } });
     await sleep(120);
 
     // The server stays healthy and emits nothing on behalf of a non-player.
     client.send({ type: "ping" });
     assert.equal((await client.waitFor((m) => m.type === "pong")).type, "pong");
     assert.equal(client.count((m) => m.type === "enemy_hit"), 0);
+    assert.equal(client.count((m) => m.type === "player_chat"), 0);
 
     await client.close();
   });

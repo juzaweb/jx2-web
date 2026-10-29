@@ -2384,10 +2384,12 @@ export class GameSocketManager {
    */
   handlePlayerChat(ws, payload = {}) {
     const player = this.players.get(ws);
+    if (!player) return;
+
     const text = sanitizeStr(payload.text || "", 120);
     if (!text) return;
 
-    const senderName = player?.displayName || player?.username || sanitizeStr(payload.sender || "Lãng Khách", 32);
+    const senderName = player.displayName || player.username || "Lãng Khách";
     const channel = payload.channel === "near" ? "near" : "world";
 
     this.broadcastAll({
@@ -2395,7 +2397,7 @@ export class GameSocketManager {
       payload: {
         id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         sender: senderName,
-        senderId: player?.id,
+        senderId: player.id,
         text,
         channel,
         time: Date.now()
