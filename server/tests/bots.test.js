@@ -201,9 +201,12 @@ test("server-authoritative PK bots", async (t) => {
     await sleep(340);
     client.send({
       type: "player_attack",
-      payload: { skill: "kiem_khi", x: 6100, y: 6000, facingRight: true }
+      payload: { skill: "thieu_duong_kiem_phap", x: 6100, y: 6000, facingRight: true }
     });
-    client.send({ type: "player_hit", payload: { targetId: botId, skill: "kiem_khi" } });
+    client.send({
+      type: "player_hit",
+      payload: { targetId: botId, skill: "thieu_duong_kiem_phap" }
+    });
 
     const left = await client.waitFor(
       (message) => message.type === "player_left" && message.payload.id === botId,

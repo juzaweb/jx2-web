@@ -225,15 +225,15 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(mp.payload.maxMp, 60);
 
     const stats = await client.waitFor((m) => m.type === "player_stats");
-    // Base attack 24 + the starter sword's +6.
-    assert.equal(stats.payload.attack, 30);
+    // Base attack 24 + the Thiếu Lâm starter gloves' +5.
+    assert.equal(stats.payload.attack, 29);
     assert.equal(stats.payload.defense, 6);
     assert.equal(stats.payload.maxHp, 100);
     assert.equal(stats.payload.level, 1);
 
     const equipment = await client.waitFor((m) => m.type === "equipment_sync");
     assert.equal(equipment.payload.equipment.armor, null, "forged gear is ignored");
-    assert.equal(equipment.payload.equipment.weapon, "kiem-lang-khach");
+    assert.equal(equipment.payload.equipment.weapon, "bao-tay-lang-khach");
 
     const bag = await client.waitFor((m) => m.type === "inventory_sync");
     assert.equal(typeof bag.payload.inventory, "object");
@@ -751,12 +751,12 @@ test("WebSocket server-authority suite", async (t) => {
 
     const synced = await client.waitFor((m) => m.type === "skills_sync");
     assert.equal(
-      synced.payload.levels.kiem_khi,
+      synced.payload.levels.thieu_duong_kiem_phap,
       undefined,
       "a freshly studied skill is implicitly level 1"
     );
 
-    client.send({ type: "skill_upgrade", payload: { skillId: "kiem_khi" } });
+    client.send({ type: "skill_upgrade", payload: { skillId: "thieu_duong_kiem_phap" } });
     const upgraded = await client.waitFor(
       (m) => m.type === "item_result" && m.payload.action === "skill_upgrade"
     );
@@ -770,10 +770,10 @@ test("WebSocket server-authority suite", async (t) => {
     assert.equal(progress.payload.exp, 380);
 
     const levels = await client.waitFor(
-      (m) => m.type === "skills_sync" && m.payload.levels?.kiem_khi === 2
+      (m) => m.type === "skills_sync" && m.payload.levels?.thieu_duong_kiem_phap === 2
     );
-    assert.equal(levels.payload.levels.kiem_khi, 2);
-    assert.equal(store.getSkillLevels("char_skill").kiem_khi, 2);
+    assert.equal(levels.payload.levels.thieu_duong_kiem_phap, 2);
+    assert.equal(store.getSkillLevels("char_skill").thieu_duong_kiem_phap, 2);
 
     await client.close();
   });
@@ -783,17 +783,48 @@ test("WebSocket server-authority suite", async (t) => {
     const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
     await join(client, { characterId: "char_broke", x: 5000, y: 5000 });
 
-    client.send({ type: "skill_upgrade", payload: { skillId: "kiem_khi" } });
+    client.send({ type: "skill_upgrade", payload: { skillId: "thieu_duong_kiem_phap" } });
     const refused = await client.waitFor(
       (m) => m.type === "item_result" && m.payload.action === "skill_upgrade"
     );
     assert.equal(refused.payload.ok, false);
     assert.equal(refused.payload.reason, "coins");
     assert.equal(
-      store.getSkillLevels("char_broke").kiem_khi,
+      store.getSkillLevels("char_broke").thieu_duong_kiem_phap,
       undefined,
       "nothing is persisted when the price cannot be paid"
     );
+
+    await client.close();
+  });
+
+  await t.test("An art of the hero's sect is studied from the F5 tree", async () => {
+    store.setProgress(
+      "char_learn",
+      { level: 20, exp: 5000, coins: 100000, kills: 0 },
+      "char_learn"
+    );
+    const client = await createTestClient(`ws://127.0.0.1:${port}/ws`);
+    await join(client, { characterId: "char_learn", x: 5000, y: 5000 });
+
+    const synced = await client.waitFor((m) => m.type === "skills_sync");
+    assert.equal(synced.payload.sect, "thieu-lam", "the sect rides on skills_sync");
+
+    client.send({ type: "learn_skill", payload: { skillId: "la_han_quyen" } });
+    const learned = await client.waitFor(
+      (m) => m.type === "item_result" && m.payload.action === "learn"
+    );
+    assert.equal(learned.payload.ok, true);
+    assert.equal(learned.payload.level, 1);
+    assert.ok(store.getLearnedSkills("char_learn").includes("la_han_quyen"));
+
+    // An art of another sect is refused outright, whether or not it exists.
+    client.send({ type: "learn_skill", payload: { skillId: "thai_cuc_quyen" } });
+    const refused = await client.waitFor(
+      (m) => m.type === "item_result" && m.payload.action === "learn" && m.payload.ok === false
+    );
+    assert.equal(refused.payload.reason, "sect");
+    assert.equal(store.getLearnedSkills("char_learn").includes("thai_cuc_quyen"), false);
 
     await client.close();
   });

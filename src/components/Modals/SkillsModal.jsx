@@ -5,12 +5,14 @@ import {
   characterLevelForSkillLevel,
   skillAtLevel,
   skillFundsShortfall,
+  skillLearnCost,
   skillLevelBonus,
   skillLevelOf,
   skillLockReason,
   skillUpgradeCost
 } from "../../game/skills.js";
 import { normalizeWeaponType, WEAPON_LABEL_KEYS } from "../../game/weapons.js";
+import { SECTS, normalizeSect } from "../../game/sects.js";
 import { formatSkillLock } from "../../game/skillLockLabel.js";
 import { moneyLabel } from "../../game/moneyLabel.js";
 import { buildSkillTree, initialSelectedId } from "../../game/skillTree.js";
@@ -27,16 +29,18 @@ const ARROW_MARKER_ID = "skill-tree-arrow";
 /**
  * Skills Panel modal inspired by JX2 / VLTK2 skill trees ("Bảng Võ Học").
  *
- * The left side renders the equipped weapon's skills as a tree of gold tiles
- * joined by arrows (layout derived from each skill's `requires`); the right side
- * shows the selected skill's details and its quick-bind buttons. Skills not yet
- * studied from a book stay locked.
+ * The left side renders the hero's sect kit as a tree of gold tiles joined by
+ * arrows (layout derived from each skill's `requires`); the right side shows the
+ * selected skill's details, its study price and its quick-bind buttons. An art
+ * the hero meets the level/prerequisites for but has not studied yet is learned
+ * here, paid in silver + EXP.
  */
 export function SkillsModal({
   isOpen,
   onClose,
   skills = [],
   weapon = "kiem",
+  sect = "vo-dang",
   learnedSkills = [],
   skillLevels = {},
   level = 1,
@@ -44,7 +48,8 @@ export function SkillsModal({
   exp = 0,
   quickSlotsMapping = {},
   onAssignSkill,
-  onUpgradeSkill
+  onUpgradeSkill,
+  onLearnSkill
 }) {
   const { t } = useI18n();
   const [showHint, setShowHint] = useState(false);
@@ -62,6 +67,7 @@ export function SkillsModal({
   if (!isOpen) return null;
 
   const weaponLabelKey = WEAPON_LABEL_KEYS[normalizeWeaponType(weapon)];
+  const sectEntry = SECTS[normalizeSect(sect)] || null;
 
   const getBoundSlots = (skillId) => {
     const bound = [];
@@ -96,6 +102,11 @@ export function SkillsModal({
   const levelTooLow = nextLevelRequired !== null && level < nextLevelRequired;
   /** HP/s an always-on art restores at its current level; 0 for every cast skill. */
   const selectedRegen = selectedSkill ? regenPerSecond(selectedSkill, selectedLevel) : 0;
+  /** Price of studying this art, when it is eligible and still unknown. */
+  const learnCost =
+    selectedSkill && selectedLockReason?.kind === "learn" ? skillLearnCost(selectedSkill) : null;
+  const learnPrice = learnCost ? moneyLabel(learnCost.coinsBac, t) : "";
+  const learnShortfall = learnCost ? skillFundsShortfall(learnCost, { coins, exp }) : null;
 
   return (
     <div className="skills-modal-overlay" id="skills-modal">
@@ -130,9 +141,11 @@ export function SkillsModal({
           </div>
         </div>
 
-        {/* Weapon Info Header */}
+        {/* Sect Info Header */}
         <div className="skills-header-info">
-          <span className="skills-weapon-badge">{t(weaponLabelKey)}</span>
+          <span className="skills-weapon-badge">
+            {sectEntry ? t(sectEntry.nameKey) : t(weaponLabelKey)}
+          </span>
           <span className="skills-level-badge">{t("common.level")} {level}</span>
         </div>
 
@@ -326,6 +339,29 @@ export function SkillsModal({
                   </span>
                 )}
               </div>
+
+              {/* Studying: an art of the hero's own sect whose level and
+                  prerequisites are met is learned here, paid in silver + EXP. */}
+              {learnCost && (
+                <div className="skills-upgrade">
+                  <button
+                    type="button"
+                    className="skills-upgrade-btn"
+                    disabled={Boolean(learnShortfall)}
+                    title={
+                      learnShortfall
+                        ? t("skills.learnShort", { price: learnPrice, exp: learnCost.exp })
+                        : t("skills.learnHint")
+                    }
+                    onClick={() => onLearnSkill?.(selectedSkill.id)}
+                  >
+                    <span className="skills-upgrade-label">{t("skills.learn")}</span>
+                    <span className="skills-upgrade-cost">
+                      {t("skills.learnCost", { price: learnPrice, exp: learnCost.exp })}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* Levelling: the server owns the price and the debit; the panel
                   only shows what the next rank costs and whether it is affordable. */}

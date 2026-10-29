@@ -88,7 +88,6 @@ describe("inventory quantities", () => {
     expect(Object.keys(STARTER_ITEMS).sort()).toEqual([
       "dai-hoan-dan",
       "hoi-thanh-phu",
-      "kiem-lang-khach",
       "kim-sang-duoc"
     ]);
     Object.entries(STARTER_ITEMS).forEach(([id, qty]) => {

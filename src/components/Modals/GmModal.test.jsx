@@ -39,7 +39,7 @@ describe("GmModal Component", () => {
     expect(markup).toContain("Đặt Cấp");
   });
 
-  it("renders weapons and skill books options in equipment tab", () => {
+  it("renders weapons and the sect-study shortcut in equipment tab", () => {
     const markup = renderModal({ initialTab: "equipment" });
     // Costumes
     expect(markup).toContain("Bộ Y Phục Lãng Khách");
@@ -55,13 +55,9 @@ describe("GmModal Component", () => {
     expect(markup).toContain("Bao Tay Lãng Khách");
     expect(markup).toContain("Nhận Trọn Bộ Vũ Khí");
 
-    // Skill Books
-    expect(markup).toContain("Bí Kíp Võ Học (Sách Kỹ Năng)");
-    expect(markup).toContain("Nhận Toàn Bộ Bí Kíp (18 Cuốn)");
-    expect(markup).toContain("Bí Kíp Thiếu Lâm (6)");
-    expect(markup).toContain("Bí Kíp Võ Đang (4)");
-    expect(markup).toContain("Bí Kíp Nga My (4)");
-    expect(markup).toContain("Bí Kíp Ngũ Độc (4)");
+    // Sect martial arts
+    expect(markup).toContain("Võ Học Môn Phái");
+    expect(markup).toContain("Học Toàn Bộ Võ Công Của Phái");
   });
 });
 

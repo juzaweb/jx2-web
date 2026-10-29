@@ -7,14 +7,16 @@ import { LobbyScene } from "../LobbyScene.jsx";
 import { SERVER_NAME } from "../../game/serverConfig.js";
 import { readSession } from "../../game/session.js";
 import { DEFAULT_FACTION, FACTIONS, FACTION_IDS, normalizeFaction } from "../../game/factions.js";
+import { DEFAULT_SECT, SECTS, SECT_IDS, normalizeSect } from "../../game/sects.js";
+import { WEAPON_LABEL_KEYS } from "../../game/weapons.js";
 
 const NAME_MIN = 2;
 const NAME_MAX = 16;
 
 /**
- * Character creation choices: a name and a gender. Sects are gone; every hero
- * starts with a sword and the Kiếm Khí skill, then learns other weapon skills
- * from books dropped by monsters.
+ * Character creation choices: a name, a gender, a faction (home city and PvP
+ * camp) and a martial sect. The sect fixes the weapon the hero starts with and
+ * the skill kit they learn from the F5 tree.
  */
 const GENDERS = [
   { key: "male", labelKey: "characterSelect.genderMale", glyph: "男" },
@@ -26,6 +28,9 @@ const DEFAULT_GENDER = GENDERS[0];
 
 /** Faction choices, in catalog order. */
 const FACTION_LIST = FACTION_IDS.map((id) => FACTIONS[id]);
+
+/** Sect choices, in catalog order. */
+const SECT_LIST = SECT_IDS.map((id) => SECTS[id]);
 
 const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", zh: "zh-CN" };
 
@@ -64,6 +69,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   const [nameInput, setNameInput] = useState("");
   const [genderKey, setGenderKey] = useState(DEFAULT_GENDER.key);
   const [factionKey, setFactionKey] = useState(DEFAULT_FACTION);
+  const [sectKey, setSectKey] = useState(DEFAULT_SECT);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -119,16 +125,19 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
   const selected = characters.find((c) => c.id === selectedId) || null;
   const activeGender = GENDER_BY_KEY[genderKey] || DEFAULT_GENDER;
   const activeFaction = FACTIONS[normalizeFaction(factionKey)] || FACTIONS[DEFAULT_FACTION];
+  const activeSect = SECTS[normalizeSect(sectKey)] || SECTS[DEFAULT_SECT];
   const selectedGender = selected ? GENDER_BY_KEY[selected.gender] || DEFAULT_GENDER : null;
   const selectedFaction = selected
     ? FACTIONS[normalizeFaction(selected.faction)] || FACTIONS[DEFAULT_FACTION]
     : null;
+  const selectedSect = selected ? SECTS[normalizeSect(selected.sect)] || SECTS[DEFAULT_SECT] : null;
 
   const handleOpenCreate = () => {
     setMode("create");
     setNameInput("");
     setGenderKey(DEFAULT_GENDER.key);
     setFactionKey(DEFAULT_FACTION);
+    setSectKey(DEFAULT_SECT);
     setError("");
     setNotice("");
   };
@@ -157,7 +166,8 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
         cleanName,
         activeGender.key,
         user?.token || readSession()?.token,
-        factionKey
+        factionKey,
+        sectKey
       );
       const createdId = data?.character?.id;
       await reload();
@@ -257,6 +267,7 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                 </div>
                 {selected && (
                   <div className="jx2-cs-stage-meta">
+                    {selectedSect ? t(selectedSect.nameKey) : ""} ·{" "}
                     {t((GENDER_BY_KEY[selected.gender] || DEFAULT_GENDER).labelKey)} ·{" "}
                     {selectedFaction ? t(`characterSelect.factions.${selectedFaction.id}`) : ""} ·{" "}
                     {t("common.level")} {selected.level} · {formatDateTime(selected.createdAt, language)}
@@ -312,6 +323,28 @@ export function CharacterSelectModal({ isOpen, user, onStart, onLogout }) {
                   ))}
                 </div>
                 <div className="jx2-cs-create-hint">{t("characterSelect.factionHint")}</div>
+
+                <label className="jx2-form-label">{t("characterSelect.sectLabel")}</label>
+                <div className="jx2-cs-factions">
+                  {SECT_LIST.map((sect) => (
+                    <button
+                      key={sect.id}
+                      type="button"
+                      className={`jx2-cs-faction-tile ${sect.id === activeSect.id ? "selected" : ""}`}
+                      onClick={() => setSectKey(sect.id)}
+                      title={t(sect.descKey)}
+                    >
+                      <span className="jx2-cs-faction-glyph" style={{ color: sect.color }}>
+                        {sect.glyph}
+                      </span>
+                      <span className="jx2-cs-faction-label">{t(sect.nameKey)}</span>
+                      <span className="jx2-cs-faction-city">
+                        {t(WEAPON_LABEL_KEYS[sect.weapon])}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="jx2-cs-create-hint">{t("characterSelect.sectHint")}</div>
 
                 <label className="jx2-form-label" htmlFor="jx2-character-name">
                   {t("characterSelect.nameLabel")}

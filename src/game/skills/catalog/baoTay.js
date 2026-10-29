@@ -1,24 +1,24 @@
 /**
- * Bao tay (fist / glove) kit.
+ * Thiếu Lâm (bao tay / fist) kit.
  *
- * Slot 0 is `thieu_lam_tam_phap`: a passive internal art that is always running
- * (no cast, no MP, no cooldown) and restores `hpPerSecond` health while the hero
- * is alive. See `passiveRegen.js` for the shared regen maths.
+ * Slot 0 is `thieu_lam_tam_phap`: the sect starter, a passive internal art that
+ * is always running (no cast, no MP, no cooldown) and restores `hpPerSecond`
+ * health while the hero is alive. See `passiveRegen.js` for the regen maths.
  */
 
 import { defineSkill } from "../schema.js";
 
-export const BAO_TAY_SKILLS = [
+export const THIEU_LAM_SKILLS = [
   defineSkill({
     id: "thieu_lam_tam_phap",
     weapon: "bao-tay",
     slot: 0,
-    book: { viName: "Thiếu Lâm Tâm Pháp", dropTiers: ["soi-xam"] },
     icon: "/skills/thieu_lam_tam_phap.png",
     glyph: "心",
     nameKey: "skills.thieuLam.thieuLamTamPhap.name",
     descKey: "skills.thieuLam.thieuLamTamPhap.desc",
-    unlockLevel: 10,
+    unlockLevel: 1,
+    starter: true,
     mp: 0,
     cooldown: 0,
     target: "self",
@@ -33,7 +33,6 @@ export const BAO_TAY_SKILLS = [
     id: "dai_tu_di_chuong",
     weapon: "bao-tay",
     slot: 1,
-    book: { viName: "Đại Tu Di Chưởng", dropTiers: ["soi-xam", "son-ca"] },
     icon: "/skills/dai_tu_di_chuong.png",
     glyph: "掌",
     requires: [{ id: "thieu_lam_tam_phap", level: 1 }],
@@ -59,7 +58,6 @@ export const BAO_TAY_SKILLS = [
     id: "la_han_quyen",
     weapon: "bao-tay",
     slot: 2,
-    book: { viName: "La Hán Quyền", dropTiers: ["da-lang", "lam-tac"] },
     icon: "/skills/la_han_quyen.png",
     glyph: "拳",
     nameKey: "skills.thieuLam.laHanQuyen.name",
@@ -88,7 +86,6 @@ export const BAO_TAY_SKILLS = [
     id: "la_han_tran",
     weapon: "bao-tay",
     slot: 3,
-    book: { viName: "La Hán Trận", dropTiers: ["lam-tac", "hac-y-sat-thu"] },
     icon: "/skills/la_han_tran.png",
     glyph: "陣",
     requires: [{ id: "dai_tu_di_chuong", level: 1 }],
@@ -119,10 +116,6 @@ export const BAO_TAY_SKILLS = [
     id: "kim_cang_bat_hoai",
     weapon: "bao-tay",
     slot: 4,
-    book: {
-      viName: "Kim Cang Bất Hoại",
-      dropTiers: ["thiet-giap-binh", "ma-giao-de-tu", "tuyet-lang", "son-tac-dau-linh"]
-    },
     icon: "/skills/kim_cang_bat_hoai.png",
     glyph: "卍",
     requires: [{ id: "la_han_tran", level: 1 }],
@@ -148,10 +141,6 @@ export const BAO_TAY_SKILLS = [
     id: "nhu_lai_than_chuong",
     weapon: "bao-tay",
     slot: 5,
-    book: {
-      viName: "Như Lai Thần Chưởng",
-      dropTiers: ["kim-giap-binh", "huyet-ma", "nga-mi-kiem-nu", "bang-tam-yeu"]
-    },
     icon: "/skills/nhu_lai_than_chuong.png",
     glyph: "佛",
     requires: [{ id: "la_han_tran", level: 1 }],

@@ -4,6 +4,16 @@ import path from "node:path";
 import { config } from "../config.js";
 import { STARTER_ITEMS, GM_STARTER_ITEMS } from "../../../src/game/items.js";
 import { normalizeSkillLevel } from "../../../src/game/skills/levels.js";
+import { SKILL_KITS } from "../../../src/game/skills.js";
+import {
+  DEFAULT_SECT,
+  SECTS,
+  SECT_IDS,
+  isSectId,
+  normalizeSect,
+  sectForSkill,
+  sectStarterSkillId
+} from "../../../src/game/sects.js";
 import { FIRST_QUEST_ID } from "../../../src/game/quests/catalog.js";
 import { normalizeQuestState } from "../../../src/game/quests/state.js";
 
@@ -24,13 +34,15 @@ const DEFAULT_LEDGER = { level: 1, exp: 0, coins: 0, kills: 0 };
  *  3 — hands the starter kit to characters left with an empty bag.
  *  4 — adds server-owned equipment, persisted HP/MP and the one-time state-import flag.
  *  5 — adds the persisted map/position, so a relog resumes where the hero stood.
- *  6 — adds the learned-skill ledger (skills are learned from dropped books).
+ *  6 — adds the learned-skill ledger (skills were once learned from dropped books).
  *  7 — adds per-skill levels (a learned skill is studied at level 1 and can be
  *      raised to the shared MAX_SKILL_LEVEL).
  *  8 — adds the newbie-quest state ledger and seeds it from the retired
  *      `quest_rewarded` flag.
+ *  9 — skill books are gone: bags drop every `book_*` stack and each hero's
+ *      learned arts are narrowed to the kit of the sect they belong to.
  */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 /**
  * Column definitions of the `saves` table, shared by the initial CREATE and the
@@ -335,7 +347,120 @@ export class PlayerDatabase {
         .run(legacy, Date.now());
     }
 
+    if (currentVersion < 9) {
+      this._migrateSects();
+    }
+
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
+
+  /**
+   * Version 9 — the sect system replaced skill books.
+   *
+   * Every stored bag loses its `book_*` stacks (nothing teaches a skill that way
+   * any more). A character is moved onto the sect its old arts came from (then the
+   * worn weapon, then the legacy gender mapping) and its learned list is narrowed
+   * to that sect's kit, keeping the levels already paid for.
+   */
+  _migrateSects() {
+    const parse = (raw, fallback) => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return fallback;
+      }
+    };
+
+    const now = Date.now();
+    const updateBag = this.db.prepare(
+      "UPDATE saves SET inventory = ?, updated_at = ? WHERE player_id = ?"
+    );
+
+    // The `characters` table lives in the same file but belongs to CharacterDatabase,
+    // which may not have been constructed yet (import order is not guaranteed).
+    const hasCharacters = this.db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'characters'")
+      .get();
+    const updateSect = hasCharacters
+      ? this.db.prepare("UPDATE characters SET sect = ? WHERE id = ?")
+      : null;
+    const updateLearned = this.db.prepare(
+      "UPDATE saves SET learned_skills = ?, skill_levels = ?, updated_at = ? WHERE player_id = ?"
+    );
+    const characters = hasCharacters
+      ? new Map(
+          this.db
+            .prepare("SELECT id, sect, gender FROM characters")
+            .all()
+            .map((row) => [row.id, row])
+        )
+      : new Map();
+
+    for (const row of this.db.prepare("SELECT * FROM saves").all()) {
+      const bag = parse(row.inventory, null);
+      if (bag && typeof bag === "object" && !Array.isArray(bag)) {
+        const books = Object.keys(bag).filter((key) => key.startsWith("book_"));
+        if (books.length > 0) {
+          const cleaned = { ...bag };
+          for (const key of books) delete cleaned[key];
+          updateBag.run(JSON.stringify(cleaned), now, row.player_id);
+        }
+      }
+
+      const character = characters.get(row.player_id);
+      if (!character) continue;
+
+      const storedLearned = parse(row.learned_skills, []);
+      const learnedIds = Array.isArray(storedLearned)
+        ? storedLearned.filter((id) => typeof id === "string" && id.length > 0)
+        : [];
+
+      // No character could choose a sect before this release, so the stored value
+      // (legacy `none`, or the old Thiếu Lâm/Nga My defaults) is not authoritative:
+      // derive the sect from the arts actually studied, then from the worn weapon,
+      // then from the legacy gender mapping. `kiem_khi` belongs to no kit and is
+      // therefore ignored by `sectForSkill`.
+      const counts = new Map();
+      for (const id of learnedIds) {
+        const owner = sectForSkill(id, SKILL_KITS);
+        if (!owner) continue;
+        counts.set(owner, (counts.get(owner) || 0) + 1);
+      }
+      let best = null;
+      for (const [owner, count] of counts) {
+        if (!best || count > best.count) best = { owner, count };
+      }
+
+      const equipment = parse(row.equipment, {});
+      const wornWeapon = equipment && typeof equipment === "object" ? equipment.weapon : null;
+      const weaponSect = SECT_IDS.find((id) => SECTS[id].weaponItemId === wornWeapon) || null;
+      const storedSect = isSectId(character.sect) ? character.sect : null;
+
+      let sect =
+        best?.owner ||
+        storedSect ||
+        weaponSect ||
+        (character.gender === "female" ? "nga-my" : DEFAULT_SECT);
+
+      sect = normalizeSect(sect);
+      if (updateSect && character.sect !== sect) updateSect.run(sect, row.player_id);
+
+      const kit = SKILL_KITS[sect] || [];
+      const kitIds = new Set(kit.map((entry) => entry.id));
+      const starterId = sectStarterSkillId(sect);
+      const kept = learnedIds.filter((id) => kitIds.has(id));
+      if (!kept.includes(starterId)) kept.push(starterId);
+
+      const storedLevels = parse(row.skill_levels, {});
+      const keptLevels = {};
+      if (storedLevels && typeof storedLevels === "object" && !Array.isArray(storedLevels)) {
+        for (const [id, level] of Object.entries(storedLevels)) {
+          if (kept.includes(id)) keptLevels[id] = normalizeSkillLevel(level);
+        }
+      }
+
+      updateLearned.run(JSON.stringify(kept), JSON.stringify(keptLevels), now, row.player_id);
+    }
   }
 
   /**

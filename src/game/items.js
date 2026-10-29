@@ -3,8 +3,6 @@
  * The catalog itself is static; stack quantities are persisted via src/game/storage.js.
  */
 
-import { SKILLS } from "./skills.js";
-
 /** Keys that would poison a plain-object quantity map if copied verbatim. */
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
@@ -175,60 +173,6 @@ export const daoLangKhach = {
   desc: "Đao bản rộng nặng tay, sát thương cao. Chỉ dùng được chiêu đao pháp đã học."
 };
 
-/**
- * Skill books are learned, not cast: the server consumes the book and records
- * the skill id on the character. Each skill owns its Vietnamese book name
- * (`book.viName`) and drop tiers, so a new skill needs no edit here.
- */
-
-/**
- * One book per learnable skill. The starter skill (Kiếm Khí) is not sold or
- * dropped: every hero already knows it.
- * @type {ReadonlyArray<{id:string, name:string, icon:string, skillId:string, weapon:string, desc:string}>}
- */
-export const BOOK_ITEMS = Object.freeze(
-  SKILLS.filter((skill) => !skill.starter).map((skill) => {
-    const name = skill.book?.viName || skill.id;
-    return Object.freeze({
-      id: `book_${skill.id}`,
-      name: `Sách: ${name}`,
-      icon: "icon-book",
-      skillId: skill.id,
-      weapon: skill.weapon,
-      desc: `Bí kíp ghi chép ${name}. Dùng để học chiêu thức này.`
-    });
-  })
-);
-
-/**
- * Catalog id of the book that teaches a skill.
- * @param {string} skillId
- * @returns {string}
- */
-export function bookItemId(skillId) {
-  return `book_${skillId}`;
-}
-
-/**
- * Skill id a book teaches, or null when the id is not a skill book.
- * @param {string} itemId
- * @returns {string|null}
- */
-export function skillIdForBook(itemId) {
-  if (typeof itemId !== "string") return null;
-  const book = BOOK_ITEMS.find((item) => item.id === itemId);
-  return book ? book.skillId : null;
-}
-
-/**
- * Whether an item id is a learnable skill book.
- * @param {string} itemId
- * @returns {boolean}
- */
-export function isSkillBook(itemId) {
-  return skillIdForBook(itemId) !== null;
-}
-
 /** Quick-slot consumables reused inside the inventory grid, destructured by their fixed order. */
 const [kimSangDuoc, daiHoanDan, nuNhiHong, hoiThanhPhu] = QUICK_ITEMS;
 
@@ -291,7 +235,6 @@ export function getItemById(id) {
     QUICK_ITEMS.find((item) => item.id === id) ||
     INVENTORY_ITEMS.find((item) => item && item.id === id) ||
     EQUIPMENT_ITEMS.find((item) => item && item.id === id) ||
-    BOOK_ITEMS.find((item) => item.id === id) ||
     QUEST_ITEMS.find((item) => item.id === id) ||
     null
   );
@@ -328,9 +271,7 @@ export function getConsumableEffect(id) {
 export const STARTER_ITEMS = Object.freeze({
   "kim-sang-duoc": 50,
   "dai-hoan-dan": 50,
-  "hoi-thanh-phu": 50,
-  // Every hero starts with a sword so the starter Kiếm Khí skill is usable.
-  "kiem-lang-khach": 1
+  "hoi-thanh-phu": 50
 });
 
 /**
@@ -510,7 +451,8 @@ export function consumeQuantity(id, amount = 1) {
 /**
  * Kill-reward tuning shared with the server, which rolls the reward from its own
  * authoritative enemy health (see server/src/rewards.js). Kills pay EXP and
- * đồng only: no loot table exists, so nothing is ever dropped on the ground.
+ * đồng only: nothing is ever dropped on the ground, and this legacy table does not
+ * cover the weapon drops (see `MONSTER_WEAPON_DROPS` in `enemyCatalog.js`).
  */
 export const KILL_REWARD = {
   exp: 35,
@@ -569,7 +511,7 @@ export function applyQuantities(quantities = defaultQuantities()) {
   const owned = sanitizeQuantities(quantities) || {};
 
   const inventoryItems = [];
-  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS, ...BOOK_ITEMS, ...QUEST_ITEMS].filter(Boolean).forEach((item) => {
+  [...INVENTORY_ITEMS, ...EQUIPMENT_ITEMS, ...QUEST_ITEMS].filter(Boolean).forEach((item) => {
     const qty = quantityOf(owned, item.id);
     if (qty > 0) inventoryItems.push({ ...item, qty });
   });

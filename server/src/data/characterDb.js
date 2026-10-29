@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { config } from "../config.js";
 import { DEFAULT_FACTION, isFactionId, normalizeFaction } from "../../../src/game/factions.js";
+import { DEFAULT_SECT, isSectId, normalizeSect } from "../../../src/game/sects.js";
 
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 // Vietnamese-friendly: letters (incl. diacritics), digits, space, hyphen, underscore.
@@ -12,17 +13,11 @@ const MIN_NAME_LENGTH = 2;
 const MAX_NAME_LENGTH = 16;
 
 /**
- * Playable genders. Sects are gone: a hero's skill kit is decided by the weapon
- * worn in the `weapon` equipment slot, not by a character class.
+ * Playable genders. A sect (see `src/game/sects.js`) owns the skill kit; the
+ * gender only drives the rig silhouette.
  */
 const GENDERS = ["male", "female"];
 const DEFAULT_GENDER = "male";
-
-/**
- * Legacy `sect` column value. The column is kept so older databases keep their
- * shape, but nothing reads it any more.
- */
-const LEGACY_SECT = "none";
 
 /**
  * Normalise an unknown gender to the default.
@@ -85,7 +80,10 @@ const mapRow = (row) => {
     id: row.id,
     userId: row.user_id,
     name: row.name,
-    gender: normalizeGender(row.gender),    faction: normalizeFaction(row.faction),    appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
+    gender: normalizeGender(row.gender),
+    faction: normalizeFaction(row.faction),
+    sect: normalizeSect(row.sect),
+    appearance: Number.isInteger(row.appearance) ? row.appearance : 0,
     level: row.level,
     createdAt: row.created_at,
     lastPlayed: row.last_played
@@ -374,9 +372,10 @@ export class CharacterDatabase {
    * @param {string} name
    * @param {"male"|"female"} [gender="male"]
    * @param {"ngo"|"thuc"|"nguy"} [faction="ngo"]
+   * @param {string} [sect] one of SECT_IDS; defaults to DEFAULT_SECT
    * @returns {Object} Sanitized character
    */
-  create(userId, name, gender = DEFAULT_GENDER, faction = DEFAULT_FACTION) {
+  create(userId, name, gender = DEFAULT_GENDER, faction = DEFAULT_FACTION, sect = DEFAULT_SECT) {
     if (!isValidUserId(userId)) {
       const err = new Error("Thông tin tài khoản không hợp lệ.");
       err.code = "INVALID_USER";
@@ -404,6 +403,13 @@ export class CharacterDatabase {
     }
     const cleanFaction = normalizeFaction(faction);
 
+    if (!isSectId(sect)) {
+      const err = new Error("Môn phái không hợp lệ.");
+      err.code = "INVALID_SECT";
+      throw err;
+    }
+    const cleanSect = normalizeSect(sect);
+
     if (this.countByUser(userId) >= MAX_CHARACTER_SLOTS) {
       const err = new Error(`Mỗi tài khoản chỉ được tạo tối đa ${MAX_CHARACTER_SLOTS} nhân vật.`);
       err.code = "SLOT_LIMIT";
@@ -421,7 +427,7 @@ export class CharacterDatabase {
         id,
         userId,
         cleanName,
-        LEGACY_SECT,
+        cleanSect,
         cleanGender,
         cleanFaction,
         1,

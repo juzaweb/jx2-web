@@ -4,7 +4,6 @@ import { bridge, EVENTS } from "../../game/bridge.js";
 import { MAX_LEVEL, MIN_LEVEL } from "../../game/progression.js";
 import { useDraggablePanel } from "./useDraggablePanel.js";
 import { MAP_IDS } from "../../game/maps/mapRegistry.js";
-import { BOOK_ITEMS } from "../../game/items.js";
 import "../../styles/gm-modal.css";
 
 const TABS = [
@@ -14,35 +13,6 @@ const TABS = [
   { key: "teleport", labelKey: "gm.tabs.teleport" },
   { key: "utility", labelKey: "gm.tabs.utility" }
 ];
-
-const SECT_BOOK_IDS = {
-  "thieu-lam": [
-    "book_thieu_lam_tam_phap",
-    "book_dai_tu_di_chuong",
-    "book_la_han_quyen",
-    "book_la_han_tran",
-    "book_kim_cang_bat_hoai",
-    "book_nhu_lai_than_chuong"
-  ],
-  "vo-dang": [
-    "book_thieu_duong_kiem_phap",
-    "book_thai_cuc_quyen",
-    "book_tam_thanh_kiem_phap",
-    "book_toat_hong_quan_khuyet"
-  ],
-  "nga-my": [
-    "book_nga_my_kiem_phap",
-    "book_mong_diep_thoi_tam",
-    "book_tu_hang_pho_do",
-    "book_luu_thuy_khanh_van"
-  ],
-  "ngu-doc": [
-    "book_ngu_doc_tam_phap",
-    "book_truy_tam_doc",
-    "book_van_doc_chieu_hong",
-    "book_u_hong_phiet_anh"
-  ]
-};
 
 export function GmModal({ isOpen, onClose, stats = {}, initialTab = "level" }) {
   const { t } = useI18n();
@@ -78,22 +48,6 @@ export function GmModal({ isOpen, onClose, stats = {}, initialTab = "level" }) {
 
   const handleAddItems = (items, text, log) => {
     emitGmAction("add_items", { items, text, log });
-  };
-
-  const handleReceiveAllBooks = () => {
-    const items = Object.fromEntries(BOOK_ITEMS.map((b) => [b.id, 1]));
-    handleAddItems(
-      items,
-      t("gm.equipment.allBooksReceivedText"),
-      t("gm.equipment.allBooksReceivedLog")
-    );
-  };
-
-  const handleReceiveSectBooks = (sectKey) => {
-    const bookIds = SECT_BOOK_IDS[sectKey] || [];
-    if (!bookIds.length) return;
-    const items = Object.fromEntries(bookIds.map((id) => [id, 1]));
-    handleAddItems(items);
   };
 
   const handleEquipCostumeSet = () => {
@@ -371,40 +325,16 @@ export function GmModal({ isOpen, onClose, stats = {}, initialTab = "level" }) {
               </div>
 
               <div className="gm-section">
-                <span className="gm-section-title">{t("gm.equipment.booksTitle")}</span>
+                <span className="gm-section-title">{t("gm.equipment.sectTitle")}</span>
                 <p className="gm-desc" style={{ fontSize: "12px", color: "#d8c29d", margin: "0 0 10px 0", lineHeight: 1.4 }}>
-                  {t("gm.equipment.booksDesc")}
+                  {t("gm.equipment.sectDesc")}
                 </p>
                 <div className="gm-btn-grid">
                   <button
                     className="gm-btn gold"
-                    onClick={handleReceiveAllBooks}
+                    onClick={() => emitGmAction("learn_sect_skills")}
                   >
-                    📚 {t("gm.equipment.receiveAllBooks")}
-                  </button>
-                  <button
-                    className="gm-btn"
-                    onClick={() => handleReceiveSectBooks("thieu-lam")}
-                  >
-                    🥊 {t("gm.equipment.receiveThieuLamBooks")}
-                  </button>
-                  <button
-                    className="gm-btn"
-                    onClick={() => handleReceiveSectBooks("vo-dang")}
-                  >
-                    ⚔️ {t("gm.equipment.receiveVoDangBooks")}
-                  </button>
-                  <button
-                    className="gm-btn"
-                    onClick={() => handleReceiveSectBooks("nga-my")}
-                  >
-                    🌸 {t("gm.equipment.receiveNgaMyBooks")}
-                  </button>
-                  <button
-                    className="gm-btn"
-                    onClick={() => handleReceiveSectBooks("ngu-doc")}
-                  >
-                    🐍 {t("gm.equipment.receiveNguDocBooks")}
+                    📖 {t("gm.equipment.learnSect")}
                   </button>
                 </div>
               </div>

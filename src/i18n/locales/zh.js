@@ -194,6 +194,8 @@ export default {
     genderFemale: "女",
     factionLabel: "势力：",
     factionHint: "势力决定你的主城与中央战场上的盟友。",
+    sectLabel: "门派：",
+    sectHint: "门派决定初始武器与在武学面板（F5）中研习的招式。",
     factions: {
       ngo: "吴",
       han: "吴",
@@ -227,6 +229,24 @@ export default {
       deleted: "已删除角色“{name}”。"
     }
   },
+  sects: {
+    thieuLam: {
+      name: "少林",
+      desc: "少林：拳套、回复心法、掌法与护身阵法。"
+    },
+    voDang: {
+      name: "武当",
+      desc: "武当：道家剑法、太极剑气与提升攻击的心法。"
+    },
+    ngaMy: {
+      name: "峨眉",
+      desc: "峨眉：轻盈剑法、治疗之术与迅捷身法。"
+    },
+    nguDoc: {
+      name: "五毒",
+      desc: "五毒：毒刀法、追心毒针与爆发蛊虫。"
+    }
+  },
   skills: {
     handLeft: "左键",
     handRight: "右键",
@@ -238,7 +258,7 @@ export default {
       eyebrow: "绑定招式",
       title: "为{hand}选择招式",
       locked: "需要等级 {level}",
-      needsBook: "未学习——使用书籍学习"
+      learnable: "可研习"
     },
     mobilePicker: {
       eyebrow: "绑定招式",
@@ -261,7 +281,7 @@ export default {
       }
     },
     modalTitle: "武学面板",
-    modalHint: "当前武器招式树。选择一个招式查看详情，将它拖到下方快捷栏 1-9 格即可绑定对应按键。未学习的招式需要用怪物掉落的书籍解锁。",
+    modalHint: "你所属门派的招式树。选择一个招式查看详情，将它拖到下方快捷栏 1-9 格即可绑定对应按键。等级与前置条件满足的招式可直接在此消耗银两与经验研习。",
     dragHint: "将招式拖到下方快捷栏 1-9 格即可绑定对应按键。",
     bindToKey: "绑定到 [{key}]",
     bindLeft: "绑定左键",
@@ -277,19 +297,17 @@ export default {
     upgradeCost: "{price} · {exp} 经验",
     upgradeShort: "需要 {price}和 {exp} 经验",
     upgradeHint: "消耗银两与经验提升该技能等级。",
+    learn: "研习招式",
+    learnCost: "{price} · {exp} 经验",
+    learnShort: "需要 {price}和 {exp} 经验",
+    learnHint: "消耗银两与经验研习该招式。",
     maxLevel: "已达最高等级（{max}）",
     reqLevelTag: "需等级 {level}",
     levelShort: "提升此技能需要角色等级 {level}",
     tree: {
       requires: "需要先学习 {name}",
-      empty: "该武器暂无招式。",
+      empty: "该门派暂无招式。",
       selectHint: "选择一个招式格查看详情。"
-    },
-    kiem: {
-      kiemKhi: {
-        name: "剑气",
-        desc: "初始剑法，向目标射出一道剑气。所有新角色都会这一招。"
-      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -671,15 +689,9 @@ export default {
       getGlove: "浪客拳套",
       getSaber: "浪客长刀",
       receiveAllWeapons: "获取全套武器",
-      booksTitle: "武功秘籍（技能书）",
-      booksDesc: "获取各派武学秘籍至背包以研习技能。",
-      receiveAllBooks: "获取全部秘籍 (18本)",
-      receiveThieuLamBooks: "少林秘籍 (6)",
-      receiveVoDangBooks: "武当秘籍 (4)",
-      receiveNgaMyBooks: "峨眉秘籍 (4)",
-      receiveNguDocBooks: "五毒秘籍 (4)",
-      allBooksReceivedText: "已获取全部武学秘籍！",
-      allBooksReceivedLog: "已将全部18本武学秘籍放入背包。"
+      sectTitle: "门派武学",
+      sectDesc: "立即研习当前门派全部招式，不消耗银两与经验。",
+      learnSect: "研习本门派全部武学"
     },
     teleport: {
       receiveScroll: "获取 99x 回城符"

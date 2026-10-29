@@ -36,10 +36,12 @@ describe("skill level normalisation", () => {
   });
 
   it("reads a level out of a skillId -> level map, defaulting to 1", () => {
-    expect(skillLevelOf({ kiem_khi: 4 }, "kiem_khi")).toBe(4);
-    expect(skillLevelOf({ kiem_khi: 99 }, "kiem_khi")).toBe(MAX_SKILL_LEVEL);
-    expect(skillLevelOf({ kiem_khi: 4 }, "other")).toBe(1);
-    expect(skillLevelOf(null, "kiem_khi")).toBe(1);
+    expect(skillLevelOf({ thieu_duong_kiem_phap: 4 }, "thieu_duong_kiem_phap")).toBe(4);
+    expect(skillLevelOf({ thieu_duong_kiem_phap: 99 }, "thieu_duong_kiem_phap")).toBe(
+      MAX_SKILL_LEVEL
+    );
+    expect(skillLevelOf({ thieu_duong_kiem_phap: 4 }, "other")).toBe(1);
+    expect(skillLevelOf(null, "thieu_duong_kiem_phap")).toBe(1);
     expect(skillLevelOf({}, "")).toBe(1);
   });
 });
@@ -55,7 +57,7 @@ describe("skill level scaling", () => {
   });
 
   it("scales damage multiplier and effect magnitudes but not control durations", () => {
-    const base = skillById("kiem_khi");
+    const base = skillById("thieu_duong_kiem_phap");
     expect(skillAtLevel(base, 1)).toBe(base);
 
     const strong = skillAtLevel(base, MAX_SKILL_LEVEL);
@@ -136,7 +138,7 @@ describe("skill price by unlock level", () => {
     // The base tier is the study floor, so the two cannot drift apart.
     expect(SKILL_PRICE_UNLOCK_BASE).toBe(MIN_CHARACTER_LEVEL_TO_LEARN);
     // unlock 1 (starter) and unlock 10 both sit at the base tier.
-    expect(skillUnlockPriceFactor(skillById("kiem_khi"))).toBe(1);
+    expect(skillUnlockPriceFactor(skillById("thieu_duong_kiem_phap"))).toBe(1);
     expect(skillUnlockPriceFactor(skillById("thieu_lam_tam_phap"))).toBe(1);
     expect(skillUnlockPriceFactor({ unlockLevel: 18 })).toBeCloseTo(1.992);
     expect(skillUnlockPriceFactor({ unlockLevel: 26 })).toBeCloseTo(8.936);
@@ -201,7 +203,7 @@ describe("skill price by unlock level", () => {
 
   it("scales the book price by the same unlock factor", () => {
     // A starter book still costs 20 bạc / 30 EXP; rank 1 is not a free pass.
-    expect(skillLearnCost(skillById("kiem_khi"))).toEqual({
+    expect(skillLearnCost(skillById("thieu_duong_kiem_phap"))).toEqual({
       coinsBac: 20,
       coinsDong: 2000,
       exp: 30
@@ -220,7 +222,7 @@ describe("skill price by unlock level", () => {
   });
 
   it("keeps the shallow arts on the old curve", () => {
-    expect(skillUpgradeCost(1, skillById("kiem_khi"))).toEqual(skillUpgradeCost(1));
+    expect(skillUpgradeCost(1, skillById("thieu_duong_kiem_phap"))).toEqual(skillUpgradeCost(1));
     expect(skillUpgradeCost(9, { unlockLevel: 10 })).toEqual(skillUpgradeCost(9));
   });
 });
@@ -234,7 +236,7 @@ describe("character level per skill rank", () => {
   });
 
   it("floors every rank at the level-10 study minimum, then adds 4 levels per rank", () => {
-    const starter = skillById("kiem_khi");
+    const starter = skillById("thieu_duong_kiem_phap");
     expect(starter.unlockLevel).toBe(1);
 
     // Literal expectations, not derived from the constants: 10 .. 46 in steps of 4.

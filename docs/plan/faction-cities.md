@@ -52,8 +52,9 @@ Remaining work is listed under _Not done_.
 
 - [ ] Battlefield objective/scoring (capture points, per-faction score, rewards);
       this needs its own plan because it adds server state.
-- [ ] Book/weapon drops for the level 30–60 species (they pay EXP and coins
-      only, so the weapon kits stay unchanged).
+- [x] Book/weapon drops for the level 30–60 species — superseded: skill
+      books are gone (arts are studied in the F5 tree) and only the weapon
+      table remains.
 
 ## Goal & scope
 

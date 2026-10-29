@@ -90,10 +90,10 @@ portals, quest claim.
    `grantItem`, `consumeItem`, `equipFromBag`, `unequipToBag`, all validated by
    `getItemById` and `planEquip`.
 3. `handlePlayerJoin`: reject without a verified token and owned character
-   (`join_rejected`); derive gender, equipment, equipped weapon kit, learned
-   skills, level, HP/MP and stats from the DB; back-fill the starter sword and
-   `kiem_khi` for characters created before the weapon system; ignore the
-   client's `hp/mp/equipment/defense/attack/critRate/gender`. Send
+   (`join_rejected`); derive gender, equipment, equipped weapon, sect, learned
+   skills, level, HP/MP and stats from the DB; back-fill the sect's starting
+   weapon and starter art for characters created before the sect system; ignore
+   the client's `hp/mp/equipment/defense/attack/critRate/gender`. Send
    `player_progress`, `inventory_sync`, `equipment_sync`, `skills_sync`,
    `player_stats`.
 4. New authenticated `POST /api/state/import`, gated by `state_imported`: validate

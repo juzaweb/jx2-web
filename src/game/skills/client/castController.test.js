@@ -44,7 +44,7 @@ function makeCombat(overrides = {}) {
     channel: null,
     pendingCast: null,
     lastChaseAt: 0,
-    learnedSkills: new Set(["kiem_khi"]),
+    learnedSkills: new Set(["thieu_duong_kiem_phap"]),
     localPlayerId: "me",
     screenCastRange: () => 10000,
     ...overrides
@@ -66,7 +66,7 @@ function makeCombat(overrides = {}) {
 describe("SkillCastController", () => {
   it("caps reach to the camera view and to PvP distance for peers", () => {
     const { combat, cast } = makeCombat();
-    const sword = skillById("kiem_khi");
+    const sword = skillById("thieu_duong_kiem_phap");
 
     expect(cast.skillReach(sword)).toBe(sword.range);
     combat.screenCastRange = () => 100;
@@ -99,7 +99,9 @@ describe("SkillCastController", () => {
     ];
     const { cast } = makeCombat({ enemyManager: { getAlive: () => wolves } });
 
-    expect(cast.resolveTargets(skillById("kiem_khi")).map((wolf) => wolf.id)).toEqual(["near"]);
+    expect(
+      cast.resolveTargets(skillById("thieu_duong_kiem_phap")).map((wolf) => wolf.id)
+    ).toEqual(["near"]);
   });
 
   it("only returns flagged peers inside the area, and none for a peaceful hero", () => {

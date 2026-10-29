@@ -7,7 +7,7 @@ import {
   isInsideCastArea,
   resolveSkillHit,
   splashDamage,
-  studyRejection,
+  learnRejection,
   upgradeRejection
 } from "../src/game/skillCast.js";
 import { MAX_SKILL_LEVEL, characterLevelForSkillLevel, skillById } from "../../src/game/skills.js";
@@ -32,33 +32,38 @@ describe("server skill cast rules", () => {
   });
 
   it("refuses a skill from another weapon kit", () => {
-    const sword = skillById("kiem_khi");
+    const sword = skillById("thieu_duong_kiem_phap");
     assert.equal(castRejection(sword, player({ weaponType: "dao" })), "weapon");
   });
 
   it("refuses a skill the hero has not learned", () => {
-    const sword = skillById("kiem_khi");
-    // The starter is always known, so use a book skill instead.
-    const bookSkill = skillById("thieu_duong_kiem_phap");
-    assert.equal(castRejection(bookSkill, player()), "locked");
-    assert.equal(castRejection(bookSkill, player({ learnedSkills: ["thieu_duong_kiem_phap"] })), null);
-    assert.equal(castRejection(sword, player()), null);
+    const starter = skillById("thieu_duong_kiem_phap");
+    const unlearned = skillById("thai_cuc_quyen");
+    // The sect starter is always known, so a fresh hero may cast it.
+    assert.equal(castRejection(starter, player()), null);
+    assert.equal(castRejection(unlearned, player({ level: 30 })), "locked");
+    assert.equal(
+      castRejection(unlearned, player({ level: 30, learnedSkills: ["thai_cuc_quyen"] })),
+      null
+    );
   });
 
   it("allows a plain swing (null skill)", () => {
     assert.equal(castRejection(null, player()), null);
   });
 
-  it("explains why a book cannot be studied", () => {
-    assert.deepEqual(studyRejection(null, 10, []), { reason: "not_usable" });
-    assert.deepEqual(studyRejection(skillById("kiem_khi"), 10, []), { reason: "already_learned" });
+  it("explains why an art cannot be studied", () => {
+    assert.deepEqual(learnRejection(null, 10, []), { reason: "not_usable" });
+    assert.deepEqual(learnRejection(skillById("thieu_duong_kiem_phap"), 10, []), {
+      reason: "already_learned"
+    });
 
     const gated = skillById("tam_thanh_kiem_phap");
     // Own level met, prerequisite missing.
-    assert.equal(studyRejection(gated, 26, [])?.reason, "prereq");
+    assert.equal(learnRejection(gated, 26, [])?.reason, "prereq");
     // Prerequisite learned, own level still too low (the third sword art needs 26).
-    assert.equal(studyRejection(gated, 25, ["thai_cuc_quyen"])?.reason, "level");
-    assert.equal(studyRejection(gated, 26, ["thai_cuc_quyen"]), null);
+    assert.equal(learnRejection(gated, 25, ["thai_cuc_quyen"])?.reason, "level");
+    assert.equal(learnRejection(gated, 26, ["thai_cuc_quyen"]), null);
   });
 
   it("applies buffs and heals to the caster", () => {
@@ -84,10 +89,10 @@ describe("server skill cast rules", () => {
   });
 
   it("authorizes a hit only inside the cast's window and hit budget", () => {
-    const skill = skillById("kiem_khi");
+    const skill = skillById("thieu_duong_kiem_phap");
     const attacker = player({
       weaponType: "kiem",
-      learnedSkills: ["kiem_khi"],
+      learnedSkills: ["thieu_duong_kiem_phap"],
       lastCast: { skillId: skill.id, at: 1000, hits: 0, aim: { x: 10, y: 10 } }
     });
     const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
@@ -104,7 +109,10 @@ describe("server skill cast rules", () => {
 
   it("rejects a hit that does not follow an accepted cast", () => {
     const attacker = player({ lastCast: null, lastSwing: null });
-    assert.equal(resolveSkillHit(attacker, { attack: 10 }, 0, "kiem_khi", 0, Math.random), null);
+    assert.equal(
+      resolveSkillHit(attacker, { attack: 10 }, 0, "thieu_duong_kiem_phap", 0, Math.random),
+      null
+    );
   });
 
   it("consumes a plain swing exactly once", () => {
@@ -125,10 +133,13 @@ describe("server skill cast rules", () => {
   });
 
   it("deals a fraction of the primary damage on splash", () => {
-    const skill = skillById("kiem_khi");
+    const skill = skillById("la_han_quyen");
     const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
     const primary = resolveSkillHit(
       player({
+        weaponType: "bao-tay",
+        level: 20,
+        learnedSkills: ["la_han_quyen"],
         lastCast: { skillId: skill.id, at: 0, hits: 0, aim: { x: 0, y: 0 } }
       }),
       stats,
@@ -143,15 +154,18 @@ describe("server skill cast rules", () => {
   });
 
   it("keeps the splash fraction constant as the skill levels up", () => {
-    const skill = skillById("kiem_khi");
-    const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
+    const skill = skillById("la_han_quyen");
+    // A large attack keeps whole-damage rounding from distorting the ratio.
+    const stats = { attack: 1000, critRate: 0, critDamage: 1.5 };
     // Defense is subtracted after the multiplier, so use an unarmoured target to
     // isolate the multiplier scaling the level is responsible for.
     const ratioAt = (level) => {
       const primary = resolveSkillHit(
         player({
-          learnedSkills: ["kiem_khi"],
-          skillLevels: { kiem_khi: level },
+          weaponType: "bao-tay",
+          level: 20,
+          learnedSkills: ["la_han_quyen"],
+          skillLevels: { la_han_quyen: level },
           lastCast: { skillId: skill.id, at: 0, hits: 0, aim: { x: 0, y: 0 } }
         }),
         stats,
@@ -174,17 +188,17 @@ describe("server skill cast rules", () => {
     assert.equal(isInsideCastArea(cast, skill, { x: 1000, y: 1000 }, { x: 0, y: 0 }), true);
     assert.equal(isInsideCastArea(cast, skill, { x: 1000 + skill.radius + 500, y: 1000 }, { x: 0, y: 0 }), false);
     // A non-AoE cast is not constrained here.
-    assert.equal(isInsideCastArea(cast, skillById("kiem_khi"), { x: 0, y: 0 }, { x: 0, y: 0 }), true);
+    assert.equal(isInsideCastArea(cast, skillById("thieu_duong_kiem_phap"), { x: 0, y: 0 }, { x: 0, y: 0 }), true);
   });
 
   it("scales a hit with the caster's level in the skill", () => {
-    const skill = skillById("kiem_khi");
+    const skill = skillById("thieu_duong_kiem_phap");
     const stats = { attack: 100, critRate: 0, critDamage: 1.5 };
     const hitAt = (level) =>
       resolveSkillHit(
         player({
-          learnedSkills: ["kiem_khi"],
-          skillLevels: { kiem_khi: level },
+          learnedSkills: ["thieu_duong_kiem_phap"],
+          skillLevels: { thieu_duong_kiem_phap: level },
           lastCast: { skillId: skill.id, at: 0, hits: 0, aim: { x: 0, y: 0 } }
         }),
         stats,
@@ -210,39 +224,43 @@ describe("server skill cast rules", () => {
   });
 
   it("refuses an upgrade the hero cannot pay for, and stops at the cap", () => {
-    const skill = skillById("kiem_khi");
+    const skill = skillById("thieu_duong_kiem_phap");
 
     assert.deepEqual(upgradeRejection(null, player()), { reason: "not_usable" });
-    assert.equal(upgradeRejection(skillById("thieu_duong_kiem_phap"), player())?.reason, "not_learned");
+    assert.equal(upgradeRejection(skillById("thai_cuc_quyen"), player())?.reason, "not_learned");
 
     const maxed = player({
-      learnedSkills: ["kiem_khi"],
-      skillLevels: { kiem_khi: MAX_SKILL_LEVEL },
+      learnedSkills: ["thieu_duong_kiem_phap"],
+      skillLevels: { thieu_duong_kiem_phap: MAX_SKILL_LEVEL },
       progress: { coins: 1e9, exp: 1e9 }
     });
     assert.equal(upgradeRejection(skill, maxed)?.reason, "max_level");
 
-    const broke = player({ level: 20, learnedSkills: ["kiem_khi"], progress: { coins: 0, exp: 0 } });
+    const broke = player({
+      level: 20,
+      learnedSkills: ["thieu_duong_kiem_phap"],
+      progress: { coins: 0, exp: 0 }
+    });
     assert.equal(upgradeRejection(skill, broke)?.reason, "coins");
 
     const noExp = player({
       level: 20,
-      learnedSkills: ["kiem_khi"],
+      learnedSkills: ["thieu_duong_kiem_phap"],
       progress: { coins: 1e6, exp: 0 }
     });
     assert.equal(upgradeRejection(skill, noExp)?.reason, "exp");
 
     const rich = player({
       level: 20,
-      learnedSkills: ["kiem_khi"],
-      skillLevels: { kiem_khi: 1 },
+      learnedSkills: ["thieu_duong_kiem_phap"],
+      skillLevels: { thieu_duong_kiem_phap: 1 },
       progress: { coins: 1e6, exp: 1e6 }
     });
     assert.equal(upgradeRejection(skill, rich), null);
   });
 
   it("gates each skill rank behind a minimum character level", () => {
-    const skill = skillById("kiem_khi");
+    const skill = skillById("thieu_duong_kiem_phap");
     const progress = { coins: 1e6, exp: 1e6 };
 
     // Rank 2 needs character level 14, rank 6 needs 30 (study floor 10 + 4 * 5).
@@ -250,8 +268,8 @@ describe("server skill cast rules", () => {
 
     const tooLow = player({
       level: 29,
-      learnedSkills: ["kiem_khi"],
-      skillLevels: { kiem_khi: 5 },
+      learnedSkills: ["thieu_duong_kiem_phap"],
+      skillLevels: { thieu_duong_kiem_phap: 5 },
       progress
     });
     const gated = upgradeRejection(skill, tooLow);
@@ -262,8 +280,8 @@ describe("server skill cast rules", () => {
 
     const highEnough = player({
       level: 30,
-      learnedSkills: ["kiem_khi"],
-      skillLevels: { kiem_khi: 5 },
+      learnedSkills: ["thieu_duong_kiem_phap"],
+      skillLevels: { thieu_duong_kiem_phap: 5 },
       progress
     });
     assert.equal(upgradeRejection(skill, highEnough), null);

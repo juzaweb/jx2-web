@@ -9,8 +9,8 @@
  * `skills/client/vfx.js`, `skills/client/tree.js`, `skills/client/castController.js`.
  *
  * Layout:
- * - `catalog/`  authored skill data, one file per weapon kit
- * - `registry`  flat catalog, kits, id/slot lookups
+ * - `catalog/`  authored skill data, one file per sect
+ * - `registry`  flat catalog, sect kits, id/slot lookups
  * - `gating`    learned / learnable / usable / lock-reason rules
  * - `cost`      MP and cooldown, including test-mode overrides
  * - `levels`    skill levels (1..10): scaling, upgrade price and funds checks
@@ -24,9 +24,9 @@ export { SKILLS, SKILL_KITS } from "./catalog/index.js";
 export {
   SKILL_SLOTS,
   BASIC_ATTACK_ID,
-  SKILLS_BY_WEAPON,
+  SKILLS_BY_SECT,
   normalizeWeaponType,
-  skillsForWeapon,
+  skillsForSect,
   skillById,
   skillForSlot,
   skillSlot

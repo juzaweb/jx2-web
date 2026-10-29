@@ -1,5 +1,5 @@
 /**
- * Skill registry: the flat catalog, per-weapon kits and id/slot lookups.
+ * Skill registry: the flat catalog, per-sect kits and id/slot lookups.
  */
 
 import { normalizeWeaponType } from "../weapons.js";
@@ -11,8 +11,8 @@ export const SKILL_SLOTS = 6;
 /** Skill ids that are not real skills, resolved by the server as a plain attack. */
 export const BASIC_ATTACK_ID = "normal";
 
-/** Skill lists keyed by weapon type id. */
-export const SKILLS_BY_WEAPON = SKILL_KITS;
+/** Skill lists keyed by sect id. */
+export const SKILLS_BY_SECT = SKILL_KITS;
 
 /** id -> skill entry. Internal lookup table shared by the helper modules. */
 export const SKILLS_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]));
@@ -21,19 +21,22 @@ export const SKILLS_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]));
 const SLOT_INDEX_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill.slot]));
 
 /**
- * Normalise a caller-supplied weapon id to a known kit id.
+ * Normalise a caller-supplied weapon id to a known weapon type.
  * @param {*} weapon
  * @returns {string}
  */
 export { normalizeWeaponType };
 
 /**
- * All skills authored for a weapon, ordered by slot.
- * @param {string} weapon
+ * All skills authored for a sect, ordered by slot. An unknown sect yields an
+ * empty list rather than silently borrowing another sect's kit; callers that
+ * hold a raw stored value normalise it with `normalizeSect` first.
+ * @param {string} sect
  * @returns {Object[]}
  */
-export function skillsForWeapon(weapon) {
-  return SKILLS_BY_WEAPON[normalizeWeaponType(weapon)] || [];
+export function skillsForSect(sect) {
+  if (typeof sect !== "string") return [];
+  return SKILLS_BY_SECT[sect] || [];
 }
 
 /**
@@ -47,13 +50,13 @@ export function skillById(id) {
 }
 
 /**
- * Skill assigned to a slot of a weapon's kit, if any.
- * @param {string} weapon
+ * Skill assigned to a slot of a sect's kit, if any.
+ * @param {string} sect
  * @param {number} slot
  * @returns {Object|undefined}
  */
-export function skillForSlot(weapon, slot) {
-  return skillsForWeapon(weapon).find((skill) => skill.slot === slot);
+export function skillForSlot(sect, slot) {
+  return skillsForSect(sect).find((skill) => skill.slot === slot);
 }
 
 /**

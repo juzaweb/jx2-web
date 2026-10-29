@@ -51,13 +51,12 @@ npm run test:watch
 ```
 
 ### Design Notes
-See `docs/weapon-skills.md` for the weapon-kit model, book learning, drop tables and how to add a new skill, weapon or book.
+See `docs/sect-skills.md` for the sect model (sect → weapon → skill kit), studying arts in the F5 panel, the weapon drop table and how to add a new sect or art.
 
 ## Controls
 - **Move:** `W`, `A`, `S`, `D`, Arrow keys, or left-click the map (hold to follow the cursor)
 - **Basic Attack:** `Space` or left-click an enemy
-- **Kiếm Khí (sword):** a ranged art (1000 px) that throws a blade-shaped shard of qi at the victim, exploding in a spreading blast that also damages every monster caught in its 220 px radius for a fraction of the hit. It is the starter skill, so it is cast from the hotbar like any other technique.
-- **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind. A hero may only cast the skills of the weapon in the `weapon` slot; study books dropped by monsters to learn the rest.
+- **Skills (hotbar `1`–`9`):** open `F5` (Võ Công), drag a technique onto a numbered slot, then press that number to cast towards the cursor / nearest enemy. Right-click a slot to unbind. A hero may only cast the arts of the sect they joined, and studying an art costs silver + EXP in the same panel.
 - **Consumables (hotbar `1`–`9`):** drag potions or scrolls from the bag onto a slot, then press the number to use them.
 - **Talk to NPC:** `F`
 - **Character:** `F3` · **Inventory:** `F4` · **Skills:** `F5`

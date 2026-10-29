@@ -860,11 +860,11 @@ describe("skill targeting", () => {
     combat.setLocalPlayerId("me");
     combat.showFloatText = vi.fn();
 
-    combat.applySkillToPlayer({ id: "kiem_khi", nameKey: "skills.kiem_khi", mult: 1.5, vfx: {} }, locked);
+    combat.applySkillToPlayer({ id: "thieu_duong_kiem_phap", nameKey: "skills.voDang", mult: 1.5, vfx: {} }, locked);
 
     expect(scene.networkClient.sendPlayerHit).toHaveBeenCalledWith({
       targetId: "locked",
-      skill: "kiem_khi"
+      skill: "thieu_duong_kiem_phap"
     });
     expect(locked.hp).toBe(100);
 
@@ -882,7 +882,7 @@ describe("skill targeting", () => {
     combat.setLocalPlayerId("me");
     combat.showFloatText = vi.fn();
 
-    combat.applySkillToPlayer({ id: "kiem_khi", nameKey: "skills.kiem_khi", mult: 1.5, vfx: {} }, far);
+    combat.applySkillToPlayer({ id: "thieu_duong_kiem_phap", nameKey: "skills.voDang", mult: 1.5, vfx: {} }, far);
 
     expect(scene.networkClient.sendPlayerHit).not.toHaveBeenCalled();
     expect(ui.addLog).toHaveBeenCalled();

@@ -94,17 +94,16 @@ test("a single-target skill does not splash", () => {
   assert.equal(nearby.hp, 1000);
 });
 
-test("Kiếm Khí's blast splashes reduced damage onto monsters caught in it", () => {
+test("La Hán Quyền's splash only deals a fraction of the primary hit", () => {
   const primary = wolf("primary", 100);
   const nearby = wolf("nearby", 250);
   const far = wolf("far", 1000);
   const { manager } = makeManager({
     enemies: [primary, nearby, far],
-    castSkillId: "kiem_khi",
-    playerWeapon: "kiem"
+    castSkillId: "la_han_quyen"
   });
 
-  manager.handleEnemyHit("ws", { id: "primary", skill: "kiem_khi" });
+  manager.handleEnemyHit("ws", { id: "primary", skill: "la_han_quyen" });
 
   const primaryDamage = 1000 - primary.hp;
   const splashDamage = 1000 - nearby.hp;
@@ -126,12 +125,11 @@ test("a levelled skill scales the primary and the splash by the same factor", ()
     const nearby = wolf("nearby", 250);
     const { manager } = makeManager({
       enemies: [primary, nearby],
-      castSkillId: "kiem_khi",
-      playerWeapon: "kiem",
-      skillLevels: { kiem_khi: level }
+      castSkillId: "la_han_quyen",
+      skillLevels: { la_han_quyen: level }
     });
 
-    manager.handleEnemyHit("ws", { id: "primary", skill: "kiem_khi" });
+    manager.handleEnemyHit("ws", { id: "primary", skill: "la_han_quyen" });
     return { primary: 1000 - primary.hp, splash: 1000 - nearby.hp };
   };
 

@@ -165,14 +165,14 @@ export function skillUsable(skill, level, learned) {
  *
  * `{ kind: "level", level }` means the character level is still too low;
  * `{ kind: "prereq", id, nameKey, level }` means another skill must be learned
- * first; `{ kind: "book" }` means the prerequisites are met but the skill has
- * not been studied from its book yet. An unknown skill id yields `null`.
+ * first; `{ kind: "learn" }` means the prerequisites are met and the art only
+ * has to be studied from the F5 skill tree. An unknown skill id yields `null`.
  *
  * @param {Object|string} skill
  * @param {number} level
  * @param {Iterable<string>|Set<string>|null} [learned=null] learned skill ids;
  *   pass null for the legacy level-only gate.
- * @returns {{ kind: "level"|"prereq"|"book", level?: number, id?: string,
+ * @returns {{ kind: "level"|"prereq"|"learn", level?: number, id?: string,
  *   nameKey?: string }|null}
  */
 export function skillLockReason(skill, level, learned = null) {
@@ -183,7 +183,7 @@ export function skillLockReason(skill, level, learned = null) {
   const learnedSet = toLearnedSet(learned);
   const known = knowsEntry(entry, learnedSet);
 
-  // An art the hero does not know yet is gated by its book requirement (the
+  // An art the hero does not know yet is gated by its study requirement (the
   // catalog level, floored at the study minimum); a known art by its own
   // unlockLevel, which is exactly what `skillUsable` enforces before a cast, so
   // the tree and the cast gate can never disagree.
@@ -198,7 +198,7 @@ export function skillLockReason(skill, level, learned = null) {
     if (!known) {
       const missing = skillMissingPrereq(entry, learnedSet);
       if (missing) return { kind: "prereq", ...missing };
-      return { kind: "book" };
+      return { kind: "learn" };
     }
     return null;
   }

@@ -252,6 +252,15 @@ export class NetworkClient {
   }
 
   /**
+   * Ask the server to study one art of the hero's sect. The sect, the
+   * level/prerequisites and the silver/EXP price are all server-owned.
+   * @param {{skillId:string}} request
+   */
+  sendSkillLearn(request) {
+    this.send("learn_skill", request);
+  }
+
+  /**
    * Ask the server to accept a newbie quest at its giver NPC.
    * @param {{questId:string, npcId:string}} request
    */

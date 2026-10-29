@@ -317,12 +317,12 @@ describe("playSkillCastVfx sprite playback", () => {
   });
 });
 
-describe("playSkillCastVfx sword-qi sprite sheet", () => {
-  const kiemKhi = () => ({
+describe("playSkillCastVfx travelling sprite sheet", () => {
+  const travelSheet = () => ({
     range: 840,
     splash: { radius: 170, mult: 0.6, maxTargets: 4 },
     vfx: {
-      sprite: "vfx-kiem-khi",
+      sprite: "vfx-test-sheet",
       travelFrames: 1,
       impact: null,
       rotateToTarget: true,
@@ -336,7 +336,7 @@ describe("playSkillCastVfx sword-qi sprite sheet", () => {
     const { scene, animConfigs } = makeScene({ frameTotal: 5 });
     scene.add.sprite = () => makeSprite();
 
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
+    playSkillCastVfx(scene, makePlayer(), travelSheet(), { x: 900, y: 100 });
 
     expect(animConfigs).toHaveLength(2);
     expect(animConfigs[0].frames).toHaveLength(1);
@@ -350,7 +350,7 @@ describe("playSkillCastVfx sword-qi sprite sheet", () => {
     const sprite = makeSprite();
     scene.add.sprite = () => sprite;
 
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 100, y: 200 });
+    playSkillCastVfx(scene, makePlayer(), travelSheet(), { x: 100, y: 200 });
 
     expect(sprite.setRotation).toHaveBeenCalledWith(Math.PI / 2);
   });
@@ -373,12 +373,12 @@ describe("playSkillCastVfx sword-qi sprite sheet", () => {
     const sprite = makeSprite();
     scene.add.sprite = () => sprite;
 
-    playSkillCastVfx(scene, makePlayer(), kiemKhi(), { x: 900, y: 100 });
+    playSkillCastVfx(scene, makePlayer(), travelSheet(), { x: 900, y: 100 });
 
     const baseScale = (90 * 1.8) / 256;
     tweenConfig.value.onComplete();
 
-    expect(sprite.play).toHaveBeenLastCalledWith("vfx-kiem-khi-impact");
+    expect(sprite.play).toHaveBeenLastCalledWith("vfx-test-sheet-impact");
     expect(sprite.setScale).toHaveBeenLastCalledWith(baseScale * 1.8);
     sprite.once.mock.calls[0][1]();
     expect(sprite.destroy).toHaveBeenCalled();

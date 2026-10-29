@@ -37,7 +37,8 @@ import {
   moveQuickSlot,
   skillBinding
 } from "./game/quickSlots.js";
-import { skillsForWeapon } from "./game/skills.js";
+import { skillsForSect } from "./game/skills.js";
+import { DEFAULT_SECT, normalizeSect } from "./game/sects.js";
 import {
   applyQuantities,
   bagQuantity,
@@ -213,6 +214,9 @@ export function App() {
   const [learnedSkills, setLearnedSkills] = useState([]);
   // skill id -> level (1..MAX_SKILL_LEVEL), mirrored from `skills_sync`.
   const [skillLevels, setSkillLevels] = useState({});
+  // Sect published by the server with `skills_sync`; it wins over the cached
+  // session copy, which may predate the sect system.
+  const [serverSect, setServerSect] = useState(null);
 
   // Bridge subscriptions live for the whole session, so they read the latest user
   // through this ref instead of a stale render's closure.
@@ -221,10 +225,12 @@ export function App() {
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  // Switching characters loads that hero's hotbar assignments (items or skills).
+  // Switching characters loads that hero's hotbar assignments (items or skills)
+  // and clears the sect cached from the previous hero's `skills_sync`.
   useEffect(() => {
     const loadedQuickSlots = loadQuickSlots(activeCharacter?.id);
     setQuickSlots(loadedQuickSlots);
+    setServerSect(null);
     bridge.emit(EVENTS.SET_QUICK_SLOTS, loadedQuickSlots);
   }, [activeCharacter?.id]);
 
@@ -276,6 +282,13 @@ export function App() {
   const handleUpgradeSkill = useCallback((skillId) => {
     if (!skillId) return;
     bridge.emit(EVENTS.ACTION_UPGRADE_SKILL, { skillId });
+  }, []);
+
+  // Studying is server-owned too: the panel names the art, the server checks the
+  // sect, the level/prerequisites and the silver + EXP price before recording it.
+  const handleLearnSkill = useCallback((skillId) => {
+    if (!skillId) return;
+    bridge.emit(EVENTS.ACTION_LEARN_SKILL, { skillId });
   }, []);
 
   // Re-sync the cached session against the authoritative profile so an out-of-band
@@ -404,6 +417,7 @@ export function App() {
     const unsubSkills = bridge.on(EVENTS.SKILLS_UPDATED, (next) => {
       setLearnedSkills(Array.isArray(next?.skills) ? next.skills : []);
       setSkillLevels(next?.levels && typeof next.levels === "object" ? next.levels : {});
+      if (typeof next?.sect === "string" && next.sect) setServerSect(next.sect);
     });
 
     const unsubStarted = bridge.on(EVENTS.GAME_STARTED, () => {
@@ -925,8 +939,11 @@ export function App() {
   }, [resetToLogin, t]);
 
   // The equipped weapon selects the skill kit shown in the HUD and the F5 tree.
+  // The hero's sect owns the skill kit; the worn weapon only decides the rig and
+  // whether a cast is allowed (the server enforces the weapon gate).
+  const sect = normalizeSect(serverSect || activeCharacter?.sect || DEFAULT_SECT);
   const weaponType = equippedWeaponType(equipment) || "kiem";
-  const weaponSkills = skillsForWeapon(weaponType);
+  const sectSkills = skillsForSect(sect);
 
   return (
     <main id="game-shell">
@@ -1014,7 +1031,7 @@ export function App() {
           onTogglePk={handleTogglePk}
           pkEnabled={pkEnabled}
           playerMp={stats.mp}
-          skills={weaponSkills}
+          skills={sectSkills}
         />
 
         <MobileControls
@@ -1027,7 +1044,7 @@ export function App() {
           onInteractNpc={() => bridge.emit(EVENTS.ACTION_INTERACT_NPC)}
           nearbyNpc={nearbyNpc}
           playerMp={stats.mp}
-          skills={weaponSkills}
+          skills={sectSkills}
           skillSlots={mobileSkillsPicker.bindings}
           items={mobileItemOptions}
           itemSlots={mobileItemsPicker.bindings}
@@ -1128,8 +1145,9 @@ export function App() {
       <SkillsModal
         isOpen={isSkillsOpen}
         onClose={handleCloseSkills}
-        skills={weaponSkills}
+        skills={sectSkills}
         weapon={weaponType}
+        sect={sect}
         learnedSkills={learnedSkills}
         skillLevels={skillLevels}
         level={stats.level}
@@ -1138,13 +1156,14 @@ export function App() {
         quickSlotsMapping={quickSlots}
         onAssignSkill={handleAssignSkill}
         onUpgradeSkill={handleUpgradeSkill}
+        onLearnSkill={handleLearnSkill}
       />
 
       {/* Mobile arc skill picker (tap "+" on a mobile skill button) */}
       <MobileSkillPicker
         isOpen={mobileSkillsPicker.isPickerOpen}
         slotIndex={mobileSkillsPicker.pickerIndex ?? 0}
-        skills={weaponSkills}
+        skills={sectSkills}
         level={stats.level}
         learnedSkills={learnedSkills}
         selectedSkillId={mobileSkillsPicker.selectedId}

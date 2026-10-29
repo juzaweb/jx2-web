@@ -5,7 +5,7 @@ import { MAX_LEVEL, MIN_LEVEL } from "./progression.js";
 import { PVP_ATTACK_RANGE, PVP_MODE } from "./pvp.js";
 import { effectiveSkillMpCost, skillById } from "./skills.js";
 
-export const BOT_SKILL_ID = "kiem_khi";
+export const BOT_SKILL_ID = "thieu_duong_kiem_phap";
 
 export const BOT_NAMES = Object.freeze([
   "Hắc Y Kiếm Sĩ",

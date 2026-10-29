@@ -130,7 +130,48 @@ describe("Character API Test Suite", () => {
     assert.equal(res.status, 400);
   });
 
-  test("a new character starts with the shared starter kit", async () => {
+  test("POST /users/:id/characters stores the chosen sect", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const res = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ name: "Thiếu Lâm Tăng", sect: "thieu-lam" })
+    });
+    assert.equal(res.status, 201);
+    const json = await res.json();
+    assert.equal(json.data.character.sect, "thieu-lam");
+  });
+
+  test("POST /users/:id/characters defaults the sect and rejects an unknown one", async () => {
+    const userId = nextUser();
+    const token = createSessionToken(userId);
+    const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ name: "Vô Môn Phái" })
+    }).then((r) => r.json());
+    assert.equal(created.data.character.sect, "vo-dang");
+
+    const otherUserId = nextUser();
+    const refused = await fetch(`${baseUrl}/users/${otherUserId}/characters`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${createSessionToken(otherUserId)}`
+      },
+      body: JSON.stringify({ name: "Tà Phái", sect: "ma-giao" })
+    });
+    assert.equal(refused.status, 400);
+  });
+
+  test("a new character starts with the shared starter kit and its sect art", async () => {
     const userId = nextUser();
     const token = createSessionToken(userId);
     const created = await fetch(`${baseUrl}/users/${userId}/characters`, {
@@ -147,12 +188,25 @@ describe("Character API Test Suite", () => {
       { headers: { Authorization: `Bearer ${token}` } }
     ).then((r) => r.json());
 
-    // The starter sword is equipped at creation, so only consumables remain in the bag.
+    // The sect's starting weapon is equipped at creation, so only consumables
+    // remain in the bag.
     assert.deepEqual(bag.data.inventory, {
       "kim-sang-duoc": 50,
       "dai-hoan-dan": 50,
       "hoi-thanh-phu": 50
     });
+
+    const { store } = await import("../src/data/playerDb.js");
+    assert.ok(
+      store.getLearnedSkills(created.data.character.id).includes("thieu_duong_kiem_phap"),
+      "the Võ Đang starter art is known from creation"
+    );
+    // The weapon is granted and worn before the first join, not back-filled later.
+    assert.equal(
+      store.getEquipment(created.data.character.id).weapon,
+      "kiem-lang-khach",
+      "the sect's starting weapon is equipped at creation"
+    );
   });
 
   test("an admin account receives the GM item in the starter kit", async () => {

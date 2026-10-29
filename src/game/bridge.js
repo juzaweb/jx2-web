@@ -104,6 +104,8 @@ export const EVENTS = {
   ACTION_CAST_SKILL: "ACTION_CAST_SKILL",
   /** Ask the server to raise a skill by one level (payload: {skillId}). */
   ACTION_UPGRADE_SKILL: "ACTION_UPGRADE_SKILL",
+  /** Ask the server to study one art of the hero's sect (payload: {skillId}). */
+  ACTION_LEARN_SKILL: "ACTION_LEARN_SKILL",
   /** Newbie quest commands (payload: {questId?, npcId?}). */
   ACTION_QUEST_ACCEPT: "ACTION_QUEST_ACCEPT",
   ACTION_QUEST_TALK: "ACTION_QUEST_TALK",
@@ -132,7 +134,7 @@ export const EVENTS = {
   ACTION_REQUEST_CITY_MAP: "ACTION_REQUEST_CITY_MAP",
   SET_PLAYER_NAME: "SET_PLAYER_NAME",
   SET_PLAYER_GENDER: "SET_PLAYER_GENDER",
-  /** Ask the scene to use a weapon's skill kit (payload: weaponType). */
+  /** Ask the scene to use a sect's skill kit (payload: weaponType). */
   SET_PLAYER_WEAPON: "SET_PLAYER_WEAPON",
   ACTION_CHAT: "ACTION_CHAT",
   ACTION_GM: "ACTION_GM",

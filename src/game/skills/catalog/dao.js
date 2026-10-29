@@ -1,20 +1,20 @@
 /**
- * Đao (saber) kit — the Ngũ Độc school, focused on poison-themed strikes and a
- * critical-rate internal art.
+ * Ngũ Độc (đao / saber) kit — poison-themed strikes and a critical-rate
+ * internal art. Slot 0 is the sect starter.
  */
 
 import { defineSkill } from "../schema.js";
 
-export const DAO_SKILLS = [
+export const NGU_DOC_SKILLS = [
   defineSkill({
     id: "ngu_doc_tam_phap",
     weapon: "dao",
     slot: 0,
-    book: { viName: "Ngũ Độc Đao Pháp", dropTiers: ["da-lang"] },
     glyph: "毒",
     nameKey: "skills.nguDoc.nguDocTamPhap.name",
     descKey: "skills.nguDoc.nguDocTamPhap.desc",
-    unlockLevel: 10,
+    unlockLevel: 1,
+    starter: true,
     mp: 6,
     cooldown: 1500,
     target: "enemy",
@@ -26,7 +26,6 @@ export const DAO_SKILLS = [
     id: "truy_tam_doc",
     weapon: "dao",
     slot: 1,
-    book: { viName: "Truy Tâm Độc", dropTiers: ["da-lang", "lam-tac"] },
     glyph: "心",
     requires: [{ id: "ngu_doc_tam_phap", level: 1 }],
     nameKey: "skills.nguDoc.truyTamDoc.name",
@@ -43,10 +42,6 @@ export const DAO_SKILLS = [
     id: "van_doc_chieu_hong",
     weapon: "dao",
     slot: 2,
-    book: {
-      viName: "Vạn Độc Triệu Cổ",
-      dropTiers: ["lam-tac", "hac-y-sat-thu", "thiet-giap-binh"]
-    },
     glyph: "蛊",
     requires: [{ id: "truy_tam_doc", level: 1 }],
     nameKey: "skills.nguDoc.vanDocChieuHong.name",
@@ -63,10 +58,6 @@ export const DAO_SKILLS = [
     id: "u_hong_phiet_anh",
     weapon: "dao",
     slot: 3,
-    book: {
-      viName: "U Hồn Phiệt Ảnh",
-      dropTiers: ["thiet-giap-binh", "ma-giao-de-tu", "tuyet-lang", "son-tac-dau-linh"]
-    },
     glyph: "影",
     requires: [{ id: "van_doc_chieu_hong", level: 2 }],
     nameKey: "skills.nguDoc.uHongPhietAnh.name",

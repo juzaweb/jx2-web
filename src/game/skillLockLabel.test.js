@@ -18,7 +18,7 @@ describe("skillLockLabel", () => {
   it("formats a pre-computed reason", () => {
     expect(formatSkillLock(null, t)).toBe("");
     expect(formatSkillLock({ kind: "level", level: 4 }, t)).toBe("level:4");
-    expect(formatSkillLock({ kind: "book" }, t)).toBe("skills.picker.needsBook");
+    expect(formatSkillLock({ kind: "learn" }, t)).toBe("skills.picker.learnable");
     expect(
       formatSkillLock({ kind: "prereq", nameKey: "skills.thieuLam.thieuLamTamPhap.name", level: 5 }, t)
     ).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
@@ -37,11 +37,11 @@ describe("skillLockLabel", () => {
     expect(skillLockLabel(gated, 1, null, t)).toBe("prereq:Thiếu Lâm Tâm Pháp@5");
   });
 
-  it("labels an unlearned skill as needing a book once its level is met", () => {
+  it("labels an unlearned skill as studyable once its level is met", () => {
     // la_han_quyen opens at the level-10 study floor.
     expect(skillLockLabel(skillById("la_han_quyen"), 9, [], t)).toBe("level:10");
     expect(skillLockLabel(skillById("la_han_quyen"), 10, [], t)).toBe(
-      "skills.picker.needsBook"
+      "skills.picker.learnable"
     );
   });
 });

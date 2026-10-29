@@ -193,6 +193,8 @@ export default {
     genderFemale: "Female",
     factionLabel: "Faction:",
     factionHint: "Your faction decides your home city and your allies on the central battlefield.",
+    sectLabel: "Sect:",
+    sectHint: "Your sect decides the starting weapon and the skill kit you study in the Martial Arts panel (F5).",
     factions: {
       ngo: "Wu",
       han: "Wu",
@@ -226,6 +228,24 @@ export default {
       deleted: 'Deleted character "{name}".'
     }
   },
+  sects: {
+    thieuLam: {
+      name: "Shaolin",
+      desc: "Shaolin: fists, healing internal art, palm strikes and a protective formation."
+    },
+    voDang: {
+      name: "Wudang",
+      desc: "Wudang: Taoist swordplay, Taiji sword qi and an attack-boosting internal art."
+    },
+    ngaMy: {
+      name: "Emei",
+      desc: "Emei: graceful swordplay, restorative arts and swift movement."
+    },
+    nguDoc: {
+      name: "Five Poisons",
+      desc: "Five Poisons: venomous saber arts, heart-piercing needles and bursting gu insects."
+    }
+  },
   skills: {
     handLeft: "Left click",
     handRight: "Right click",
@@ -237,7 +257,7 @@ export default {
       eyebrow: "Assign skill",
       title: "Choose a skill for {hand}",
       locked: "Requires level {level}",
-      needsBook: "Not learned — study a book"
+      learnable: "Ready to study"
     },
     mobilePicker: {
       eyebrow: "Assign skill",
@@ -260,7 +280,7 @@ export default {
       }
     },
     modalTitle: "Martial Arts",
-    modalHint: "Skill tree for the equipped weapon. Select a skill for details, then drag it onto hotbar slots 1-9 to bind it to that key. Unlearned skills unlock by studying books dropped by monsters.",
+    modalHint: "Skill tree of the sect you joined. Select a skill for details, then drag it onto hotbar slots 1-9 to bind it to that key. An art whose level and prerequisites are met can be studied right here for silver and EXP.",
     dragHint: "Drag a skill onto hotbar slots 1-9 to bind it to that number key.",
     bindToKey: "Assign to [{key}]",
     bindLeft: "Assign Left Click",
@@ -276,19 +296,17 @@ export default {
     upgradeCost: "{price} · {exp} EXP",
     upgradeShort: "Requires {price} and {exp} EXP",
     upgradeHint: "Spend silver and EXP to raise this skill's level.",
+    learn: "Study skill",
+    learnCost: "{price} · {exp} EXP",
+    learnShort: "Requires {price} and {exp} EXP",
+    learnHint: "Spend silver and EXP to study this art.",
     maxLevel: "Max level reached ({max})",
     reqLevelTag: "Requires Lv {level}",
     levelShort: "Character level {level} required to raise this skill",
     tree: {
       requires: "Learn {name} first",
-      empty: "This weapon has no skills yet.",
+      empty: "This sect has no arts yet.",
       selectHint: "Select a skill tile to see its details."
-    },
-    kiem: {
-      kiemKhi: {
-        name: "Sword Qi",
-        desc: "Starter sword skill: fire a blade of qi at the target. Every new hero knows it."
-      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -670,15 +688,9 @@ export default {
       getGlove: "Wanderer Gloves",
       getSaber: "Wanderer Saber",
       receiveAllWeapons: "Receive All Weapons",
-      booksTitle: "Martial Arts Skill Books",
-      booksDesc: "Receive sect skill books to inventory to study skills.",
-      receiveAllBooks: "Receive All Skill Books (18)",
-      receiveThieuLamBooks: "Shaolin Books (6)",
-      receiveVoDangBooks: "Wudang Books (4)",
-      receiveNgaMyBooks: "Emei Books (4)",
-      receiveNguDocBooks: "Five Poisons Books (4)",
-      allBooksReceivedText: "Received all martial skill books!",
-      allBooksReceivedLog: "Received all 18 skill books to inventory."
+      sectTitle: "Sect Martial Arts",
+      sectDesc: "Study every art of the hero's current sect at once, free of silver and EXP.",
+      learnSect: "Study Every Art of My Sect"
     },
     teleport: {
       receiveScroll: "Receive 99x Return City Talisman"

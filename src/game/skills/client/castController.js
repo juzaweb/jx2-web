@@ -25,7 +25,7 @@ import {
   skillLevelOf,
   skillLockReason,
   skillUsable,
-  skillsForWeapon
+  skillById
 } from "../index.js";
 import {
   channelDurationMs,
@@ -74,10 +74,10 @@ export class SkillCastController {
    * @returns {boolean}
    */
   castSkillById(skillId, aim = null) {
-    const skill = skillsForWeapon(this.combat.player.weaponType).find(
-      (entry) => entry.id === skillId
-    );
-    if (!skill) {
+    const skill = skillById(skillId);
+    // The server re-checks the sect and the worn weapon; the client only avoids
+    // sending a cast that cannot land (a stale hotbar binding, for instance).
+    if (!skill || skill.weapon !== this.combat.player.weaponType) {
       this.combat.ui.addLog("Vũ khí đang trang bị không có chiêu thức này.");
       return false;
     }

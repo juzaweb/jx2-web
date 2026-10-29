@@ -11,8 +11,6 @@
  * 3-9 coins so the existing server reward tests keep their expectations.
  */
 
-import { SKILLS } from "./skills.js";
-
 /**
  * @typedef {object} MonsterVisual
  * @property {"beast"|"humanoid"|"armored"|"boss"} kind
@@ -890,64 +888,8 @@ export const MONSTERS = {
 export const MONSTER_IDS = Object.keys(MONSTERS);
 
 /**
- * Probability that a kill drops one book, per monster. The book *pool* itself is
- * derived from each skill's `book.dropTiers`, so adding a skill to a hunting
- * tier only touches the skill entry (in `skills/catalog/`).
- * @type {Readonly<Record<string, number>>}
- */
-export const MONSTER_BOOK_CHANCES = Object.freeze({
-  "son-ca": 0.03,
-  "soi-xam": 0.03,
-  "da-lang": 0.04,
-  "lam-tac": 0.05,
-  "hac-y-sat-thu": 0.06,
-  "thiet-giap-binh": 0.08,
-  "ma-giao-de-tu": 0.1,
-  // Late-game hunting grounds drop the rank-4 and ultimate books, so a hero can
-  // only farm the art it is actually high enough level to study.
-  "tuyet-lang": 0.08,
-  "son-tac-dau-linh": 0.09,
-  "kim-giap-binh": 0.08,
-  "huyet-ma": 0.1,
-  "nga-mi-kiem-nu": 0.08,
-  "bang-tam-yeu": 0.1
-});
-
-/**
- * Skill books each monster can drop, grouped by the hunting tier it belongs to.
- * The starter skill (Kiếm Khí) has no book and is therefore never in a pool.
- * `chance` is the probability that a kill drops one book from the pool.
- * @type {Readonly<Record<string, { chance: number, skills: string[] }>>}
- */
-export const MONSTER_BOOK_DROPS = Object.freeze(
-  Object.fromEntries(
-    Object.entries(MONSTER_BOOK_CHANCES).map(([monsterId, chance]) => [
-      monsterId,
-      Object.freeze({
-        chance,
-        skills: Object.freeze(
-          SKILLS.filter((skill) => skill.book?.dropTiers?.includes(monsterId)).map(
-            (skill) => skill.id
-          )
-        )
-      })
-    ])
-  )
-);
-
-/**
- * Book-drop group for a monster, or null when it drops none.
- * @param {string} [monsterId]
- * @returns {{ chance: number, skills: string[] }|null}
- */
-export function bookDropsFor(monsterId) {
-  return MONSTER_BOOK_DROPS[monsterId] || null;
-}
-
-/**
- * Weapons a monster can drop. Weapon drops are rarer than books: this is how a
- * hero switches to a different kit (gloves/saber) and unlocks that weapon's
- * learned skills.
+ * Weapons a monster can drop. Skills are learned from the F5 tree, so a kill
+ * never hands out a book: the only item loot left is this rare weapon drop.
  * @type {Readonly<Record<string, { chance: number, itemId: string }>>}
  */
 export const MONSTER_WEAPON_DROPS = Object.freeze({

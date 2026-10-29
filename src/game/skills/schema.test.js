@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   EFFECT_KINDS,
   SKILLS,
-  SKILLS_BY_WEAPON,
+  SKILLS_BY_SECT,
   skillById,
   validateSkillCatalog
 } from "./index.js";
@@ -28,10 +28,10 @@ function collectJsFiles(dir) {
 
 describe("skill catalog schema", () => {
   it("keeps the catalog structurally valid", () => {
-    expect(validateSkillCatalog(SKILLS, SKILLS_BY_WEAPON)).toEqual([]);
+    expect(validateSkillCatalog(SKILLS, SKILLS_BY_SECT)).toEqual([]);
   });
 
-  it("has books, drop tiers, assets and translations for every skill", () => {
+  it("has sect kits, assets and translations for every skill", () => {
     const { problems } = auditSkillContent({ rootDir: ROOT });
     expect(problems, problems.join("\n")).toEqual([]);
   });

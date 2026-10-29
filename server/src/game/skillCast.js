@@ -1,9 +1,9 @@
 /**
- * Pure server-side skill action rules: casting, book study, levelling and the
+ * Pure server-side skill action rules: casting, learning, levelling and the
  * authorization of a follow-up hit.
  *
  * Extracted from the WebSocket server so cast validation, self-effect
- * application, study/upgrade gates and damage authorization can be unit-tested
+ * application, learn/upgrade gates and damage authorization can be unit-tested
  * without a socket, a live world, or a database. Every function here takes plain
  * objects and mutates only the state it is handed (the cast's hit budget, the
  * player's buffs/HP), never transport or storage.
@@ -53,7 +53,7 @@ export function castRejection(skill, player) {
 }
 
 /**
- * Why a skill book cannot be studied, or null when it can.
+ * Why a skill cannot be learned from the F5 tree, or null when it can.
  *
  * @param {Object|null|undefined} skill resolved catalog entry
  * @param {number} level character level
@@ -61,7 +61,7 @@ export function castRejection(skill, player) {
  * @returns {{ reason: "not_usable"|"already_learned"|"level"|"prereq",
  *   level?: number, prereqId?: string|null }|null}
  */
-export function studyRejection(skill, level, learned = []) {
+export function learnRejection(skill, level, learned = []) {
   if (!skill) return { reason: "not_usable" };
 
   const known = Array.isArray(learned) ? learned : [];

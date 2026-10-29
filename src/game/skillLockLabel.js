@@ -18,8 +18,8 @@ import { skillLockReason } from "./skills.js";
 export function formatSkillLock(reason, t = translate) {
   if (!reason) return "";
 
-  if (reason.kind === "book") {
-    return t("skills.picker.needsBook");
+  if (reason.kind === "learn") {
+    return t("skills.picker.learnable");
   }
 
   if (reason.kind === "prereq") {

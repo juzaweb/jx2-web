@@ -8,7 +8,7 @@ import { CombatSystem, toggleAudio, isAudioEnabled, setAudioEnabled, playTone, S
 import { UIBridgeAdapter } from "./uiBridgeAdapter.js";
 import { StorageManager } from "./storage.js";
 import { bridge, EVENTS } from "./bridge.js";
-import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, isSkillBook, isCommandToken, QUICK_ITEMS } from "./items.js";
+import { getQuantity, replaceQuantities, getItemById, getConsumableEffect, isCommandToken, QUICK_ITEMS } from "./items.js";
 import { skillById } from "./skills.js";
 import { translate } from "../i18n/translator.js";
 import { loadQuickSlots, skillIdFromBinding } from "./quickSlots.js";
@@ -63,7 +63,8 @@ const HIT_REJECT_MESSAGES = {
 
 import { normalizeGender } from "./gender.js";
 import { normalizeKey } from "./keybinds.js";
-import { skillsForWeapon } from "./skills.js";
+import { skillsForSect } from "./skills.js";
+import { DEFAULT_SECT, normalizeSect } from "./sects.js";
 import { MELEE_REACH } from "./combatRules.js";
 import { ensureHeroBodyTexture, ensureWeaponVfx } from "./lazyAssets.js";
 
@@ -354,16 +355,18 @@ export class JiangHuScene extends Phaser.Scene {
       this.handleEquipmentSync(payload);
     });
 
-    // Skills studied from books and their levels. The server is authoritative: a
-    // learned id is only usable after it lands here.
+    // Skills studied from the F5 tree, their levels and the hero's sect. The
+    // server is authoritative: a learned id is only usable after it lands here,
+    // and the kit shown must match the sect the server will validate against.
     this.networkClient.on("skills_sync", (payload) => {
       const learned = Array.isArray(payload?.skills) ? payload.skills : [];
       const levels = payload?.levels && typeof payload.levels === "object" ? payload.levels : {};
+      if (typeof payload?.sect === "string" && payload.sect) this.playerSectId = payload.sect;
       if (this.combat) {
         this.combat.learnedSkills = new Set(learned);
         this.combat.skillLevels = { ...levels };
       }
-      bridge.emit(EVENTS.SKILLS_UPDATED, { skills: learned, levels });
+      bridge.emit(EVENTS.SKILLS_UPDATED, { skills: learned, levels, sect: payload?.sect });
     });
 
     // Result of a server-side use/equip/unequip action.
@@ -710,6 +713,10 @@ export class JiangHuScene extends Phaser.Scene {
         if (!skillId || !this.networkClient?.isConnected) return;
         this.networkClient.sendSkillUpgrade({ skillId });
       }),
+      bridge.on(EVENTS.ACTION_LEARN_SKILL, ({ skillId } = {}) => {
+        if (!skillId || !this.networkClient?.isConnected) return;
+        this.networkClient.sendSkillLearn({ skillId });
+      }),
       bridge.on(EVENTS.SET_QUICK_SLOTS, (quickSlots = {}) => {
         if (this.started && quickSlots) {
           this.quickSlots = { ...this.quickSlots, ...quickSlots };
@@ -717,7 +724,8 @@ export class JiangHuScene extends Phaser.Scene {
       }),
       bridge.on(EVENTS.SET_PLAYER_WEAPON, (weaponType) => {
         this.player?.setWeaponType(weaponType);
-        if (weaponType) ensureWeaponVfx(this, skillsForWeapon(weaponType));
+        // VFX follow the sect kit, not the weapon: two sects share the sword.
+        ensureWeaponVfx(this, skillsForSect(this.playerSect()));
       }),
       bridge.on(EVENTS.ACTION_USE_POTION, (slot) => {
         if (this.started && !this.isPaused) this.useItem(slot);
@@ -1094,17 +1102,6 @@ export class JiangHuScene extends Phaser.Scene {
 
     if (item.slot) {
       this.equipItem(itemId);
-      return;
-    }
-
-    // A skill book is studied on the server: it validates the level and
-    // prerequisites, consumes one copy and records the skill.
-    if (isSkillBook(itemId)) {
-      if (!this.networkClient?.isConnected) {
-        this.uiBridge.addLog("Cần kết nối máy chủ để học chiêu thức.", "guide");
-        return;
-      }
-      this.networkClient.useItem(itemId);
       return;
     }
 
@@ -1531,13 +1528,20 @@ export class JiangHuScene extends Phaser.Scene {
   handleEquipmentSync(payload = {}) {
     if (!payload.equipment || !this.player) return;
     this.player.applyEquipment(payload.equipment);
-    // A different weapon means a different skill kit: pull its art now and tell
-    // the HUD so the skill panel shows the matching tree.
-    if (this.player.weaponType) {
-      ensureWeaponVfx(this, skillsForWeapon(this.player.weaponType));
-    }
+    // Worn gear decides the rig; the sect kit owns the arts and their VFX.
+    ensureWeaponVfx(this, skillsForSect(this.playerSect()));
     this.emitEquipment();
     this.uiBridge.updateHud(this.player.stats);
+  }
+
+  /**
+   * Sect of the active character: it owns the skill kit and its VFX.
+   * @returns {string}
+   */
+  playerSect() {
+    return normalizeSect(
+      this.playerSectId || readSession()?.activeCharacter?.sect || DEFAULT_SECT
+    );
   }
 
   /**
@@ -1555,7 +1559,8 @@ export class JiangHuScene extends Phaser.Scene {
       unknown_item: "Vật phẩm không tồn tại.",
       already_learned: "Bạn đã học chiêu thức này rồi.",
       level: "Cấp độ nhân vật chưa đủ cho chiêu thức này.",
-      prereq: "Cần học chiêu thức trước đó trước khi học sách này.",
+      prereq: "Cần học chiêu thức trước đó trước khi lĩnh hội chiêu này.",
+      sect: "Chiêu thức này không thuộc môn phái của bạn.",
       not_learned: "Bạn chưa học chiêu thức này.",
       max_level: "Chiêu thức đã đạt cấp tối đa.",
       coins: "Không đủ bạc cho chiêu thức này.",

@@ -11,6 +11,7 @@
  */
 
 import { VFX_PRESETS, expandVfxPreset } from "./presets.js";
+import { SECTS } from "../sects.js";
 
 /** Effect kinds the engine understands. Unknown kinds are ignored by readers. */
 export const EFFECT_KINDS = Object.freeze(["regen", "stun", "buff", "heal", "slow"]);
@@ -78,21 +79,9 @@ export function validateSkill(skill) {
   if (skill.vfx?.preset !== undefined && !VFX_PRESETS[skill.vfx.preset]) {
     problems.push(`unknown vfx preset ${JSON.stringify(skill.vfx.preset)}`);
   }
+  // Arts are studied in the F5 tree now, so a book declaration is stale metadata.
   if (skill.book !== undefined) {
-    if (!skill.book || typeof skill.book !== "object") {
-      problems.push("book must be an object when set");
-    } else {
-      if (typeof skill.book.viName !== "string" || skill.book.viName.length === 0) {
-        problems.push("book.viName must be a non-empty string");
-      }
-      if (!Array.isArray(skill.book.dropTiers) || skill.book.dropTiers.length === 0) {
-        problems.push("book.dropTiers must be a non-empty array of monster ids");
-      } else if (
-        skill.book.dropTiers.some((tier) => typeof tier !== "string" || tier.length === 0)
-      ) {
-        problems.push("book.dropTiers entries must be non-empty monster ids");
-      }
-    }
+    problems.push("book metadata is no longer supported (arts are studied in the F5 tree)");
   }
   if (skill.requires !== undefined) {
     if (!Array.isArray(skill.requires)) {
@@ -148,7 +137,7 @@ export function defineSkill(entry) {
  * prerequisite integrity.
  *
  * @param {ReadonlyArray<Object>} skills flat catalog
- * @param {Record<string, ReadonlyArray<Object>>} [kits] kit id -> entries
+ * @param {Record<string, ReadonlyArray<Object>>} [kits] sect id -> entries
  * @returns {string[]} human-readable problems; empty when valid
  */
 export function validateSkillCatalog(skills = [], kits = {}) {
@@ -165,23 +154,42 @@ export function validateSkillCatalog(skills = [], kits = {}) {
       problems.push(`${skill.id}: duplicate id`);
     }
     byId.set(skill.id, skill);
-    if (kitIds.size > 0 && !kitIds.has(skill.weapon)) {
-      problems.push(`${skill.id}: weapon "${skill.weapon}" has no kit`);
+    if (kitIds.size > 0) {
+      let owner = null;
+      for (const [sect, entries] of Object.entries(kits)) {
+        if (entries.some((entry) => entry?.id === skill.id)) {
+          owner = sect;
+          break;
+        }
+      }
+      if (!owner) problems.push(`${skill.id}: belongs to no sect kit`);
     }
   }
 
-  for (const [weapon, entries] of Object.entries(kits)) {
+  for (const [sect, entries] of Object.entries(kits)) {
+    const expectedWeapon = SECTS[sect]?.weapon;
+    if (!expectedWeapon) problems.push(`unknown sect kit "${sect}"`);
+
     for (const skill of entries) {
-      if (skill.weapon !== weapon) {
-        problems.push(`${skill.id}: weapon "${skill.weapon}" does not match kit "${weapon}"`);
+      if (expectedWeapon && skill.weapon !== expectedWeapon) {
+        problems.push(
+          `${skill.id}: weapon "${skill.weapon}" does not match sect "${sect}" (${expectedWeapon})`
+        );
       }
-      const slotKey = `${weapon}:${skill.slot}`;
+      const slotKey = `${sect}:${skill.slot}`;
       if (slotOwners.has(slotKey)) {
         problems.push(
-          `${skill.id}: slot ${skill.slot} in kit "${weapon}" is already used by ${slotOwners.get(slotKey)}`
+          `${skill.id}: slot ${skill.slot} in kit "${sect}" is already used by ${slotOwners.get(slotKey)}`
         );
       }
       slotOwners.set(slotKey, skill.id);
+    }
+
+    const starters = entries.filter((skill) => skill?.starter === true);
+    if (starters.length !== 1) {
+      problems.push(`kit "${sect}": exactly one starter is required (got ${starters.length})`);
+    } else if (starters[0].slot !== 0) {
+      problems.push(`kit "${sect}": starter ${starters[0].id} must sit in slot 0`);
     }
   }
 

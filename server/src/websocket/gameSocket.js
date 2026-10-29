@@ -56,8 +56,10 @@ import {
   skillLearnCost,
   skillLevelOf,
   skillUpgradeCost,
+  skillsForSect,
   skillUsable
 } from "../../../src/game/skills.js";
+import { normalizeSect, sectStarterSkillId, sectWeaponItemId } from "../../../src/game/sects.js";
 import { isTestMode } from "../../../src/game/testMode.js";
 import { deriveCombatStats } from "../../../src/game/derivedStats.js";
 import { botSnapshot, botLevelForMap } from "../../../src/game/botAi.js";
@@ -68,10 +70,10 @@ import {
   isInsideCastArea as isTargetInsideCastArea,
   resolveSkillHit,
   splashDamage,
-  studyRejection,
+  learnRejection,
   upgradeRejection
 } from "../game/skillCast.js";
-import { getConsumableEffect, skillIdForBook } from "../../../src/game/items.js";
+import { getConsumableEffect } from "../../../src/game/items.js";
 import { equippedWeaponType } from "../../../src/game/equipment.js";
 import { shopPurchase } from "../../../src/game/shop.js";
 import {
@@ -666,6 +668,10 @@ export class GameSocketManager {
         this.handleSkillUpgrade(ws, msg.payload);
         break;
 
+      case "learn_skill":
+        this.handleLearnSkill(ws, msg.payload);
+        break;
+
       case "equip_item":
         this.handleEquipItem(ws, msg.payload);
         break;
@@ -756,23 +762,27 @@ export class GameSocketManager {
     const playerId = characterId;
     const displayName = sanitizeStr(character.name || "Lãng Khách", 32);
     const username = displayName;
+    const sect = normalizeSect(character.sect);
     let equipment = readEquipment(characterId);
 
     // Characters created before weapons existed (and any hero who lost their
-    // weapon) get the starter sword and Kiếm Khí, so the starting kit is always
-    // playable. New characters already receive both at creation time.
+    // weapon) get their sect's starting weapon, so the starting kit is always
+    // playable. New characters already receive it at creation time.
     if (!equipment.weapon) {
-      if (!readBag(characterId)["kiem-lang-khach"]) {
-        grantItem(characterId, "kiem-lang-khach", 1);
+      const starterWeaponId = sectWeaponItemId(sect);
+      if (!readBag(characterId)[starterWeaponId]) {
+        grantItem(characterId, starterWeaponId, 1);
       }
-      const equipped = equipItem(characterId, "kiem-lang-khach");
+      const equipped = equipItem(characterId, starterWeaponId);
       if (equipped.ok) equipment = equipped.equipment;
     }
 
+    // The sect's starter art is always known; saves that predate sects get it here.
     const learnedSkills = store.getLearnedSkills(characterId);
-    if (!learnedSkills.includes("kiem_khi")) {
-      store.addLearnedSkill(characterId, "kiem_khi");
-      learnedSkills.push("kiem_khi");
+    const starterSkillId = sectStarterSkillId(sect);
+    if (!learnedSkills.includes(starterSkillId)) {
+      store.addLearnedSkill(characterId, starterSkillId);
+      learnedSkills.push(starterSkillId);
     }
 
     // The server is the economy's source of truth: a fresh character starts at
@@ -865,6 +875,8 @@ export class GameSocketManager {
       gender: character.gender === "female" ? "female" : "male",
       /** Political camp; decides hostility on a faction battlefield. */
       faction: normalizeFaction(character.faction),
+      /** Martial sect; owns the skill kit this hero may cast and study. */
+      sect,
       characterId,
       progress,
       questState,
@@ -882,9 +894,9 @@ export class GameSocketManager {
       attackSpeed: stats.attackSpeed,
       /** Active timed buffs: { stat, amount, until, skillId }. */
       buffs: [],
-      /** Weapon type of the worn weapon; decides which skill kit may be cast. */
+      /** Weapon type of the worn weapon; a cast must match its sect's weapon. */
       weaponType: equippedWeaponType(equipment),
-      /** Skill ids studied from books (starter skills are always known). */
+      /** Skill ids studied from the F5 tree (starter skills are always known). */
       learnedSkills,
       /** skill id -> level (1..MAX_SKILL_LEVEL); absent entries are level 1. */
       skillLevels: store.getSkillLevels(characterId),
@@ -959,7 +971,7 @@ export class GameSocketManager {
     this.send(ws, { type: "equipment_sync", payload: { equipment } });
     this.send(ws, {
       type: "skills_sync",
-      payload: { skills: learnedSkills, levels: playerData.skillLevels }
+      payload: { skills: learnedSkills, levels: playerData.skillLevels, sect }
     });
     this.send(ws, {
       type: "player_stats",
@@ -1094,6 +1106,7 @@ export class GameSocketManager {
       equipment: player.equipment,
       gender: player.gender,
       faction: player.faction || null,
+      sect: player.sect || null,
       level: player.level,
       hp: player.hp,
       maxHp: player.maxHp,
@@ -1244,11 +1257,6 @@ export class GameSocketManager {
     if (!player || !player.characterId) return;
 
     const itemId = sanitizeStr(payload.itemId, 64);
-    const bookSkillId = skillIdForBook(itemId);
-    if (bookSkillId) {
-      this.handleLearnSkill(ws, player, itemId, bookSkillId);
-      return;
-    }
 
     const effect = getConsumableEffect(itemId);
     const consumed = consumeItem(player.characterId, itemId, 1);
@@ -1328,28 +1336,30 @@ export class GameSocketManager {
   }
 
   /**
-   * Publish the player's learned skills together with their levels.
+   * Publish the player's sect, learned skills and their levels.
    * @param {WebSocket} ws
    * @param {Object} player
    */
   publishSkills(ws, player) {
     this.send(ws, {
       type: "skills_sync",
-      payload: { skills: player.learnedSkills, levels: player.skillLevels }
+      payload: { skills: player.learnedSkills, levels: player.skillLevels, sect: player.sect }
     });
   }
 
   /**
-   * Study a skill book: validate the level/prerequisites and the silver/EXP
-   * price, consume one copy, then record the skill at level 1. The client is told
-   * whether the study succeeded so it can update the skill panel and the bag.
+   * Study one art of the hero's own sect from the F5 tree. There is no book any
+   * more: the server validates the sect, the level/prerequisites and the
+   * silver/EXP price, records the skill at level 1 and publishes the new list.
    * @param {WebSocket} ws
-   * @param {Object} player
-   * @param {string} itemId
-   * @param {string} skillId
+   * @param {{skillId?:string}} payload
    */
-  handleLearnSkill(ws, player, itemId, skillId) {
-    const skill = skillById(skillId);
+  handleLearnSkill(ws, payload = {}) {
+    const player = this.players.get(ws);
+    if (!player || !player.characterId) return;
+
+    const skill = skillById(sanitizeStr(payload.skillId, 64));
+    const skillId = skill?.id || null;
     const learned = Array.isArray(player.learnedSkills)
       ? player.learnedSkills
       : store.getLearnedSkills(player.characterId);
@@ -1357,18 +1367,23 @@ export class GameSocketManager {
     const reject = (reason, extra = {}) => {
       this.send(ws, {
         type: "item_result",
-        payload: { ok: false, action: "learn", itemId, skillId, reason, ...extra }
+        payload: { ok: false, action: "learn", skillId, reason, ...extra }
       });
     };
 
-    const rejection = studyRejection(skill, player.level, learned);
+    // A hero may only study the arts of their own sect, whatever the client sends.
+    const sect = normalizeSect(player.sect);
+    if (!skill || !skillsForSect(sect).some((entry) => entry.id === skill.id)) {
+      return reject("sect");
+    }
+
+    const rejection = learnRejection(skill, player.level, learned);
     if (rejection) {
       const { reason, ...extra } = rejection;
       return reject(reason, extra);
     }
 
-    // Studying costs silver and EXP on top of the book. Funds are checked before
-    // the book is consumed, so a refused study never destroys it.
+    // Studying costs silver and EXP. Funds are checked before anything is written.
     const cost = skillLearnCost(skill);
     const shortfall = skillFundsShortfall(cost, player.progress);
     if (shortfall) {
@@ -1379,25 +1394,17 @@ export class GameSocketManager {
       });
     }
 
-    const consumed = consumeItem(player.characterId, itemId, 1);
-    if (!consumed.ok) {
-      this.sendInventory(player, consumed.bag);
-      return reject(consumed.reason || "missing_item");
-    }
-
     // Grant the skill before the debit: a crash between the two writes must never
     // leave the player charged for an art they did not receive.
     player.learnedSkills = store.addLearnedSkill(player.characterId, skill.id);
     player.skillLevels = store.setSkillLevel(player.characterId, skill.id, 1);
     this.chargeSkillCost(ws, player, cost);
-    this.sendInventory(player, consumed.bag);
     this.publishSkills(ws, player);
     this.send(ws, {
       type: "item_result",
       payload: {
         ok: true,
         action: "learn",
-        itemId,
         skillId: skill.id,
         level: 1,
         coins: player.progress?.coins,
@@ -1800,7 +1807,7 @@ export class GameSocketManager {
     const now = Date.now();
     this.players.forEach((player) => {
       const rate = passiveRegenRate(
-        player.weaponType,
+        player.sect,
         player.level,
         player.learnedSkills,
         player.skillLevels
@@ -2537,6 +2544,32 @@ export class GameSocketManager {
             payload: progressPayload(player.progress)
           });
         }
+        break;
+      }
+
+      case "learn_sect_skills": {
+        // GM shortcut: every art of the hero's own sect at rank 1, no cost.
+        if (!player.characterId) return;
+        const sect = normalizeSect(player.sect);
+        let learned = store.getLearnedSkills(player.characterId);
+        for (const entry of skillsForSect(sect)) {
+          if (learned.includes(entry.id)) continue;
+          learned = store.addLearnedSkill(player.characterId, entry.id);
+          store.setSkillLevel(player.characterId, entry.id, 1);
+        }
+        player.learnedSkills = learned;
+        player.skillLevels = store.getSkillLevels(player.characterId);
+        this.publishSkills(ws, player);
+        this.send(ws, {
+          type: "player_chat",
+          payload: {
+            id: `chat-${Date.now()}-gm-sect`,
+            sender: "Hệ Thống",
+            text: `Đã học toàn bộ võ công của phái ${sect}.`,
+            channel: "system",
+            time: Date.now()
+          }
+        });
         break;
       }
 

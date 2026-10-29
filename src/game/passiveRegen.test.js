@@ -6,7 +6,7 @@ import {
   passiveRegenRate,
   regenPerSecond
 } from "./passiveRegen.js";
-import { skillById, skillsForWeapon } from "./skills.js";
+import { skillById, skillsForSect } from "./skills.js";
 
 describe("regenPerSecond", () => {
   it("reads a regen effect out of a catalog skill", () => {
@@ -31,23 +31,22 @@ describe("regenPerSecond", () => {
 });
 
 describe("passiveRegenRate", () => {
-  it("sums the learned passive arts of a weapon kit", () => {
-    // The fist internal art unlocks at character level 10.
-    expect(passiveRegenRate("bao-tay", 10, ["thieu_lam_tam_phap"])).toBe(2);
-    expect(passiveRegenRate("kiem", 10, ["thieu_lam_tam_phap"])).toBe(0);
-    // An unlearned passive contributes nothing.
-    expect(passiveRegenRate("bao-tay", 10, [])).toBe(0);
-    // Unknown weapons normalise to the sword kit, which has no passive.
+  it("sums the learned passive arts of a sect kit", () => {
+    // Thiếu Lâm's internal art is its starter, so it is always in effect.
+    expect(passiveRegenRate("thieu-lam", 1, ["thieu_lam_tam_phap"])).toBe(2);
+    expect(passiveRegenRate("thieu-lam", 1, [])).toBe(2);
+    // The sword sects have no passive art at all.
+    expect(passiveRegenRate("vo-dang", 10, ["thieu_lam_tam_phap"])).toBe(0);
+    // Unknown sects normalise to Võ Đang, which has no passive.
     expect(passiveRegenRate("bogus", 10, ["thieu_lam_tam_phap"])).toBe(0);
   });
 
-  it("ignores a passive the hero has not unlocked yet", () => {
-    expect(passiveRegenRate("bao-tay", 9, ["thieu_lam_tam_phap"])).toBe(0);
-    expect(passiveRegenRate("bao-tay", 0, ["thieu_lam_tam_phap"])).toBe(0);
+  it("ignores a passive below the minimum character level", () => {
+    expect(passiveRegenRate("thieu-lam", 0, ["thieu_lam_tam_phap"])).toBe(0);
   });
 
   it("only counts skills flagged as passive", () => {
-    for (const skill of skillsForWeapon("bao-tay")) {
+    for (const skill of skillsForSect("thieu-lam")) {
       if (skill.passive) continue;
       expect(regenPerSecond(skill)).toBe(0);
     }

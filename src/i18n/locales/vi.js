@@ -193,6 +193,8 @@ export default {
     genderFemale: "Nữ",
     factionLabel: "Phe phái:",
     factionHint: "Phe quyết định thành nhà và đồng minh trên chiến trường trung tâm.",
+    sectLabel: "Môn phái:",
+    sectHint: "Môn phái quyết định loại vũ khí khởi đầu và bộ chiêu thức học trong bảng Võ Công (F5).",
     factions: {
       ngo: "Ngô",
       han: "Ngô",
@@ -226,6 +228,24 @@ export default {
       deleted: 'Đã xoá nhân vật "{name}".'
     }
   },
+  sects: {
+    thieuLam: {
+      name: "Thiếu Lâm",
+      desc: "Thiếu Lâm: bao tay, nội công hồi phục, chưởng pháp và trận pháp hộ thân."
+    },
+    voDang: {
+      name: "Võ Đang",
+      desc: "Võ Đang: kiếm pháp đạo gia, kiếm khí thái cực và nội công tăng công kích."
+    },
+    ngaMy: {
+      name: "Nga My",
+      desc: "Nga My: kiếm pháp thanh nhã, hồi phục đồng đội và thân pháp nhanh nhẹn."
+    },
+    nguDoc: {
+      name: "Ngũ Độc",
+      desc: "Ngũ Độc: đao pháp độc tố, ám khí xuyên tâm và cổ trùng bộc phát."
+    }
+  },
   skills: {
     handLeft: "Chuột trái",
     handRight: "Chuột phải",
@@ -237,7 +257,7 @@ export default {
       eyebrow: "Gán chiêu",
       title: "Chọn chiêu cho {hand}",
       locked: "Cần cấp {level}",
-      needsBook: "Chưa học — dùng sách để học"
+      learnable: "Có thể học"
     },
     mobilePicker: {
       eyebrow: "Gán chiêu",
@@ -260,7 +280,7 @@ export default {
       }
     },
     modalTitle: "Võ Công",
-    modalHint: "Cây chiêu thức theo vũ khí đang trang bị. Chọn một ô để xem chi tiết, kéo chiêu thả vào ô số 1-9 để gán phím nhanh. Chiêu chưa học sẽ mở khoá bằng sách rớt từ quái.",
+    modalHint: "Cây chiêu thức của môn phái bạn theo. Chọn một ô để xem chi tiết, kéo chiêu thả vào ô số 1-9 để gán phím nhanh. Chiêu đủ cấp và đủ điều kiện tiên quyết có thể học ngay tại đây bằng bạc và kinh nghiệm.",
     dragHint: "Kéo chiêu thức thả vào ô số 1-9 trên thanh dưới để gán phím nhanh.",
     bindToKey: "Gán vào [{key}]",
     bindLeft: "Gán Chuột Trái",
@@ -276,19 +296,17 @@ export default {
     upgradeCost: "{price} · {exp} EXP",
     upgradeShort: "Cần {price} và {exp} EXP",
     upgradeHint: "Tiêu bạc và kinh nghiệm để tăng cấp chiêu thức.",
+    learn: "Học chiêu",
+    learnCost: "{price} · {exp} EXP",
+    learnShort: "Cần {price} và {exp} EXP",
+    learnHint: "Tiêu bạc và kinh nghiệm để lĩnh hội chiêu thức này.",
     maxLevel: "Đã đạt cấp tối đa ({max})",
     reqLevelTag: "Cần cấp {level}",
     levelShort: "Cần cấp nhân vật {level} để nâng cấp chiêu thức này",
     tree: {
       requires: "Cần học {name} trước",
-      empty: "Vũ khí này chưa có chiêu thức.",
+      empty: "Môn phái này chưa có chiêu thức.",
       selectHint: "Chọn một ô chiêu thức để xem chi tiết."
-    },
-    kiem: {
-      kiemKhi: {
-        name: "Kiếm Khí",
-        desc: "Chiêu kiếm khởi đầu, phóng một luồng khí kiếm về phía mục tiêu. Mọi nhân vật mới đều biết chiêu này."
-      }
     },
     thieuLam: {
       thieuLamTamPhap: {
@@ -685,15 +703,9 @@ export default {
       getGlove: "Bao Tay Lãng Khách",
       getSaber: "Đao Lãng Khách",
       receiveAllWeapons: "Nhận Trọn Bộ Vũ Khí",
-      booksTitle: "Bí Kíp Võ Học (Sách Kỹ Năng)",
-      booksDesc: "Nhận bí kíp các môn phái vào hành trang để học kỹ năng.",
-      receiveAllBooks: "Nhận Toàn Bộ Bí Kíp (18 Cuốn)",
-      receiveThieuLamBooks: "Bí Kíp Thiếu Lâm (6)",
-      receiveVoDangBooks: "Bí Kíp Võ Đang (4)",
-      receiveNgaMyBooks: "Bí Kíp Nga My (4)",
-      receiveNguDocBooks: "Bí Kíp Ngũ Độc (4)",
-      allBooksReceivedText: "Đã nhận toàn bộ bí kíp kỹ năng!",
-      allBooksReceivedLog: "Đã nhận toàn bộ 18 cuốn bí kíp kỹ năng vào túi đồ."
+      sectTitle: "Võ Học Môn Phái",
+      sectDesc: "Học ngay toàn bộ chiêu thức của môn phái nhân vật đang theo, không tốn bạc hay kinh nghiệm.",
+      learnSect: "Học Toàn Bộ Võ Công Của Phái"
     },
     teleport: {
       receiveScroll: "Nhận 99x Hồi Thành Phù"

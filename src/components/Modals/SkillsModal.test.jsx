@@ -104,34 +104,36 @@ describe("SkillsModal Component", () => {
   it("reports the prerequisite that still blocks a skill", () => {
     const gated = [
       skillById("thieu_lam_tam_phap"),
+      skillById("dai_tu_di_chuong"),
       {
-        ...skillById("dai_tu_di_chuong"),
-        requires: [{ id: "thieu_lam_tam_phap", level: 5 }]
+        ...skillById("la_han_tran"),
+        requires: [{ id: "dai_tu_di_chuong", level: 5 }]
       }
     ];
 
     const markup = renderToStaticMarkup(
       <I18nProvider>
-        <SkillsModal isOpen={true} skills={gated} level={18} />
+        <SkillsModal isOpen={true} skills={gated} level={30} />
       </I18nProvider>
     );
 
-    expect(markup).toContain("Cần học Thiếu Lâm Tâm Pháp trước");
+    expect(markup).toContain("Cần học Đại Tu Di Chưởng trước");
     // The tile badge shows the blocking level of the prerequisite.
     expect(markup).toContain(
-      '<span class="skill-node-level" aria-hidden="true">10</span>'
+      '<span class="skill-node-level" aria-hidden="true">18</span>'
     );
   });
 
-  it("displays the correct weapon badge for different kits", () => {
-    for (const [weapon, expectedLabel] of [
-      ["kiem", "Kiếm"],
-      ["bao-tay", "Bao Tay"],
-      ["dao", "Đao"]
+  it("labels the tree with the hero's sect", () => {
+    for (const [sect, expectedLabel] of [
+      ["vo-dang", "Võ Đang"],
+      ["thieu-lam", "Thiếu Lâm"],
+      ["nga-my", "Nga My"],
+      ["ngu-doc", "Ngũ Độc"]
     ]) {
       const markup = renderToStaticMarkup(
         <I18nProvider>
-          <SkillsModal isOpen={true} skills={[]} weapon={weapon} />
+          <SkillsModal isOpen={true} skills={[]} sect={sect} />
         </I18nProvider>
       );
       expect(markup).toContain(`<span class="skills-weapon-badge">${expectedLabel}</span>`);

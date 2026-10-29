@@ -7,8 +7,7 @@
  * whole repo:
  *
  * - every skill has a translated name and description in vi/en/zh;
- * - every learnable skill has book metadata with at least one hunting tier;
- * - every drop tier names a real monster;
+ * - every kit carries exactly one starter in slot 0 (checked by the schema);
  * - a declared icon / VFX sprite / overhead image exists under `public/`;
  * - every VFX preset reference exists.
  *
@@ -22,10 +21,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   SKILLS,
-  SKILLS_BY_WEAPON,
+  SKILLS_BY_SECT,
   validateSkillCatalog
 } from "../src/game/skills/index.js";
-import { MONSTERS, MONSTER_BOOK_CHANCES } from "../src/game/enemyCatalog.js";
 import { OVERHEAD_IMAGES, VFX_SPRITES } from "../src/game/lazyAssets.js";
 import { translateFor } from "../src/i18n/translator.js";
 
@@ -44,10 +42,9 @@ const assetExists = (rootDir, publicUrl) =>
  * @param {{ rootDir: string, skills?: ReadonlyArray<Object>, kits?: Record<string, ReadonlyArray<Object>> }} options
  * @returns {{ problems: string[], warnings: string[] }}
  */
-export function auditSkillContent({ rootDir, skills = SKILLS, kits = SKILLS_BY_WEAPON }) {
+export function auditSkillContent({ rootDir, skills = SKILLS, kits = SKILLS_BY_SECT }) {
   const problems = validateSkillCatalog(skills, kits).map((problem) => `catalog: ${problem}`);
   const warnings = [];
-  const monsterIds = new Set(Object.keys(MONSTERS));
 
   for (const skill of skills) {
     const label = `skill "${skill.id}"`;
@@ -57,16 +54,6 @@ export function auditSkillContent({ rootDir, skills = SKILLS, kits = SKILLS_BY_W
       const desc = translateFor(lang, skill.descKey, undefined, null);
       if (!name || name === skill.nameKey) problems.push(`${label}: missing ${lang} name`);
       if (!desc || desc === skill.descKey) problems.push(`${label}: missing ${lang} desc`);
-    }
-
-    if (skill.starter) {
-      if (skill.book) problems.push(`${label}: starter skills must not declare a book`);
-    } else if (!skill.book) {
-      problems.push(`${label}: missing book metadata (viName + dropTiers)`);
-    } else {
-      for (const tier of skill.book.dropTiers || []) {
-        if (!monsterIds.has(tier)) problems.push(`${label}: unknown drop tier "${tier}"`);
-      }
     }
 
     if (skill.icon && !assetExists(rootDir, skill.icon)) {
@@ -89,13 +76,6 @@ export function auditSkillContent({ rootDir, skills = SKILLS, kits = SKILLS_BY_W
       else if (!assetExists(rootDir, url)) {
         problems.push(`${label}: overhead image missing (${url})`);
       }
-    }
-  }
-
-  for (const monsterId of Object.keys(MONSTER_BOOK_CHANCES)) {
-    const pool = skills.filter((skill) => skill.book?.dropTiers?.includes(monsterId));
-    if (pool.length === 0) {
-      warnings.push(`monster "${monsterId}": book chance configured but no skill drops there`);
     }
   }
 
