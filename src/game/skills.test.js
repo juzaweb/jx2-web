@@ -107,6 +107,20 @@ describe("skill catalog", () => {
         fps: 12
       }
     });
+    expect(skillsForSect("vo-dang")[3]).toMatchObject({
+      id: "toat_hong_quan_khuyet",
+      weapon: "kiem",
+      slot: 3,
+      unlockLevel: 34,
+      range: 0,
+      radius: 0,
+      icon: "/skills/toat_hong_quan_khuyet.png",
+      vfx: {
+        sprite: "vfx-toat-hong-quan-khuyet",
+        color: 0xa855f7,
+        fps: 12
+      }
+    });
     expect(skillById("thai_cuc_quyen")?.id).toBe("thai_cuc_kiem_phap");
     expect(SKILLS_BY_ID.get("thai_cuc_quyen")?.id).toBe("thai_cuc_kiem_phap");
     expect(skillSlot("thai_cuc_quyen")).toBe(1);
@@ -242,7 +256,9 @@ describe("skill catalog", () => {
       "public/skills/thai_cuc_kiem_phap.png",
       "public/skills/vfx/thai_cuc_kiem_phap/sheet.png",
       "public/skills/tam_thanh_kiem_phap.png",
-      "public/skills/vfx/tam_thanh_kiem_phap/sheet.png"
+      "public/skills/vfx/tam_thanh_kiem_phap/sheet.png",
+      "public/skills/toat_hong_quan_khuyet.png",
+      "public/skills/vfx/toat_hong_quan_khuyet/sheet.png"
     ]) {
       expect(fs.existsSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)))).toBe(true);
     }

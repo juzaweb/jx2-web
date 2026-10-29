@@ -50,6 +50,11 @@ export const VFX_SPRITES = {
     url: "/skills/vfx/tam_thanh_kiem_phap/sheet.png",
     frameWidth: 256,
     frameHeight: 256
+  },
+  "vfx-toat-hong-quan-khuyet": {
+    url: "/skills/vfx/toat_hong_quan_khuyet/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
   }
 };
 

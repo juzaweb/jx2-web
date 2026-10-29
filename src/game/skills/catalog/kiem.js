@@ -84,6 +84,7 @@ export const VO_DANG_SKILLS = [
     id: "toat_hong_quan_khuyet",
     weapon: "kiem",
     slot: 3,
+    icon: "/skills/toat_hong_quan_khuyet.png",
     glyph: "罡",
     requires: [{ id: "tam_thanh_kiem_phap", level: 2 }],
     nameKey: "skills.voDang.toatHongQuanKhuyet.name",
@@ -95,7 +96,12 @@ export const VO_DANG_SKILLS = [
     range: 0,
     radius: 0,
     mult: 0,
-    effects: [{ kind: "buff", stat: "attackPct", amount: 0.15, duration: 180000 }]
+    effects: [{ kind: "buff", stat: "attackPct", amount: 0.15, duration: 180000 }],
+    vfx: {
+      sprite: "vfx-toat-hong-quan-khuyet",
+      color: 0xa855f7,
+      fps: 12
+    }
   })
 ];
 
