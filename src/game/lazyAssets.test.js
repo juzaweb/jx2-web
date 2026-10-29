@@ -122,7 +122,8 @@ describe("ensureWeaponVfx", () => {
       { id: "ring", vfx: { sprite: "vfx-la-han-tran" } },
       { id: "ultimate", vfx: { sprite: "vfx-nhu-lai-than-chuong" } },
       { id: "sword", vfx: { sprite: "vfx-thieu-duong-kiem-phap" } },
-      { id: "taichi", vfx: { sprite: "vfx-thai-cuc-kiem-phap" } }
+      { id: "taichi", vfx: { sprite: "vfx-thai-cuc-kiem-phap" } },
+      { id: "triad", vfx: { sprite: "vfx-tam-thanh-kiem-phap" } }
     ]);
 
     expect(scene.calls.filter(([name]) => name === "spritesheet").map((call) => call[1])).toEqual([
@@ -130,7 +131,8 @@ describe("ensureWeaponVfx", () => {
       "vfx-la-han-tran",
       "vfx-nhu-lai-than-chuong",
       "vfx-thieu-duong-kiem-phap",
-      "vfx-thai-cuc-kiem-phap"
+      "vfx-thai-cuc-kiem-phap",
+      "vfx-tam-thanh-kiem-phap"
     ]);
     expect(scene.calls.filter(([name]) => name === "start")).toHaveLength(1);
   });

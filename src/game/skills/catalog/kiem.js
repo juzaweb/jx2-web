@@ -60,6 +60,7 @@ export const VO_DANG_SKILLS = [
     id: "tam_thanh_kiem_phap",
     weapon: "kiem",
     slot: 2,
+    icon: "/skills/tam_thanh_kiem_phap.png",
     glyph: "三",
     requires: [{ id: "thai_cuc_kiem_phap", level: 1 }],
     nameKey: "skills.voDang.tamThanhKiemPhap.name",
@@ -70,7 +71,14 @@ export const VO_DANG_SKILLS = [
     target: "enemy",
     range: 400,
     radius: 0,
-    mult: 1.5
+    mult: 1.5,
+    vfx: {
+      sprite: "vfx-tam-thanh-kiem-phap",
+      travelFrames: 1,
+      impact: null,
+      color: 0x00e5ff,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "toat_hong_quan_khuyet",
