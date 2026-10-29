@@ -9,3 +9,8 @@
 **Vulnerability:** Character REST routes (`/users/:userId/characters`) allowed unauthenticated clients to read, create, or delete characters for arbitrary user IDs.
 **Learning:** Route definitions under `server/src/routes/character.routes.js` lacked authentication middleware checking bearer session tokens and matching token user IDs against requested parameters.
 **Prevention:** Always attach an authorization middleware on user-scoped API routes to verify session tokens and match `userId`.
+
+## 2026-03-31 - Unauthenticated WebSocket Chat Injection & Sender Spoofing
+**Vulnerability:** WebSocket chat messages (`player_chat`) did not verify if the socket belonged to a joined/authenticated player and trusted `payload.sender` from client input.
+**Learning:** `GameSocketManager.handlePlayerChat` broadcasted messages from un-joined sockets and used client-supplied `payload.sender`, allowing unauthenticated clients to send chat messages and impersonate other users/admins.
+**Prevention:** Ensure all WebSocket event handlers check for an authenticated player session (`if (!player) return;`) and use authoritative player session properties rather than client-controlled payload fields.
