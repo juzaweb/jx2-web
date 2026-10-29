@@ -177,7 +177,9 @@ export class BotRoster {
   }
 
   releaseBotsIfEmpty(mapId) {
-    const occupied = Array.from(this.game.players.values()).some((player) => player.mapId === mapId);
+    const occupied = this.game.isMapOccupied
+      ? this.game.isMapOccupied(mapId)
+      : Array.from(this.game.players.values()).some((player) => player.mapId === mapId);
     if (!occupied) this.despawnBotsOnMap(mapId);
   }
 
@@ -218,9 +220,9 @@ export class BotRoster {
     const bot = this.bots.get(botId);
     if (!bot || !bot.isDead) return;
 
-    const occupied = Array.from(this.game.players.values()).some(
-      (player) => player.mapId === bot.mapId
-    );
+    const occupied = this.game.isMapOccupied
+      ? this.game.isMapOccupied(bot.mapId)
+      : Array.from(this.game.players.values()).some((player) => player.mapId === bot.mapId);
     if (!occupied) {
       this.despawnBot(bot, { announce: false });
       return;
@@ -271,10 +273,14 @@ export class BotRoster {
     if (this.bots.size === 0) return;
 
     const now = Date.now();
-    const players = Array.from(this.game.players.values()).filter((player) => player.hp > 0);
+    const players = this.game.getPlayersOnMap
+      ? null
+      : Array.from(this.game.players.values()).filter((player) => player.hp > 0);
 
     this.botByMap.forEach((roster, mapId) => {
-      const mapPlayers = players.filter((player) => player.mapId === mapId);
+      const mapPlayers = this.game.getPlayersOnMap
+        ? this.game.getPlayersOnMap(mapId).filter((player) => player.hp > 0)
+        : players.filter((player) => player.mapId === mapId);
       if (mapPlayers.length === 0) return;
 
       const map = getMap(mapId);

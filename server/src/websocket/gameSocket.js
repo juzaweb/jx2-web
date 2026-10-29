@@ -351,6 +351,7 @@ export class GameSocketManager {
     this.path = options.path || "/ws";
     this.wss = new WebSocketServer({ server: httpServer, path: this.path });
     this.players = new Map(); // key: socket, value: player object
+    this.playersByMap = new Map(); // key: mapId, value: Map<WebSocket, player>
     this.playerById = new Map(); // key: playerId, value: { socket, data }
 
     // Server-owned enemy state, one roster per map. `enemies` / `enemyGrid` keep
@@ -568,6 +569,60 @@ export class GameSocketManager {
     this.broadcastToMap(player.mapId, data, excludeWs);
   }
 
+  _ensurePlayersByMap() {
+    if (!this.playersByMap) {
+      this.playersByMap = new Map();
+      if (this.players) {
+        for (const [ws, p] of this.players.entries()) {
+          if (p && p.mapId) {
+            let mapPlayers = this.playersByMap.get(p.mapId);
+            if (!mapPlayers) {
+              mapPlayers = new Map();
+              this.playersByMap.set(p.mapId, mapPlayers);
+            }
+            mapPlayers.set(ws, p);
+          }
+        }
+      }
+    }
+    return this.playersByMap;
+  }
+
+  addPlayerToMap(mapId, ws, player) {
+    if (!mapId) return;
+    const byMap = this._ensurePlayersByMap();
+    let mapPlayers = byMap.get(mapId);
+    if (!mapPlayers) {
+      mapPlayers = new Map();
+      byMap.set(mapId, mapPlayers);
+    }
+    mapPlayers.set(ws, player);
+  }
+
+  removePlayerFromMap(mapId, ws) {
+    if (!mapId) return;
+    const byMap = this._ensurePlayersByMap();
+    const mapPlayers = byMap.get(mapId);
+    if (mapPlayers) {
+      mapPlayers.delete(ws);
+      if (mapPlayers.size === 0) {
+        byMap.delete(mapId);
+      }
+    }
+  }
+
+  getPlayersOnMap(mapId) {
+    const byMap = this._ensurePlayersByMap();
+    const mapPlayers = byMap.get(mapId);
+    return mapPlayers ? Array.from(mapPlayers.values()) : [];
+  }
+
+  isMapOccupied(mapId) {
+    const byMap = this._ensurePlayersByMap();
+    const mapPlayers = byMap.get(mapId);
+    return Boolean(mapPlayers && mapPlayers.size > 0);
+  }
+
   /**
    * Send an identity event (join/leave) to every player standing on one map.
    * @param {string} mapId
@@ -575,14 +630,15 @@ export class GameSocketManager {
    * @param {WebSocket|null} [excludeWs]
    */
   broadcastToMap(mapId, data, excludeWs = null) {
+    const byMap = this._ensurePlayersByMap();
+    const mapPlayers = byMap.get(mapId);
+    if (!mapPlayers || mapPlayers.size === 0) return;
     const payload = JSON.stringify(data);
-    this.wss.clients.forEach((client) => {
-      if (client === excludeWs || client.readyState !== WebSocket.OPEN) return;
-      if (client.bufferedAmount >= this.maxBufferedBytes) return;
-      const receiver = this.players.get(client);
-      if (!receiver || receiver.mapId !== mapId) return;
+    for (const [client] of mapPlayers) {
+      if (client === excludeWs || client.readyState !== WebSocket.OPEN) continue;
+      if (client.bufferedAmount >= this.maxBufferedBytes) continue;
       client.send(payload);
-    });
+    }
   }
 
   /**
@@ -761,6 +817,7 @@ export class GameSocketManager {
         } catch {
           // ignore
         }
+        this.removePlayerFromMap(existing.data.mapId, existing.ws);
         this.players.delete(existing.ws);
       }
     }
@@ -854,17 +911,21 @@ export class GameSocketManager {
     };
 
     this.players.set(ws, playerData);
+    this.addPlayerToMap(mapId, ws, playerData);
     this.playerById.set(playerId, { ws, data: playerData });
 
     this.ensureBotsForMap(mapId, ws, playerData.faction);
 
     // 1. Send all existing players *on this map* to the joining player
     const existingPlayers = [];
-    this.players.forEach((p, clientWs) => {
-      if (clientWs !== ws && p.mapId === mapId) {
-        existingPlayers.push(this.playerSnapshot(p));
+    const mapPlayers = this.playersByMap.get(mapId);
+    if (mapPlayers) {
+      for (const [clientWs, p] of mapPlayers) {
+        if (clientWs !== ws) {
+          existingPlayers.push(this.playerSnapshot(p));
+        }
       }
-    });
+    }
     this.botsOnMap(mapId).forEach((bot) => existingPlayers.push(botSnapshot(bot)));
 
     this.send(ws, {
@@ -948,7 +1009,9 @@ export class GameSocketManager {
     // Leaving: the old map stops seeing this player.
     this.broadcastToMap(fromMapId, { type: "player_left", payload: { id: player.id } }, ws);
 
+    this.removePlayerFromMap(fromMapId, ws);
     player.mapId = target.id;
+    this.addPlayerToMap(target.id, ws, player);
     player.x = clampNum(portal.targetSpawn.x, target.bounds.x0, target.bounds.x1, target.spawn.x);
     player.y = clampNum(portal.targetSpawn.y, target.bounds.y0, target.bounds.y1, target.spawn.y);
     player.vx = 0;
@@ -978,9 +1041,12 @@ export class GameSocketManager {
    */
   announceMapArrival(player, ws, map) {
     const peers = [];
-    this.players.forEach((other, clientWs) => {
-      if (clientWs !== ws && other.mapId === map.id) peers.push(this.playerSnapshot(other));
-    });
+    const mapPlayers = this.playersByMap.get(map.id);
+    if (mapPlayers) {
+      for (const [clientWs, other] of mapPlayers) {
+        if (clientWs !== ws) peers.push(this.playerSnapshot(other));
+      }
+    }
     this.botsOnMap(map.id).forEach((bot) => peers.push(botSnapshot(bot)));
 
     this.send(ws, {
@@ -2244,7 +2310,13 @@ export class GameSocketManager {
     }
 
     const vacatedMapId = fromMapId;
+    if (crossMap) {
+      this.removePlayerFromMap(fromMapId, victimWs);
+    }
     victim.mapId = home.id;
+    if (crossMap) {
+      this.addPlayerToMap(home.id, victimWs, victim);
+    }
     victim.x = home.spawn.x;
     victim.y = home.spawn.y;
     victim.vx = 0;
@@ -2552,12 +2624,14 @@ export class GameSocketManager {
 
         if (currentMapId !== targetMapId) {
           this.broadcastToMap(currentMapId, { type: "player_left", payload: { id: player.id } }, ws);
+          this.removePlayerFromMap(currentMapId, ws);
           player.mapId = targetMapId;
+          this.addPlayerToMap(targetMapId, ws, player);
           this.ensureBotsForMap(targetMapId, ws, player.faction);
           this.releaseBotsIfEmpty(currentMapId);
 
-          const peers = Array.from(this.players.values())
-            .filter((peer) => peer !== player && peer.mapId === targetMapId)
+          const peers = this.getPlayersOnMap(targetMapId)
+            .filter((peer) => peer !== player)
             .map((peer) => this.playerSnapshot(peer));
           this.botsOnMap(targetMapId).forEach((bot) => peers.push(botSnapshot(bot)));
 
@@ -2642,11 +2716,7 @@ export class GameSocketManager {
   }
 
   combatantsOnMap(mapId) {
-    const list = [];
-    this.players.forEach((player) => {
-      if (player.mapId === mapId) list.push(player);
-    });
-    list.push(...this.botsOnMap(mapId));
+    const list = [...this.getPlayersOnMap(mapId), ...this.botsOnMap(mapId)];
     return list;
   }
 
@@ -2920,17 +2990,13 @@ export class GameSocketManager {
   tickEnemies() {
     if (!this.wss.clients.size) return;
 
-    const players = Array.from(this.players.values());
-
     // Each map steps its own roster against its own players: a monster must never
     // chase someone standing on another map.
     this.enemyByMap.forEach((roster, mapId) => {
       if (!roster.size) return;
 
       const map = getMap(mapId);
-      const mapPlayers = players
-        .filter((player) => player.mapId === mapId)
-        .concat(this.botsOnMap(mapId));
+      const mapPlayers = this.getPlayersOnMap(mapId).concat(this.botsOnMap(mapId));
       const grid = this.gridFor(mapId);
       const moved = [];
       // The market keeps a few legacy spawns outside its square; clamping those to
@@ -3068,6 +3134,7 @@ export class GameSocketManager {
     const player = this.players.get(ws);
     if (player) {
       this.players.delete(ws);
+      this.removePlayerFromMap(player.mapId, ws);
 
       // Only drop the id -> socket mapping when it still belongs to this socket.
       // A reconnect registers a new socket under the same id first, and the old
@@ -3100,9 +3167,7 @@ export class GameSocketManager {
       }
 
       const mapId = player.mapId || DEFAULT_MAP_ID;
-      const mapStillOccupied = Array.from(this.players.values()).some(
-        (other) => other.mapId === mapId
-      );
+      const mapStillOccupied = this.isMapOccupied(mapId);
 
       // When the last player leaves a map, walk its living monsters home and
       // retire the PK bots that were spawned for that population.
@@ -3147,6 +3212,7 @@ export class GameSocketManager {
     this.enemyRespawnTimers.clear();
     this.botRoster?.close();
     this.players.clear();
+    this.playersByMap.clear();
     this.playerById.clear();
     if (this.wss) {
       this.wss.clients.forEach((client) => {
