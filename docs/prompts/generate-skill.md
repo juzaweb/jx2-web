@@ -1,6 +1,6 @@
 # Hướng Dẫn & Bộ Prompt Chi Tiết Từng Skill Bằng AI
 
-Tài liệu này cung cấp bộ prompt chuẩn và cụ thể cho **toàn bộ 18 kỹ năng** hiện có trong game **JX2-Web ("Giang Hồ")**, chia theo **4 môn phái**: Thiếu Lâm (bao tay), Võ Đang (kiếm), Nga My (kiếm) và Ngũ Độc (đao).
+Tài liệu này cung cấp bộ prompt chuẩn và cụ thể cho **toàn bộ 24 kỹ năng** trong game **JX2-Web ("Giang Hồ")**, chia theo **5 môn phái**: Thiếu Lâm (bao tay), Võ Đang (kiếm), Nga My (kiếm), Ngũ Độc (đao) và Cái Bang (bao tay).
 
 Với mỗi kỹ năng trong game, tài nguyên hình ảnh được phân loại như sau:
 - **Chiêu thức Chủ động (Active Skills):** Gồm đầy đủ **2 Prompt** — **Prompt 1 (Skill Icon)** và **Prompt 2 (VFX Sprite Sheet)**.
@@ -17,7 +17,7 @@ You are an expert game developer working on the JX2-Web ("Giang Hồ") codebase.
 Your task is to implement or update a skill into the game according to `docs/sect-skills.md`.
 
 ### Skill Details:
-- **Sect:** [thieu-lam | vo-dang | nga-my | ngu-doc]  (a sect owns a kit and a fixed weapon)
+- **Sect:** [thieu-lam | vo-dang | nga-my | ngu-doc | cai-bang]  (a sect owns a kit and a fixed weapon)
 - **Skill ID:** [skill_id]
 - **Skill Name (VI / EN / ZH):** [Name VI] / [Name EN] / [Name ZH]
 - **Slot Index:** [0..5] | **Unlock Level:** [Level] | **MP:** [Cost] | **Cooldown:** [ms]
@@ -42,7 +42,7 @@ Your task is to implement or update a skill into the game according to `docs/sec
 > [!NOTE]
 > **Quy tắc phân loại Asset cho chiêu thức:**
 > - **Chiêu thức Chủ động (Kiếm pháp, Đao pháp, Quyền pháp, Chưởng pháp, Trận pháp, Tuyệt kỹ):** Đầy đủ **2 Prompt** (1 Icon + 1 VFX Sprite Sheet).
-> - **Chiêu thức Tâm Pháp Bị động (*Thiếu Lâm Tâm Pháp*):** **CHỈ CÓ 1 Prompt (Icon)**, hoàn toàn **KHÔNG CÓ VFX Sprite Sheet** vì là nội công bị động tự vận hành ngầm trong cơ thể.
+> - **Chiêu thức Tâm Pháp Bị động (*Thiếu Lâm Tâm Pháp*, *Cái Bang Tâm Pháp*):** **CHỈ CÓ 1 Prompt (Icon)**, hoàn toàn **KHÔNG CÓ VFX Sprite Sheet** vì là nội công bị động tự vận hành ngầm trong cơ thể.
 > - **Quy chuẩn Icon:** Thiết kế **không viền (borderless, no frame)** tràn viền (full bleed) để khung hiển thị UI trong game (`HotbarDock` / slot chiêu thức) tự quản lý viền và bo góc, tránh bị trùng lặp 2 lớp viền.
 > - **Quy chuẩn Sprite Sheet:** Sử dụng **nền trắng thuần (`Solid pure white background`)** cho toàn bộ hiệu ứng chiêu thức để tối ưu tách nền AI và chuyển đổi sang PNG trong suốt (Alpha channel).
 
@@ -269,6 +269,79 @@ A 2D skill icon of the Nether Ghost Phantom Strike (U Hồn Phiệt Ảnh), dark
 * **Prompt 2 (Sprite Sheet):**
 ```text
 A 2D game VFX sprite sheet of a rising ghostly specter and soul fire burst, top-down isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: dark purple shadowy smoke rising from the hero's silhouette; Frame 2: a demonic specter phantom shrieking upward with glowing purple eyes; Frame 3: specter bursting into radial phantom soul flames and skull-shaped smoke wisps; Frame 4: soul flames settling into a sinister dark purple critical-strike aura around the body. Solid pure white background, 256x256 per frame --ar 4:1 --v 6.0 --style raw
+```
+
+---
+
+### PHẦN D: BỘ KỸ NĂNG CÁI BANG CHƯỞNG (`bao-tay` - 6 Kỹ Năng)
+
+---
+
+#### 19. Cái Bang Tâm Pháp (`cai_bang_tam_phap` - Slot 0, Tâm pháp khởi đầu, bị động né tránh & hồi phục)
+* **Prompt 1 (Icon):**
+```text
+A 2D game skill icon of the Beggars' Sect Internal Mental Art (Cái Bang Tâm Pháp), classic Wuxia style. A weathered bamboo wine gourd flask hanging beside a flowing beggar belt sash, surrounded by warm amber inner qi mist, floating spirit wine vapor ripples and subtle fiery dragon breath wisps. Dark rustic slate background, borderless, no frame. Clean UI vector clarity, balanced composition, readable at 64x64 --ar 1:1 --v 6.0 --no border frame
+```
+* **Prompt 2 (Sprite Sheet):** *Không có* — Chiêu thức Tâm Pháp (Nội công / Bị động) tự động vận hành trong cơ thể, không có VFX Sprite Sheet thi triển trên sàn đấu.
+
+---
+
+#### 20. Bổ Phong Tróc Ảnh (`bo_phong_troc_anh` - Slot 1, Thân pháp chưởng phong áp sát chớp nhoáng)
+* **Prompt 1 (Icon):**
+```text
+A 2D game skill icon of Wind-Catching Shadow Palm (Bổ Phong Tróc Ảnh), dynamic martial arts style. A rugged weathered palm thrusting forward at blinding speed, ripping through atmospheric wind barriers with swirling gale-force wind spirals and fiery orange motion blurs. Dark charcoal background, borderless, no frame. High contrast, dynamic speed impact, mobile RPG UI ready --ar 1:1 --v 6.0 --no border frame
+```
+* **Prompt 2 (Sprite Sheet):**
+```text
+A 2D game VFX sprite sheet of a rapid dashing wind-burst and fiery palm thrust, top-down isometric combat view. Single horizontal row of 4 animation frames from left to right: Frame 1: a compressed cone of swirling wind pressure and orange dash trails launching forward; Frame 2: a fiery beggar palm silhouette piercing through an expanding sonic wind vortex; Frame 3: explosive cross-cutting wind wave impact flash with blazing orange sparks; Frame 4: fading residual gale currents and dissipating heat ripples. Solid pure white background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
+```
+
+---
+
+#### 21. Hàng Long Chưởng (`hang_long_chuong` - Slot 2, Hỏa long chưởng kình tầm xa)
+* **Prompt 1 (Icon):**
+```text
+A high-detail 2D game skill icon of the Dragon Subduing Palm (Hàng Long Chưởng), Chinese Wuxia fantasy style. A roaring golden-crimson celestial dragon head emerging from a powerful open strike palm, engulfed in blazing solar fire sparks and swirling incandescent heat waves. Deep obsidian stone background, borderless, no frame. Intense fiery contrast, sharp icon clarity at 64x64 --ar 1:1 --v 6.0 --style raw --no border frame
+```
+* **Prompt 2 (Sprite Sheet):**
+```text
+A 2D game VFX sprite sheet of a flying fiery dragon projectile and impact explosion, isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: a coiled blazing red-gold Chinese dragon head shooting forward leaving a swirling flame tail; Frame 2: the dragon projectile lunging with open jaws and intense fire aura; Frame 3: violent detonation on collision, fiery dragon body shattering into an expanding supernova blast of fire waves and embers; Frame 4: residual fiery smoke rings and dispersing crimson sparks. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+```
+
+---
+
+#### 22. Túy Điệp Cuồng Vũ (`tuy_diep_cuong_vu` - Slot 3, Thần pháp túy quyền buff né tránh & bạo kích)
+* **Prompt 1 (Icon):**
+```text
+A 2D skill icon of the Drunken Butterfly Frenzy Footwork (Túy Điệp Cuồng Vũ), Wuxia drunken master style. An ancient jade wine pot pouring glistening golden liquor into a floating wooden cup, enveloped in spiraling golden liquor droplets, elusive ethereal butterfly silhouettes and fiery drunken mist. Dark aged wood background, borderless, no frame. Fluid artistic motion, vibrant warm palette --ar 1:1 --v 6.0 --no border frame
+```
+* **Prompt 2 (Sprite Sheet):**
+```text
+A 2D game VFX sprite sheet of a drunken swirling wine aura and spectral phantom clones, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: golden liquor mist and swirling amber ribbons spiraling up from the feet; Frame 2: two illusory drunken afterimage silhouettes dodging in opposite arcs; Frame 3: golden wine splash vortex bursting into floating ember butterflies and liquor droplets; Frame 4: warm pulsing amber drunken combat aura settling around the character. Solid pure white background, 256x256 cell size, high contrast --ar 4:1 --v 6.0 --style raw
+```
+
+---
+
+#### 23. Kháng Long Hữu Hối (`khang_long_huu_hoi` - Slot 4, Kình long bộc phát cực mạnh gây choáng)
+* **Prompt 1 (Icon):**
+```text
+A high-detail 2D game skill icon of Proud Dragon Repents (Kháng Long Hữu Hối), epic Wuxia martial art. Two massive glowing fiery bronze dragons intertwining tightly around a forward-thrusting clenched iron fist, crackling with blinding golden solar lightning and explosive shockwave arcs. Pitch black background, borderless, no frame. Monumental physical impact, hyper-focused lighting, 8k --ar 1:1 --v 6.0 --style raw --no border frame
+```
+* **Prompt 2 (Sprite Sheet):**
+```text
+A 2D game VFX sprite sheet of a massive dual-dragon piercing thrust and seismic stun shockwave, isometric perspective. Single horizontal row of 4 animation frames from left to right: Frame 1: two swirling red-gold fire dragons coiling tightly around an intense energy vortex; Frame 2: twin dragon energy beams piercing straight through the impact point with blinding solar flash; Frame 3: catastrophic shockwave eruption blasting concentric golden flame rings and jagged ground fissures; Frame 4: lingering dragon smoke phantoms and crackling golden lightning sparks. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
+```
+
+---
+
+#### 24. Phi Long Tại Thiên (`phi_long_tai_thien` - Slot 5, Tuyệt kỹ nộ long giáng trần oanh tạc diện rộng)
+* **Prompt 1 (Icon):**
+```text
+A high-detail 2D game skill icon of Flying Dragon in the Heavens (Phi Long Tại Thiên), legendary ultimate Wuxia art. A colossal fiery crimson-gold celestial dragon diving straight down from stormy heavenly clouds engulfed in raging inferno flames, jaws open roaring toward the earth. Dark scorched stone background, borderless, no frame. Epic apocalyptic scale, masterpiece UI asset, 8k --ar 1:1 --v 6.0 --style raw --no border frame
+```
+* **Prompt 2 (Sprite Sheet):**
+```text
+A 2D game VFX sprite sheet of a colossal descending fire dragon crashing and inferno shockwave, top-down isometric view. Single horizontal row of 4 animation frames from left to right: Frame 1: a giant fiery dragon descending vertically from the sky wrapped in a vortex of roaring flames; Frame 2: cataclysmic impact flash as the dragon strikes the earth with outward holy flame erupting; Frame 3: massive circular inferno crater expanding with churning fire waves, flying molten rocks, and roaring flame columns; Frame 4: lingering burning scorched earth, dissipating smoke plumes and fading crimson dragon embers. Solid pure white background, 256x256 per frame, high contrast --ar 4:1 --v 6.0 --style raw
 ```
 
 ---
