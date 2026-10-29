@@ -38,12 +38,12 @@ describe("server skill cast rules", () => {
 
   it("refuses a skill the hero has not learned", () => {
     const starter = skillById("thieu_duong_kiem_phap");
-    const unlearned = skillById("thai_cuc_quyen");
+    const unlearned = skillById("thai_cuc_kiem_phap");
     // The sect starter is always known, so a fresh hero may cast it.
     assert.equal(castRejection(starter, player()), null);
     assert.equal(castRejection(unlearned, player({ level: 30 })), "locked");
     assert.equal(
-      castRejection(unlearned, player({ level: 30, learnedSkills: ["thai_cuc_quyen"] })),
+      castRejection(unlearned, player({ level: 30, learnedSkills: ["thai_cuc_kiem_phap"] })),
       null
     );
   });
@@ -62,8 +62,8 @@ describe("server skill cast rules", () => {
     // Own level met, prerequisite missing.
     assert.equal(learnRejection(gated, 26, [])?.reason, "prereq");
     // Prerequisite learned, own level still too low (the third sword art needs 26).
-    assert.equal(learnRejection(gated, 25, ["thai_cuc_quyen"])?.reason, "level");
-    assert.equal(learnRejection(gated, 26, ["thai_cuc_quyen"]), null);
+    assert.equal(learnRejection(gated, 25, ["thai_cuc_kiem_phap"])?.reason, "level");
+    assert.equal(learnRejection(gated, 26, ["thai_cuc_kiem_phap"]), null);
   });
 
   it("applies buffs and heals to the caster", () => {
@@ -227,7 +227,7 @@ describe("server skill cast rules", () => {
     const skill = skillById("thieu_duong_kiem_phap");
 
     assert.deepEqual(upgradeRejection(null, player()), { reason: "not_usable" });
-    assert.equal(upgradeRejection(skillById("thai_cuc_quyen"), player())?.reason, "not_learned");
+    assert.equal(upgradeRejection(skillById("thai_cuc_kiem_phap"), player())?.reason, "not_learned");
 
     const maxed = player({
       learnedSkills: ["thieu_duong_kiem_phap"],

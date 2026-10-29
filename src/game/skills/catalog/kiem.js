@@ -33,27 +33,35 @@ export const VO_DANG_SKILLS = [
     }
   }),
   defineSkill({
-    id: "thai_cuc_quyen",
+    id: "thai_cuc_kiem_phap",
     weapon: "kiem",
     slot: 1,
+    icon: "/skills/thai_cuc_kiem_phap.png",
     glyph: "太",
     requires: [{ id: "thieu_duong_kiem_phap", level: 1 }],
-    nameKey: "skills.voDang.thaiCucQuyen.name",
-    descKey: "skills.voDang.thaiCucQuyen.desc",
+    nameKey: "skills.voDang.thaiCucKiemPhap.name",
+    descKey: "skills.voDang.thaiCucKiemPhap.desc",
     unlockLevel: 18,
     mp: 10,
     cooldown: 3500,
     target: "enemy",
     range: 180,
     radius: 0,
-    mult: 1.35
+    mult: 1.35,
+    vfx: {
+      sprite: "vfx-thai-cuc-kiem-phap",
+      travelFrames: 1,
+      impact: null,
+      color: 0x7fb3e0,
+      fps: 12
+    }
   }),
   defineSkill({
     id: "tam_thanh_kiem_phap",
     weapon: "kiem",
     slot: 2,
     glyph: "三",
-    requires: [{ id: "thai_cuc_quyen", level: 1 }],
+    requires: [{ id: "thai_cuc_kiem_phap", level: 1 }],
     nameKey: "skills.voDang.tamThanhKiemPhap.name",
     descKey: "skills.voDang.tamThanhKiemPhap.desc",
     unlockLevel: 26,

@@ -14,11 +14,24 @@ export const BASIC_ATTACK_ID = "normal";
 /** Skill lists keyed by sect id. */
 export const SKILLS_BY_SECT = SKILL_KITS;
 
+/** Legacy or misnamed skill id aliases mapped to canonical ids. */
+export const LEGACY_SKILL_ID_ALIASES = Object.freeze({
+  thai_cuc_quyen: "thai_cuc_kiem_phap"
+});
+
 /** id -> skill entry. Internal lookup table shared by the helper modules. */
 export const SKILLS_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]));
+for (const [legacyId, canonicalId] of Object.entries(LEGACY_SKILL_ID_ALIASES)) {
+  const target = SKILLS_BY_ID.get(canonicalId);
+  if (target) SKILLS_BY_ID.set(legacyId, target);
+}
 
 /** id -> slot index. Internal lookup table for {@link skillSlot}. */
 const SLOT_INDEX_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill.slot]));
+for (const [legacyId, canonicalId] of Object.entries(LEGACY_SKILL_ID_ALIASES)) {
+  const slot = SLOT_INDEX_BY_ID.get(canonicalId);
+  if (typeof slot === "number") SLOT_INDEX_BY_ID.set(legacyId, slot);
+}
 
 /**
  * Normalise a caller-supplied weapon id to a known weapon type.

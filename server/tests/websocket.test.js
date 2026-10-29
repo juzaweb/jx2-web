@@ -819,12 +819,12 @@ test("WebSocket server-authority suite", async (t) => {
     assert.ok(store.getLearnedSkills("char_learn").includes("la_han_quyen"));
 
     // An art of another sect is refused outright, whether or not it exists.
-    client.send({ type: "learn_skill", payload: { skillId: "thai_cuc_quyen" } });
+    client.send({ type: "learn_skill", payload: { skillId: "thai_cuc_kiem_phap" } });
     const refused = await client.waitFor(
       (m) => m.type === "item_result" && m.payload.action === "learn" && m.payload.ok === false
     );
     assert.equal(refused.payload.reason, "sect");
-    assert.equal(store.getLearnedSkills("char_learn").includes("thai_cuc_quyen"), false);
+    assert.equal(store.getLearnedSkills("char_learn").includes("thai_cuc_kiem_phap"), false);
 
     await client.close();
   });

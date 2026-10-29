@@ -339,6 +339,10 @@ export default {
         name: "Thiếu Dương Kiếm Pháp",
         desc: "Kiếm pháp cơ bản Võ Đang, linh hoạt nhanh nhẹn."
       },
+      thaiCucKiemPhap: {
+        name: "Thái Cực Kiếm Pháp",
+        desc: "Kiếm pháp mượn lực đả lực, gây sát thương chấn động."
+      },
       thaiCucQuyen: {
         name: "Thái Cực Kiếm Pháp",
         desc: "Kiếm pháp mượn lực đả lực, gây sát thương chấn động."

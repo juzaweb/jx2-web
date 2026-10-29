@@ -448,13 +448,17 @@ export class PlayerDatabase {
       const kit = SKILL_KITS[sect] || [];
       const kitIds = new Set(kit.map((entry) => entry.id));
       const starterId = sectStarterSkillId(sect);
-      const kept = learnedIds.filter((id) => kitIds.has(id));
+      const canonicalLearnedIds = learnedIds.map((id) =>
+        id === "thai_cuc_quyen" ? "thai_cuc_kiem_phap" : id
+      );
+      const kept = canonicalLearnedIds.filter((id) => kitIds.has(id));
       if (!kept.includes(starterId)) kept.push(starterId);
 
       const storedLevels = parse(row.skill_levels, {});
       const keptLevels = {};
       if (storedLevels && typeof storedLevels === "object" && !Array.isArray(storedLevels)) {
-        for (const [id, level] of Object.entries(storedLevels)) {
+        for (const [rawId, level] of Object.entries(storedLevels)) {
+          const id = rawId === "thai_cuc_quyen" ? "thai_cuc_kiem_phap" : rawId;
           if (kept.includes(id)) keptLevels[id] = normalizeSkillLevel(level);
         }
       }
@@ -532,7 +536,9 @@ export class PlayerDatabase {
     try {
       const parsed = JSON.parse(raw || "[]");
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((id) => typeof id === "string" && id.length > 0);
+      return parsed
+        .filter((id) => typeof id === "string" && id.length > 0)
+        .map((id) => (id === "thai_cuc_quyen" ? "thai_cuc_kiem_phap" : id));
     } catch {
       return [];
     }
@@ -549,8 +555,9 @@ export class PlayerDatabase {
       const parsed = JSON.parse(raw || "{}");
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
       const levels = {};
-      for (const [id, level] of Object.entries(parsed)) {
-        if (DANGEROUS_KEYS.has(id) || typeof id !== "string" || id.length === 0) continue;
+      for (const [rawId, level] of Object.entries(parsed)) {
+        if (DANGEROUS_KEYS.has(rawId) || typeof rawId !== "string" || rawId.length === 0) continue;
+        const id = rawId === "thai_cuc_quyen" ? "thai_cuc_kiem_phap" : rawId;
         const value = Number(level);
         if (!Number.isFinite(value)) continue;
         levels[id] = normalizeSkillLevel(value);

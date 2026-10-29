@@ -340,6 +340,10 @@ export default {
         name: "少阳剑法",
         desc: "武当基础剑术，轻灵快捷。"
       },
+      thaiCucKiemPhap: {
+        name: "太极剑法",
+        desc: "借力打力的太极剑法，造成强劲冲击伤害。"
+      },
       thaiCucQuyen: {
         name: "太极剑法",
         desc: "借力打力的太极剑法，造成强劲冲击伤害。"

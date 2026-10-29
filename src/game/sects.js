@@ -121,8 +121,9 @@ export function sectWeaponItemId(sect) {
  */
 export function sectForSkill(skillId, kits = {}) {
   if (typeof skillId !== "string") return null;
+  const canonicalId = skillId === "thai_cuc_quyen" ? "thai_cuc_kiem_phap" : skillId;
   for (const [sect, entries] of Object.entries(kits)) {
-    if (Array.isArray(entries) && entries.some((entry) => entry?.id === skillId)) return sect;
+    if (Array.isArray(entries) && entries.some((entry) => entry?.id === canonicalId)) return sect;
   }
   return null;
 }

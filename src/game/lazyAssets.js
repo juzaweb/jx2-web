@@ -40,6 +40,11 @@ export const VFX_SPRITES = {
     url: "/skills/vfx/thieu_duong_kiem_phap/sheet.png",
     frameWidth: 256,
     frameHeight: 256
+  },
+  "vfx-thai-cuc-kiem-phap": {
+    url: "/skills/vfx/thai_cuc_kiem_phap/sheet.png",
+    frameWidth: 256,
+    frameHeight: 256
   }
 };
 

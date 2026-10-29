@@ -168,9 +168,9 @@ test("skill books are stripped and learned arts move onto the hero's sect kit", 
     );
     assert.deepEqual(store.getLearnedSkills("char_mislabelled"), [
       "thieu_duong_kiem_phap",
-      "thai_cuc_quyen"
+      "thai_cuc_kiem_phap"
     ]);
-    assert.deepEqual(store.getSkillLevels("char_mislabelled"), { thai_cuc_quyen: 2 });
+    assert.deepEqual(store.getSkillLevels("char_mislabelled"), { thai_cuc_kiem_phap: 2 });
 
     store.db.close();
   } finally {

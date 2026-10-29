@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { translateFor } from "../i18n/translator.js";
+import { sectForSkill } from "./sects.js";
+import { SKILLS_BY_ID } from "./skills/registry.js";
 import {
   SKILL_SLOTS,
   SKILLS,
@@ -34,7 +36,7 @@ describe("skill catalog", () => {
       "kim_cang_bat_hoai",
       "nhu_lai_than_chuong",
       "thieu_duong_kiem_phap",
-      "thai_cuc_quyen",
+      "thai_cuc_kiem_phap",
       "tam_thanh_kiem_phap",
       "toat_hong_quan_khuyet",
       "nga_my_kiem_phap",
@@ -73,6 +75,26 @@ describe("skill catalog", () => {
         fps: 12
       }
     });
+    expect(skillsForSect("vo-dang")[1]).toMatchObject({
+      id: "thai_cuc_kiem_phap",
+      weapon: "kiem",
+      slot: 1,
+      unlockLevel: 18,
+      range: 180,
+      radius: 0,
+      icon: "/skills/thai_cuc_kiem_phap.png",
+      vfx: {
+        sprite: "vfx-thai-cuc-kiem-phap",
+        travelFrames: 1,
+        impact: null,
+        color: 0x7fb3e0,
+        fps: 12
+      }
+    });
+    expect(skillById("thai_cuc_quyen")?.id).toBe("thai_cuc_kiem_phap");
+    expect(SKILLS_BY_ID.get("thai_cuc_quyen")?.id).toBe("thai_cuc_kiem_phap");
+    expect(skillSlot("thai_cuc_quyen")).toBe(1);
+    expect(sectForSkill("thai_cuc_quyen", SKILLS_BY_SECT)).toBe("vo-dang");
     expect(skillsForSect("nga-my")[0]).toMatchObject({
       id: "nga_my_kiem_phap",
       weapon: "kiem",
@@ -200,7 +222,9 @@ describe("skill catalog", () => {
       "public/skills/nhu_lai_than_chuong.png",
       "public/skills/vfx/nhu_lai_than_chuong/sheet.png",
       "public/skills/thieu_duong_kiem_phap.png",
-      "public/skills/vfx/thieu_duong_kiem_phap/sheet.png"
+      "public/skills/vfx/thieu_duong_kiem_phap/sheet.png",
+      "public/skills/thai_cuc_kiem_phap.png",
+      "public/skills/vfx/thai_cuc_kiem_phap/sheet.png"
     ]) {
       expect(fs.existsSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)))).toBe(true);
     }

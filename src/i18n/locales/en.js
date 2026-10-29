@@ -339,6 +339,10 @@ export default {
         name: "Shao Yang Sword Style",
         desc: "Basic Wudang sword technique, agile and precise."
       },
+      thaiCucKiemPhap: {
+        name: "Tai Chi Sword Art",
+        desc: "Tai Chi sword technique borrowing force to redirect momentum, dealing concussive damage."
+      },
       thaiCucQuyen: {
         name: "Tai Chi Sword Art",
         desc: "Tai Chi sword technique borrowing force to redirect momentum, dealing concussive damage."
