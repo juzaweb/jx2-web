@@ -95,4 +95,16 @@ describe("findNearestPvpTarget", () => {
     expect(findNearestPvpTarget(null, [])).toBeNull();
     expect(findNearestPvpTarget(attacker, null)).toBeNull();
   });
+
+  it("handles large crowds efficiently without Math.hypot overhead", () => {
+    const crowdedPeers = Array.from({ length: 1000 }, (_, i) =>
+      peer(`p_${i}`, 50 + i * 2, 50 + i * 2)
+    );
+    const start = performance.now();
+    for (let i = 0; i < 500; i++) {
+      findNearestPvpTarget(attacker, crowdedPeers);
+    }
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(100);
+  });
 });
