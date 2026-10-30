@@ -68,14 +68,17 @@ export function findPlayerAt(players, x, y) {
   }
 
   let best = null;
-  let bestDistance = Infinity;
+  // Use squared distance to avoid expensive Math.hypot square roots in target search.
+  let bestDistSq = Infinity;
   for (const player of players) {
     if (!isPointOnPlayer(player, x, y)) continue;
 
-    const distance = Math.hypot(player.x - x, player.y - y);
-    if (distance < bestDistance) {
+    const dx = player.x - x;
+    const dy = player.y - y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < bestDistSq) {
       best = player;
-      bestDistance = distance;
+      bestDistSq = distSq;
     }
   }
   return best;
@@ -118,17 +121,24 @@ export function findNearestPvpTarget(
   if (!attacker || !Array.isArray(players)) return null;
   if (typeof attacker.x !== "number" || typeof attacker.y !== "number") return null;
 
+  const ax = attacker.x;
+  const ay = attacker.y;
+  const maxRangeSq = maxRange * maxRange;
+
   let best = null;
-  let bestDistance = Infinity;
+  // Use squared distance to avoid expensive Math.hypot square roots in loop over players.
+  let bestDistSq = Infinity;
   for (const player of players) {
     if (!isLive(player)) continue;
     if (!isDuelCandidate(attacker, player, pvpMode)) continue;
     if (attacker.id && player.id === attacker.id) continue;
 
-    const distance = Math.hypot(player.x - attacker.x, player.y - attacker.y);
-    if (distance <= maxRange && distance < bestDistance) {
+    const dx = player.x - ax;
+    const dy = player.y - ay;
+    const distSq = dx * dx + dy * dy;
+    if (distSq <= maxRangeSq && distSq < bestDistSq) {
       best = player;
-      bestDistance = distance;
+      bestDistSq = distSq;
     }
   }
   return best;

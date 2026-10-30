@@ -26,5 +26,8 @@ export function shouldReportPosition(state = {}, threshold = TELEPORT_REPORT_THR
   // Nothing reported yet: send the current spot so peers never start stale.
   if (!lastReported) return true;
 
-  return Math.hypot(x - lastReported.x, y - lastReported.y) > threshold;
+  const dx = x - lastReported.x;
+  const dy = y - lastReported.y;
+  // Use squared distance to avoid expensive Math.hypot square root in position check.
+  return dx * dx + dy * dy > threshold * threshold;
 }

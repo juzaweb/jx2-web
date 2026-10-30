@@ -37,7 +37,9 @@ export function skillCastReach(skill) {
 export function isInsideCastArea(cast, skill, target, fallback) {
   if (!(skill?.radius > 0) || cast?.skillId !== skill.id) return true;
   const center = cast.aim || fallback;
-  return (
-    Math.hypot(center.x - target.x, center.y - target.y) <= skill.radius + HIT_RADIUS_SLACK
-  );
+  const dx = center.x - target.x;
+  const dy = center.y - target.y;
+  const maxRadius = skill.radius + HIT_RADIUS_SLACK;
+  // Use squared distance to avoid expensive Math.hypot square root in area check.
+  return dx * dx + dy * dy <= maxRadius * maxRadius;
 }
