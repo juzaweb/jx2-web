@@ -195,12 +195,24 @@ describe("Giang Ho Backend API Test Suite", () => {
     assert.equal(foreignJson.success, false);
   });
 
-  test("Leaderboard reads from persisted saves", async () => {
+  test("Leaderboard reads from persisted saves and sanitizes query input", async () => {
     const lbRes = await fetch(`${baseUrl}/leaderboard?sortBy=level&limit=5`);
     assert.equal(lbRes.status, 200);
     const lbJson = await lbRes.json();
     assert.equal(lbJson.success, true);
     assert.ok(Array.isArray(lbJson.data.rankings));
+
+    // Invalid sortBy parameter falls back safely to 'level'
+    const invalidSortRes = await fetch(`${baseUrl}/leaderboard?sortBy=invalid_column&limit=5`);
+    assert.equal(invalidSortRes.status, 200);
+    const invalidSortJson = await invalidSortRes.json();
+    assert.equal(invalidSortJson.data.sortBy, "level");
+
+    // Limit parameter is clamped to a maximum of 50
+    const overLimitRes = await fetch(`${baseUrl}/leaderboard?sortBy=coins&limit=999`);
+    assert.equal(overLimitRes.status, 200);
+    const overLimitJson = await overLimitRes.json();
+    assert.equal(overLimitJson.data.sortBy, "coins");
   });
 
   test("Validation: rejects invalid playerId", async () => {
