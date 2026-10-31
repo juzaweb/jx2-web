@@ -240,7 +240,10 @@ export class CombatSystem {
     let closest = null;
     let minSq = reachSq;
 
-    for (const wolf of this.enemyManager.getAlive()) {
+    // BOLT OPTIMIZATION: Prefer getAll() with in-loop liveness checks to avoid intermediate array allocation from getAlive()
+    const enemies = this.enemyManager.getAll ? this.enemyManager.getAll() : this.enemyManager.getAlive();
+    for (const wolf of enemies) {
+      if (!wolf || wolf.active === false || wolf.isDead) continue;
       const dx = wolf.x - px;
       const dy = wolf.y - py;
       const distSq = dx * dx + dy * dy;
@@ -478,7 +481,10 @@ export class CombatSystem {
     let closest = null;
     let minSq = maxSq;
 
-    for (const wolf of this.enemyManager.getAlive()) {
+    // BOLT OPTIMIZATION: Prefer getAll() with in-loop liveness checks to avoid intermediate array allocation from getAlive()
+    const enemies = this.enemyManager.getAll ? this.enemyManager.getAll() : this.enemyManager.getAlive();
+    for (const wolf of enemies) {
+      if (!wolf || wolf.active === false || wolf.isDead) continue;
       const dx = wolf.x - px;
       const dy = wolf.y - py;
       const distSq = dx * dx + dy * dy;
@@ -501,7 +507,10 @@ export class CombatSystem {
     let closest = null;
     let minSq = maxSq;
 
-    for (const wolf of this.enemyManager.getAlive()) {
+    // BOLT OPTIMIZATION: Prefer getAll() with in-loop liveness checks to avoid intermediate array allocation from getAlive()
+    const enemies = this.enemyManager.getAll ? this.enemyManager.getAll() : this.enemyManager.getAlive();
+    for (const wolf of enemies) {
+      if (!wolf || wolf.active === false || wolf.isDead) continue;
       const dx = wolf.x - px;
       const dy = wolf.y - py;
       const distSq = dx * dx + dy * dy;
@@ -593,7 +602,17 @@ export class CombatSystem {
    * @returns {Object|null}
    */
   findPendingTarget(targetId) {
-    const wolf = this.enemyManager.getAlive().find((entry) => entry.id === targetId);
+    // BOLT OPTIMIZATION: Use O(1) getById lookup when available, avoiding array allocation and search
+    let wolf = null;
+    if (typeof this.enemyManager.getById === "function") {
+      const candidate = this.enemyManager.getById(targetId);
+      if (candidate && candidate.active !== false && !candidate.isDead) {
+        wolf = candidate;
+      }
+    } else {
+      const enemies = this.enemyManager.getAll ? this.enemyManager.getAll() : this.enemyManager.getAlive();
+      wolf = enemies.find((entry) => entry && entry.id === targetId && entry.active !== false && !entry.isDead) || null;
+    }
     if (wolf) return wolf;
 
     const peer = (this.scene.remotePlayerManager?.getAll?.() || []).find((entry) => entry.id === targetId);
