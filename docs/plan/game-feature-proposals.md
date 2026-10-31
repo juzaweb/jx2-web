@@ -1,35 +1,40 @@
 # Game Feature Proposals
 
-- **Date:** 2026-10-28
-- **Project / engine:** React 19, Vite 8, Phaser 3.90 (Arcade Physics), Node.js / WebSocket server authority
-- **Genre / target platform:** Browser-playable 2.5D isometric wuxia RPG (PC desktop & mobile web browser)
-- **Development stage:** Playable Alpha / Content Expansion (13 playable maps across 3 factions Hán/Thục/Ngụy, weapon-kit skill architecture, Dã Tẩu newbie quest chain, server-authoritative combat & persistent player DB)
-- **Audit scope:** `src/game/` (progression, equipment, items, skills, shop, combat, maps, worldManager, quests, autoTarget, targetRing, pvp, factions), `src/components/` (HUD, Modals, MobileControls, MinimapPanel, ChatPanel), `server/src/` (gameSocket, rewards, enemy loop, auth, state), and `docs/`
-- **Limitations:** Live high-concurrency WAN network latency (>200ms) under real multi-region conditions was not benchmarked; art assets reuse vector-painted graphics and sprite sheets without custom 3D models.
+- **Date:** 2026-10-31
+- **Project / engine:** React 19, Vite 8, Phaser 3.90 (Arcade Physics), Node.js WebSocket Server Authority
+- **Genre / target platform:** Browser-playable 2.5D isometric wuxia MMORPG (PC desktop & mobile web touch)
+- **Development stage:** Alpha / Content & Systems Expansion (13 playable maps across 3 factions Hán/Thục/Ngụy, 4 sect skill trees with custom VFX & F5 tree progression, server-authoritative combat, movement & inventory)
+- **Audit scope:** `src/game/` (equipment, items, skills, enemyCatalog, combat, targetRing, autoTarget, pvpTargeting, maps, worldManager, quests), `src/components/` (HUD, Modals, MobileControls, MinimapPanel, ChatPanel), `server/src/` (gameSocket, rewards, playerDb, playerBag, state), and `docs/plan/`
+- **Limitations:** High-concurrency WAN internet latency under live multi-player stress conditions (>200ms ping) has not been benchmarked; visual assets utilize procedural/vector-painted graphics and 2D sprite frames.
 
 ## Executive summary
 
-Giang Hồ is a React and Phaser 3 browser wuxia RPG inspired by classic Vietnamese martial arts MMORPGs (Võ Lâm Truyền Kỳ 2). The game features a solid technical foundation: 60FPS Arcade physics, server-authoritative movement/combat/rewards, bi-directional React-Phaser bridge, persistent SQLite/JSON database, 3 faction capitals (Biện Kinh, Thục Thành, Ngụy Thành), 9 hunting grounds (levels 3–60), 1 shared cross-faction PvP battlefield (Trung Nguyên Chiến Trường), and an active Dã Tẩu newbie quest chain (`src/game/quests/catalog.js`).
+Giang Hồ is a browser wuxia MMORPG inspired by classic Vietnamese martial arts titles (e.g., Võ Lâm Truyền Kỳ 2). Built with React and Phaser 3, the project possesses a mature server-authoritative architecture: movement validation with snap-backs, server-calculated damage formulas, server-owned inventory/equipment, 13 interconnected map zones (3 faction capitals, 9 tiered hunting grounds, 1 central PvP battlefield), and four distinct sect skill trees (Thiếu Lâm, Võ Đang, Nga My, Ngũ Độc) learned directly via the F5 tree panel.
 
-While navigation, faction PvP, and early-game questing are functional, current playability faces four distinct design gaps:
-1. **Economic Sink & Gear Upgrade Void:** Monsters pay silver coins and drop basic items, but silver is mostly spent on potions at Dược Sư; there is no gear-enhancement system or upgrade material sink yet.
-2. **Combat Usability in Dense Camps & PvP:** Hunting grounds feature dense monster spawns (90 to 270 monsters per map). Target selection lacks explicit visual target lock rings and range indicators during intense PC hotbar or touch combat.
-3. **Mid/High-Level Weapon Kit & Drop Pool Gap:** Level 30–60 species in Bắc Lĩnh, Tây Sơn, Kiếm Các, etc. grant EXP and silver but do not yet drop higher-tier weapons or advanced skill books, leaving late-game item progression flat (`docs/plan/faction-cities.md`).
-4. **Repeatable Endgame Goals:** While the Level 1–10 Dã Tẩu talk chain guides newbies, players lack daily repeatable mob hunting contracts once they enter Level 15+ hunting grounds.
+An inspection of the current repository state reveals that while core combat mechanics, sect arts, and early navigation are in place, several key design gaps limit mid-to-late game engagement and economic health:
+1. **Economic Sink & Gear Upgrade Void:** Silver is earned from mob kills and quests, but expenditure is almost exclusively limited to consumable potions at Dược Sư. There is currently no gear enhancement or refinement sink for equipment.
+2. **Flat Equipment Ladder in High-Level Hunting Grounds:** Monsters in Level 30–60 hunting grounds (Bắc Lĩnh, Tây Sơn, Kiếm Các, Nga Mi, Quan Trung, Nghiệp Quan) drop silver and EXP, but only 2 low-level monsters (`hac-y-sat-thu` and `ma-giao-de-tu`) drop weapons (`bao-tay-lang-khach` and `dao-lang-khach`). Higher-tier weapons and armor pieces do not exist in the drop or equipment tables.
+3. **Target Cycling & Selection Usability:** Although `TargetRing` and `TargetVitals` exist for display upon clicking or auto-targeting, players in dense monster camps (90–270 mobs) lack direct target-cycling keybinds (`Tab`) and mobile switch target controls, causing targeting friction during fast-paced mob grinding and PvP.
+4. **Repeatable Endgame Daily Objectives:** The Dã Tẩu quest system provides an introduction for levels 1–10 (`src/game/quests/catalog.js`), but once players enter hunting grounds at level 15+, no structured daily contracts guide farming or reward sustained engagement.
+5. **Static Battlefield Territory:** Trung Nguyên Chiến Trường currently allows free faction PvP, but lacks capturable territory objectives, point tallies, or faction-wide incentives to organize battles.
 
-This document proposes 5 prioritized, evidence-backed features designed to deepen the core loop without introducing feature bloat or scope creep.
+This document outlines 5 prioritized, high-fit feature proposals focused on reinforcing the core gameplay loop without bloating the project scope.
 
 ---
 
 ## Current game and core loop
 
-The implemented gameplay loop follows a classic ARPG structure:
+The active gameplay loop operates as follows:
 
-1. **Player Goal:** Select a faction (Hán, Thục, Ngụy), advance character level (up to 99), acquire silver coins and rare upgrade materials, learn weapon skills from monster book drops, acquire higher-tier gear, and engage in cross-faction PvP on Trung Nguyên Chiến Trường or conquer high-level hunting grounds (Bắc Lĩnh, Tây Sơn, Kiếm Các, Nga Mi, Quan Trung).
-2. **Core Player Actions:** Direct movement (WASD, click-to-move, or mobile joystick), quick-slot skill casting (`1`–`9` hotbar or mobile radial fan), consumable usage, talking to market NPCs (`NPC_DUOC`, Dã Tẩu, shopkeepers), and completing newbie quests.
-3. **Challenge / Opposition:** Aggressive and leashed enemy camps across 9 hunting grounds (Level 3 to 60 species in `src/game/enemyCatalog.js`), and hostile faction players on the central battlefield (`trung-nguyen`).
-4. **Feedback and Rewards:** Server-calculated floating damage numbers, Web Audio synth sounds, EXP bar gains, silver coin payouts, and server-rolled skill-book/weapon drops (`rollEnemyReward` in `server/src/rewards.js`).
-5. **Progression and Persistence:** Level vitals calculated in `src/game/progression.js`, equipment stat bonuses derived in `src/game/equipment.js` (`attack`, `defense`, `maxHp`, `maxMp`, `critRate`, `accuracy`), quest progression saved in `saves.quest_state`, all server-owned via `server/src/websocket/gameSocket.js`; local hotbar/mobile bindings live in `localStorage` (`src/game/storage.js`).
+1. **Player Goal:** Choose a faction (Hán, Thục, Ngụy) and sect (Thiếu Lâm, Võ Đang, Nga My, Ngũ Độc). Train in hunting grounds (levels 3 to 60), gather silver and rare drops, master martial arts from the F5 tree, optimize equipment, and represent the faction in Trung Nguyên Chiến Trường.
+2. **Core Player Actions:**
+   - Movement: Direct WASD/arrow keys, click-to-move with cursor follow, or mobile virtual joystick.
+   - Combat: Basic attack (`Space` or click/tap enemy) and quick-slot skill casting (hotbar `1`–`9` or mobile radial fan).
+   - Progression: Studying and leveling sect techniques in the F5 tree using silver and EXP (`src/game/skills/levels.js`).
+   - Interaction: Interacting with NPCs (`NPC_DUOC`, Dã Tẩu, shopkeepers), completing newbie quests, managing inventory (`F4`) and equipment (`F3`).
+3. **Challenge / Opposition:** Aggressive and leashed monster camps across 9 hunting grounds (Level 3–60 monsters in `src/game/enemyCatalog.js`), and enemy faction players on `trung-nguyen` (`src/game/pvp.js`).
+4. **Feedback and Rewards:** Server-echoed floating damage and crit indicators, Web Audio synth combat sound effects, EXP gain bar, silver currency increments, rare equipment drops (`server/src/rewards.js`), and target health displays (`TargetVitals.jsx`).
+5. **Progression and Persistence:** Character vitals and stats derive server-side (`src/game/derivedStats.js`, `src/game/progression.js`). Equipment bonuses derive via `deriveEquipmentBonuses` (`src/game/equipment.js`). Inventory, equipped gear, vitals, and quest state are stored in the server SQLite/JSON database (`server/src/data/playerDb.js`), while quick-slot bindings are persisted locally (`src/game/storage.js`).
 
 ---
 
@@ -37,11 +42,11 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 | Priority | Feature | Target Player Value | Effort | Confidence |
 | --- | --- | --- | --- | --- |
-| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Converts silver coins and material drops (Huyễn Kim Thạch) into gear stat growth (+1 to +10), solving silver inflation and deepening item chase. | M | High |
-| **P1** | **Target Selection & Visual Lock Indicator (Khóa Mục Tiêu Chiêu Thức)** | Renders visual target ring & range feedback in dense mob camps and PvP, fixing targeting ambiguity on PC & mobile. | S | High |
-| **P1** | **Weapon Kit Expansion & High-Tier Drops (Mở Rộng Bộ Võ Công & Trang Bị Cấp Cao)** | Extends book/weapon drop pools to Level 30–60 species, adding tier-2/3 weapons (Huyền Thiết Kiếm, Trảm Mã Đao) and new kit techniques. | M | High |
-| **P2** | **Daily Bounty Quest System (Nhiệm Vụ Dã Tẩu Săn Bắt)** | Builds upon the Dã Tẩu newbie chain by adding repeatable daily mob-kill contracts with silver and material rewards. | M | High |
-| **P2** | **Battlefield Objective & Faction Scoring System (Chiếm Căn Cứ Chiến Trường)** | Adds capture points and real-time faction score tracking on Trung Nguyên Chiến Trường, transforming raw deathmatches into strategic combat. | L | Medium |
+| **P1** | **Equipment Enhancement System (Cường Hóa Trang Bị)** | Introduces a progressive gear enhancement mechanic (+1 to +10) consuming silver and upgrade stones, solving currency inflation and deepening the item progression chase. | M | High |
+| **P1** | **High-Tier Equipment & Drop Ladder (Bậc Trang Bị Cấp Cao & Rơi Đồ Quái Vật)** | Expands equipment from starter tier (`lang-khach`) into Tier-2 and Tier-3 sets across weapons and armors, wiring them into Level 15–60 monster drop tables. | M | High |
+| **P2** | **Target Cycling & Selection Controls (Chuyển Đổi & Khóa Mục Tiêu Nhanh)** | Implements `Tab` key cycling on PC and a target switch button on mobile touch controls to cycle through visible hostiles cleanly in dense mob camps and PvP. | S | High |
+| **P2** | **Daily Bounty Hunting Contracts (Nhiệm Vụ Dã Tẩu Truy Nã Hàng Ngày)** | Adds repeatable daily mob elimination bounties from Dã Tẩu scaled to player level brackets, awarding silver, EXP, and enhancement materials. | M | High |
+| **P2** | **Battlefield Outposts & Faction Scoring (Căn Cứ & Điểm Chiến Trường Trung Nguyên)** | Introduces 3 capturable territory flags on Trung Nguyên Chiến Trường that reward faction score and passive stat buffs to the holding faction. | L | Medium |
 
 ---
 
@@ -51,222 +56,236 @@ The implemented gameplay loop follows a classic ARPG structure:
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Gives silver coins and material drops a clear progression purpose. Allows players to continuously upgrade equipped gear (`weapon`, `armor`, `helmet`, `pants`, `boots`), giving tangible power progression (+1 to +10 stats) when fighting Level 30+ monsters in Bắc Lĩnh, Tây Sơn, or Kiếm Các.
-- **Design summary:** Players visit a Blacksmith NPC (e.g. `chu-tiem-vu-khi`) or open an Enhancement tab in the equipment sheet. Inserting an equipped item costs silver coins and 1x upgrade material (Huyễn Kim Thạch). Enhancing increases item bonus stats (e.g. `attack +3` per rank for weapons, `defense +2` for armor) up to +10. Success rate starts at 100% (+1 to +3) and scales down to 40% (+10), with failure retaining the item but consuming materials.
-- **Core loop connection:** Monster kill -> Silver & material drop -> Blacksmith Enhancement -> Higher stats (`attack`, `defense`, `maxHp`) -> Able to conquer higher-level hunting grounds.
+- **Player value:** Provides an essential currency sink for silver and creates a long-term power progression goal for equipment items (`weapon`, `armor`, `helmet`, `pants`, `boots`). Players feel tangible power growth when upgrading their gear to take on tougher monster tiers in Bắc Lĩnh, Tây Sơn, or Kiếm Các.
+- **Design summary:** Players interact with the Blacksmith NPC (`chu-tiem-vu-khi`) or open an Enhancement tab inside the Character Modal (`F3`). Enhancing an equipped or inventory item requires silver and an upgrade catalyst material (Huyễn Kim Thạch). Each enhancement rank (+1 to +10) grants flat additive stat increases (e.g., +3 Attack per weapon rank; +2 Defense and +15 Max HP per armor rank). Enhancement success rates are 100% for ranks +1 to +3, decreasing progressively to 40% at +10. A failed enhancement consumes the materials and silver without destroying the base item.
+- **Core loop connection:** Grinding monsters -> Earning silver and Huyễn Kim Thạch -> Enhancing gear -> Increased combat stats (`derivedStats.js`) -> Tackling higher-tier hunting grounds and competitive PvP.
 - **MVP scope:**
-  - Enhance equipped items up to +6 with deterministic silver + material cost.
-  - Server-authoritative enhancement validation (`server/src/websocket/gameSocket.js`).
-  - Stat multiplier/additive bonus applied in `deriveEquipmentBonuses()` in `src/game/equipment.js`.
-  - Visual enhancement level indicator (`+1` .. `+6` badge) on equipment slots in `CharacterModal.jsx`.
+  - Introduce upgrade material `huyen-kim-thach` in `src/game/items.js`.
+  - Add enhancement rank metadata `enhancement: 0..10` to equipment item schema and persistence in `server/src/game/playerBag.js` and `server/src/data/playerDb.js`.
+  - Server WebSocket handler `enhance_item { itemId, slot }` in `server/src/websocket/gameSocket.js` validating currency, material count, and success RNG.
+  - Update `deriveEquipmentBonuses` (`src/game/equipment.js`) to apply enhancement multipliers/flat bonuses to attack, defense, and vitals.
+  - Visual enhancement indicator (e.g., `+1`, `+5`) in `CharacterModal.jsx` and item tooltips.
 - **Optional extensions:**
-  - Visual glowing aura / particle effect on character rig for +7 and above weapons (`heroRigView.js`).
-  - Protection talismans to prevent downgrade on higher tiers (+7 to +10).
-- **Dependencies:** `src/game/equipment.js`, `src/game/items.js`, `server/src/websocket/gameSocket.js`.
-- **Risks and trade-offs:** Must be server-authoritative to prevent cheated upgrades. Requires clear UI feedback for success/failure.
-- **Effort:** M — Server validation logic, equipment modifier extension, and React modal integration.
+  - Visual weapon glow/aura effect in `heroRigView.js` for weapons at rank +7 and higher.
+  - Lucky talismans (Bùa May Mắn) dropped by high-level bosses to boost success rates by +15%.
+- **Dependencies:** `src/game/items.js`, `src/game/equipment.js`, `server/src/websocket/gameSocket.js`, `src/components/Modals/CharacterModal.jsx`.
+- **Risks and trade-offs:** Must be strictly server-authoritative to prevent forged enhancement requests. RNG failure must feel fair; retaining the item on failure prevents catastrophic loss of player investment.
+- **Effort:** M — Server validation logic, equipment bonus calculation, and React UI enhancement panel.
 - **Acceptance criteria:**
-  - [ ] Player can submit an equipped item, required silver, and the upgrade material to enhance gear.
-  - [ ] Enhancing an item updates `deriveEquipmentBonuses()` with upgraded stat values.
-  - [ ] Server validates silver and material balance before confirming enhancement.
-  - [ ] Failed attempts deduct materials without destroying or corrupting the equipped item.
-- **Validation plan:** Unit test enhancement logic in `equipment.test.js`; integration test server websocket handler with mock silver/material quantities in `server/tests/websocket.test.js`.
-- **Evidence:** `src/game/items.js` lists equipment items (`EQUIPMENT_ITEMS`) and `src/game/equipment.js` derives bonuses via `deriveEquipmentBonuses()`. Silver is currently only spent at shopkeepers (`src/game/shop.js`).
-- **Assumptions / open questions:** Enhancement values are additive flat bonuses to item stats.
+  - [ ] Player with sufficient silver and Huyễn Kim Thạch can enhance equipped/inventory gear.
+  - [ ] Successful enhancement increments the item rank and updates derived combat stats in `deriveEquipmentBonuses()`.
+  - [ ] Failed enhancement consumes silver and material but leaves the base item intact.
+  - [ ] Server rejects enhancement attempts when silver or material count is insufficient.
+  - [ ] Item tooltips and character equipment slots display enhancement badges (`+1`..`+10`).
+- **Validation plan:** Unit test enhancement stat derivations in `equipment.test.js`; test WebSocket enhancement handler with mock rolls in `server/tests/websocket.test.js`.
+- **Evidence:** `src/game/items.js` lists equipment with static bonuses; `src/game/equipment.js` derives stats via `deriveEquipmentBonuses()`. Currently, silver has no sinks beyond low-cost potions at `NPC_DUOC` (`src/game/shop.js`).
+- **Assumptions / open questions:** Enhancement ranks provide flat additive bonuses rather than percentage multipliers to preserve low-level arithmetic clarity.
 
 ---
 
-### [P1] Target Selection & Visual Lock Indicator (Khóa Mục Tiêu Chiêu Thức)
+### [P1] High-Tier Equipment & Drop Ladder (Bậc Trang Bị Cấp Cao & Rơi Đồ Quái Vật)
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Prevents mis-clicks and wasted skill casts when fighting crowded monster camps (90–270 spawns per map) or enemy players on Trung Nguyên Chiến Trường. Provides immediate visual feedback on target selection and skill cast range.
-- **Design summary:** Clicking or tapping an enemy or hostile player locks them as the active target, drawing a ground indicator ring (gold for monsters, red for enemy faction players) beneath their feet. Single-target skills automatically cast toward the locked target. The range indicator ring highlights whether the target is within skill cast range.
-- **Core loop connection:** Improves combat precision, skill responsiveness, and targeting clarity during intense mob farming and faction PvP encounters.
+- **Player value:** Bridges the item progression desert after level 10. Currently, only the starter `lang-khach` gear exists in `EQUIPMENT_ITEMS`. High-level monsters in maps up to level 60 drop silver and EXP but no equipment, leaving loot excitement flat after the initial hours of play.
+- **Design summary:** Introduce Tier-2 (Levels 20–35) and Tier-3 (Levels 40–55) weapons and armors. Wire these new items into the drop tables of monsters in hunting grounds across all three factions (Đông Môn Thành, Ba Thục, Hứa Điền, Bắc Lĩnh, Kiếm Các, Nghiệp Quan, Tây Sơn, Nga Mi, Quan Trung).
+  - Tier-2 Weapons: Thanh Phong Kiếm, Thiết Quyền Bao Tay, Phách Sơn Đao (Level req 20, higher base attack).
+  - Tier-3 Weapons: Huyền Thiết Kiếm, Long Hổ Bao Tay, Trảm Mã Đao (Level req 40, advanced stat bonuses).
+  - Tier-2/3 Armors: Thiết Giáp, Tử Vi Y, Hắc Báo Ngoa (providing progressive defense and HP).
+- **Core loop connection:** Fighting mid-to-high level monsters -> Excitement of rare gear drop -> Equipping higher-tier weapons -> Visual and numerical combat upgrade.
 - **MVP scope:**
-  - Explicit active target lock state in Phaser scene (`JiangHuScene.activeTarget`).
-  - Ground target ring drawn using `TargetRing` (`src/game/targetRing.js`) for both PC click selection and touch targeting.
-  - Skill cast targets `activeTarget` if valid and alive; falls back to cursor direction or auto-proximity when no target is locked.
-  - Pressing `Tab` or clicking empty ground cycles hostiles or clears selection.
+  - Define Tier-2 and Tier-3 weapon and armor items in `src/game/items.js` with level equip requirements.
+  - Wire drop chances in `MONSTER_WEAPON_DROPS` and expand `rollEnemyReward` in `server/src/rewards.js` to roll armor drops in addition to weapons.
+  - Update `planEquip` (`src/game/equipment.js`) to enforce character level requirements when equipping gear.
+  - Add localized names, descriptions, and icon mappings across VI, EN, and ZH locales (`src/i18n/locales/`).
 - **Optional extensions:**
-  - Target vitals HUD bar displaying target HP %, level, and faction icon.
-  - Auto-switch target on target death to nearest hostile monster.
-- **Dependencies:** `src/game/combat.js`, `src/game/targetRing.js`, `src/game/autoTarget.js`, `src/game/game.js`.
-- **Risks and trade-offs:** Must handle target death, map transition, and despawn cleanly without leaving dangling references or crashing render loops.
-- **Effort:** S — Client targeting and rendering integration using existing `TargetRing`.
+  - Rare blue/purple item affix rolls (+critRate, +attackSpeed) on monster drops.
+  - Equipment recycling/salvaging at Blacksmith to yield Huyễn Kim Thạch fragments.
+- **Dependencies:** `src/game/items.js`, `src/game/equipment.js`, `src/game/enemyCatalog.js`, `server/src/rewards.js`, `src/i18n/locales/`.
+- **Risks and trade-offs:** Drop rates must be balanced (e.g., 2%–5% per kill) so that acquiring a full tier feels rewarding without saturating the inventory.
+- **Effort:** M — Item definition, drop table expansion, equip validation, and localization entries.
 - **Acceptance criteria:**
-  - [ ] Clicking a monster or hostile player selects them and displays a ground target ring.
-  - [ ] Single-target skills target the locked target if alive and within map bounds.
-  - [ ] Target ring automatically disappears when the target dies, disconnects, or leaves sight range.
-  - [ ] Pressing `Tab` cycles through visible hostiles within 400px radius.
-- **Validation plan:** Manual verification in Đông Môn Thành and Trung Nguyên Chiến Trường; unit test target resolution in `autoTarget.test.js` and `pvpTargeting.test.js`.
-- **Evidence:** `src/game/targetRing.js` exists for mobile touch targeting, but PC click targeting in `combat.js` resolves direction toward cursor without persistent ground lock ring.
-- **Assumptions / open questions:** Target lock is client-side visual and selection logic; damage calculations remain server-authoritative.
+  - [ ] Level 20+ and Level 40+ monsters drop corresponding Tier-2 and Tier-3 equipment items.
+  - [ ] Characters below the required item level cannot equip higher-tier gear.
+  - [ ] Equipping high-tier gear reflects higher attack and defense values in `deriveCombatStats`.
+  - [ ] All new items display proper icons and localized text in VI, EN, and ZH.
+- **Validation plan:** Unit test equip requirements in `equipment.test.js`; test monster drop rolls in `rewards.test.js` and `enemyCatalog.test.js`.
+- **Evidence:** `src/game/enemyCatalog.js` line 895 defines `MONSTER_WEAPON_DROPS` containing only 2 low-level monsters (`hac-y-sat-thu` and `ma-giao-de-tu`). All level 30–60 species in `docs/plan/faction-cities.md` currently have empty drop tables.
+- **Assumptions / open questions:** Level requirements use existing `character.level` check during `planEquip`.
 
 ---
 
-### [P1] Weapon Kit Expansion & High-Tier Drops (Mở Rộng Bộ Võ Công & Trang Bị Cấp Cao)
+### [P2] Target Cycling & Selection Controls (Chuyển Đổi & Khóa Mục Tiêu Nhanh)
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Extends character specialization across sword (`kiem`), gloves (`baoTay`), and saber (`dao`) kits into high levels (30–60), providing players with rare high-tier weapon drops and advanced skill books in high-level hunting grounds.
-- **Design summary:** Populate weapon and book drop pools for Level 30–60 species across Bắc Lĩnh, Tây Sơn, Kiếm Các, Nga Mi, Nghiệp Quan, Quan Trung (`docs/plan/faction-cities.md`). Add Tier-2 and Tier-3 weapons (e.g. Huyền Thiết Kiếm, Trảm Mã Đao, Hổ Trảo Bao Tay) and complementary skills for each weapon kit in `src/game/skills/catalog/`.
-- **Core loop connection:** Farm Level 30+ monsters -> Rare book & high-tier weapon drops -> Learn advanced kit techniques & equip powerful weapons -> Dominate Trung Nguyên Chiến Trường.
+- **Player value:** Eliminates combat frustration in crowded camps (where up to 270 monsters spawn) and during multi-player skirmishes on Trung Nguyên Chiến Trường. Allows PC players to quickly switch focus using `Tab` and mobile players to cycle targets with a dedicated touch button.
+- **Design summary:** While single-target clicking sets `activeCombatTarget` via `setCombatTarget` (`src/game/game.js`), pressing `Tab` on desktop cycles through nearby visible hostiles within 400px radius in order of proximity or health percentage. On touch devices, a small target-cycle button adjacent to the attack cluster triggers target cycling. Pressing `Escape` or clicking empty ground deselects the current target.
+- **Core loop connection:** Direct impact on core attack and skill execution speed during grinding and PvP skirmishes.
 - **MVP scope:**
-  - Author additional skills per weapon kit in `src/game/skills/catalog/{baoTay,kiem,dao}.js`.
-  - Add Tier-2/3 weapons to `EQUIPMENT_ITEMS` in `src/game/items.js`.
-  - Assign drop tables for Level 30–60 species in `src/game/enemyCatalog.js`.
-  - Add i18n strings (VI, EN, ZH) and icons for all new skills and weapons.
+  - Keybind handler in `src/game/game.js` capturing `Tab` (overriding minimap zoom toggle or binding `Tab` specifically for target cycle when hostiles are present).
+  - Target cycling algorithm that filters alive hostiles (monsters or hostile faction players on PvP maps) within cast range and sets `setCombatTarget`.
+  - Mobile touch target cycle button added to `src/components/MobileControls.jsx`.
+  - Pressing `Escape` clears `activeCombatTarget` and hides the target ring.
 - **Optional extensions:**
-  - Server-authoritative poison damage-over-time (DoT) status effect tick engine for the saber (`dao`) kit.
-  - Weapon-specific elemental visual effects on skill impact.
-- **Dependencies:** `src/game/skills.js`, `src/game/weapons.js`, `src/game/items.js`, `src/game/enemyCatalog.js`, `server/src/rewards.js`, `src/i18n/locales/`.
-- **Risks and trade-offs:** Must maintain skill MP cost and cooldown balance so no kit dominates early/mid game.
-- **Effort:** M — Catalog authoring, drop table wiring, i18n translations, and unit tests.
+  - Target priority preferences in game settings (e.g., "Prioritize Lowest HP", "Prioritize Enemy Players").
+  - Visual directional arrow on screen edge if the locked target moves off-screen.
+- **Dependencies:** `src/game/game.js`, `src/game/autoTarget.js`, `src/game/keybinds.js`, `src/components/MobileControls.jsx`.
+- **Risks and trade-offs:** `Tab` is currently used as the minimap zoom shortcut in `src/i18n/locales/`; target cycling must cleanly co-exist (e.g., Tab targets nearby hostile; if no hostile nearby, toggles minimap, or assign dedicated keybind `Q`/`Tab`).
+- **Effort:** S — Keyboard input mapping, proximity cycle helper, and mobile touch button.
 - **Acceptance criteria:**
-  - [ ] Every learnable skill has a book item and appears in at least one monster drop pool (`skills.test.js`).
-  - [ ] Every weapon drop maps to a valid item with `slot: "weapon"` and a `weaponType` (`rewards.test.js`).
-  - [ ] All new skill names and descriptions resolve cleanly across VI, EN, and ZH.
-  - [ ] `npm test` and `npm run server:test` remain 100% green.
-- **Validation plan:** Unit test catalog invariants in `skills.test.js` and `enemyCatalog.test.js`; test server drop rolls in `rewards.test.js`.
-- **Evidence:** `docs/plan/faction-cities.md` explicitly noted that Level 30–60 species pay EXP/coins only and need book/weapon drop table wiring.
-- **Assumptions / open questions:** Drops are rolled server-side in `server/src/rewards.js` using existing drop rate math.
+  - [ ] Pressing `Tab` cycles focus to the next nearest hostile target within range.
+  - [ ] Target cycle respects PvP rules (never targets allies on faction maps).
+  - [ ] Mobile players can tap the cycle target button to rotate locked targets.
+  - [ ] Pressing `Escape` or clicking open ground deselects the target.
+- **Validation plan:** Vitest unit test for proximity cycling logic; verify key event handlers in `game.test.js` and mobile button callback in `MobileControls.test.jsx`.
+- **Evidence:** `src/game/game.js` lines 2080–2135 implement `setCombatTarget` and `clearCombatTarget`, but target selection currently requires individual pointer clicks or proximity auto-targeting.
+- **Assumptions / open questions:** Standard ARPG `Tab` cycling convention is preferred over requiring mouse accuracy in high-density mob camps.
 
 ---
 
-### [P2] Daily Bounty Quest System (Nhiệm Vụ Dã Tẩu Săn Bắt)
+### [P2] Daily Bounty Hunting Contracts (Nhiệm Vụ Dã Tẩu Truy Nã Hàng Ngày)
 
 - **Status:** Proposed
 - **Confidence:** High
-- **Player value:** Expands the Dã Tẩu quest system beyond the Level 1–10 newbie talk chain (`src/game/quests/catalog.js`) into repeatable daily monster hunting contracts (e.g., "Defeat 20 Tuyết Lang in Bắc Lĩnh"), rewarding structured player effort with bonus EXP, silver, and Huyễn Kim Thạch upgrade materials.
-- **Design summary:** Players interact with Dã Tẩu in any faction capital or click the Quest Tracker on the HUD. Accepting a bounty assigns a kill contract (0/20 target monsters). As targeted monsters are defeated on any map, server updates contract progress in real time. Turning in the contract grants EXP, silver, and upgrade materials.
-- **Core loop connection:** Directs player hunting location -> Encourages exploration of Level 15–60 hunting grounds -> Grants enhancement materials needed for gear upgrading.
+- **Player value:** Gives players structured, repeatable short-term goals after completing the newbie tutorial chain. Encourages exploration of higher-level hunting grounds and rewards consistent daily play with silver, EXP, and enhancement materials (Huyễn Kim Thạch).
+- **Design summary:** Players speak to Dã Tẩu in any capital city (`market`, `thuc-thanh`, `nguy-thanh`) or interact with the Quest Tracker on the HUD. Dã Tẩu offers 3 daily bounty contracts tailored to the player's level tier (e.g., "Slay 25 Tuyết Lang in Bắc Lĩnh" or "Eliminate 20 Sơn Tặc in Đông Môn Thành"). As target monsters are defeated, the server increments contract progress and syncs to the HUD. Turning in completed contracts awards bonus EXP, silver, and upgrade stones.
+- **Core loop connection:** Directs players to relevant hunting grounds -> Defeating monsters fulfills bounty objectives -> Handing in contracts yields upgrade stones -> Fuels Equipment Enhancement.
 - **MVP scope:**
-  - Single active bounty contract state persisted in server player data (`saves.bounty_state`).
-  - Server listens to `enemy_killed` events in `gameSocket.js` and updates contract counters.
-  - HUD Quest Tracker in `MinimapPanel.jsx` displays active bounty contract progress.
-  - Contract turn-in via Dã Tẩu NPC grants silver, EXP, and 1x Huyễn Kim Thạch.
+  - Daily contract catalog in `src/game/quests/bounties.js` categorized by level brackets (3–14, 15–29, 30–44, 45–60).
+  - Server tracking of active bounty progress in `player_progress` / `saves` DB table.
+  - Server event listener on `enemy_killed` in `server/src/websocket/gameSocket.js` incrementing active bounty counts.
+  - HUD quest tracker update in `src/components/HUD/MinimapPanel.jsx` displaying bounty contract progress (e.g., `Tuyết Lang: 14/25`).
+  - Completion turn-in via Dã Tẩu granting reward bundle (EXP, coins, 1x Huyễn Kim Thạch).
 - **Optional extensions:**
-  - Tiered bounty contracts based on player level brackets (3–14, 15–29, 30–44, 45–60).
-  - Daily limit (5 contracts/day) with streak bonus rewards.
-- **Dependencies:** `src/game/quests/catalog.js`, `src/components/HUD/MinimapPanel.jsx`, `server/src/websocket/gameSocket.js`.
-- **Risks and trade-offs:** Quest state must persist in server player data so progress is never lost on disconnect or map transition.
-- **Effort:** M — Server contract tracking logic, WebSocket payload extension, and Minimap UI integration.
+  - Daily streak bonus (completing 3/3 daily bounties grants a rare equipment chest).
+  - Faction-specific bounties requiring patrol or enemy player defeats on `trung-nguyen`.
+- **Dependencies:** `src/game/quests/`, `src/components/HUD/MinimapPanel.jsx`, `server/src/websocket/gameSocket.js`, `server/src/data/playerDb.js`.
+- **Risks and trade-offs:** Must maintain clean separation from the main Dã Tẩu newbie quest chain (`tan-thu-1`..`tan-thu-6`) so newbie story progression is not blocked.
+- **Effort:** M — Server-authoritative contract persistence, kill-counter hook, and UI tracker integration.
 - **Acceptance criteria:**
-  - [ ] Player can accept a daily monster hunting contract matching their level.
-  - [ ] Defeating target monsters increments contract progress in real time on the HUD.
-  - [ ] Contract completion allows turning in for bonus EXP, silver, and upgrade materials.
-  - [ ] Bounty state survives disconnects and map transitions cleanly.
-- **Validation plan:** Unit test bounty progression helper; test WebSocket event handlers for contract update and turn-in in `server/tests/websocket.test.js`.
-- **Evidence:** `src/game/quests/catalog.js` established the Dã Tẩu NPC structure and `MinimapPanel.jsx` contains the HUD quest tracker UI.
-- **Assumptions / open questions:** Daily bounties complement the newbie talk chain without overwriting existing `tan-thu-1`..`tan-thu-6` quest IDs.
+  - [ ] Dã Tẩu offers daily bounties matching the player's level bracket.
+  - [ ] Defeating target monsters increments the bounty count in real-time on the HUD.
+  - [ ] Completing the bounty permits turn-in with proper reward distribution.
+  - [ ] Daily bounty progress persists across map transitions and server reconnects.
+- **Validation plan:** Unit test bounty progression criteria in `bounties.test.js`; test WebSocket contract completion and reward credit in `server/tests/websocket.test.js`.
+- **Evidence:** `src/game/quests/catalog.js` establishes the Dã Tẩu quest engine; `MinimapPanel.jsx` contains the existing quest tracker UI ready for multi-quest display.
+- **Assumptions / open questions:** Contracts reset daily at 00:00 server time or operate on a 20-hour cooldown per account.
 
 ---
 
-### [P2] Battlefield Objective & Faction Scoring System (Chiếm Căn Cứ Chiến Trường)
+### [P2] Battlefield Outposts & Faction Scoring (Căn Cứ & Điểm Chiến Trường Trung Nguyên)
 
 - **Status:** Proposed
 - **Confidence:** Medium
-- **Player value:** Gives players on Trung Nguyên Chiến Trường strategic objectives beyond individual PK kills, encouraging faction teamwork to capture territory flags and earn faction-wide stat buffs and bonus silver.
-- **Design summary:** Place 3 territorial Control Posts (Căn Cứ Hán, Căn Cứ Thục, Căn Cứ Ngụy) on Trung Nguyên Chiến Trường. Standing inside an uncaptured post's 150px zone channels capture points for the player's faction over 10 seconds. Controlling a post grants all faction members on the map a +5% attack/defense buff and periodically ticks faction victory points.
-- **Core loop connection:** End-game faction competition -> Strategic team combat -> Faction rewards and realm pride.
+- **Player value:** Transforms Trung Nguyên Chiến Trường from an unstructured deathmatch arena into an organized territorial battleground, giving faction members shared objectives, tactical focal points, and faction pride.
+- **Design summary:** Three strategic outposts (Căn Cứ Hán, Căn Cứ Thục, Căn Cứ Ngụy) are established on `trung-nguyen`. Standing within a 160px zone around an outpost's flagpole channels capture points for the occupying faction over 10 seconds (contested if multiple factions are in zone). Holding an outpost periodically yields faction victory points and grants active faction players on the map a passive stat buff (+5% Attack/Defense per held base).
+- **Core loop connection:** Endgame competitive objective -> Faction teamwork and coordinated pushes -> Faction rewards and status buffs.
 - **MVP scope:**
-  - 3 capture zone areas defined on `trung-nguyen` map.
-  - Server-authoritative capture point state and tick loop in `gameSocket.js`.
-  - Visual banner/flag indicator in Phaser scene representing controlling faction color (Blue/Red/Yellow).
-  - Real-time faction score overlay HUD widget on `trung-nguyen`.
+  - 3 capture outpost zones positioned on `trung-nguyen` map (`src/game/maps/trungNguyenMap.js`).
+  - Server-authoritative outpost state machine in `server/src/websocket/gameSocket.js` tracking occupancy and capture progression.
+  - Phaser outpost banner entities displaying the controlling faction's color (Blue for Hán, Green for Thục, Gold for Ngụy, Gray for Neutral).
+  - Top-screen battlefield HUD widget displaying current faction victory scores and captured outpost tallies.
 - **Optional extensions:**
-  - Hourly battlefield reward payout based on controlling faction points.
-  - Server-wide system announcement when a control post changes hands.
+  - Periodic battlefield score rewards: faction with the highest hourly score receives bonus silver sent to members' mailbox/bag.
+  - Faction guard NPCs spawned to defend captured outposts.
 - **Dependencies:** `src/game/factions.js`, `src/game/maps/trungNguyenMap.js`, `server/src/websocket/gameSocket.js`, `src/components/HUD/`.
-- **Risks and trade-offs:** Must be carefully optimized on the server tick loop so zone collision checks for multiple players do not degrade server TPS.
-- **Effort:** L — Server zone occupancy logic, state broadcast, Phaser banner rendering, and HUD widget.
+- **Risks and trade-offs:** Outpost occupancy checks on the server tick loop must be lightweight to prevent degradation of server tick rate (TPS) during large player gatherings.
+- **Effort:** L — Server territory tick engine, Phaser banner rendering, and battlefield HUD overlay.
 - **Acceptance criteria:**
-  - [ ] Players standing in a capture zone channel control points for their faction.
-  - [ ] Controlling a post changes its visual banner color and grants active faction members a stat buff.
-  - [ ] Faction score tally updates in real time on the battlefield HUD.
-  - [ ] All capture state is server-authoritative and synced to joining clients.
-- **Validation plan:** Server WebSocket test simulating multi-player capture channel and score accumulation in `server/tests/websocket.test.js`.
-- **Evidence:** `docs/plan/faction-cities.md` explicitly identified battlefield objective/scoring as the primary uncompleted item for Phase 3.
-- **Assumptions / open questions:** Score ticks occur every 5 seconds on the server loop while the map is active.
+  - [ ] Standing uncontested in an outpost zone captures the outpost after 10 seconds.
+  - [ ] Banner graphic changes to the occupying faction's color upon capture.
+  - [ ] Controlling an outpost awards periodic score points and applies a passive stat buff to faction members on the map.
+  - [ ] Outpost state and faction scores sync reliably to all connected clients on `trung-nguyen`.
+- **Validation plan:** Server-side multi-client WebSocket test simulating outpost contest, capture, and score accumulation in `server/tests/websocket.test.js`.
+- **Evidence:** `docs/plan/faction-cities.md` specifically identified "Battlefield objective/scoring (capture points, per-faction score, rewards)" as the remaining uncompleted item from Phase 3.
+- **Assumptions / open questions:** Scoring ticks run every 5 seconds on the server loop while at least one outpost is occupied.
 
 ---
 
 ## Suggested roadmap
 
 ### Next
-High-value, well-understood features ready for immediate development:
-1. **Target Selection & Visual Lock Indicator [P1]:** Low risk, uses existing `TargetRing`, provides immediate combat precision.
-2. **Equipment Enhancement System [P1]:** Provides essential silver/material sink and power progression for Level 30+ content.
-3. **Weapon Kit Expansion & High-Tier Drops [P1]:** Fills the catalog and drop gap for Level 30–60 species (`docs/plan/faction-cities.md`).
+High-value, feasible features with immediate positive impact on player progression and retention:
+1. **Equipment Enhancement System [P1]:** Implements the required silver/material sink and establishes vertical progression.
+2. **High-Tier Equipment & Drop Ladder [P1]:** Fills the Level 15–60 loot gap and brings equipment parity across all hunting grounds.
+3. **Target Cycling & Selection Controls [P2]:** Quick usability win that significantly reduces combat friction.
 
 ### Validate first
-Promising ideas that require balance playtests or technical prototypes before commitment:
-1. **Daily Bounty Quest System [P2]:** Validate contract kill counts and material reward scaling against mob density.
-2. **Battlefield Objective & Faction Scoring System [P2]:** Prototype server zone tick performance with multi-client WebSocket test.
+Systems requiring prototype balancing and server tick performance verification:
+1. **Daily Bounty Hunting Contracts [P2]:** Validate mob kill thresholds (e.g., 20 vs 30 kills) to ensure bounties feel engaging without excessive grinding.
+2. **Battlefield Outposts & Faction Scoring [P2]:** Prototype server spatial checks for multiple players in outpost capture zones under simulated concurrency.
 
 ### Later
-Longer-term expansions and future content iterations:
-1. **Server-Authoritative Poison / DoT Engine (Dao v2):** Dedicated status effect tick loop for poison damage over time.
-2. **Guild / Faction Alliances & Territory Tax:** Meta-economy systems for faction leaders.
+Long-term meta expansions for subsequent development phases:
+1. **Guild / Bang Hội System:** Formal player-created guilds with shared guild treasuries and faction leadership elections.
+2. **Specialized Weapon Sockets & Gem Inscription:** Horizontal gear customization allowing players to socket elemental gems into enhanced weapons.
 
 ---
 
 ## Dependencies and milestones
 
 ```
-[Milestone 1: Combat Precision & Equipment Sink]
-  ├── Target Selection & Visual Lock Indicator (TargetRing integration)
-  └── Equipment Enhancement System (+1..+6, Huyễn Kim Thạch material sink)
+[Milestone 1: Equipment & Economic Core]
+  ├── Equipment Enhancement System (Huyễn Kim Thạch, silver sink, +1..+10)
+  └── High-Tier Equipment & Drop Ladder (Tier-2/3 weapons & armors, drop table wiring)
 
-[Milestone 2: Content Expansion & Daily Objectives]
-  ├── Weapon Kit Expansion & High-Tier Drops (Level 30-60 drop tables)
-  └── Daily Bounty Quest System (Repeatable mob contracts & Minimap HUD)
+[Milestone 2: Combat Usability & Daily Flow]
+  ├── Target Cycling & Selection Controls (Tab key & mobile target cycle button)
+  └── Daily Bounty Hunting Contracts (Dã Tẩu mob bounties & Minimap HUD tracker)
 
-[Milestone 3: Faction Meta-Gameplay]
-  └── Battlefield Objective & Faction Scoring (Trung Nguyên capture points)
+[Milestone 3: Faction Warfare]
+  └── Battlefield Outposts & Faction Scoring (Trung Nguyên capture zones, faction score HUD)
 ```
 
 ---
 
 ## Validation checklist
 
-1. **Combat Usability Test:**
-   - [ ] Click or tap monster/player -> Target ring renders cleanly beneath feet.
-   - [ ] Cast single-target skill -> Skill lands on active locked target.
-   - [ ] Target dies or leaves map -> Lock ring hides smoothly without errors.
+1. **Equipment Enhancement Verification:**
+   - [ ] Equip starter weapon and open enhancement interface.
+   - [ ] Confirm enhancement request with sufficient silver and Huyễn Kim Thạch increases item rank by +1.
+   - [ ] Verify derived stats in `CharacterModal` reflect increased attack values.
+   - [ ] Confirm server rejects enhancement if player silver or materials are deficient.
+   - [ ] Verify failed attempts at high ranks consume materials without destroying the weapon.
 
-2. **Equipment Enhancement Test:**
-   - [ ] Submit gear + required silver + 1x Huyễn Kim Thạch -> Item rank increases (+1).
-   - [ ] Stat bonuses update in `deriveEquipmentBonuses()` and character panel.
-   - [ ] Server refuses enhancement if silver or material count is insufficient.
+2. **Equipment Drop Ladder Verification:**
+   - [ ] Defeat Level 30+ monsters in Bắc Lĩnh/Kiếm Các; confirm rare Tier-2 weapon drop.
+   - [ ] Attempt to equip Tier-2 weapon on a Level 5 character; confirm equip is rejected due to level requirement.
+   - [ ] Level up to 20; confirm weapon equips and bonuses apply properly.
+   - [ ] Confirm item names and descriptions display properly in VI, EN, and ZH.
 
-3. **Weapon Drops & Skills Test:**
-   - [ ] Every learnable skill has a book item and appears in a drop table.
-   - [ ] Level 30–60 species drop tier-2/3 weapons and books.
-   - [ ] `npm test` and `npm run server:test` pass all catalog invariants.
+3. **Target Cycling Verification:**
+   - [ ] Enter a hunting ground with multiple monsters.
+   - [ ] Press `Tab`; confirm active target locks to nearest monster and displays target ring.
+   - [ ] Press `Tab` again; confirm focus cycles smoothly to the next closest monster.
+   - [ ] Test mobile target cycle button; verify identical behavior on touch viewport.
+   - [ ] Press `Escape`; confirm target deselects and target ring disappears.
 
-4. **Daily Bounty System Test:**
-   - [ ] Accept contract from Dã Tẩu -> Active progress shown on Minimap HUD tracker.
-   - [ ] Defeat target mobs -> Counter increments 1/20 .. 20/20 in real time.
-   - [ ] Turn in bounty -> Silver, EXP, and upgrade material awarded.
+4. **Daily Bounty Contracts Verification:**
+   - [ ] Speak to Dã Tẩu; accept daily bounty contract matching player level.
+   - [ ] Defeat designated monsters; confirm kill counter updates in real time on Minimap HUD tracker.
+   - [ ] Complete bounty and speak to Dã Tẩu; verify EXP, silver, and Huyễn Kim Thạch are awarded.
+   - [ ] Disconnect and reconnect; verify active bounty progress remains persisted.
 
-5. **Battlefield Objective Test:**
-   - [ ] Stand in capture zone -> Progress channels toward hero's faction.
-   - [ ] Capture completed -> Faction banner changes color and buff is applied.
-   - [ ] Disconnect & rejoin -> Active battlefield score and capture state remain synced.
+5. **Battlefield Outpost Verification:**
+   - [ ] Travel to Trung Nguyên Chiến Trường and enter an outpost capture zone.
+   - [ ] Hold position for 10 seconds uncontested; confirm outpost captures for player faction.
+   - [ ] Verify outpost banner color updates to faction hue.
+   - [ ] Confirm faction score ticks upward on the battlefield HUD widget.
+   - [ ] Bring enemy faction player into zone; verify capture pauses due to contest state.
 
 ---
 
 ## Deferred ideas
 
-- **Real-Time Auction House / Player Market:** Out of scope for current architecture; direct NPC shops and trade suffice.
-- **Gacha / Paid Loot Boxes:** Explicitly rejected to preserve authentic wuxia MMORPG mechanics and avoid manipulative monetization loops.
-- **Automated AFK Botting Engine:** Rejected to maintain active gameplay engagement and anti-cheat integrity.
+- **Player-to-Player Direct Trade & Auction House:** Deferred to avoid secondary market exploitation and botting until server-wide trade logging and anti-fraud checks are built.
+- **Pay-to-Win Gacha / Loot Boxes:** Explicitly rejected to preserve authentic classic wuxia progression and player trust.
+- **Full Automated Combat Botting:** Explicitly rejected; auto-targeting aids touch usability, but autonomous navigation/farming botting degrades active multiplayer immersion.
 
 ---
 
 ## Open questions
 
-1. Should Equipment Enhancement display visual glowing aura/particle effects on character rigs at +7 and above in the Phaser renderer?
-2. Should Daily Bounty contracts have a hard daily reset limit (e.g. 5/day) or be infinitely repeatable with diminishing EXP returns?
+1. **Minimap Zoom Keybind Conflict:** `Tab` currently toggles the minimap 5x zoom. Should `Tab` be repurposed for Target Cycling while `Shift+Tab` or `M` handles map view, or should target cycling use `Q` / `E` by default?
+2. **Enhancement Tier Thresholds:** Should higher enhancement tiers (+7 to +10) introduce a risk of rank degradation on failure (e.g., dropping to +6), or should failures simply retain the current rank to keep the progression accessible?
