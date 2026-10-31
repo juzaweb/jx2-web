@@ -560,8 +560,14 @@ export class JiangHuScene extends Phaser.Scene {
       // Check if clicking directly on a living monster (target and attack). A
       // city square is a safe zone: there the click only walks the hero, and the
       // player is told why the monster is left alone.
+      // BOLT OPTIMIZATION: Use getAll() instead of getAlive() to avoid intermediate array allocation
+      // as findEnemyAt already validates liveness internally.
       const mayFight = this.canFight();
-      const clickedEnemy = findEnemyAt(this.enemyManager?.getAlive() || [], worldX, worldY);
+      const clickedEnemy = findEnemyAt(
+        this.enemyManager?.getAll?.() || this.enemyManager?.getAlive?.() || [],
+        worldX,
+        worldY
+      );
       if (clickedEnemy) {
         if (!mayFight) {
           this.uiBridge.addLog(SAFE_ZONE_LOG, "system");
@@ -1921,8 +1927,10 @@ export class JiangHuScene extends Phaser.Scene {
       // A safe zone has no attackable body: keep the plain cursor so the player is
       // never promised a strike the city will refuse.
       const mayFight = this.canFight();
+      // BOLT OPTIMIZATION: Avoid allocating an intermediate array via getAlive() on every pointermove.
+      // cursorForGroundPoint -> findEnemyAt checks liveness internally for each candidate.
       cursor = cursorForGroundPoint(
-        mayFight ? this.enemyManager?.getAlive() || [] : [],
+        mayFight ? (this.enemyManager?.getAll?.() || this.enemyManager?.getAlive?.() || []) : [],
         mayFight ? this.remotePlayerManager?.getAll?.() || [] : [],
         ground.x,
         ground.y,
